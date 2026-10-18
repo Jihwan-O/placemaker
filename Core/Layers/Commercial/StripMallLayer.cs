@@ -43,7 +43,7 @@ namespace Placemaker.Core.Layers.Commercial
             // (shops4) Off by default: the strip mall is the lot and the shops (the user: "what are those green rectangles, why is there a
             // path going nowhere"); the extras stay for the player to add.
             // (shops4) A square in the middle of the row of shops: a plaza, a small park or a garden (off by default).
-            Shared(c.Choice("square", "none", ControlTier.More, "extras", "none", "plaza", "park", "garden")).Tip();
+            Shared(c.Choice("square", "none", ControlTier.More, "extras", "none", "plaza", "park", "garden", "pond")).Tip();
             ExtrasControls(c, walkways: false, plaza: false, bikes: "none", trucks: 0, pads: false, designed: false, hedges: true, sites: false, worn: false, water: "none", plotTrees: false);
             c.Fixed("style");
         }
@@ -61,6 +61,7 @@ namespace Placemaker.Core.Layers.Commercial
             // (shops4) Variations of the strip mall with a square in the middle of the row: a café plaza, a small park.
             Preset("plazaRow", ("style", "classic"), ("lotSize", "large"), ("plotDepth", 32.0), ("zoneKind", ZoneKinds.CommercialLow), ("evShare", 10.0), ("square", "plaza"));
             Preset("parkRow", ("style", "classic"), ("lotSize", "large"), ("plotDepth", 32.0), ("zoneKind", ZoneKinds.CommercialLow), ("evShare", 10.0), ("square", "park"));
+            Preset("pondRow", ("style", "classic"), ("lotSize", "large"), ("plotDepth", 32.0), ("zoneKind", ZoneKinds.CommercialLow), ("evShare", 10.0), ("square", "pond"));
         }
 
         /// <summary>(rf-shops3) Planned from the player's entrances (the centre: StripMallCentre.cs); the hidden corner and rear-alley styles too.</summary>

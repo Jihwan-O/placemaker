@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using Placemaker.Core.Geometry;
 using Placemaker.Core.Layers.Common;
+using Placemaker.Core.Layers.Leisure;
 using Unity.Mathematics;
 
 namespace Placemaker.Core.Layers.Commercial
@@ -477,6 +478,18 @@ namespace Placemaker.Core.Layers.Commercial
             {
                 mall.Release(square);
                 uint salt = Hashing.Mix(ctx.Seed, 0x5A0u);
+                if (o.Square == "pond")
+                {
+                    // A pond in the row (the user: "a pond could be cool"): water in a planted margin (MallDesign.DressPond, when the
+                    // leftovers are dressed). The one piece of dug ground of the strip mall, and only when asked for.
+                    var c = Poly.Centroid(square);
+                    float rad = 0.5f * math.min(math.distance(square[0], square[1]), math.distance(square[1], square[2])) - 6f;
+                    var kept = rad >= 7f ? mall.Keep(square, Mall.KeepKind.Pond, salt) : null;
+                    if (kept != null) { kept.Inner = LeisureKit.Blob(c, rad, Hashing.Mix(ctx.Seed, 0xB0Bu), 14, 0.22f); ctx.Plan.Facts["square"] = 1; }
+                    else mall.Green(square, salt + 1u);
+                }
+                else
+                {
                 string layer = o.Square == "plaza" ? "plaza" : "park", preset = o.Square == "plaza" ? "cafe" : o.Square == "garden" ? "garden" : "pocket";
                 // two ways in from the lane (a quarter in from each side): its walks run through it, never to a dead end
                 float w2 = 0.5f * (b - a), mid2 = 0.5f * (a + b), sw = 0f;
@@ -484,6 +497,7 @@ namespace Placemaker.Core.Layers.Commercial
                 var doors = new List<(Mall.Lane, float2)> { (lane, r.At(mid2 - 0.5f * sw, tl)), (lane, r.At(mid2 + 0.5f * sw, tl)) };
                 if (mall.FillOpen(square, layer, preset, doors, null, salt)) ctx.Plan.Facts["square"] = 1;
                 else mall.Green(square, salt + 1u);
+                }
             }
             foreach (var (loop, _, _, _, _) in loops) rows += mall.LaneRows(loop, ic, null, +1, 0f, 0f, o.MaxPiece, 2, i => i % 2 == 0) > 0 ? 2 : 0;
             if (mall.Shops.Count == 0) return Fail(6);

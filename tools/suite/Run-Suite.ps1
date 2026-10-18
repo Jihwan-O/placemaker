@@ -337,6 +337,13 @@ if (-not $KeepGraphics) {
     if (Test-Path $sc) {
         $t = Get-Content -LiteralPath $sc -Raw -Encoding UTF8
         $t = $t -replace '"masterVolume":\s*[0-9.]+', '"masterVolume": 0'
+        $t = $t -replace '"menuVolume":\s*[0-9.]+', '"menuVolume": 0'
+        $t = $t -replace '"radioActive":\s*true', '"radioActive": false'
+        # the game saves a section only once a value differs from its default: with default volumes there is no audio
+        # section to change, and the game plays its music. Add one, muted (the user's file comes back after the run).
+        if ($t -notmatch '(?m)^Audio Settings\s*$') {
+            $t = $t.TrimEnd() + "`r`nAudio Settings`r`n{`n    `"masterVolume`": 0,`n    `"menuVolume`": 0,`n    `"ingameVolume`": 0,`n    `"radioActive`": false,`n    `"radioVolume`": 0`n}`r`n"
+        }
         $t = $t -replace '"vSync":\s*true', '"vSync": false'
         $t = $t -replace '"displayMode":\s*"[A-Za-z]+"', '"displayMode": "Window"'
         $t = $t -replace '"volumetricCloudsEnabled":\s*true', '"volumetricCloudsEnabled": false'
@@ -351,7 +358,7 @@ if (-not $KeepGraphics) {
         $t = $t -replace '("enabled":\s*)true(,\s*"sampleCount")', '${1}false$2'
         Write-NoBom $sc $t
     }
-    Say "suite profile: $Window window, vsync off, full detail without LOD cross-fade, no clouds or cloud shadows, no DOF/motion blur/dynamic resolution, muted"
+    Say "suite profile: $Window window, vsync off, full detail without LOD cross-fade, no clouds or cloud shadows, no DOF/motion blur/dynamic resolution, muted (music and radio off)"
 }
 
 # ───────────── arm ─────────────

@@ -67,6 +67,9 @@ namespace Placemaker.Tests
             var region = LayerRegion.From(Poly.To2D(ring));
             var corridors = new List<float2[]>();
 
+            // (shops4) The strip mall reshapes no ground (the user: "try to only use painting"): a driveway meeting a street on a bank
+            // is ramped by the game's own road, not by the mall's sculpt; the hollow check below still holds.
+            lanes.Clear();
             foreach (var n in lanes)
                 for (int end = 0; end < 2; end++)
                 {

@@ -31,6 +31,30 @@ namespace Placemaker.Game.Suite
                 case "yards": yield return LabYards(st, step, rec); yield break;
                 case "yardscheck": LabYardsCheck(rec); yield break;
                 case "anatomy": LabAnatomy(st, rec); yield break;
+                case "polishparts":
+                {
+                    // which parts neighbourhood polish edits: lines, lawns, both, none (isolates a crash to one kind of edit)
+                    string parts = ((string)step["parts"] ?? "both").ToLowerInvariant();
+                    Placemaker.Game.Neighbours.NeighbourPolishSystem.EditLines = parts == "lines" || parts == "both";
+                    Placemaker.Game.Neighbours.NeighbourPolishSystem.EditLawns = parts == "lawns" || parts == "both";
+                    rec["parts"] = parts;
+                    Mod.Log.Info("Placemaker lab: neighbourhood polish edits " + parts);
+                    yield break;
+                }
+                case "polishstats":
+                {
+                    // neighbourhood polish totals since the game started (Game/Neighbours/NeighbourPolishSystem)
+                    yield return Frames(30);
+                    rec["enabled"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled;
+                    rec["passes"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPasses;
+                    rec["pairs"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPairs;
+                    rec["linesMoved"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalMoved;
+                    rec["linesHidden"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalHidden;
+                    rec["lawnsGrown"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalLawns;
+                    rec["lawnM2"] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalLawnM2);
+                    Mod.Log.Info("Placemaker lab: polish stats " + new JObject { ["passes"] = rec["passes"], ["pairs"] = rec["pairs"], ["moved"] = rec["linesMoved"], ["hidden"] = rec["linesHidden"], ["lawns"] = rec["lawnsGrown"], ["m2"] = rec["lawnM2"] }.ToString(Newtonsoft.Json.Formatting.None));
+                    yield break;
+                }
             }
             var shapes = _world.GetExistingSystemManaged<SuiteLabShapeSystem>();
             if (shapes == null) { rec["error"] = "lab: the shape system is not registered"; yield break; }

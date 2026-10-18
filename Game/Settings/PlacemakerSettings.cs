@@ -17,8 +17,8 @@ namespace Placemaker.Game.Settings
     public enum PreviewDetail { Simple = 0, Normal = 1, Detailed = 2 }
 
     [FileLocation("ModsSettings/Placemaker/Placemaker")]
-    [SettingsUIGroupOrder(GroupGeneral, GroupBrush, GroupBuild, GroupKeys, GroupMaintenance)]
-    [SettingsUIShowGroupName(GroupGeneral, GroupBrush, GroupBuild, GroupKeys, GroupMaintenance)]
+    [SettingsUIGroupOrder(GroupGeneral, GroupBrush, GroupBuild, GroupNeighbourhood, GroupKeys, GroupMaintenance)]
+    [SettingsUIShowGroupName(GroupGeneral, GroupBrush, GroupBuild, GroupNeighbourhood, GroupKeys, GroupMaintenance)]
     [SettingsUIKeyboardAction(ActionToggleTool, ActionType.Button)]
     [SettingsUIKeyboardAction(ActionPrimary, ActionType.Button)]
     [SettingsUIKeyboardAction(ActionUndo, ActionType.Button)]
@@ -32,6 +32,7 @@ namespace Placemaker.Game.Settings
         public const string GroupMaintenance = "Maintenance";
         public const string GroupBuild = "Build";
         public const string GroupBrush = "Brush";
+        public const string GroupNeighbourhood = "Neighbourhood";
 
         public const string ActionToggleTool = "ToggleTool";
         public const string ActionPrimary = "Primary";
@@ -364,6 +365,10 @@ namespace Placemaker.Game.Settings
         [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(CompanionOff))]
         public float CompanionUpkeepFactor { get; set; }
 
+        /// <summary>Neighbourhood polish: houses that finish building are stitched to their neighbours (one shared fence or hedge line, back fences meeting it, lawns up to it). NeighbourPolishSystem.</summary>
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        public bool NeighbourhoodPolish { get; set; }
+
         public bool ParkingEconomyOff() => !ParkingEconomy;
         public bool CompanionOff() => !ExperimentalParkingCompanion;
 
@@ -400,6 +405,7 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Economy.ParkingEconomySystem.DefaultFee = DefaultParkingFee;
                 global::Placemaker.Game.Economy.ParkingCompanionSystem.CompanionEnabled = ExperimentalParkingCompanion;
                 global::Placemaker.Game.Economy.ParkingCompanionUpkeepSystem.UpkeepFactor = CompanionUpkeepFactor;
+                global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = NeighbourhoodPolish;
             }
             catch (Exception e) { Mod.Log.Warn("Placemaker: build options not applied: " + e.Message); }
         }
@@ -440,6 +446,7 @@ namespace Placemaker.Game.Settings
             OverlayPavedSurfaces = true;
             DecalsNeverCollide = true;
             SeeThroughDecals = true;
+            NeighbourhoodPolish = false;   // experimental: on once it has been seen in the game
             ChargeNetConstruction = true;
             SelectAsOneThing = true;
             DebugTerrainDump = false;

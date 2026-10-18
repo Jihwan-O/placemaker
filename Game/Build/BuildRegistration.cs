@@ -38,6 +38,13 @@ namespace Placemaker.Game.Build
             // tagging them there (still Updated) lets AreaBatchSystem (PreCulling) render their material.
             updateSystem.UpdateAt<GhostSurfaceSystem>(SystemUpdatePhase.ModificationEnd);
 
+            // ── Neighbourhood polish ───────────────────────────────────────────────────
+            // Modification4B: after LaneSystem's barrier (the houses' fence lanes exist and were just reset), before
+            // Net.OverrideSystem, culling and rendering in Modification5+ (a rebuilt house is re-stitched in the same frame).
+            updateSystem.UpdateAt<global::Placemaker.Game.Neighbours.NeighbourPolishSystem>(SystemUpdatePhase.Modification4B);
+            // its lawn edits: next frame, before Areas.GeometrySystem re-triangulates Updated surfaces (Modification2B)
+            updateSystem.UpdateBefore<global::Placemaker.Game.Neighbours.NeighbourLawnSystem, global::Game.Areas.GeometrySystem>(SystemUpdatePhase.Modification2B);
+
             // ── Groups ─────────────────────────────────────────────────────────────────
             // Removal marks Deleted in PreTool: SubElementDeleteSystem (PostTool) cascades and
             // Game.Net.ReferencesSystem (Modification2B) clears node references in the same frame

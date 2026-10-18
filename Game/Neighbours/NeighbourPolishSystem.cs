@@ -190,6 +190,8 @@ namespace Placemaker.Game.Neighbours
             foreach (int i in cluster) stitch.Add(Describe(houses[i], lanesOf, lawnsOf));
             var plan = Planner(stitch, Settings);
             if (TotalPasses < 6)
+                foreach (var note in plan.Notes) Mod.Log.Info("Placemaker neighbourhood polish: " + note);
+            if (TotalPasses < 6)
                 Mod.Log.Info($"Placemaker neighbourhood polish pass {TotalPasses + 1}: {done.Count} houses asked, {cluster.Count} in their neighbourhoods, {plan.Pairs.Count} pairs, "
                     + $"{plan.MoveLines.Count} lines to move, {plan.HideLines.Count} to hide, {plan.Lawns.Count} lawns{(EditLines ? "" : " (lines off)")}{(EditLawns ? "" : " (lawns off)")}");
 
@@ -248,6 +250,15 @@ namespace Placemaker.Game.Neighbours
             {
                 Id = Id(h.E), Position = h.T.m_Position.xz, Forward = math.normalizesafe(fwd.xz, new float2(0f, 1f)), HalfLot = (float2)h.Lot * 4f,
             };
+            // the house itself: its mesh's ground outline (no moved fence may cross it)
+            if (ModelBounds(h.Prefab, out var bnd))
+            {
+                sh.Footprint = new[]
+                {
+                    global::Game.Objects.ObjectUtils.LocalToWorld(h.T, new float3(bnd.min.x, 0f, bnd.min.z)).xz, global::Game.Objects.ObjectUtils.LocalToWorld(h.T, new float3(bnd.max.x, 0f, bnd.min.z)).xz,
+                    global::Game.Objects.ObjectUtils.LocalToWorld(h.T, new float3(bnd.max.x, 0f, bnd.max.z)).xz, global::Game.Objects.ObjectUtils.LocalToWorld(h.T, new float3(bnd.min.x, 0f, bnd.max.z)).xz,
+                };
+            }
             bool hasPrefabLanes = EntityManager.HasBuffer<global::Game.Prefabs.SubLane>(h.Prefab);
             var prefabLanes = hasPrefabLanes ? EntityManager.GetBuffer<global::Game.Prefabs.SubLane>(h.Prefab, true) : default;
             foreach (var sl in EntityManager.GetBuffer<global::Game.Net.SubLane>(h.E, true))
@@ -308,6 +319,31 @@ namespace Placemaker.Game.Neighbours
         }
 
         // ───────────── helpers ─────────────
+
+        private readonly Dictionary<Entity, Bounds3?> _modelBounds = new Dictionary<Entity, Bounds3?>();
+
+        /// <summary>The house model's own bounds (its meshes), not the collision box (which covers the whole lot).</summary>
+        private bool ModelBounds(Entity prefab, out Bounds3 bounds)
+        {
+            if (!_modelBounds.TryGetValue(prefab, out var cached))
+            {
+                cached = null;
+                try
+                {
+                    if (_prefabs.TryGetPrefab<ObjectGeometryPrefab>(prefab, out var p) && p != null && p.m_Meshes != null)
+                        foreach (var mi in p.m_Meshes)
+                        {
+                            if (!(mi?.m_Mesh is RenderPrefab rp)) continue;
+                            var b = new Bounds3(rp.bounds.min + mi.m_Position, rp.bounds.max + mi.m_Position);
+                            cached = cached.HasValue ? new Bounds3(math.min(cached.Value.min, b.min), math.max(cached.Value.max, b.max)) : b;
+                        }
+                }
+                catch (Exception) { cached = null; }
+                _modelBounds[prefab] = cached;
+            }
+            bounds = cached ?? default;
+            return cached.HasValue;
+        }
 
         private bool IsFence(Entity lanePrefab) =>
             EntityManager.HasComponent<UtilityLaneData>(lanePrefab) && (EntityManager.GetComponentData<UtilityLaneData>(lanePrefab).m_UtilityTypes & UtilityTypes.Fence) != 0;

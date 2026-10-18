@@ -38,11 +38,26 @@ namespace Placemaker.Core.Neighbours
             var moved = new Dictionary<long, (float2 A, float2 B)>();
             (float2 A, float2 B) Current(StitchLine l) => moved.TryGetValue(l.Id, out var m) ? m : (l.A, l.B);
 
+            var touchedBy = new List<(StitchPair Pair, HashSet<long> Lines)>();
+            void Track(Action stitch)
+            {
+                var movedBefore = new Dictionary<long, (float2, float2)>(moved);
+                var hiddenBefore = new HashSet<long>(plan.HideLines);
+                int pairs = plan.Pairs.Count;
+                stitch();
+                if (plan.Pairs.Count == pairs) return;
+                var lines = new HashSet<long>();
+                foreach (var kv in moved) if (!movedBefore.TryGetValue(kv.Key, out var was) || !was.Equals(kv.Value)) lines.Add(kv.Key);
+                foreach (var id in plan.HideLines) if (!hiddenBefore.Contains(id)) lines.Add(id);
+                touchedBy.Add((plan.Pairs[plan.Pairs.Count - 1], lines));
+            }
+
             foreach (var a in houses)
             {
                 // a's right-hand neighbour: facing the same way, its left side next to a's right side
                 StitchHouse best = null;
                 float bestGap = float.MaxValue;
+                string why = null;
                 foreach (var b in houses)
                 {
                     if (ReferenceEquals(a, b) || math.dot(a.Forward, b.Forward) < 0.5f) continue;
@@ -50,17 +65,157 @@ namespace Placemaker.Core.Neighbours
                     // side by side, not one behind the other: their street edges line up (lots start at the street, depths differ)
                     var frontA = a.Position + a.Forward * a.HalfLot.y;
                     var frontB = b.Position + b.Forward * b.HalfLot.y;
-                    if (math.abs(math.dot(frontB - frontA, a.Forward)) > s.MaxFrontOffset) continue;
+                    float offset = math.abs(math.dot(frontB - frontA, a.Forward));
                     float fg = math.distance(a.FrontRight, b.FrontLeft), bg = math.distance(BackAt(a, +1, Deep(a, b)), BackAt(b, -1, Deep(a, b)));
-                    if (fg > s.MaxFrontGap || bg > s.MaxBackGap || fg >= bestGap) continue;
+                    if (fg > 60f) continue;
+                    if (offset > s.MaxFrontOffset) { why = why ?? $"{b.Id}: street edges {offset:F1} m apart"; continue; }
+                    if (fg > s.MaxFrontGap || bg > s.MaxBackGap) { why = $"{b.Id}: gap {fg:F1} m at the street, {bg:F1} m at the back"; continue; }
+                    if (fg >= bestGap) continue;
                     best = b;
                     bestGap = fg;
                 }
-                if (best == null) continue;
-                Stitch(a, best, s, plan, lawnNow, moved, Current);
+                if (best == null) { if (why != null) plan.Notes.Add($"{a.Id} has no right neighbour: nearest {why}"); continue; }
+                var bb = best;
+                Track(() => Stitch(a, bb, s, plan, lawnNow, moved, Current));
+            }
+            // back to back across the middle of a block (or the centre of a circle)
+            if (s.Knob("rear", 1f) > 0.5f)
+                for (int i = 0; i < houses.Count; i++)
+                    for (int j = i + 1; j < houses.Count; j++)
+                    {
+                        var a = houses[i];
+                        var b = houses[j];
+                        Track(() => StitchRear(a, b, s, plan, lawnNow, moved, Current));
+                    }
+
+            // a moved fence or hedge never runs through a house: that pair's line edits are undone
+            var footprints = houses.Where(h => h.Footprint != null && h.Footprint.Length >= 3).Select(h => (h.Id, Ring: h.Footprint)).ToList();
+            foreach (var (pair, lines) in touchedBy)
+            {
+                long hit = -1;
+                foreach (var id in lines)
+                {
+                    if (!moved.TryGetValue(id, out var m)) continue;
+                    foreach (var fp in footprints)
+                    {
+                        float inside = Poly.ClipSegmentToPolygon(fp.Ring, m.A, m.B).Sum(x => math.distance(x.a, x.b));
+                        if (inside > 0.3f) { hit = fp.Id; break; }
+                    }
+                    if (hit >= 0) break;
+                }
+                if (hit < 0) continue;
+                pair.Reverted = true;
+                foreach (var id in lines) { moved.Remove(id); plan.HideLines.Remove(id); }
+                plan.Notes.Add($"pair {pair.Left}|{pair.Right}{(pair.Rear ? " (back to back)" : "")}: lines left as they were, the border would cross house {hit}");
             }
             foreach (var kv in moved) if (!plan.HideLines.Contains(kv.Key)) plan.MoveLines[kv.Key] = kv.Value;
             return plan;
+        }
+
+        /// <summary>
+        /// Two houses back to back (facing away from each other, back edges overlapping side to side): one line on the
+        /// middle line between their back edges, the other house's back line hidden, side lines meeting it, lawns to it.
+        /// </summary>
+        private static void StitchRear(StitchHouse a, StitchHouse b, StitchSettings s, StitchPlan plan, Dictionary<long, float2[]> lawnNow,
+            Dictionary<long, (float2 A, float2 B)> moved, Func<StitchLine, (float2 A, float2 B)> current)
+        {
+            if (math.dot(a.Forward, b.Forward) > -0.5f) return;
+            var backA = a.Position - a.Forward * a.HalfLot.y;
+            var backB = b.Position - b.Forward * b.HalfLot.y;
+            // b's back edge behind a's: both backs face each other, and not too far apart
+            float gapA = math.dot(backB - backA, -a.Forward), gapB = math.dot(backA - backB, -b.Forward);
+            float maxGap = s.Knob("maxRearGap", 24f);
+            if (gapA < -2f || gapB < -2f || gapA > maxGap || gapB > maxGap) return;
+            var mid = (backA + backB) * 0.5f;
+            var dir = math.normalizesafe(a.Right - b.Right, a.Right);
+            float Along(float2 p) => math.dot(p - mid, dir);
+            float a0 = math.min(Along(a.BackLeft), Along(a.BackRight)), a1 = math.max(Along(a.BackLeft), Along(a.BackRight));
+            float b0 = math.min(Along(b.BackLeft), Along(b.BackRight)), b1 = math.max(Along(b.BackLeft), Along(b.BackRight));
+            float o0 = math.max(a0, b0), o1 = math.min(a1, b1);
+            if (o1 - o0 < s.Knob("minRearOverlap", 6f)) return;
+            float2 OnMid(float2 p) => mid + dir * Along(p);   // straight across onto the middle line
+            var pair = new StitchPair { Left = a.Id, Right = b.Id, Rear = true, Front = mid + dir * o0, Back = mid + dir * o1, FrontGap = math.abs(gapA), BackGap = math.abs(gapA) };
+            plan.Pairs.Add(pair);
+
+            var backLinesA = EdgeLines(a, back: true, s).ToList();
+            var backLinesB = EdgeLines(b, back: true, s).ToList();
+            var all = backLinesA.Select(l => (House: a, Line: l)).Concat(backLinesB.Select(l => (House: b, Line: l))).ToList();
+            bool touching = math.abs(gapA) < s.TouchingGap;
+            if (all.Count > 0)
+            {
+                var keep = all.OrderByDescending(x => Score(x.Line.Name)).ThenByDescending(x => math.distance(x.Line.A, x.Line.B)).First();
+                pair.KeptLine = keep.Line.Id;
+                foreach (var x in all)
+                {
+                    if (x.House != keep.House)
+                    {
+                        // only the part of the other house's back line that the kept one covers goes
+                        var c = current(x.Line);
+                        if (Along(c.A) >= o0 - 1f && Along(c.A) <= o1 + 1f && Along(c.B) >= o0 - 1f && Along(c.B) <= o1 + 1f) plan.HideLines.Add(x.Line.Id);
+                        continue;
+                    }
+                    if (touching) continue;
+                    var cur = current(x.Line);
+                    moved[x.Line.Id] = (OnMid(cur.A), OnMid(cur.B));
+                }
+            }
+            if (touching) return;
+            // side lines ending at a back corner inside the overlap reach the middle line
+            foreach (var h in new[] { a, b })
+                foreach (var l in h.Lines)
+                {
+                    if (all.Any(x => x.Line.Id == l.Id)) continue;
+                    var la = h.ToLocal(l.A);
+                    var lb = h.ToLocal(l.B);
+                    bool atA = math.abs(la.y + h.HalfLot.y) < s.EdgeTolerance, atB = math.abs(lb.y + h.HalfLot.y) < s.EdgeTolerance;
+                    if (atA == atB) continue;
+                    var c = current(l);
+                    var end = atA ? c.A : c.B;
+                    float t = Along(end);
+                    if (t < o0 - 1f || t > o1 + 1f) continue;
+                    moved[l.Id] = atA ? (OnMid(end), c.B) : (c.A, OnMid(end));
+                }
+            // lawns touching the back edge grow to the middle line, over the overlap
+            foreach (var h in new[] { a, b })
+                foreach (var lawn in h.Lawns)
+                {
+                    var ring = lawnNow[lawn.Id];
+                    if (!ring.Any(p => math.abs(h.ToLocal(p).y + h.HalfLot.y) < s.LawnContact)) continue;
+                    float inner = -h.HalfLot.y + s.LawnContact;
+                    // the band: from just inside the back edge to the middle line, between the overlap's ends
+                    var p0 = mid + dir * o0;
+                    var p1 = mid + dir * o1;
+                    float2 Inside(float2 m) { var l = h.ToLocal(m); return h.ToWorld(new float2(l.x, inner)); }
+                    var band = new[] { Inside(p0), Inside(p1), p1, p0 };
+                    var avoid = a.Hard.Concat(b.Hard).Concat(new[] { a, b }.Where(o => o != h).SelectMany(o => o.Lawns.Select(x => lawnNow[x.Id]))).ToList();
+                    var near = avoid.Where(r => r.Length >= 3).Select(r => (IReadOnlyList<float2>)Ccw(r)).ToList();
+                    var pieces = near.Count > 0 ? Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(band) }, near, BoolOp.Difference, FillRule.NonZero) : Poly.Normalize(Ccw(band));
+                    if (pieces.Count == 0) continue;
+                    var piece = pieces.OrderByDescending(r => r.Area).First().Outer;
+                    if (Poly.Area(piece) < 1f) continue;
+                    var merged = Poly.Boolean(new[] { Ccw(ring) }, new[] { Ccw(piece) }, BoolOp.Union);
+                    if (merged.Count == 0) continue;
+                    var main = merged.OrderByDescending(r => r.Area).First();
+                    if (main.HasHoles) continue;
+                    var grown = Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(main.Outer, 0.05f), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance)
+                        .OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                    if (grown == null || Poly.Area(grown) <= Poly.Area(ring) + 0.5f) continue;
+                    plan.LawnAddedM2 += Poly.Area(grown) - Poly.Area(ring);
+                    lawnNow[lawn.Id] = grown;
+                    plan.Lawns[lawn.Id] = grown;
+                }
+        }
+
+        /// <summary>A house's lines lying along its back edge (or front edge).</summary>
+        private static IEnumerable<StitchLine> EdgeLines(StitchHouse h, bool back, StitchSettings s)
+        {
+            float z = back ? -h.HalfLot.y : h.HalfLot.y;
+            foreach (var l in h.Lines)
+            {
+                var a = h.ToLocal(l.A);
+                var b = h.ToLocal(l.B);
+                if (math.abs(a.y - z) < s.EdgeTolerance && math.abs(b.y - z) < s.EdgeTolerance && math.abs(a.x - b.x) > 1f) yield return l;
+            }
         }
 
         private static void Stitch(StitchHouse a, StitchHouse b, StitchSettings s, StitchPlan plan, Dictionary<long, float2[]> lawnNow,

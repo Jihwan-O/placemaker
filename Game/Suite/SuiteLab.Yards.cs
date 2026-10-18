@@ -43,7 +43,20 @@ namespace Placemaker.Game.Suite
             if (!_fixture.Prefabs.TryGetValue(roadName, out var road)) { rec["error"] = "lab: no road prefab " + roadName; yield break; }
             var curves = new List<Bezier4x3>();
             float3 P(float2 p) => new float3(p.x, _fixture.H(p.x, p.y), p.y);
-            if (shape == "straight")
+            if (shape == "block")
+            {
+                // a square loop of streets: houses on all four sides meet back to back in the middle
+                float side = (float?)step["length"] ?? 130f, h = side * 0.5f;
+                var c = Pt(step["at"], b, false);
+                var corners = new[] { c + new float2(-h, -h), c + new float2(h, -h), c + new float2(h, h), c + new float2(-h, h) };
+                for (int k = 0; k < 4; k++)
+                {
+                    float2 p = corners[k], q = corners[(k + 1) % 4];
+                    int n = (int)math.ceil(side / 75f);
+                    for (int i = 0; i < n; i++) curves.Add(NetUtils.StraightCurve(P(math.lerp(p, q, i / (float)n)), P(math.lerp(p, q, (i + 1) / (float)n))));
+                }
+            }
+            else if (shape == "straight")
             {
                 float len = (float?)step["length"] ?? 220f, yaw = math.radians((float?)step["yaw"] ?? 0f);
                 var c = Pt(step["at"], b, false);
@@ -55,8 +68,9 @@ namespace Placemaker.Game.Suite
             else
             {
                 float r = (float?)step["radius"] ?? 90f;
-                float a0 = math.radians((float?)step["from"] ?? 0f), a1 = math.radians((float?)step["to"] ?? 180f);
-                var c = step["at"] != null ? Pt(step["at"], b, false) : b.Center - new float2(0f, r * 0.45f);
+                bool circle = shape == "circle";
+                float a0 = math.radians((float?)step["from"] ?? 0f), a1 = math.radians((float?)step["to"] ?? (circle ? 360f : 180f));
+                var c = step["at"] != null ? Pt(step["at"], b, false) : circle ? b.Center : b.Center - new float2(0f, r * 0.45f);
                 int n = math.max(1, (int)math.ceil(math.abs(a1 - a0) / math.radians(30f)));
                 for (int k = 0; k < n; k++)
                 {

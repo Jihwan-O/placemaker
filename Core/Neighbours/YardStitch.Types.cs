@@ -31,6 +31,8 @@ namespace Placemaker.Core.Neighbours
         public List<StitchLawn> Lawns = new List<StitchLawn>();
         /// <summary>The house's other surfaces (driveway, paving, sand): grown lawns never cover them.</summary>
         public List<float2[]> Hard = new List<float2[]>();
+        /// <summary>The house itself (its mesh's ground outline): no moved fence or hedge may cross it.</summary>
+        public float2[] Footprint;
 
         public float2 Right => new float2(Forward.y, -Forward.x);
         public float2 ToLocal(float2 w) { var d = w - Position; return new float2(math.dot(d, Right), math.dot(d, Forward)); }
@@ -66,6 +68,10 @@ namespace Placemaker.Core.Neighbours
         public float2 Front, Back;
         public float FrontGap, BackGap;
         public long KeptLine = -1;
+        /// <summary>Back to back (across the middle of a block) rather than side by side.</summary>
+        public bool Rear;
+        /// <summary>Its line edits were undone: a moved line would have crossed a house.</summary>
+        public bool Reverted;
     }
 
     public sealed class StitchPlan
@@ -75,5 +81,7 @@ namespace Placemaker.Core.Neighbours
         public readonly Dictionary<long, (float2 A, float2 B)> MoveLines = new Dictionary<long, (float2, float2)>();
         public readonly Dictionary<long, float2[]> Lawns = new Dictionary<long, float2[]>();
         public float LawnAddedM2;
+        /// <summary>Why pairs formed or not, and what was undone (the game runner logs them).</summary>
+        public readonly List<string> Notes = new List<string>();
     }
 }

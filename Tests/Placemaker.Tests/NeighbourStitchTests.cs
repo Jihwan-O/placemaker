@@ -129,6 +129,46 @@ namespace Placemaker.Tests
         }
 
         [Fact]
+        public void A_border_that_would_run_through_a_house_leaves_that_pair_as_it_was()
+        {
+            float2 At(float angle) => 64f * new float2(math.cos(angle), math.sin(angle));
+            float2 Facing(float angle) => -new float2(math.cos(angle), math.sin(angle));
+            float a0 = math.radians(90f), a1 = a0 + 0.45f;
+            var a = House(1, At(a0), Facing(a0));
+            var b = House(2, At(a1), Facing(a1));
+            // b's house is wider than its lot on a's side: it reaches over the border
+            b.Footprint = new[] { b.ToWorld(new float2(-14f, 10f)), b.ToWorld(new float2(6f, 10f)), b.ToWorld(new float2(6f, -10f)), b.ToWorld(new float2(-14f, -10f)) };
+            var plan = YardStitch.Plan(new[] { a, b });
+            Assert.True(plan.Pairs[0].Reverted);
+            Assert.DoesNotContain(11L, plan.HideLines);
+            Assert.False(plan.MoveLines.ContainsKey(22L));
+            Assert.Contains(plan.Notes, n => n.Contains("cross house 2"));
+        }
+
+        [Fact]
+        public void Back_to_back_houses_share_one_back_line_on_the_middle_line_and_lawns_reach_it()
+        {
+            // a faces south to its street, b faces north to the other street; 8 m between their back edges
+            var a = House(1, new float2(0f, 0f), new float2(0f, -1f), right: "FenceResidentialHigh01");
+            var b = House(2, new float2(0f, 56f), new float2(0f, 1f), right: "HedgeHigh01");
+            // lawns along the back edges
+            a.Lawns[0].Ring = new[] { a.ToWorld(new float2(-7f, -23f)), a.ToWorld(new float2(7f, -23f)), a.ToWorld(new float2(7f, -10f)), a.ToWorld(new float2(-7f, -10f)) };
+            b.Lawns[0].Ring = new[] { b.ToWorld(new float2(-7f, -23f)), b.ToWorld(new float2(7f, -23f)), b.ToWorld(new float2(7f, -10f)), b.ToWorld(new float2(-7f, -10f)) };
+            var plan = YardStitch.Plan(new[] { a, b });
+            var rear = plan.Pairs.Single(p => p.Rear);
+            // b's back line is a hedge (its "right" kind), a's a fence: the hedge is kept on the middle line (z = 28)
+            Assert.Equal(23L, rear.KeptLine);
+            Assert.Contains(13L, plan.HideLines);
+            var kept = plan.MoveLines[23L];
+            Assert.True(math.abs(kept.A.y - 28f) < 0.01f && math.abs(kept.B.y - 28f) < 0.01f, $"kept back line at {kept.A} {kept.B}");
+            // both lawns reach the middle line
+            Assert.True(plan.Lawns[15L].Max(p => p.y) > 27.5f);
+            Assert.True(plan.Lawns[25L].Min(p => p.y) < 28.5f);
+            // a's right fence ends at its back corner: it now reaches the middle line too
+            Assert.True(math.abs(plan.MoveLines[11L].B.y - 28f) < 0.01f);
+        }
+
+        [Fact]
         public void A_house_behind_another_is_not_its_side_neighbour()
         {
             var a = House(1, new float2(0f, 0f), new float2(0f, 1f));

@@ -26,11 +26,15 @@ namespace Placemaker.Core.Layers.Commercial
             /// <summary>Widest plot in cells (big boxes 6) and the anchors' extra width at the row ends.</summary>
             public int MaxPiece = 3;
             public float AnchorWeight = 1.8f;
+            /// <summary>A square in the middle of the back row, shops either side of it facing the same lane: "plaza", "park", "garden", or null.</summary>
+            public string Square;
         }
 
         public const string LotFact = "lotCentre";
         /// <summary>(shops4) No layout fits: the area is too shallow behind its entrances, or too narrow (an error: Build waits).</summary>
         public const string NoRoomKey = K + "Issue.NoRoom";
+        /// <summary>(shops4) The site is too steep for the shops' lanes on the ground as it is (an error: Build waits).</summary>
+        public const string TooSteepKey = K + "Issue.TooSteep";
 
         /// <summary>The layout, else an error saying what the site lacks. True when laid out.</summary>
         protected static bool LotCentre(LayerContext ctx, Mall mall, List<StreetShops.Run> runs, LotLayout o)
@@ -42,7 +46,11 @@ namespace Placemaker.Core.Layers.Commercial
             float need = CompactDepth(h, 2);
             float have = 0f;
             foreach (var r in Frames(ctx, mall, runs)) { Extent(mall, r, out _, out _, out float t0, out float t1); have = math.max(have, t1 - math.max(t0, -2f)); }
-            ctx.Plan.Issues.Add(new PlanIssue { Severity = IssueSeverity.Error, Key = NoRoomKey, Args = new object[] { (int)math.ceil(need), (int)math.floor(have) } });
+            // On a steep site the lanes found no line across the slope gentle enough (the ground is not reshaped): say that instead.
+            mall.Region.PrincipalAxes(out _, out _, out _, out float minor);
+            float relief = Relief(ctx, mall.Region.Ring);
+            if (relief / math.max(20f, minor) > 0.08f) ctx.Plan.Issues.Add(new PlanIssue { Severity = IssueSeverity.Error, Key = TooSteepKey, Args = new object[] { (int)math.round(100f * relief / math.max(20f, minor)) } });
+            else ctx.Plan.Issues.Add(new PlanIssue { Severity = IssueSeverity.Error, Key = NoRoomKey, Args = new object[] { (int)math.ceil(need), (int)math.floor(have) } });
             return false;
         }
 
@@ -95,10 +103,18 @@ namespace Placemaker.Core.Layers.Commercial
             float bestScore = 0f; int bestK = -1;
             var frames = Frames(ctx, mall, runs);
             var tries = new List<float>();
-            // Every frame is planned and scored (shop ground plus stalls), then the best planned again for real.
+            // The frames ranked by a cheap estimate (no lot planned); the best two are planned and scored (shops and parking in
+            // balance, every entrance connected), then the winner planned again for real. (Planning every frame fully ran past the
+            // game's 12 s planning limit on a 300 x 280 m site.)
+            var order = new List<(float est, int k)>();
+            for (int k = 0; k < frames.Count; k++) { ctx.Check(); if (CompactIn(ctx, mall, frames[k], o, true, out float e)) order.Add((e, k)); }
+            order.Sort((x, y) => y.est.CompareTo(x.est));
+            var chosen = new HashSet<int>();
+            for (int i = 0; i < order.Count && i < 2; i++) chosen.Add(order[i].k);
             for (int k = 0; k < frames.Count; k++)
             {
                 ctx.Check();
+                if (!chosen.Contains(k)) { tries.Add(-1f); continue; }
                 float score = 0f; int lostMask = 0;
                 if (CompactIn(ctx, mall, frames[k], o))
                 {
@@ -108,6 +124,12 @@ namespace Placemaker.Core.Layers.Commercial
                     // the difference between them (a stall with its share of aisle is about 26 m²).
                     float shops = mall.ShopArea(), lot = 26f * mall.Stalls;
                     score = math.max(1f, shops + lot - 0.5f * math.abs(shops - lot) - 100000f * lost);
+                    // The best-ranked frame that connects every entrance is kept as it is (no second planning).
+                    if (lost == 0 && k == order[0].k)
+                    {
+                        ctx.Plan.Facts["compactFrames"] = frames.Count; ctx.Plan.Facts["compactFrame"] = k;
+                        return true;
+                    }
                 }
                 tries.Add(math.round(score) + lostMask * 0.01f);
                 planMark.Restore(ctx.Plan); mall.Rewind(mallMark); mall.ResetDesign(); mall.RowHolds.Clear(); mall.Gates = gates;
@@ -125,8 +147,12 @@ namespace Placemaker.Core.Layers.Commercial
         /// The compact layout in frame <paramref name="r"/> (s along the front, t inward): the deepest lane line whose plots behind it
         /// stay inside the site, the lot in front of it entered from the player's entrances on its edge, the rest routed to the lane.
         /// </summary>
-        private static bool CompactIn(LayerContext ctx, Mall mall, StreetShops.Run r, LotLayout o)
+        private static bool CompactIn(LayerContext ctx, Mall mall, StreetShops.Run r, LotLayout o) => CompactIn(ctx, mall, r, o, false, out _);
+
+        /// <summary><paramref name="estimate"/>: only the best line's score (cheap: no lot planned), to rank the frames.</summary>
+        private static bool CompactIn(LayerContext ctx, Mall mall, StreetShops.Run r, LotLayout o, bool estimate, out float est)
         {
+            est = 0f;
             var (asset, h) = Mall.ShopLane(ctx);
             mall.MainDir = r.Dir;
             mall.AnchorWeight = o.AnchorWeight;
@@ -181,7 +207,8 @@ namespace Placemaker.Core.Layers.Commercial
                     cand.Add((shops + lot - 0.5f * math.abs(shops - lot) - waste, tl, a, b, gate));
                 }
                 cand.Sort((x, y) => y.score.CompareTo(x.score));
-                for (int c = 0; c < cand.Count && c < 6; c++)
+                if (estimate) { if (cand.Count == 0) continue; est = cand[0].score; return true; }
+                for (int c = 0; c < cand.Count && c < 3; c++)
                     if (Compose(ctx, mall, r, o, cand[c].tl, cand[c].a, cand[c].b, cells, h, asset, sMin, sMax, tMin)) return true;
             }
             return false;
@@ -217,9 +244,20 @@ namespace Placemaker.Core.Layers.Commercial
             bool Fail(int step) { planMark.Restore(ctx.Plan); mall.Rewind(mallMark); mall.RowHolds.Clear(); foreach (var g in mall.Gates) g.Landed = "none"; ctx.Plan.Facts["compactFail"] = step; return false; }
             float d = cells * Mall.Cell, zo = Mall.ZoneOffset(h);
             float span = 2f * (zo + d), island = span + 2f * h;
+            // The ground is not reshaped, so the lanes lie on it as it is: none steeper than a road should be (across the slope instead).
+            if (Steep(ctx, r.At(a, tl), r.At(b, tl))) return Fail(20);
             var lane = mall.Connect(Mall.End.Free(r.At(a, tl)), null, Mall.End.Free(r.At(b, tl)), NetRole.Alley, asset, h);
             if (lane == null) return Fail(1);
-            if (mall.HoldRow(Mall.Rect(r, a + h + 0.5f, b - h - 0.5f, tl + h, tl + zo + d + 1f)) == null) return Fail(2);
+            // The square (an extra) takes the middle of the row: its land is kept before the row is held either side of it.
+            float2[] square = null;
+            if (o.Square != null && b - a >= 6f * Mall.Cell + 40f)
+            {
+                float w = math.clamp(0.3f * (b - a), 32f, 64f), mid = 0.5f * (a + b);
+                square = mall.Hold(Mall.Rect(r, mid - 0.5f * w, mid + 0.5f * w, tl + h + 0.3f, tl + zo + d + 1f));
+                if (mall.HoldRow(Mall.Rect(r, a + h + 0.5f, mid - 0.5f * w - 0.3f, tl + h, tl + zo + d + 1f)) == null) return Fail(2);
+                if (mall.HoldRow(Mall.Rect(r, mid + 0.5f * w + 0.3f, b - h - 0.5f, tl + h, tl + zo + d + 1f)) == null) return Fail(2);
+            }
+            else if (mall.HoldRow(Mall.Rect(r, a + h + 0.5f, b - h - 0.5f, tl + h, tl + zo + d + 1f)) == null) return Fail(2);
 
             // ── the double rows ──
             float front = (tl - h) - tMin;
@@ -241,6 +279,7 @@ namespace Placemaker.Core.Layers.Commercial
                 // a planted end and room to walk round it, not a lane along the street
                 ia += 8f; ib -= 8f;
                 if (ib - ia < 6f * Mall.Cell + 2f * h) return Fail(11);
+                if (Steep(ctx, r.At(ia, y1), r.At(ib, y1)) || Steep(ctx, r.At(ia, y2), r.At(ib, y2)) || Steep(ctx, r.At(ia, y1), r.At(ia, y2))) return Fail(21);
                 var loop = mall.Loop(r.At(ia, y1), new[] { r.At(ib, y1), r.At(ib, y2), r.At(ia, y2) }, NetRole.Alley, asset, h);
                 if (loop == null) return Fail(12);
                 if (mall.HoldRow(Mall.Rect(r, ia + h + 0.5f, ib - h - 0.5f, y1 + h, y1 + zo + d)) == null) return Fail(13);
@@ -312,6 +351,18 @@ namespace Placemaker.Core.Layers.Commercial
             // ── the shops ──
             mall.ReleaseRows();
             int rows = mall.LaneRows(lane, cells, null, +1, 0f, 0f, o.MaxPiece, 2) > 0 ? 1 : 0;
+            if (square != null)
+            {
+                mall.Release(square);
+                uint salt = Hashing.Mix(ctx.Seed, 0x5A0u);
+                string layer = o.Square == "plaza" ? "plaza" : "park", preset = o.Square == "plaza" ? "cafe" : o.Square == "garden" ? "garden" : "pocket";
+                // two ways in from the lane (a quarter in from each side): its walks run through it, never to a dead end
+                float w2 = 0.5f * (b - a), mid2 = 0.5f * (a + b), sw = 0f;
+                foreach (var v in square) sw = math.max(sw, math.abs(math.dot(v - r.A, r.Dir) - mid2));
+                var doors = new List<(Mall.Lane, float2)> { (lane, r.At(mid2 - 0.5f * sw, tl)), (lane, r.At(mid2 + 0.5f * sw, tl)) };
+                if (mall.FillOpen(square, layer, preset, doors, null, salt)) ctx.Plan.Facts["square"] = 1;
+                else mall.Green(square, salt + 1u);
+            }
             foreach (var (loop, _, _, _, _) in loops) rows += mall.LaneRows(loop, cells, null, +1, 0f, 0f, o.MaxPiece, 2, i => i % 2 == 0) > 0 ? 2 : 0;
             if (mall.Shops.Count == 0) return Fail(6);
             ctx.Plan.Facts[StripMallLayer.RowsFact] = rows;
@@ -334,6 +385,18 @@ namespace Placemaker.Core.Layers.Commercial
                 return cut != null && cut.Length >= 3 ? cut : ring;
             }
             catch (Exception) { return ring; }
+        }
+
+        /// <summary>A lane on the ground as it is from a to b climbs more than 8 % over any 8 m.</summary>
+        private static bool Steep(LayerContext ctx, float2 a, float2 b)
+        {
+            float len = math.distance(a, b);
+            for (float u = 0f; u + 8f <= len; u += 4f)
+            {
+                var p = math.lerp(a, b, u / len); var q = math.lerp(a, b, (u + 8f) / len);
+                if (math.abs(ctx.H(q) - ctx.H(p)) / 8f > 0.08f) return true;
+            }
+            return false;
         }
 
         /// <summary>Area (m²) of the site between t0 and t1 in frame <paramref name="r"/>.</summary>
@@ -421,9 +484,10 @@ namespace Placemaker.Core.Layers.Commercial
         {
             Mall.LotTry best = null; float bestScore = float.MinValue;
             float ang = math.degrees(math.atan2(mall.MainDir.Value.y, mall.MainDir.Value.x));
-            foreach (bool ring in new[] { false, true })
+            foreach (bool ring in new[] { true, false })
                 foreach (float rot in new[] { 0f, 90f })
                 {
+                    if (best != null) break;   // the lot's own drive round it, rows along the frame first; the others only when that fails
                     var bag = new SettingsBag();
                     foreach (var kv in parking.Values) bag.Values[kv.Key] = kv.Value;
                     bag.Values["setback"] = 0.5;
@@ -432,6 +496,7 @@ namespace Placemaker.Core.Layers.Commercial
                     bag.Values["perimeterRoad"] = ring;
                     var t = mall.PlanLot(lot, entries, bag, salt + (uint)rot + (ring ? 7u : 0u), true);
                     if (t == null || NetFit.Violations(t.Sub.Nets, t.Site).Count > 0 || Mall.Warns(t)) continue;
+                    t.Sub.Issues.RemoveAll(i => i.Key != null && i.Key.EndsWith("PerimeterRoadDropped"));   // our choice to try, not the player's
                     // An aisle ending in a turning circle reads as a dead end (the user: "how do the cars even get in there"): each
                     // costs the stalls of a short row.
                     int dead = DeadEnds(t.Sub.Nets);

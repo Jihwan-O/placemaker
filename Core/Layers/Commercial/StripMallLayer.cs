@@ -42,6 +42,8 @@ namespace Placemaker.Core.Layers.Commercial
             // (rf-shops3) The architect's extras: walks, plaza, bikes, food trucks, pads, designed planting, building sites, plot trees, worn ground.
             // (shops4) Off by default: the strip mall is the lot and the shops (the user: "what are those green rectangles, why is there a
             // path going nowhere"); the extras stay for the player to add.
+            // (shops4) A square in the middle of the row of shops: a plaza, a small park or a garden (off by default).
+            Shared(c.Choice("square", "none", ControlTier.More, "extras", "none", "plaza", "park", "garden")).Tip();
             ExtrasControls(c, walkways: false, plaza: false, bikes: "none", trucks: 0, pads: false, designed: false, hedges: true, sites: false, worn: false, water: "none", plotTrees: false);
             c.Fixed("style");
         }
@@ -56,6 +58,9 @@ namespace Placemaker.Core.Layers.Commercial
             Preset("neighbourhood", ("style", "classic"), ("lotSize", "small"), ("frontage", 90.0), ("plotDepth", 16.0), ("lotGreen", "medians"), ("zoneKind", ZoneKinds.CommercialLow));
             // (shops2) Big box: a few very wide, deep low-rise stores (one-storey boxes) on the biggest lots.
             Preset("bigBox", ("style", "classic"), ("lotSize", "large"), ("frontage", 240.0), ("plotDepth", 48.0), ("zoneKind", ZoneKinds.CommercialLow), ("evShare", 10.0), ("lotMedian", 3.5));
+            // (shops4) Variations of the strip mall with a square in the middle of the row: a café plaza, a small park.
+            Preset("plazaRow", ("style", "classic"), ("lotSize", "large"), ("plotDepth", 32.0), ("zoneKind", ZoneKinds.CommercialLow), ("evShare", 10.0), ("square", "plaza"));
+            Preset("parkRow", ("style", "classic"), ("lotSize", "large"), ("plotDepth", 32.0), ("zoneKind", ZoneKinds.CommercialLow), ("evShare", 10.0), ("square", "park"));
         }
 
         /// <summary>(rf-shops3) Planned from the player's entrances (the centre: StripMallCentre.cs); the hidden corner and rear-alley styles too.</summary>
@@ -67,7 +72,8 @@ namespace Placemaker.Core.Layers.Commercial
             if (style != "classic") return false;
             // (shops4) The lot first, the shops behind it (LotCentre.cs); the ring centre (StripMallCentre.cs) is no longer used.
             bool big = ctx.Raw("plotDepth") >= 44f;
-            return LotCentre(ctx, mall, runs, new LotLayout { MaxPiece = big ? 6 : 3, AnchorWeight = big ? 1.25f : 1.8f });
+            string sq = ctx.S("square");
+            return LotCentre(ctx, mall, runs, new LotLayout { MaxPiece = big ? 6 : 3, AnchorWeight = big ? 1.25f : 1.8f, Square = sq == "none" || string.IsNullOrEmpty(sq) ? null : sq });
         }
 
         protected override void Compose(LayerContext ctx, Mall mall, List<StreetShops.Run> runs)

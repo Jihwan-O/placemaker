@@ -143,7 +143,7 @@ namespace Placemaker.Core.Layers.Commercial
                     return;
                 }
                 // (shops4) The layout said why it does not fit (an error the panel shows; Build waits): nothing else is tried.
-                if (ctx.Plan.Issues.Exists(i => i.Key == NoRoomKey)) return;
+                if (ctx.Plan.Issues.Exists(i => i.Key == NoRoomKey || i.Key == TooSteepKey)) return;
                 // The site could not hold it: the type's older layout (its lanes join the streets themselves) when a street runs
                 // along it; a shops type never quietly becomes a park (the lead: a user drawing 8 m off a road got one).
                 if (runs.Count == 0)

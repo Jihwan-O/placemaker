@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using Colossal.Mathematics;
 using Game;
@@ -50,8 +51,19 @@ namespace Placemaker.Game.Neighbours
         /// <summary>Every house again with the current rules (lines and lawns no longer planned go back to the game's own).</summary>
         public static void Redo() => s_redo = true;
 
+        /// <summary>The options panel's choices (lawns, painted gardens, planting, paths, rocks, paint) as planner knobs; every
+        /// house again when one changed.</summary>
+        public static void SetOptions(Dictionary<string, float> options)
+        {
+            bool changed = false;
+            foreach (var kv in options)
+                if (!Settings.Extra.TryGetValue(kv.Key, out var was) || was != kv.Value) { Settings.Extra[kv.Key] = kv.Value; changed = true; }
+            if (changed && FeatureEnabled) Redo();
+        }
+
         // a pass costs ~0.6 ms per house asked (its neighbourhood included): 16 keeps a pass near 10 ms, every 4th frame
-        private const int HousesPerPass = 16;
+        // a pass takes this many changed houses (more when many wait: a city switched on, a big area rebuilt)
+        private const int HousesPerPass = 16, HousesPerBigPass = 64;
         // a plot depends on houses up to ~2 lots away (and a ring's shared green on the whole ring): the pass plans with
         // everything within ClusterRadius but edits only houses within CoreRadius of a dirty one, so a house at the edge of
         // a pass (its neighbours not in it) is never planned half-blind and reset
@@ -95,6 +107,10 @@ namespace Placemaker.Game.Neighbours
         private float _lawnM2;
         private double _ms;
 
+        /// <summary>For the game runner: houses still waiting, or a plan still being worked out.</summary>
+        public static bool Busy { get; private set; }
+        public static int Waiting { get; private set; }
+
         /// <summary>For the game runner: totals since the game started.</summary>
         public static int TotalPairs, TotalMoved, TotalHidden, TotalLawns, TotalPasses;
         public static float TotalLawnM2;
@@ -127,7 +143,7 @@ namespace Placemaker.Game.Neighbours
         [Preserve]
         protected override void OnUpdate()
         {
-            if (!FeatureEnabled) { _wasEnabled = false; return; }
+            if (!FeatureEnabled) { _wasEnabled = false; Busy = false; return; }
             try
             {
                 if (!_wasEnabled || s_redo)
@@ -136,10 +152,14 @@ namespace Placemaker.Game.Neighbours
                     // switched on (or a city loaded with it on): every house once, a few per pass
                     _wasEnabled = true;
                     using (var all = _houses.ToEntityArray(Allocator.Temp)) foreach (var e in all) _dirty.Add(e);
+                    _described.Clear();
+                    _gridStale = true;
                     Mod.Log.Info($"Placemaker neighbourhood polish: on, {_dirty.Count} buildings to look at.");
                 }
                 CollectChanged();
                 ++_frame;
+                Busy = _dirty.Count > 0 || _planning != null;
+                Waiting = _dirty.Count;
                 if (_planning != null)
                 {
                     if (_planning.IsCompleted) Finish();
@@ -159,14 +179,25 @@ namespace Placemaker.Game.Neighbours
         {
             if (!_goneHouses.IsEmptyIgnoreFilter)
                 using (var gone = _goneHouses.ToEntityArray(Allocator.Temp))
-                using (var all = _houses.ToEntityArray(Allocator.Temp))
+                {
+                    EnsureGrid();
                     foreach (var g in gone)
                     {
                         var at = EntityManager.GetComponentData<global::Game.Objects.Transform>(g).m_Position.xz;
                         _dirty.Remove(g);
-                        foreach (var e in all)
-                            if (math.distance(EntityManager.GetComponentData<global::Game.Objects.Transform>(e).m_Position.xz, at) < GoneRadius) _dirty.Add(e);
+                        _described.Remove(g);
+                        _planted.Remove(g);
+                        for (int dx = -2; dx <= 2; dx++)
+                            for (int dz = -2; dz <= 2; dz++)
+                                if (_grid.TryGetValue(Key(at + new float2(dx, dz) * Cell), out var near))
+                                    foreach (int j in near)
+                                    {
+                                        var h = _gridHouses[j];
+                                        if (h.E != g && math.distance(h.T.m_Position.xz, at) < GoneRadius && EntityManager.Exists(h.E)) _dirty.Add(h.E);
+                                    }
                     }
+                    _gridStale = true;
+                }
             if (_changedFences.IsEmptyIgnoreFilter) return;
             using (var lanes = _changedFences.ToEntityArray(Allocator.Temp))
                 foreach (var lane in lanes)
@@ -207,11 +238,29 @@ namespace Placemaker.Game.Neighbours
             return list;
         }
 
-        private void Pass()
+        // every finished growable in a coarse grid, kept between passes: rebuilt when buildings come or go (a city of 100 000
+        // lots is read once, not on every pass)
+        private List<House> _gridHouses;
+        private Dictionary<long, List<int>> _grid;
+        private Dictionary<Entity, int> _gridIndex;
+        private bool _gridStale = true;
+        private int _gridBuilt;
+        // what each house looks like to the planner, kept until the house changes (or we gave it something new)
+        private readonly Dictionary<Entity, Described> _described = new Dictionary<Entity, Described>();
+
+        private sealed class Described
         {
-            var sw = Stopwatch.StartNew();
-            _passes++;
-            // every finished growable, in a coarse grid
+            public StitchHouse House;
+            public List<(long Id, Entity Lane, float3 A, float3 B)> Lanes;
+            public List<(long Id, Entity Lawn)> Lawns;
+            public Entity LawnPrefab;
+        }
+
+        private void EnsureGrid()
+        {
+            if (!_gridStale && _grid != null && _frame - _gridBuilt < 3600) return;
+            _gridStale = false;
+            _gridBuilt = _frame;
             var houses = new List<House>();
             var grid = new Dictionary<long, List<int>>();
             using (var all = _houses.ToEntityArray(Allocator.Temp))
@@ -228,6 +277,22 @@ namespace Placemaker.Game.Neighbours
                 }
             var index = new Dictionary<Entity, int>();
             for (int i = 0; i < houses.Count; i++) index[houses[i].E] = i;
+            _gridHouses = houses;
+            _grid = grid;
+            _gridIndex = index;
+        }
+
+        private void Pass()
+        {
+            var sw = Stopwatch.StartNew();
+            _passes++;
+            // a changed house the grid does not know (just built): the grid again
+            foreach (var e in _dirty) if (_gridIndex == null || !_gridIndex.ContainsKey(e)) { _gridStale = true; break; }
+            EnsureGrid();
+            var houses = _gridHouses;
+            var grid = _grid;
+            var index = _gridIndex;
+            int batch = _dirty.Count > 200 ? HousesPerBigPass : HousesPerPass;
 
             // this pass: up to HousesPerPass dirty houses and everything within ClusterRadius of them
             var cluster = new HashSet<int>();
@@ -235,7 +300,7 @@ namespace Placemaker.Game.Neighbours
             var done = new List<Entity>();
             foreach (var e in _dirty)
             {
-                if (done.Count >= HousesPerPass) break;
+                if (done.Count >= batch) break;
                 done.Add(e);
                 if (!index.TryGetValue(e, out int i)) continue;   // gone, or still being built: its lanes come back as Created later
                 var p = houses[i].T.m_Position.xz;
@@ -249,7 +314,7 @@ namespace Placemaker.Game.Neighbours
                                 if (d <= CoreRadius) core.Add(j);
                             }
             }
-            foreach (var e in done) _dirty.Remove(e);
+            foreach (var e in done) { _dirty.Remove(e); _described.Remove(e); }
             if (cluster.Count == 0) return;
 
             var stitch = new List<StitchHouse>();
@@ -260,10 +325,29 @@ namespace Placemaker.Game.Neighbours
             var coreIds = new HashSet<long>();
             foreach (int i in cluster)
             {
-                var described = Describe(houses[i], core.Contains(i) ? lanesOf : null, core.Contains(i) ? lawnsOf : null);
-                described.Edit = core.Contains(i);
-                stitch.Add(described);
-                if (core.Contains(i)) coreIds.Add(Id(houses[i].E));
+                var e = houses[i].E;
+                if (!_described.TryGetValue(e, out var d) || !EntityManager.Exists(e))
+                {
+                    var lanes = new Dictionary<long, (Entity, float3, float3)>();
+                    var lawns = new Dictionary<long, Entity>();
+                    var sh = Describe(houses[i], lanes, lawns);
+                    d = new Described
+                    {
+                        House = sh, Lanes = lanes.Select(kv => (kv.Key, kv.Value.Item1, kv.Value.Item2, kv.Value.Item3)).ToList(),
+                        Lawns = lawns.Select(kv => (kv.Key, kv.Value)).ToList(), LawnPrefab = _lawnPrefabOf.TryGetValue(sh.Id, out var lp) ? lp : Entity.Null,
+                    };
+                    _described[e] = d;
+                }
+                bool isCore = core.Contains(i);
+                _houseOf[d.House.Id] = e;
+                if (d.LawnPrefab != Entity.Null) _lawnPrefabOf[d.House.Id] = d.LawnPrefab;
+                if (isCore)
+                {
+                    foreach (var (id, lane, a, b) in d.Lanes) lanesOf[id] = (lane, a, b);
+                    foreach (var (id, lawn) in d.Lawns) lawnsOf[id] = lawn;
+                    coreIds.Add(d.House.Id);
+                }
+                stitch.Add(Copy(d.House, isCore));
             }
             var planner = Planner;
             var settings = Settings;
@@ -377,6 +461,7 @@ namespace Placemaker.Game.Neighbours
                 {
                     if (!_houseOf.TryGetValue(id, out var house)) continue;
                     var now = want.TryGetValue(id, out var w) ? w : new List<(string, float2)>();
+                    if (now.Count > 0 || _planted.ContainsKey(house)) _described.Remove(house);
                     if (_planted.TryGetValue(house, out var before))
                         foreach (var (name, at) in before)
                             if (!now.Exists(x => x.Item1 == name && math.distance(x.Item2, at) < 0.3f)) RemovePlanted(house, name, at);
@@ -468,7 +553,7 @@ namespace Placemaker.Game.Neighbours
                     if (!EntityManager.Exists(o) || EntityManager.HasComponent<global::Game.Objects.Tree>(o) || EntityManager.HasComponent<global::Game.Objects.Plant>(o)) continue;
                     if (!EntityManager.HasComponent<global::Game.Objects.Transform>(o) || !EntityManager.HasComponent<PrefabRef>(o)) continue;
                     var op = EntityManager.GetComponentData<PrefabRef>(o).m_Prefab;
-                    if (!EntityManager.HasComponent<ObjectGeometryData>(op)) continue;
+                    if (!EntityManager.HasComponent<ObjectGeometryData>(op) || Array.IndexOf(YardStitch.BushKinds, NameOf(op)) >= 0) continue;   // not our own rocks
                     var gb = EntityManager.GetComponentData<ObjectGeometryData>(op).m_Bounds;
                     var size = gb.max - gb.min;
                     if (size.x * size.z < 1.5f || size.y < 0.25f) continue;
@@ -516,6 +601,13 @@ namespace Placemaker.Game.Neighbours
 
         private readonly Dictionary<Entity, Bounds3?> _modelBounds = new Dictionary<Entity, Bounds3?>();
         private readonly Dictionary<long, Entity> _houseOf = new Dictionary<long, Entity>();
+
+        /// <summary>The cached description with this pass's Edit flag (the lists are shared: the planner only reads them).</summary>
+        private static StitchHouse Copy(StitchHouse h, bool edit) => new StitchHouse
+        {
+            Id = h.Id, Position = h.Position, Forward = h.Forward, HalfLot = h.HalfLot, Lines = h.Lines, Lawns = h.Lawns, Hard = h.Hard,
+            Footprint = h.Footprint, Props = h.Props, Edit = edit,
+        };
         /// <summary>What each house was given (beds, paths, bushes) by the last plan that edited it: by prefab name and centre.</summary>
         private readonly Dictionary<Entity, List<(string Name, float2 At)>> _planted = new Dictionary<Entity, List<(string, float2)>>();
 

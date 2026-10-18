@@ -210,7 +210,7 @@ namespace Placemaker.Core.Neighbours
                 {
                     float fg = math.distance(a.FrontRight, b.FrontLeft), bg = math.distance(BackAt(a, +1, deep), BackAt(b, -1, deep));
                     uint ph = Hash(((ulong)a.Id * 0x9E3779B97F4A7C15UL) ^ (ulong)b.Id);
-                    bool step = s.Knob("steps", 1f) > 0.5f && ringCut[i] == null && ringCut[right[i]] == null && bg > fg + 6f && ph % 100 < (uint)s.Knob("stepChance", 60f)
+                    bool step = s.Knob("steps", 1f) > 0.5f && ringCut[i] == null && ringCut[right[i]] == null && bg > fg + 6f && ph % 100 < (uint)s.Knob("stepChance", 0f)
                         && SideLines(a, +1, s).Any() && SideLines(b, -1, s).Any();
                     bool alley = !step && s.Knob("alleys", 1f) > 0.5f && fg >= 3f && fg <= 9f && math.abs(bg - fg) < 2f && (ph >> 8) % 100 < (uint)s.Knob("alleyChance", 45f);
                     if (step || alley)
@@ -354,7 +354,7 @@ namespace Placemaker.Core.Neighbours
                 float hz = math.min(a.HalfLot.y, b.HalfLot.y);
                 var ring = Ccw(new[] { a.FrontRight, b.FrontLeft, BackAt(b, -1, hz), BackAt(a, +1, hz) });
                 var inset = Poly.Offset(ring, 0.35f).OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
-                var path = inset == null ? null : Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(inset, 0.05f), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance).OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                var path = inset == null ? null : Prepared(inset);
                 if (path != null && path.Length >= 3) plan.Paths.Add((a.Id, path, s.Knob("alleyTiles", 0f) > 0.5f ? "Tiles Surface 01" : "Pavement Surface 01"));
                 plan.Pairs.Add(new StitchPair { Left = a.Id, Right = b.Id, Rear = true, FrontGap = math.distance(a.FrontRight, b.FrontLeft), BackGap = math.distance(a.BackRight, b.BackLeft) });
                 plan.Notes.Add($"{a.Id}/{b.Id}: a walkway between them");
@@ -498,7 +498,7 @@ namespace Placemaker.Core.Neighbours
                 foreach (var (hi, a, b, inward) in stepBeds) if (houses[hi].Edit) StepRow(houses[hi], plots[hi], a, b, inward, plan, beds[hi], built, s);
                 Plant(houses, plots, touched, plan, moved, beds, built, s);
                 Paths(houses, plots, touched, plan, beds, built, s);
-                Rocks(houses, plots, plan, built, s);
+                Rocks(houses, plots, plan, moved, built, s);
             }
 
             Stage("plant");
@@ -528,13 +528,28 @@ namespace Placemaker.Core.Neighbours
                 var h = houses[i];
                 var plot = Ccw(plots[i]);
                 plan.Plots[h.Id] = plot;
+                if (s.Knob("lawns", 1f) < 0.5f) continue;   // the player keeps lawns as the houses come
                 // once the plot reaches past the lot, the lawn fills all of it but driveways and paving (lawn and fence meet)
                 var ext = Poly.Boolean(new[] { (IReadOnlyList<float2>)plot }, new[] { (IReadOnlyList<float2>)Ccw(Lot(h)) }, BoolOp.Difference, FillRule.NonZero);
                 if (ext.Sum(r => r.Area) < 1f) continue;
+                var hard0 = houses.SelectMany(o => o.Hard).Where(r => r != null && r.Length >= 3 && Overlaps(plot, r)).Select(r => new Region(Ccw(r))).Concat(beds[i]).ToList();
+                // variety, as streets are: some gardens (about a third) keep their own lawn and the rest of their new land is
+                // painted (lush ground, soft edges) rather than drawn as lawn
+                if (Hash((ulong)h.Id ^ 0x9A1D7UL) % 100 < (uint)s.Knob("paintedGardens", 33f))
+                {
+                    var bare = Poly.Boolean(lawnLand[i], new[] { new Region(Ccw(Lot(h))) }, BoolOp.Difference);
+                    var keepOff = hard0.Concat(h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3).Select(l => new Region(Ccw(l.Ring)))).ToList();
+                    if (keepOff.Count > 0) bare = Poly.Boolean(bare, keepOff, BoolOp.Difference);
+                    foreach (var r in bare.Where(r => r.Area >= 6f))
+                        Paint(plan, r.Outer, (int)s.Knob("lushLayer", 2f), s.Knob("gardenPaint", 0.85f), 1.6f, 1.4f, 5f, (uint)(h.Id * 2246822519L) ^ (uint)Poly.Area(r.Outer));
+                    plan.Notes.Add($"{h.Id}: a painted garden");
+                    continue;
+                }
                 var lawns = h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3).OrderByDescending(l => Poly.Area(l.Ring)).ToList();
                 var hard = houses.SelectMany(o => o.Hard).Where(r => r != null && r.Length >= 3 && Overlaps(plot, r)).Select(r => new Region(Ccw(r))).Concat(beds[i]).ToList();
                 var pieces = hard.Count > 0 ? Poly.Boolean(lawnLand[i], hard, BoolOp.Difference) : lawnLand[i];
                 pieces = pieces.Where(p => p.Area > 0.5f).ToList();
+                if (s.Knob("debugLawns", 0f) > 0.5f) plan.Notes.Add($"{h.Id}: land {lawnLand[i].Sum(r => r.Area):F0} m², {pieces.Count} pieces ({string.Join(", ", pieces.Select(p => p.Area.ToString("F0")))}), {lawns.Count} lawns ({string.Join(", ", lawns.Select(l => Poly.Area(l.Ring).ToString("F0")))})");
                 // each lawn (largest first) takes the pieces of the plot it lies in; the house's other lawns stay as they are
                 foreach (var lawn in lawns)
                 {
@@ -550,9 +565,15 @@ namespace Placemaker.Core.Neighbours
                     // what the other lawns cut off from it is land no lawn reaches yet
                     pieces.AddRange(merged.Where(r => r != keep));
                     var main = OpenHoles(keep, h);
-                    var grownLawn = Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(main.Outer, 0.05f), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance)
-                        .OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                    var grownLawn = Prepared(main.Outer);
                     bool overBeds = grownLawn != null && beds[i].Count > 0 && Poly.Boolean(new[] { new Region(Ccw(grownLawn)) }, beds[i], BoolOp.Intersection).Sum(r => r.Area) > 0.5f;
+                    if (overBeds)
+                    {
+                        // the lawn's cleaned outline reaches a little over some beds: the beds give way (trimmed round the
+                        // lawn; one that loses most of itself goes, with its bushes)
+                        FitBedsAround(h, grownLawn, plan, beds[i]);
+                        overBeds = false;
+                    }
                     if ((grownLawn == null || grownLawn.Length < 3 || overBeds) && beds[i].Count > 0)
                     {
                         // the beds leave a shape the game will not take: the garden goes without them
@@ -565,8 +586,7 @@ namespace Placemaker.Core.Neighbours
                         if (plain.Count > 0)
                         {
                             main = OpenHoles(Keeping(plain, lawn.Ring), h);
-                            grownLawn = Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(main.Outer, 0.05f), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance)
-                                .OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                            grownLawn = Prepared(main.Outer);
                         }
                         plan.Notes.Add($"{h.Id}: its beds left out (the lawn would not take them{(overBeds ? ": they would sit under it" : "")})");
                     }
@@ -579,8 +599,7 @@ namespace Placemaker.Core.Neighbours
                 foreach (var piece in pieces.OrderByDescending(p => p.Area))
                 {
                     if (piece.Area < s.Knob("minNewLawn", 20f)) continue;
-                    var ring = Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(OpenHoles(piece, h).Outer, 0.05f), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance)
-                        .OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                    var ring = Prepared(OpenHoles(piece, h).Outer);
                     if (ring == null || ring.Length < 3) continue;
                     plan.NewLawns.Add((h.Id, ring));
                     plan.LawnAddedM2 += Poly.Area(ring);
@@ -682,8 +701,7 @@ namespace Placemaker.Core.Neighbours
                 // half a metre in from the fences, cleaned (no slivers, no needle points) so the game draws it
                 var inset = Poly.Offset(piece.HasHoles ? Poly.CutHoles(piece, 0f).First() : piece.Outer, 0.5f).OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
                 if (inset == null) continue;
-                var green = Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(inset, 0.1f), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance)
-                    .OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                var green = Prepared(inset);
                 if (green == null || green.Length < 3) continue;
                 plan.Commons.Add(green);
                 plan.Notes.Add($"a shared green in the middle ({Poly.Area(green):F0} m²)");
@@ -725,26 +743,35 @@ namespace Placemaker.Core.Neighbours
                     float width = 1.2f + (hash >> 8 & 7) * 0.08f;
                     var e0 = a + d * 1.4f;
                     var e1 = b - d * 1.4f;
-                    var rect = Ccw(new[] { e0 - nrm * 1f, e1 - nrm * 1f, e1 + nrm * width, e0 + nrm * width });
+                    // an organic edge: the bed swells and narrows along the fence and tapers into the lawn at its ends
+                    float blen = math.distance(e0, e1), phase = (hash >> 24 & 255) / 255f * 6.28f;
+                    float Width(float t) => width * (0.35f + 0.65f * math.sqrt(math.max(0f, math.sin(math.PI * t)))) * (1f + 0.22f * math.sin(t * blen / 2.6f + phase));
+                    var edge = new List<float2> { e0 - nrm * 1f };
+                    int segs = math.max(4, (int)(blen / 0.9f));
+                    for (int k = 0; k <= segs; k++) { float t = k / (float)segs; edge.Add(math.lerp(e0, e1, t) + nrm * Width(t)); }
+                    edge.Add(e1 - nrm * 1f);
+                    var rect = Ccw(edge.ToArray());
                     var region = Poly.Boolean(new[] { new Region(rect) }, new[] { new Region(plot) }, BoolOp.Intersection);
-                    var near = built.Near(rect).Concat(beds[i]).ToList();
+                    // only on bare land: never over a lawn the house keeps as it is
+                    var near = built.Near(rect).Concat(beds[i]).Concat(h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3).Select(l => new Region(Ccw(l.Ring)))).ToList();
                     if (near.Count > 0) region = Poly.Boolean(region, near, BoolOp.Difference);
                     var piece = region.OrderByDescending(r => r.Area).FirstOrDefault();
                     if (piece == null || piece.Area < 4f) continue;
-                    var ring = Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(piece.HasHoles ? Poly.CutHoles(piece, 0f).First() : piece.Outer, 0.05f), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance)
-                        .OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                    // a bed reaches the garden's edge (one cut off from it by a driveway would be an island the lawn cannot go round)
+                    if (!piece.Outer.Any(q => DistanceToRing(plot, q) < 0.15f)) continue;
+                    var ring = Prepared(piece.HasHoles ? Poly.CutHoles(piece, 0f).First() : piece.Outer);
                     if (ring == null || ring.Length < 3) continue;
                     plan.Beds.Add((h.Id, ring));
                     beds[i].Add(new Region(Ccw(ring)));
                     // bushes along the bed's middle, two kinds alternating
                     int k0 = (int)(hash >> 12) % FirstRock, k1 = (k0 + 1 + (int)(hash >> 16) % (FirstRock - 1)) % FirstRock;   // plants only (rocks come after them)
                     float spacing = 2.3f + (hash >> 20 & 7) * 0.12f;
-                    var line0 = e0 + nrm * (width * 0.55f);
                     int count = 0;
-                    for (float t = spacing * 0.5f; t < math.distance(e0, e1) && bushes < maxBushes; t += spacing)
+                    for (float t = spacing * 0.5f; t < blen && bushes < maxBushes; t += spacing)
                     {
                         uint hb = Hash(hash + (uint)count * 7919u);
-                        var p = line0 + d * (t + ((hb & 255) / 255f - 0.5f) * 0.5f) + nrm * (((hb >> 8 & 255) / 255f - 0.5f) * width * 0.35f);
+                        float tt = math.saturate((t + ((hb & 255) / 255f - 0.5f) * 0.5f) / blen);
+                        var p = math.lerp(e0, e1, tt) + nrm * (Width(tt) * (0.5f + ((hb >> 8 & 255) / 255f - 0.5f) * 0.3f));
                         if (!Poly.Contains(ring, p)) continue;
                         plan.Bushes.Add((h.Id, p, (hb >> 16 & 1023) / 1023f * 2f * math.PI, count % 2 == 0 ? k0 : k1));
                         bushes++;
@@ -796,7 +823,7 @@ namespace Placemaker.Core.Neighbours
             if (near.Count > 0) region = Poly.Boolean(region, near, BoolOp.Difference);
             var piece = region.OrderByDescending(r => r.Area).FirstOrDefault();
             if (piece == null || piece.Area < 2f) return;
-            var ring = Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(piece.Outer, 0.05f), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance).OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+            var ring = Prepared(piece.Outer);
             if (ring == null || ring.Length < 3) return;
             plan.Beds.Add((h.Id, ring));
             beds.Add(new Region(Ccw(ring)));
@@ -843,8 +870,7 @@ namespace Placemaker.Core.Neighbours
                 if (nearPath.Count > 0) path = Poly.Boolean(path, nearPath, BoolOp.Difference);
                 var piece = path.OrderByDescending(r => r.Area).FirstOrDefault();
                 if (piece == null || piece.Area < 5f) continue;
-                var ring = Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(piece.HasHoles ? Poly.CutHoles(piece, 0f).First() : piece.Outer, 0.05f), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance)
-                    .OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                var ring = Prepared(piece.HasHoles ? Poly.CutHoles(piece, 0f).First() : piece.Outer);
                 if (ring == null || ring.Length < 3) continue;
                 plan.Paths.Add((h.Id, ring, "Tiles Surface 01"));
                 beds[i].Add(new Region(Ccw(ring)));
@@ -852,15 +878,18 @@ namespace Placemaker.Core.Neighbours
         }
 
         /// <summary>A rock or two where some shared fences meet the street (in the garden, clear of driveways).</summary>
-        private static void Rocks(IReadOnlyList<StitchHouse> houses, float2[][] plots, StitchPlan plan, Obstacle built, StitchSettings s)
+        private static void Rocks(IReadOnlyList<StitchHouse> houses, float2[][] plots, StitchPlan plan, Dictionary<long, (float2 A, float2 B)> moved, Obstacle built, StitchSettings s)
         {
+            // a rock never sits by a hedge (a rock against a hedge looks placed, not found)
+            var hedges = houses.SelectMany(h => h.Lines).Where(l => Score(l.Name) == 3 && !plan.HideLines.Contains(l.Id))
+                .Select(l => moved.TryGetValue(l.Id, out var m) ? m : (l.A, l.B)).ToList();
             var byId = new Dictionary<long, int>();
             for (int i = 0; i < houses.Count; i++) byId[houses[i].Id] = i;
             foreach (var pair in plan.Pairs)
             {
                 if (pair.Rear || math.lengthsq(pair.Back - pair.Front) < 1f) continue;
                 uint hash = Hash(((ulong)pair.Left << 20) ^ (ulong)pair.Right ^ 0xB0D1UL);
-                if (hash % 100 >= (uint)s.Knob("rockChance", 25f)) continue;
+                if (hash % 100 >= (uint)s.Knob("rockChance", 12f)) continue;
                 long owner = (hash >> 7 & 1) == 0 ? pair.Left : pair.Right;
                 if (!byId.TryGetValue(owner, out int oi)) continue;
                 var d = math.normalizesafe(pair.Back - pair.Front);
@@ -870,8 +899,16 @@ namespace Placemaker.Core.Neighbours
                 var p = pair.Front + d * (1.6f + (hash >> 9 & 3) * 0.3f) + side * 1.2f;
                 if (!Poly.Contains(plots[oi], p) || built.Near(new[] { p - 0.1f, p + 0.1f }).Any(r => Poly.Contains(r.Outer, p))
                     || plan.Beds.Any(bd => Poly.Contains(bd.Ring, p)) || plan.Paths.Any(pt => Poly.Contains(pt.Ring, p))) continue;
+                if (hedges.Any(hl => DistanceToSegment(p, hl.A, hl.B) < 4f)) continue;
                 plan.Bushes.Add((owner, p, (hash >> 12 & 1023) / 1023f * 2f * math.PI, FirstRock + (int)(hash >> 22) % 3));
             }
+        }
+
+        private static float DistanceToSegment(float2 p, float2 a, float2 b)
+        {
+            var ab = b - a;
+            float t = math.saturate(math.dot(p - a, ab) / math.max(1e-6f, math.dot(ab, ab)));
+            return math.distance(p, a + ab * t);
         }
 
         private static float2[] Strip(float2 a, float2 b, float width)
@@ -904,6 +941,41 @@ namespace Placemaker.Core.Neighbours
         private static (float2 A, float2 B) Along(StitchLine l, float2 a, float2 b) =>
             math.distance(l.A, a) + math.distance(l.B, b) <= math.distance(l.A, b) + math.distance(l.B, a) ? (a, b) : (b, a);
 
+/// <summary>
+        /// A ring cleaned into a shape the game draws (PrepareSurface: node spacing, triangulation): tried as it is, then
+        /// simplified more and more (a wavy bed edge or a cut-out leaves tiny edges the game will not take); the largest
+        /// accepted piece, or null when nothing near the asked-for size is left.
+        /// </summary>
+        private static float2[] Prepared(IReadOnlyList<float2> ring)
+        {
+            if (ring == null || ring.Count < 3) return null;
+            float want = Poly.Area(ring);
+            foreach (float tol in new[] { 0.05f, 0.25f, 0.6f })
+            {
+                var r = Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(ring, tol), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance)
+                    .OrderByDescending(x => Poly.Area(x)).FirstOrDefault();
+                if (r != null && r.Length >= 3 && Poly.Area(r) >= want * 0.6f) return r;
+            }
+            return null;
+        }
+
+        /// <summary>The house's beds trimmed round its lawn; a bed left with under half of itself goes, and bushes off a bed go too.</summary>
+        private static void FitBedsAround(StitchHouse h, float2[] lawn, StitchPlan plan, List<Region> beds)
+        {
+            var lawnRegion = new[] { new Region(Ccw(lawn)) };
+            beds.Clear();
+            for (int k = plan.Beds.Count - 1; k >= 0; k--)
+            {
+                var (house, ring) = plan.Beds[k];
+                if (house != h.Id) continue;
+                var left = Poly.Boolean(new[] { new Region(Ccw(ring)) }, lawnRegion, BoolOp.Difference).OrderByDescending(r => r.Area).FirstOrDefault();
+                var fitted = left != null && left.Area >= Poly.Area(ring) * 0.5f ? Prepared(left.HasHoles ? Poly.CutHoles(left, 0f).First() : left.Outer) : null;
+                if (fitted == null) plan.Beds.RemoveAt(k);
+                else { plan.Beds[k] = (house, fitted); beds.Add(new Region(Ccw(fitted))); }
+            }
+            plan.Bushes.RemoveAll(b => b.House == h.Id && b.Kind < FirstRock && !plan.Beds.Any(bd => bd.House == h.Id && Poly.Contains(bd.Ring, b.Position)));
+        }
+
         private static uint Hash(ulong x)
         {
             x ^= x >> 33; x *= 0xff51afd7ed558ccdUL; x ^= x >> 33; x *= 0xc4ceb9fe1a85ec53UL; x ^= x >> 33;
@@ -919,17 +991,18 @@ namespace Placemaker.Core.Neighbours
         /// </summary>
         private static void PlanPaint(StitchPlan plan, StitchSettings s)
         {
-            float fade = s.Knob("fadeWidth", 10f);
+            float fade = s.Knob("fadeWidth", 8f);
             foreach (var kv in plan.Lawns.Select(x => (Key: x.Key, Value: x.Value)).Concat(plan.NewLawns.Select(x => (Key: x.House, Value: x.Ring))))
             {
                 var outer = Poly.Offset(Ccw(kv.Value), -fade);
                 if (outer.Count == 0) continue;
-                Paint(plan, outer.OrderByDescending(r => Poly.Area(r)).First(), (int)s.Knob("lushLayer", 2f), s.Knob("fadeStrength", 0.75f), fade, 2f, 9f, (uint)(kv.Key * 2654435761L));
+                Paint(plan, outer.OrderByDescending(r => Poly.Area(r)).First(), (int)s.Knob("lushLayer", 2f), s.Knob("fadeStrength", 0.65f), fade, 2f, 9f, (uint)(kv.Key * 2654435761L));
             }
             foreach (var common in plan.Commons) Paint(plan, common, (int)s.Knob("lushLayer", 2f), s.Knob("meadowStrength", 0.9f), 3f, 2f, 8f, 0x51CEu);
             foreach (var pair in plan.Pairs)
             {
-                if (pair.Gap != null && Poly.Area(pair.Gap) >= 20f)
+                // (the gap between two houses is their lawns now: painting it too left dark patches behind when a plan changed)
+                if (s.Knob("gapPaint", 0f) > 0.5f && pair.Gap != null && Poly.Area(pair.Gap) >= 20f)
                 {
                     var region = Poly.Normalize(Ccw(pair.Gap));
                     if (region.Count > 0) Paint(plan, region[0].Outer, (int)s.Knob("lushLayer", 2f), s.Knob("meadowStrength", 0.9f), 2.5f, 1.5f, 7f, (uint)((pair.Left * 17 + pair.Right * 3) & 0x7fffffff));

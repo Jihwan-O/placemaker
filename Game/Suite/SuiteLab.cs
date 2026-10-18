@@ -163,6 +163,23 @@ namespace Placemaker.Game.Suite
                     yield return Frames(30);
                     yield break;
                 }
+                case "polishidle":
+                {
+                    // until the polish has looked at every house it was asked to (a city switched on): how long it took, how
+                    // many passes; the runner logs the step's worst frame
+                    float limit = (float?)step["seconds"] ?? 300f;
+                    var clock = System.Diagnostics.Stopwatch.StartNew();
+                    int passes0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPasses;
+                    int frames = 0;
+                    yield return Frames(4);
+                    while (Placemaker.Game.Neighbours.NeighbourPolishSystem.Busy && clock.Elapsed.TotalSeconds < limit) { frames++; yield return null; }
+                    rec["seconds"] = Math.Round(clock.Elapsed.TotalSeconds, 1);
+                    rec["frames"] = frames;
+                    rec["passes"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPasses - passes0;
+                    rec["stillWaiting"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.Waiting;
+                    Mod.Log.Info($"Placemaker lab: polish idle after {clock.Elapsed.TotalSeconds:F1} s, {frames} frames ({(frames > 0 ? clock.Elapsed.TotalMilliseconds / frames : 0):F1} ms a frame), {rec["passes"]} passes, {rec["stillWaiting"]} still waiting");
+                    yield break;
+                }
                 case "polishdump":
                 {
                     // every house in the land as the polish planner sees it (tools: Tests NeighbourReplay draws plans offline)

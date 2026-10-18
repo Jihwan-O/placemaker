@@ -369,6 +369,39 @@ namespace Placemaker.Game.Settings
         [SettingsUISection(SectionMain, GroupNeighbourhood)]
         public bool NeighbourhoodPolish { get; set; }
 
+        /// <summary>Lawns grow to the shared fences (off: only the fences and hedges are joined).</summary>
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public bool PolishLawns { get; set; }
+
+        /// <summary>Share of gardens whose new land is painted (lush ground) rather than drawn as lawn: variety along a street.</summary>
+        [SettingsUISlider(min = 0, max = 100, step = 5, scalarMultiplier = 1, unit = global::Game.UI.Unit.kPercentage)]
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public int PolishPaintedGardens { get; set; }
+
+        /// <summary>Planted beds with bushes along new fences and hedges.</summary>
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public bool PolishPlanting { get; set; }
+
+        /// <summary>Garden paths in some big gardens, walkways between some houses.</summary>
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public bool PolishPaths { get; set; }
+
+        /// <summary>Now and then a rock by the street where two gardens meet.</summary>
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public bool PolishRocks { get; set; }
+
+        /// <summary>Ground paint: soft lush edges round the gardens, worn ground along fences facing open land.</summary>
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public bool PolishGroundPaint { get; set; }
+
+        public bool PolishOff() => !NeighbourhoodPolish;
+
         public bool ParkingEconomyOff() => !ParkingEconomy;
         public bool CompanionOff() => !ExperimentalParkingCompanion;
 
@@ -406,6 +439,16 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Economy.ParkingCompanionSystem.CompanionEnabled = ExperimentalParkingCompanion;
                 global::Placemaker.Game.Economy.ParkingCompanionUpkeepSystem.UpkeepFactor = CompanionUpkeepFactor;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = NeighbourhoodPolish;
+                global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetOptions(new System.Collections.Generic.Dictionary<string, float>
+                {
+                    ["lawns"] = PolishLawns ? 1f : 0f,
+                    ["paintedGardens"] = PolishPaintedGardens,
+                    ["plant"] = PolishPlanting ? 1f : 0f,
+                    ["pathChance"] = PolishPaths ? 45f : 0f,
+                    ["alleyChance"] = PolishPaths ? 45f : 0f,
+                    ["rockChance"] = PolishRocks ? 12f : 0f,
+                    ["paint"] = PolishGroundPaint ? 1f : 0f,
+                });
             }
             catch (Exception e) { Mod.Log.Warn("Placemaker: build options not applied: " + e.Message); }
         }
@@ -447,6 +490,12 @@ namespace Placemaker.Game.Settings
             DecalsNeverCollide = true;
             SeeThroughDecals = true;
             NeighbourhoodPolish = false;   // experimental: on once it has been seen in the game
+            PolishLawns = true;
+            PolishPaintedGardens = 33;
+            PolishPlanting = true;
+            PolishPaths = true;
+            PolishRocks = true;
+            PolishGroundPaint = true;
             ChargeNetConstruction = true;
             SelectAsOneThing = true;
             DebugTerrainDump = false;

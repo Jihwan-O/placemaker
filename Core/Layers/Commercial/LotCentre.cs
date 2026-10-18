@@ -655,10 +655,9 @@ namespace Placemaker.Core.Layers.Commercial
                     bag.Values["rowAngle"] = (double)(ang + rot);
                     bag.Values["perimeterRoad"] = ring;
                     var t = mall.PlanLot(lot, entries, bag, salt + (uint)rot + (ring ? 7u : 0u), true);
-                   
                     if (t == null || NetFit.Violations(t.Sub.Nets, t.Site).Count > 0 || Mall.Warns(t)) continue;
-                    t.Sub.Issues.RemoveAll(i => i.Key != null && i.Key.EndsWith("PerimeterRoadDropped"));
-                    if (BaysOffAsphalt(t.Sub) > 0) continue;   // a stall marking on grass ("grassy parking spots"): another variant   // our choice to try, not the player's
+                    t.Sub.Issues.RemoveAll(i => i.Key != null && i.Key.EndsWith("PerimeterRoadDropped"));   // our choice to try, not the player's
+                    t.Capacity -= DropBaysOffAsphalt(t.Sub);   // no stall marking on grass ("grassy parking spots")
                     // An aisle ending in a turning circle reads as a dead end (the user: "how do the cars even get in there"): each
                     // costs the stalls of a short row.
                     int dead = DeadEnds(t.Sub.Nets);
@@ -668,18 +667,25 @@ namespace Placemaker.Core.Layers.Commercial
             return best;
         }
 
-        /// <summary>Stall markings whose middle lies on no asphalt surface of the lot (the asphalt left out there, the marking not).</summary>
-        private static int BaysOffAsphalt(AreaPlan sub)
+        /// <summary>Drops the stall markings that do not lie wholly on the lot's asphalt (it stopped short of them); returns how many.</summary>
+        private static int DropBaysOffAsphalt(AreaPlan sub)
         {
             var asphalt = new List<float2[]>();
             foreach (var sf in sub.Surfaces) if (sf.Role == SurfaceRole.Asphalt) asphalt.Add(Poly.To2D(sf.Ring));
             int off = 0;
-            foreach (var ob in sub.Objects)
+            for (int i = sub.Objects.Count - 1; i >= 0; i--)
             {
+                var ob = sub.Objects[i];
                 if (ob.Role != ObjectRole.ParkingBay) continue;
-                bool on = false;
-                foreach (var a in asphalt) if (Poly.Contains(a, ob.Position.xz)) { on = true; break; }
-                if (!on) off++;
+                // the whole stall, not its middle: at a slanted lot edge the asphalt stopped mid-stall (the game runner's big site)
+                var c = ob.Position.xz;
+                var ax = new float2(math.sin(ob.Yaw), math.cos(ob.Yaw)); var px = new float2(-ax.y, ax.x);
+                foreach (var p in new[] { c, c + ax * 2.3f, c - ax * 2.3f, c + px * 1.1f, c - px * 1.1f })
+                {
+                    bool on = false;
+                    foreach (var a in asphalt) if (Poly.Contains(a, p) || Poly.DistanceToBoundary(a, p) < 0.35f) { on = true; break; }
+                    if (!on) { off++; sub.Objects.RemoveAt(i); break; }
+                }
             }
             return off;
         }

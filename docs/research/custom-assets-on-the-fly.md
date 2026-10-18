@@ -106,6 +106,19 @@ are edited after they are placed (Game/Neighbours, Core/Neighbours/YardStitch, 1
   meadow on shared greens and wedges with no lawn, worn dirt where a shared side meets the back fence and the street.
   Vanilla has no decorative ground decals (docs/DECALS.md); decals from the player's packs could be added on top but
   cannot be seen in the game runner (clean profile).
+* **How a gap is shared** (as people do): the middle line; or, on a wedge opening to the back, a stepped split (one
+  house takes the front part, the other the back; both fences stay on the houses' own lot lines, a row of bushes makes
+  the step); or, on a narrow even gap, a paved walkway between the two houses. Gardens never reach the street: between
+  neighbours whose gap opens to the street the line joining their front corners, 0.6 m in, is the limit.
+* **Planting** in gardens the stitching made bigger: forest-floor beds along some fences with bushes (two kinds a bed),
+  a paved garden path with a dog-leg in some big gardens, a rock by the street at some shared fences. Beds, paths and
+  bushes are owned by the house (bulldozed with it); a plan that no longer has one takes it away (deleted at PostTool,
+  where the game deletes a building's own pieces: deleting later in the frame crashed the game natively).
+* **Fences stop** at houses, sheds, pools, decks, driveways and paving (30 cm in from their edges).
+* **Bulldozing**: the houses within 70 m of a bulldozed one are planned again (their fences go back to their own lots).
+  The ground paint stays (terrain paint is permanent).
+* **Off the frame**: the planner runs on a worker thread (a pass gathers the houses, plans in the background, and is
+  applied when done); a house only there for context is not planted.
 * A pass plans with every house within 110 m of the houses that changed but edits only those within 40 m, so a house at
   the edge of a pass is never planned without its neighbours.
 * Offline replay: lab op "polishDump" records the houses as the planner sees them; tools/hot/Replay-Polish.ps1 -Run <run>

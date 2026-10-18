@@ -131,6 +131,38 @@ namespace Placemaker.Game.Suite
                     yield return Frames(10);
                     yield break;
                 }
+                case "bulldozehouses":
+                {
+                    // the player bulldozes some houses (every n-th in the land): the polish must give their neighbours their
+                    // own fences back and leave nothing of theirs standing
+                    var b = st.S.Block;
+                    int every = math.max(2, (int?)step["every"] ?? 4);
+                    var em = _world.EntityManager;
+                    var victims = new System.Collections.Generic.List<Entity>();
+                    using (var q = em.CreateEntityQuery(ComponentType.ReadOnly<global::Game.Buildings.Building>(), ComponentType.ReadOnly<global::Game.Objects.Transform>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>()))
+                    using (var all = q.ToEntityArray(Allocator.Temp))
+                    {
+                        var inLand = all.Where(e => { var p = em.GetComponentData<global::Game.Objects.Transform>(e).m_Position; return p.x >= b.X0 && p.x <= b.X1 && p.z >= b.Z0 && p.z <= b.Z1; })
+                            .OrderBy(e => em.GetComponentData<global::Game.Objects.Transform>(e).m_Position.x).ThenBy(e => em.GetComponentData<global::Game.Objects.Transform>(e).m_Position.z).ToList();
+                        for (int i = 1; i < inLand.Count; i += every) victims.Add(inLand[i]);
+                    }
+                    yield return ApplyWithFixtureTool(t =>
+                    {
+                        foreach (var v in victims)
+                        {
+                            var def = t.NewDefinition();
+                            em.AddComponentData(def, new CreationDefinition { m_Original = v, m_Flags = CreationFlags.Delete });
+                            em.AddComponent<Updated>(def);
+                            var tr = em.GetComponentData<global::Game.Objects.Transform>(v);
+                            em.AddComponentData(def, new ObjectDefinition { m_Position = tr.m_Position, m_Rotation = tr.m_Rotation, m_LocalPosition = tr.m_Position, m_LocalRotation = tr.m_Rotation, m_ParentMesh = -1, m_Scale = new float3(1f), m_Intensity = 1f, m_PrefabSubIndex = -1 });
+                        }
+                        return victims.Count;
+                    }, "bulldoze houses");
+                    rec["bulldozed"] = victims.Count;
+                    Mod.Log.Info($"Placemaker lab: {victims.Count} houses bulldozed");
+                    yield return Frames(30);
+                    yield break;
+                }
                 case "polishdump":
                 {
                     // every house in the land as the polish planner sees it (tools: Tests NeighbourReplay draws plans offline)
@@ -148,6 +180,7 @@ namespace Placemaker.Game.Suite
                             ["lawns"] = new JArray(h.Lawns.Select(l => (object)new JObject { ["id"] = l.Id, ["ring"] = Ring(l.Ring) }).ToArray()),
                             ["hard"] = new JArray(h.Hard.Select(r => (object)Ring(r)).ToArray()),
                             ["footprint"] = Ring(h.Footprint),
+                            ["props"] = new JArray(h.Props.Select(r => (object)Ring(r)).ToArray()),
                         });
                     rec["houses"] = arr;
                     Mod.Log.Info($"Placemaker lab: polish dump of {arr.Count} houses");

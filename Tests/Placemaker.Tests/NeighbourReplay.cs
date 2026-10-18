@@ -80,6 +80,7 @@ namespace Placemaker.Tests
             foreach (var l in e.GetProperty("lawns").EnumerateArray()) h.Lawns.Add(new StitchLawn { Id = l.GetProperty("id").GetInt64(), Ring = Ring(l.GetProperty("ring")) });
             foreach (var r in e.GetProperty("hard").EnumerateArray()) { var ring = Ring(r); if (ring != null) h.Hard.Add(ring); }
             if (e.TryGetProperty("footprint", out var fp)) h.Footprint = Ring(fp);
+            if (e.TryGetProperty("props", out var props)) foreach (var r in props.EnumerateArray()) { var ring = Ring(r); if (ring != null) h.Props.Add(ring); }
             return h;
         }
 
@@ -108,6 +109,10 @@ namespace Placemaker.Tests
                 // the street side
                 sb.Append(Line(h.FrontLeft, h.FrontRight, "stroke:#333;stroke-width:0.6"));
             }
+            foreach (var h in houses) foreach (var r in h.Props) sb.Append(Poly(r, "fill:#4a6fa5;fill-opacity:0.7"));
+            foreach (var bed in plan.Beds) sb.Append(Poly(bed.Ring, "fill:#6b4f2a;fill-opacity:0.85"));
+            foreach (var path in plan.Paths) sb.Append(Poly(path.Ring, "fill:#d8d2c0;fill-opacity:0.95;stroke:#998;stroke-width:0.1"));
+            foreach (var bush in plan.Bushes) sb.Append($"<circle cx=\"{F(bush.Position.x - lo.x)}\" cy=\"{F(hi.y - bush.Position.y)}\" r=\"0.9\" fill=\"{(bush.Kind >= 5 ? "#777" : bush.Kind >= 2 && bush.Kind <= 3 ? "#c04d8a" : "#1e5a1e")}\"/>\n");
             foreach (var kv in plan.NewLawns) sb.Append(Poly(kv.Ring, "fill:#3fa34d;fill-opacity:0.75;stroke:#185;stroke-width:0.15"));
             foreach (var kv in plan.Plots)
             {

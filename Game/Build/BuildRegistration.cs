@@ -48,6 +48,10 @@ namespace Placemaker.Game.Build
             updateSystem.UpdateAt<global::Placemaker.Game.Neighbours.NeighbourPaintSystem>(SystemUpdatePhase.ToolUpdate);
             // its shared-green surfaces: permanent definitions right before GenerateAreasSystem (as zone spawns are made)
             updateSystem.UpdateBefore<global::Placemaker.Game.Neighbours.NeighbourAreaSystem, global::Game.Tools.GenerateAreasSystem>(SystemUpdatePhase.Modification1);
+            // pieces a garden no longer has: deleted at PostTool, where the game deletes a building's own pieces
+            updateSystem.UpdateAfter<global::Placemaker.Game.Neighbours.NeighbourDeleteSystem, global::Game.Objects.SubElementDeleteSystem>(SystemUpdatePhase.PostTool);
+            // its bushes: owned objects, permanent definitions right before GenerateObjectsSystem
+            updateSystem.UpdateBefore<global::Placemaker.Game.Neighbours.NeighbourObjectSystem, global::Game.Tools.GenerateObjectsSystem>(SystemUpdatePhase.Modification1);
 
             // ── Groups ─────────────────────────────────────────────────────────────────
             // Removal marks Deleted in PreTool: SubElementDeleteSystem (PostTool) cascades and

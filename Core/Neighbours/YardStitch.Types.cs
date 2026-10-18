@@ -33,6 +33,11 @@ namespace Placemaker.Core.Neighbours
         public List<float2[]> Hard = new List<float2[]>();
         /// <summary>The house itself (its mesh's ground outline): no moved fence or hedge may cross it.</summary>
         public float2[] Footprint;
+        /// <summary>The house's other built pieces (shed, pool, greenhouse, deck): no moved fence or hedge crosses them.</summary>
+        public List<float2[]> Props = new List<float2[]>();
+        /// <summary>False: only there so its neighbours are planned right (the game layer edits it in another pass); its
+        /// lawn, beds and paths are not worked out.</summary>
+        public bool Edit = true;
 
         public float2 Right => new float2(Forward.y, -Forward.x);
         public float2 ToLocal(float2 w) { var d = w - Position; return new float2(math.dot(d, Right), math.dot(d, Forward)); }
@@ -96,5 +101,11 @@ namespace Placemaker.Core.Neighbours
         /// <summary>Lawns to add, owned by a house: for a house with none (gravel yards), and for the part of a plot its own
         /// lawn cannot reach (a driveway splits it). The game layer creates them as the house's own surfaces.</summary>
         public readonly List<(long House, float2[] Ring)> NewLawns = new List<(long, float2[])>();
+        /// <summary>Planted beds (forest-floor ground) along new fences and hedges, owned by the house whose garden they are in.</summary>
+        public readonly List<(long House, float2[] Ring)> Beds = new List<(long, float2[])>();
+        /// <summary>Bushes on those beds, and rocks by the street, owned by the house: Kind indexes <see cref="YardStitch.BushKinds"/>.</summary>
+        public readonly List<(long House, float2 Position, float Yaw, int Kind)> Bushes = new List<(long, float2, float, int)>();
+        /// <summary>Walkways and alleys (a vanilla path surface by name), owned by a house.</summary>
+        public readonly List<(long House, float2[] Ring, string Surface)> Paths = new List<(long, float2[], string)>();
     }
 }

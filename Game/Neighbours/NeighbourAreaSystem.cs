@@ -59,6 +59,7 @@ namespace Placemaker.Game.Neighbours
             {
                 if (_byName == null) Index();
                 var heights = _terrain.GetHeightData(true);
+                _centres = null;
                 foreach (var r in Queue)
                 {
                     var ring = r.Ring;
@@ -71,6 +72,8 @@ namespace Placemaker.Game.Neighbours
                     long key = ((long)math.round(c.x) << 32) ^ (uint)(int)math.round(c.y) ^ ((long)prefab.Index << 20);
                     // free-standing ones once per spot; owned ones whenever the house has lost theirs (a rebuild deletes it)
                     if ((r.Owner == Entity.Null && !_made.Add(key)) || Exists(prefab, c)) continue;
+                    if (!_centres.TryGetValue(prefab, out var mine)) _centres[prefab] = mine = new List<float2>();
+                    mine.Add(c);
                     var def = EntityManager.CreateEntity();
                     EntityManager.AddComponentData(def, new CreationDefinition { m_Prefab = prefab, m_Owner = r.Owner, m_Flags = CreationFlags.Permanent });
                     var nodes = EntityManager.AddBuffer<Node>(def);
@@ -85,21 +88,33 @@ namespace Placemaker.Game.Neighbours
             Queue.Clear();
         }
 
+        private Dictionary<Entity, List<float2>> _centres;
+
         /// <summary>A surface of this kind already centred here (after a load our in-memory list is empty).</summary>
         private bool Exists(Entity prefab, float2 centre)
         {
+            if (_centres == null) IndexCentres();
+            if (!_centres.TryGetValue(prefab, out var list)) return false;
+            foreach (var p in list) if (math.distance(p, centre) < 1.5f) return true;
+            return false;
+        }
+
+        /// <summary>Every surface's centre by kind, once per frame that has requests.</summary>
+        private void IndexCentres()
+        {
+            _centres = new Dictionary<Entity, List<float2>>();
             using (var q = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<global::Game.Areas.Surface>(), ComponentType.ReadOnly<Node>(), ComponentType.ReadOnly<PrefabRef>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>()))
             using (var all = q.ToEntityArray(Allocator.Temp))
                 foreach (var e in all)
                 {
-                    if (EntityManager.GetComponentData<PrefabRef>(e).m_Prefab != prefab) continue;
+                    var prefab = EntityManager.GetComponentData<PrefabRef>(e).m_Prefab;
                     var nodes = EntityManager.GetBuffer<Node>(e, true);
                     if (nodes.Length < 3) continue;
                     var c = float2.zero;
                     for (int i = 0; i < nodes.Length; i++) c += nodes[i].m_Position.xz;
-                    if (math.distance(c / nodes.Length, centre) < 1.5f) return true;
+                    if (!_centres.TryGetValue(prefab, out var list)) _centres[prefab] = list = new List<float2>();
+                    list.Add(c / nodes.Length);
                 }
-            return false;
         }
 
         private void Index()

@@ -337,6 +337,9 @@ if (-not $KeepGraphics) {
     if (Test-Path $sc) {
         $t = Get-Content -LiteralPath $sc -Raw -Encoding UTF8
         $t = $t -replace '"masterVolume":\s*[0-9.]+', '"masterVolume": 0'
+        # A profile that never changed the volume has no "Audio Settings" section (the game then plays at its default volume):
+        # add one, muted. The user's own file is put back after the run.
+        if ($t -notmatch '(?m)^Audio Settings\s*$') { $t = $t.TrimEnd() + "`r`nAudio Settings`r`n{`r`n    `"masterVolume`": 0,`r`n    `"radioActive`": false`r`n}`r`n" }
         $t = $t -replace '"vSync":\s*true', '"vSync": false'
         $t = $t -replace '"displayMode":\s*"[A-Za-z]+"', '"displayMode": "Window"'
         $t = $t -replace '"volumetricCloudsEnabled":\s*true', '"volumetricCloudsEnabled": false'

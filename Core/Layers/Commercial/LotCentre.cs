@@ -310,6 +310,9 @@ namespace Placemaker.Core.Layers.Commercial
             public int Landed;
         }
 
+        /// <summary>The share of a double row's planned cells the game zones when the row stands out in the lot (not inside the U).</summary>
+        private const float DoubleRowZoned = 0.75f;
+
         /// <summary>Below this width (m) between the U's legs the court holds no proper lot.</summary>
         private const float CourtMin = 40f;
 
@@ -438,7 +441,9 @@ namespace Placemaker.Core.Layers.Commercial
                 if (u) { ia = math.max(ia, v.A2 + 2f * h + 8f); ib = math.min(ib, v.B2 - 2f * h - 8f); }
                 if (ib - ia < 6f * Mall.Cell + 2f * h) return false;
                 if (Steep(ctx, r.At(ia, y1), r.At(ib, y1)) || Steep(ctx, r.At(ia, y2), r.At(ib, y2)) || Steep(ctx, r.At(ia, y1), r.At(ia, y2))) return false;
-                shops += 2f * (ib - ia - 2f * h - 1f) * di;
+                // (a double row out in the lot zones about three quarters of its cells in the game, one inside the U all of them: game
+                // runs send-split-1018-103736 and -111039, 21-47 % lost on four sites without the U, none on two with it)
+                shops += 2f * (ib - ia - 2f * h - 1f) * di * (u ? 1f : DoubleRowZoned);
                 t = hi + island;
             }
             // The car entrances that come in through the front lot (the others drive to a lane: no ramp from a street above or below

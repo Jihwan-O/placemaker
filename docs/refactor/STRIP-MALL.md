@@ -34,15 +34,23 @@ stalls were built (game run `shops4-base`). The leftover pieces were drawn as la
   16 m shop lanes: shops 11 % of the site, asphalt 58 % (the U and the double rows never came in: the U was off with a
   square, the double row needed 9 m more depth). Now every layout behind the best lane lines is estimated from its
   geometry and the most even one is planned first (`Variants`, `Estimate`, `Even` in `LotCentre.cs`): double rows (0 to
-  8, shops three or two cells deep), the U on or off (its side rows four, three or two cells deep), with or without the
-  square, combined (a U round double rows on big sites). The lot counts only its whole aisle bays; the bands between
-  rows are whole bays and the front band takes the rest, and the line may sit a little short of the back so the lot
-  ends at the shops' lane instead of leaving a strip of grass before them. A layout that plans out well short of its
-  estimate (an entrance behind the row took its shops) is taken back and the next tried. Offline (shops / asphalt): the
-  user's block 24 / 27 % (was 11 / 58), 220 x 220 m 26 / 32 %, 300 x 280 m 26 / 27 %; a 150 x 140 m block keeps its
-  single row (16-20 % shops: the back street's zone margin and the lot leave no room for more). Plan facts `estShops`,
+  8, shops three or two cells deep), the U on or off (its side rows four or three cells deep: two-cell side rows gave
+  less of both), with or without the square, combined (a U round double rows on big sites). The lot counts only its
+  whole aisle bays; the bands between rows are whole bays and the front band takes the rest, and the line may sit a
+  little short of the back so the lot ends at the shops' lane instead of leaving a strip of grass before them. A layout
+  that plans out well short of its estimate (an entrance behind the row took its shops) is taken back and the next
+  tried; the plain row is always among the tries. A car entrance that would not come in through the lot (its drive to
+  a lane has no ramp from a street above or below the ground) costs a layout 4000 m². Offline (shops / asphalt): the
+  user's block 20-24 / 27-29 % (was 11 / 58), 220 x 220 m 23-26 / 27-30 %, 300 x 280 m 24-26 / 31-35 %; a 150 x 140 m
+  block 16-17 / 27-39 % (the back street's zone margin and the lot leave no room for more). Plan facts `estShops`,
   `estLot`, `evenPlanned`, `sideCells`, `midCells`. Offline renders: `Tests/Placemaker.Tests/StripMallSplitTests.cs` (Probe)
   (`PM_PROBE_OUT`); game scenarios: `.forensics/split/gen.js`.
+- **Double rows out in the lot lose plots in the game (open).** Game runs `send-split-1018-103736` and `-111039`: a
+  double row inside the U zoned every planned cell (220 x 220 m 241 / 241, 300 x 280 m 370 / 370), one out in the lot
+  without the U lost 21-47 % (the user's block 158 -> 114, 400 x 160 m with three of them 324 -> 172), the same loss
+  the double rows had before (`shops4-it19`: 468 -> 372). Both rows of the island lose cells at the same spots; the
+  log blames the game's depth rule and lot zone blockers. The estimate counts those rows at three quarters
+  (`DoubleRowZoned`), so the U wins where it fits; the cause is not found yet.
 - **Ground**: nothing is reshaped on land that rises and falls less than 1 m under the lot; on a slope only the lot is
   levelled (parking grading); lanes are never laid steeper than 8 % (else "too steep"). Lawn is terrain paint kept 2 m off
   every road (it was a lawn surface that spilled onto roads).

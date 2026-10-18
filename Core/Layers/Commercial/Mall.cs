@@ -470,6 +470,47 @@ namespace Placemaker.Core.Layers.Commercial
             return new LotTry { Sub = sub, Ring = lot, Capacity = (float)cap, Ev = (float)ev, Synthetic = synthetic, Site = site };
         }
 
+        /// <summary>
+        /// (shops4) An asphalt ring as pieces the game draws whole: cut into 30 m tiles square to the main street, each tile's part made
+        /// convex; parts the game would refuse are left out when tiny or a sliver (else the part stays as it is). Null when the ring
+        /// is small and convex already.
+        /// </summary>
+        private List<float2[]> SafeAsphalt(float2[] ring)
+        {
+            if (Poly.IsConvex(ring) && Poly.Area(ring) <= 900f) return null;
+            bool Good(float2[] p) => SurfaceAcceptance.IsAccepted(p) && Build.AreaRings.IsValid(p, Build.AreaRings.SurfaceMinNodeDistance + Build.AreaRings.Margin);
+            var d = MainDir ?? new float2(1f, 0f); var n = new float2(-d.y, d.x);
+            float a0 = float.MaxValue, a1 = float.MinValue, b0 = float.MaxValue, b1 = float.MinValue;
+            foreach (var p in ring) { float a = math.dot(p, d), b = math.dot(p, n); a0 = math.min(a0, a); a1 = math.max(a1, a); b0 = math.min(b0, b); b1 = math.max(b1, b); }
+            const float T = 30f;
+            var res = new List<float2[]>();
+            try
+            {
+                for (float a = a0; a < a1; a += T)
+                    for (float b = b0; b < b1; b += T)
+                    {
+                        var tile = Poly.EnsureCcw(new[] { d * a + n * b, d * (a + T) + n * b, d * (a + T) + n * (b + T), d * a + n * (b + T) });
+                        foreach (var reg in Poly.Intersection(ring, tile))
+                        {
+                            if (reg?.Outer == null || reg.Outer.Length < 3) continue;
+                            var piece = Poly.EnsureCcw(Poly.Clean(reg.Outer, 0.05f));
+                            if (piece.Length < 3 || Poly.Area(piece) < 0.5f) continue;
+                            var parts = Poly.IsConvex(piece) ? new List<float2[]> { piece } : ConvexDecomposition.Decompose(piece, true);
+                            if (parts == null || parts.Count == 0) parts = new List<float2[]> { piece };
+                            foreach (var p in parts)
+                            {
+                                if (Good(p)) { res.Add(p); continue; }
+                                // a sliver under a metre wide (a seam along a lane's edge, which the lane covers) is left out
+                                float per = 0f; for (int k = 0; k < p.Length; k++) per += math.distance(p[k], p[(k + 1) % p.Length]);
+                                if (Poly.Area(p) >= 3f && 2f * Poly.Area(p) / math.max(per, 0.01f) >= 0.5f) res.Add(p);
+                            }
+                        }
+                    }
+            }
+            catch (Exception) { return null; }
+            return res.Count > 0 ? res : null;
+        }
+
         /// <summary>Merges a planned lot into the plan and takes its land.</summary>
         public bool CommitLot(LotTry t, bool leftover = false)
         {
@@ -487,23 +528,14 @@ namespace Placemaker.Core.Layers.Commercial
             // that leave the islands out, so the bare ground shows there.
             if (LotFirstMode)
             {
-                // The asphalt as convex pieces: the game split one big many-sided lot ring into triangles with a long sliver missing,
-                // grass showing under a row of stalls (game runner, 300 x 280 m site). A convex piece has no such sliver.
+                // The asphalt as small convex pieces: the game split a big many-sided lot ring into triangles with a long sliver
+                // missing, grass showing under a row of stalls (game runner, 300 x 280 m site). 30 m tiles, each made convex.
                 for (int i = sub.Surfaces.Count - 1; i >= 0; i--)
                 {
                     var sf = sub.Surfaces[i];
                     if (sf.Role != SurfaceRole.Asphalt || sf.Ring.Length <= 4) continue;
-                    var r2 = Poly.To2D(sf.Ring);
-                    if (Poly.IsConvex(r2)) continue;
-                    List<float2[]> parts;
-                    try { parts = ConvexDecomposition.Decompose(r2, true); }
-                    catch (Exception) { continue; }
-                    if (parts == null || parts.Count < 2) continue;
-                    bool ok = true;
-                    // (a part the game would refuse: a sliver under 3 m² is left out, a bigger one keeps the ring whole)
-                    parts.RemoveAll(p => (!SurfaceAcceptance.IsAccepted(p) || !Build.AreaRings.IsValid(p, Build.AreaRings.SurfaceMinNodeDistance + Build.AreaRings.Margin)) && Poly.Area(p) < 3f);
-                    foreach (var p in parts) if (!SurfaceAcceptance.IsAccepted(p) || !Build.AreaRings.IsValid(p, Build.AreaRings.SurfaceMinNodeDistance + Build.AreaRings.Margin)) { ok = false; break; }
-                    if (!ok) continue;
+                    var parts = SafeAsphalt(Poly.To2D(sf.Ring));
+                    if (parts == null) continue;
                     sub.Surfaces.RemoveAt(i);
                     foreach (var p in parts)
                         sub.Surfaces.Insert(i, new PlannedSurface { Ring = Poly.To3D(p, q => sub.HeightAfter != null ? sub.HeightAfter(q) : Ctx.H(q)), Role = sf.Role, Asset = sf.Asset, Control = sf.Control, Category = sf.Category });

@@ -717,10 +717,10 @@ namespace Placemaker.Core.Layers.Commercial
                 {
                     if (part?.Outer == null || part.Outer.Length < 3 || Poly.Area(part.Outer) < 20f) continue;
                     var p = part.Outer;
-                    kit.Fill(p, TerrainMaterials.Dry, 0.8f, 1.5f, 1.6f, 9f);
-                    kit.Speckle(p, TerrainMaterials.Dirt, 0.85f, 9f, 0.38f, 0.35f, 1.5f);
-                    kit.Speckle(p, TerrainMaterials.Sand, 0.7f, 15f, 0.16f, 0.4f, 1.5f);
-                    kit.Speckle(p, TerrainMaterials.Lush, 0.6f, 6f, 0.25f, 0.3f, 1.5f);
+                    kit.Fill(p, TerrainMaterials.Dry, 1f, 1f, 1.6f, 9f);
+                    kit.Speckle(p, TerrainMaterials.Dirt, 1f, 8f, 0.5f, 0.3f, 1f);
+                    kit.Speckle(p, TerrainMaterials.Sand, 0.9f, 14f, 0.22f, 0.35f, 1f);
+                    kit.Speckle(p, TerrainMaterials.Lush, 0.8f, 5f, 0.22f, 0.3f, 1f);
                 }
             }
             catch (Exception) { }

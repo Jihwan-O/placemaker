@@ -67,7 +67,7 @@ namespace Placemaker.Game.Neighbours
         // a plot depends on houses up to ~2 lots away (and a ring's shared green on the whole ring): the pass plans with
         // everything within ClusterRadius but edits only houses within CoreRadius of a dirty one, so a house at the edge of
         // a pass (its neighbours not in it) is never planned half-blind and reset
-        private const float ClusterRadius = 110f;
+        private const float ClusterRadius = 90f;
         private const float CoreRadius = 40f;
         // a bulldozed house: the houses this near it are planned again (a neighbour's line on the shared side goes back)
         private const float GoneRadius = 70f;
@@ -87,11 +87,16 @@ namespace Placemaker.Game.Neighbours
         private readonly HashSet<long> _painted = new HashSet<long>();
         private bool _wasEnabled;
         // the planner runs off the frame: a pass gathers the houses here, plans on a worker, and is applied when it is done
-        private Task<StitchPlan> _planning;
-        private Pending _pending;
+        // plans worked out on workers at once, each for its own patch of town (patches far enough apart never edit the same house)
+        private readonly List<Pending> _inFlight = new List<Pending>();
+        private static readonly int MaxInFlight = math.clamp(Environment.ProcessorCount / 4, 1, 3);
+        // a patch: a waiting house and every waiting house this near it, planned together with the houses around them
+        private const float PatchRadius = 50f;
 
         private sealed class Pending
         {
+            public Task<StitchPlan> Task;
+            public float2 Seed;
             public List<StitchHouse> Stitch;
             public Dictionary<long, (Entity Lane, float3 A, float3 B)> LanesOf;
             public Dictionary<long, Entity> LawnsOf;
@@ -158,13 +163,12 @@ namespace Placemaker.Game.Neighbours
                 }
                 CollectChanged();
                 ++_frame;
-                Busy = _dirty.Count > 0 || _planning != null;
+                Busy = _dirty.Count > 0 || _inFlight.Count > 0;
                 Waiting = _dirty.Count;
-                if (_planning != null)
-                {
-                    if (_planning.IsCompleted) Finish();
-                }
-                else if (_dirty.Count > 0 && (_frame & 1) == 0) Pass();
+                // one finished plan written per frame (writing is the part on the frame), one new patch started per frame
+                for (int k = 0; k < _inFlight.Count; k++)
+                    if (_inFlight[k].Task.IsCompleted) { var done = _inFlight[k]; _inFlight.RemoveAt(k); Finish(done); break; }
+                if (_dirty.Count > 0 && _inFlight.Count < MaxInFlight) Pass();
                 if (_passes > 0 && (_frame & 255) == 0) Report();
             }
             catch (Exception e)
@@ -294,15 +298,33 @@ namespace Placemaker.Game.Neighbours
             var index = _gridIndex;
             int batch = _dirty.Count > 200 ? HousesPerBigPass : HousesPerPass;
 
-            // this pass: up to HousesPerPass dirty houses and everything within ClusterRadius of them
+            // this pass: one patch of town. A waiting house far enough from the patches still being planned, and every
+            // waiting house near it (a compact patch: its neighbourhood is small, so its plan is quick)
             var cluster = new HashSet<int>();
             var core = new HashSet<int>();
             var done = new List<Entity>();
+            int seed = -1;
+            var unknown = new List<Entity>();
             foreach (var e in _dirty)
             {
-                if (done.Count >= batch) break;
-                done.Add(e);
-                if (!index.TryGetValue(e, out int i)) continue;   // gone, or still being built: its lanes come back as Created later
+                if (!index.TryGetValue(e, out int i)) { unknown.Add(e); continue; }   // gone, or still being built: its lanes come back as Created later
+                var at = houses[i].T.m_Position.xz;
+                bool clear = true;
+                foreach (var f in _inFlight) if (math.distance(f.Seed, at) < 2f * (PatchRadius + CoreRadius) + 10f) { clear = false; break; }
+                if (clear) { seed = i; break; }
+            }
+            foreach (var e in unknown) _dirty.Remove(e);
+            if (seed < 0) return;
+            var seedAt = houses[seed].T.m_Position.xz;
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dz = -1; dz <= 1; dz++)
+                    if (grid.TryGetValue(Key(seedAt + new float2(dx, dz) * Cell), out var near0))
+                        foreach (int j in near0)
+                            if (done.Count < batch && _dirty.Contains(houses[j].E) && math.distance(houses[j].T.m_Position.xz, seedAt) <= PatchRadius) done.Add(houses[j].E);
+            if (!done.Contains(houses[seed].E)) done.Add(houses[seed].E);
+            foreach (var e in done)
+            {
+                if (!index.TryGetValue(e, out int i)) continue;
                 var p = houses[i].T.m_Position.xz;
                 for (int dx = -2; dx <= 2; dx++)
                     for (int dz = -2; dz <= 2; dz++)
@@ -351,21 +373,18 @@ namespace Placemaker.Game.Neighbours
             }
             var planner = Planner;
             var settings = Settings;
-            _pending = new Pending
+            _inFlight.Add(new Pending
             {
                 Stitch = stitch, LanesOf = lanesOf, LawnsOf = lawnsOf, CoreIds = coreIds, HouseOf = new Dictionary<long, Entity>(_houseOf),
                 LawnPrefabOf = new Dictionary<long, Entity>(_lawnPrefabOf), Asked = done.Count, Cluster = cluster.Count, Clock = sw,
-            };
-            _planning = Task.Run(() => planner(stitch, settings));
+                Seed = seedAt, Task = Task.Run(() => planner(stitch, settings)),
+            });
         }
 
         /// <summary>A plan the worker finished: written into the houses (anything gone since is skipped).</summary>
-        private void Finish()
+        private void Finish(Pending pend)
         {
-            var task = _planning;
-            var pend = _pending;
-            _planning = null;
-            _pending = null;
+            var task = pend.Task;
             if (task.IsFaulted || task.IsCanceled || pend == null)
             {
                 if (_errors++ < 5) Mod.Log.Warn("Placemaker neighbourhood polish: a plan failed: " + task.Exception?.GetBaseException().Message);

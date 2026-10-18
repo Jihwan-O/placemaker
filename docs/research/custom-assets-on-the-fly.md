@@ -117,8 +117,12 @@ are edited after they are placed (Game/Neighbours, Core/Neighbours/YardStitch, 1
 * **Fences stop** at houses, sheds, pools, decks, driveways and paving (30 cm in from their edges).
 * **Bulldozing**: the houses within 70 m of a bulldozed one are planned again (their fences go back to their own lots).
   The ground paint stays (terrain paint is permanent).
-* **Off the frame**: the planner runs on a worker thread (a pass gathers the houses, plans in the background, and is
-  applied when done); a house only there for context is not planted.
+* **Off the frame, in patches**: a pass takes one compact patch of town (a waiting house and every waiting house within
+  50 m), plans it on a worker thread with the houses within 90 m as context, and writes it when done; up to 3 patches far
+  apart are planned at once. The house grid and each house's description are kept between passes. A town of 309 houses
+  switched on at once: done in 7.9 s, 8.1 ms average frame, worst 59 ms (was 114 s with scattered batches).
+* **Options** (settings panel, Neighbourhood polish): lawns up to the fences, painted gardens (share, default 33 %), beds
+  and bushes, garden paths and walkways, rocks, ground paint.
 * A pass plans with every house within 110 m of the houses that changed but edits only those within 40 m, so a house at
   the edge of a pass is never planned without its neighbours.
 * Offline replay: lab op "polishDump" records the houses as the planner sees them; tools/hot/Replay-Polish.ps1 -Run <run>

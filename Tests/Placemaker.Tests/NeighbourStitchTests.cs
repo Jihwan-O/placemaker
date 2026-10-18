@@ -456,6 +456,147 @@ namespace Placemaker.Tests
             Assert.True(math.distance(back.B, plan.Pairs.Single(p => p.Right == 2).Back) < 0.01f);
         }
 
+        // ───────────── yes meets no (the player's per-lot flag) ─────────────
+
+        /// <summary>A wedge on the outside of a curve: a (polished) on the left, b (unpolished) on the right.</summary>
+        private static (StitchHouse A, StitchHouse B) Wedge()
+        {
+            float2 At(float angle) => 64f * new float2(math.cos(angle), math.sin(angle));
+            float2 Facing(float angle) => -new float2(math.cos(angle), math.sin(angle));
+            float a0 = math.radians(90f), a1 = a0 + 0.45f;
+            var a = House(1, At(a0), Facing(a0));
+            var b = House(2, At(a1), Facing(a1));
+            b.Polished = false;
+            return (a, b);
+        }
+
+        private static void AssertUntouched(StitchPlan plan, StitchHouse h)
+        {
+            foreach (var l in h.Lines)
+            {
+                Assert.DoesNotContain(l.Id, plan.HideLines);
+                Assert.False(plan.MoveLines.ContainsKey(l.Id), $"unpolished {h.Id}'s line {l.Id} moved");
+            }
+            foreach (var l in h.Lawns) Assert.False(plan.Lawns.ContainsKey(l.Id), $"unpolished {h.Id}'s lawn changed");
+            Assert.DoesNotContain(plan.NewLawns, x => x.House == h.Id);
+            Assert.DoesNotContain(plan.Beds, x => x.House == h.Id);
+            Assert.DoesNotContain(plan.Bushes, x => x.House == h.Id);
+            Assert.DoesNotContain(plan.Paths, x => x.House == h.Id);
+            Assert.False(plan.Plots.ContainsKey(h.Id));
+        }
+
+        /// <summary>How far p lies inside h's lot (negative: outside).</summary>
+        private static float InsideLot(StitchHouse h, float2 p)
+        {
+            var l = h.ToLocal(p);
+            return math.min(h.HalfLot.x - math.abs(l.x), h.HalfLot.y - math.abs(l.y));
+        }
+
+        [Fact]
+        public void A_polished_house_beside_an_unpolished_one_takes_the_whole_gap_and_leans_on_its_fence()
+        {
+            var (a, b) = Wedge();
+            var plan = YardStitch.Plan(new[] { a, b }, MiddleLine());
+            var pair = Assert.Single(plan.Pairs);
+            Assert.True(pair.Edge);
+            AssertUntouched(plan, b);
+            // b's left hedge is the border: a's own right fence (its duplicate) goes
+            Assert.Contains(11L, plan.HideLines);
+            Assert.Equal(22L, pair.KeptLine);
+            // a's garden reaches b's left lot edge (not the middle line), and never into b's lot
+            var plot = plan.Plots[1];
+            Assert.True(plot.Max(p => b.ToLocal(p).x) > -b.HalfLot.x - 0.05f, "a's plot stops short of b's edge");
+            Assert.True(plot.All(p => InsideLot(b, p) < 0.05f), "a's plot enters b's lot");
+            var lawn = plan.Lawns[15L];
+            Assert.True(lawn.Any(p => math.abs(b.ToLocal(p).x + b.HalfLot.x) < 0.6f), "a's lawn does not reach b's edge");
+            Assert.True(lawn.All(p => InsideLot(b, p) < 0.05f), "a's lawn enters b's lot");
+            // a's back fence runs on to b's edge
+            var back = plan.MoveLines[13L];
+            Assert.True(new[] { back.A, back.B }.Any(p => math.abs(b.ToLocal(p).x + b.HalfLot.x) < 0.1f), $"a's back fence ends at {back.A} {back.B}");
+            Assert.Contains(plan.Notes, n => n.Contains("leans on"));
+        }
+
+        [Fact]
+        public void When_the_unpolished_lot_has_no_fence_on_that_side_the_polished_ones_line_goes_on_its_edge()
+        {
+            var (a, b) = Wedge();
+            b.Lines.RemoveAll(l => l.Id == 22L);   // b has no left line
+            var plan = YardStitch.Plan(new[] { a, b }, MiddleLine());
+            AssertUntouched(plan, b);
+            Assert.DoesNotContain(11L, plan.HideLines);
+            var m = plan.MoveLines[11L];
+            foreach (var p in new[] { m.A, m.B })
+                Assert.True(math.abs(b.ToLocal(p).x + b.HalfLot.x) < 0.05f, $"a's fence end {p} is not on b's left edge (local x {b.ToLocal(p).x:F2})");
+            Assert.True(math.distance(m.A, m.B) > 30f, $"a's fence on the edge is only {math.distance(m.A, m.B):F1} m");
+        }
+
+        [Fact]
+        public void The_unpolished_house_on_the_left_is_the_edge_too()
+        {
+            var (a, b) = Wedge();
+            a.Polished = false;
+            b.Polished = true;
+            var plan = YardStitch.Plan(new[] { a, b }, MiddleLine());
+            AssertUntouched(plan, a);
+            // a's right fence is the border: b's left hedge (its duplicate) goes, b's garden reaches a's right edge
+            Assert.Contains(22L, plan.HideLines);
+            Assert.Equal(11L, plan.Pairs[0].KeptLine);
+            Assert.True(plan.Plots[2].Min(p => a.ToLocal(p).x) < a.HalfLot.x + 0.05f);
+            Assert.True(plan.Plots[2].All(p => InsideLot(a, p) < 0.05f));
+        }
+
+        [Fact]
+        public void Two_unpolished_neighbours_are_left_alone()
+        {
+            var (a, b) = Wedge();
+            a.Polished = false;
+            var plan = YardStitch.Plan(new[] { a, b }, MiddleLine());
+            Assert.Empty(plan.Pairs);
+            Assert.Empty(plan.HideLines);
+            Assert.Empty(plan.MoveLines);
+            Assert.Empty(plan.Lawns);
+            Assert.Empty(plan.Paints);
+            AssertUntouched(plan, a);
+            AssertUntouched(plan, b);
+        }
+
+        [Fact]
+        public void Nothing_is_planted_or_painted_on_an_unpolished_lot()
+        {
+            var (a, b) = Wedge();
+            var c = House(3, 64f * new float2(math.cos(math.radians(90f) - 0.45f), math.sin(math.radians(90f) - 0.45f)), -new float2(math.cos(math.radians(90f) - 0.45f), math.sin(math.radians(90f) - 0.45f)));
+            var houses = new[] { c, a, b };
+            foreach (var h in houses) h.Footprint = new[] { h.ToWorld(new float2(-5f, 2f)), h.ToWorld(new float2(5f, 2f)), h.ToWorld(new float2(5f, 14f)), h.ToWorld(new float2(-5f, 14f)) };
+            var plan = YardStitch.Plan(houses, MiddleLine());
+            AssertUntouched(plan, b);
+            // ground paint never reaches into b's lot (a soft edge may touch it)
+            foreach (var paint in plan.Paints)
+            {
+                var ring = paint.Ring.Select(p => p.xz).ToArray();
+                Assert.True(ring.Count(p => InsideLot(b, p) > 1f) == 0, $"paint layer {paint.Layer} reaches into the unpolished lot");
+            }
+            foreach (var (_, p, _, _) in plan.Bushes) Assert.True(InsideLot(b, p) < 0f);
+            foreach (var (_, ring) in plan.Beds) Assert.True(ring.All(p => InsideLot(b, p) < 0.05f));
+        }
+
+        [Fact]
+        public void A_polished_house_back_to_back_with_an_unpolished_one_reaches_its_back_edge_and_uses_its_back_fence()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, -1f), right: "FenceResidentialHigh01");
+            var b = House(2, new float2(0f, 56f), new float2(0f, 1f), right: "HedgeHigh01");
+            b.Polished = false;
+            a.Lawns[0].Ring = new[] { a.ToWorld(new float2(-7f, -23f)), a.ToWorld(new float2(7f, -23f)), a.ToWorld(new float2(7f, -10f)), a.ToWorld(new float2(-7f, -10f)) };
+            var noPlanting = new StitchSettings();
+            noPlanting.Extra["plant"] = 0f;
+            var plan = YardStitch.Plan(new[] { a, b }, noPlanting);
+            AssertUntouched(plan, b);
+            Assert.Single(plan.Pairs, p => p.Rear && p.Edge);
+            // a's garden reaches b's back edge (z = 32), not the middle line (28); b's back hedge closes it, so a's back fence goes
+            Assert.True(plan.Lawns[15L].Max(p => p.y) > 31.4f, $"a's lawn reaches {plan.Lawns[15L].Max(p => p.y):F1}");
+            Assert.True(plan.Lawns[15L].Max(p => p.y) < 32.05f);
+            Assert.True(plan.HideLines.Contains(13L) || (plan.MoveLines.TryGetValue(13L, out var m13) && math.distance(m13.A, m13.B) < 2.5f), "a's back fence doubles b's hedge");
+        }
+
         private static float DistanceToSegment(float2 p, float2 a, float2 b)
         {
             var ab = b - a;

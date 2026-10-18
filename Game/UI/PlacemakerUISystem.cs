@@ -53,6 +53,7 @@ namespace Placemaker.Game.UI
             Trigger<bool>("setPanelCollapsed", c => _tool.SetPanelCollapsed(c));
             Trigger<string>("goToStage", s => { if (StageMachine.TryParse(s, out var st)) _tool.GoToStage(st); });
             Trigger("primary", () => _tool.Primary());
+            Trigger<bool>("polishStamp", yes => _tool.PolishStamp(yes));   // PROTOCOL 25: the painter's Polish / Unpolish
             Trigger("undo", () => _tool.Undo());
             Trigger("redo", () => _tool.Redo());
             // Area overhaul: Road nodes is part of Points (corners snap to road nodes); an older panel asking for it gets Points.
@@ -197,6 +198,12 @@ namespace Placemaker.Game.UI
                     DescriptionKey = e.DescriptionKey,
                 });
             }
+            // the neighbourhood-polish painter: picked like a type (Recipes/shelf/neighbourhood.json shows it)
+            entries.Add(new RecipeListEntry
+            {
+                Id = PlacemakerToolSystem.PainterId, Name = "Placemaker.Painter.Name", Icon = "Media/Game/Icons/Lawn.svg",
+                DescriptionKey = "Placemaker.Painter.Desc", Painter = true, Group = "neighbourhood",
+            });
             var store = _tool.Presets;
             _catalog.Update(UiModels.Catalog(GeneratorRegistry.All, entries, store != null ? g => store.ViewsFor(g) : (Func<IAreaGenerator, IReadOnlyList<PresetView>>)null).ToString());
         }
@@ -212,7 +219,7 @@ namespace Placemaker.Game.UI
             _designStamp = _tool.DesignVersion;
             _designPlanStamp = _tool.PlanRevision;
             _designAssetsStamp = _tool.AssetsResolvedStamp;
-            _design.Update(UiModels.Design(_tool.CurrentRecipe, _tool.RecipeId, _tool.Modified, _tool.Focus, _tool.StepStatuses(), _tool.Plan,
+            _design.Update(UiModels.Design(_tool.Painter ? null : _tool.CurrentRecipe, _tool.Painter ? PlacemakerToolSystem.PainterId : _tool.RecipeId, !_tool.Painter && _tool.Modified, _tool.Focus, _tool.StepStatuses(), _tool.Plan,
                 null, _tool.ActivePreset, _tool.PresetsFile, _tool.PlanStale, _tool.Unavailability(), AssetLabelOf).ToString());
         }
 

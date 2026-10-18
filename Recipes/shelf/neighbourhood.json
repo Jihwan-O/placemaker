@@ -1,0 +1,15 @@
+{
+  "_about": "Make-row category 'Neighbourhood' (Core/Tool/Shelf.cs; one file per category). Not a type: 'Polish gardens' is the neighbourhood-polish painter (Game/Tool/PlacemakerToolSystem.Painter.cs), picked like a type. It stamps the lots in the area polished (yes) or as the game made them (no); it plans and builds nothing.",
+  "id": "neighbourhood",
+  "name": "Neighbourhood",
+  "order": 9,
+  "hidden": false,
+  "groups": [
+    "neighbourhood"
+  ],
+  "types": [
+    "polishGardens"
+  ],
+  "hiddenTypes": [],
+  "hiddenStyles": {}
+}

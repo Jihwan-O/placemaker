@@ -77,7 +77,7 @@ namespace Placemaker.Game.Tool
 
             r[s.GetSettingsLocaleID()] = T("Placemaker.Name", "Placemaker");
             r[s.GetOptionTabLocaleID(PlacemakerSettings.SectionMain)] = T("Placemaker.Settings.Tab.Main", "Placemaker");
-            foreach (var g in new[] { PlacemakerSettings.GroupGeneral, PlacemakerSettings.GroupBrush, PlacemakerSettings.GroupBuild, PlacemakerSettings.GroupKeys, PlacemakerSettings.GroupMaintenance })
+            foreach (var g in new[] { PlacemakerSettings.GroupGeneral, PlacemakerSettings.GroupBrush, PlacemakerSettings.GroupBuild, PlacemakerSettings.GroupNeighbourhood, PlacemakerSettings.GroupKeys, PlacemakerSettings.GroupMaintenance })
                 r[s.GetOptionGroupLocaleID(g)] = T("Placemaker.Settings.Group." + g, g);
             foreach (var p in new[]
             {
@@ -98,6 +98,9 @@ namespace Placemaker.Game.Tool
                 nameof(PlacemakerSettings.ClearExistingTreesAndProps), nameof(PlacemakerSettings.RecoverRejectedPieces), nameof(PlacemakerSettings.OverlayPavedSurfaces),
                 nameof(PlacemakerSettings.ChargeNetConstruction), nameof(PlacemakerSettings.SelectAsOneThing), nameof(PlacemakerSettings.ConfirmBulldoze),
                 nameof(PlacemakerSettings.ApplyParkStats), nameof(PlacemakerSettings.RealParkStats),
+                nameof(PlacemakerSettings.NeighbourhoodPolish), nameof(PlacemakerSettings.PolishNewHouses), nameof(PlacemakerSettings.PolishLawns),
+                nameof(PlacemakerSettings.PolishPaintedGardens), nameof(PlacemakerSettings.PolishPavedFill), nameof(PlacemakerSettings.PolishPlanting),
+                nameof(PlacemakerSettings.PolishPaths), nameof(PlacemakerSettings.PolishRocks), nameof(PlacemakerSettings.PolishGroundPaint), nameof(PlacemakerSettings.RemoveAllPolish),
             })
             {
                 r[s.GetOptionLabelLocaleID(p)] = T("Placemaker.Settings." + p, p);
@@ -105,6 +108,7 @@ namespace Placemaker.Game.Tool
             }
             r[s.GetOptionWarningLocaleID(nameof(PlacemakerSettings.RemoveEverything))] = T("Placemaker.Settings.RemoveEverything.Warning", "Remove everything Placemaker built?");
             r[s.GetOptionWarningLocaleID(nameof(PlacemakerSettings.ResetDefaults))] = T("Placemaker.Settings.ResetDefaults.Warning", "Reset all Placemaker options and saved defaults?");
+            r[s.GetOptionWarningLocaleID(nameof(PlacemakerSettings.RemoveAllPolish))] = T("Placemaker.Settings.RemoveAllPolish.Warning", "Put every garden back as the game made it?");
             foreach (PreviewDetail d in Enum.GetValues(typeof(PreviewDetail)))
                 r[s.GetEnumValueLocaleID(d)] = T("Placemaker.Settings.PreviewDetail." + d, d.ToString());
             r[s.GetBindingMapLocaleID()] = T("Placemaker.Name", "Placemaker");

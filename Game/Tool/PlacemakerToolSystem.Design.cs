@@ -75,7 +75,10 @@ namespace Placemaker.Game.Tool
         public void SelectRecipe(string id)
         {
             EndValuePreview(true);
-            if (string.IsNullOrEmpty(id) || id == _recipeId && _recipe != null) return;
+            // the painter is picked like a type (it is not one: no recipe, nothing planned)
+            if (id == PainterId) { SetPainter(true); return; }
+            bool leftPainter = SetPainter(false);
+            if (string.IsNullOrEmpty(id) || id == _recipeId && _recipe != null) { if (leftPainter) DesignChanged(); return; }
             if (!SwitchRecipe(id)) return;
             _presetLayer = ""; _presetId = "";
             DesignChanged();

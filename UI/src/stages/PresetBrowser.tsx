@@ -42,10 +42,12 @@ export function isMix(catalog: Catalog, r: RecipeInfo) {
  */
 export function makeRecipes(catalog: Catalog): RecipeInfo[] {
     const fills = new Set(catalog.layers.filter((l) => l.kind === "fill" && !l.hidden).map((l) => l.id.toLowerCase()));
-    const singles = catalog.recipes.filter((r) => !r.custom && fills.has(r.id.toLowerCase()));
-    const types = singles.length ? singles : catalog.recipes.filter((r) => !isMix(catalog, r));
+    const singles = catalog.recipes.filter((r) => !r.custom && !r.painter && fills.has(r.id.toLowerCase()));
+    const types = singles.length ? singles : catalog.recipes.filter((r) => !r.painter && !isMix(catalog, r));
+    // (PROTOCOL 25) the neighbourhood-polish painter is picked like a type (it has no layer of its own)
+    const painter = catalog.recipes.filter((r) => r.painter);
     // (core) The central shelf hides whole categories (industry, transport) and single types (RecipeInfo.shelved).
-    return types.filter((r) => !r.shelved);
+    return [...types, ...painter].filter((r) => !r.shelved);
 }
 
 export type MakeGroup = { id: string; key: string; en: string };

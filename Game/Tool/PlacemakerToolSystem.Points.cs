@@ -163,6 +163,7 @@ namespace Placemaker.Game.Tool
             {
                 if (s?.Ring == null || s.Ring.Length < 3) return s;
                 if (_mode != SelectionMode.Draw && _mode != SelectionMode.Perimeter) return s;
+                if (_painter) return s;   // the painter picks lots by their middle: the outline is exactly what was drawn, across streets too
                 var rules = BrushRules.ForOutline();
                 var ring = s.Ring2D();
                 Poly.Bounds(ring, out var mn, out var mx);

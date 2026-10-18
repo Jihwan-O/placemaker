@@ -13,7 +13,6 @@
         "roads": "none"
       },
       "steps": [
-        { "do": "setting", "name": "PolishExistingHouses", "value": true },
         { "do": "setting", "name": "NeighbourhoodPolish", "value": false },
         { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ -220, -220 ] },
         { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ -220, 0 ] },
@@ -29,6 +28,7 @@
           "shotMode": "render"
         },
         { "do": "setting", "name": "NeighbourhoodPolish", "value": true },
+        { "do": "lab", "op": "polishStamp", "yes": true },
         { "do": "lab", "op": "polishIdle", "seconds": 400 },
         { "do": "lab", "op": "polishStats" },
         { "do": "shot", "name": "after-top", "camera": { "target": "area", "view": "top" },

@@ -61,6 +61,7 @@ namespace Placemaker.Game.Tool
         {
             EndValuePreview(true);
             if (string.IsNullOrEmpty(layerId)) return;
+            SetPainter(false);
             layerId = LayerAliases.Canonical(layerId);
             presetId = presetId ?? "";
             if (presetId.Length > 0 && !_presets.Exists(layerId, presetId)) { Flash(new LocText("Placemaker.Problem.UnknownPreset")); return; }

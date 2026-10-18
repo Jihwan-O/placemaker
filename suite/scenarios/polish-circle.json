@@ -25,7 +25,6 @@
             "pieDepth": 8
           }
         },
-        { "do": "setting", "name": "PolishExistingHouses", "value": true },
         { "do": "setting", "name": "NeighbourhoodPolish", "value": false },
         { "do": "lab", "op": "street", "shape": "circle", "radius": 75 },
         { "do": "grow", "seconds": 120 },
@@ -33,6 +32,7 @@
           "shotMode": "render"
         },
         { "do": "setting", "name": "NeighbourhoodPolish", "value": true },
+        { "do": "lab", "op": "polishStamp", "yes": true },
         { "do": "wait", "seconds": 4 },
         { "do": "lab", "op": "polishStats" },
         { "do": "shot", "name": "after-top", "camera": { "target": "area", "view": "top" },

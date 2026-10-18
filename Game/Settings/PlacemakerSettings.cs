@@ -369,10 +369,11 @@ namespace Placemaker.Game.Settings
         [SettingsUISection(SectionMain, GroupNeighbourhood)]
         public bool NeighbourhoodPolish { get; set; }
 
-        /// <summary>Also the houses already standing when it is switched on or a city is loaded (off: only houses that spawn or are rebuilt from then on).</summary>
+        /// <summary>A lot that spawns is marked polished (off: left as the game made it until the painter polishes it).
+        /// Houses already standing are polished with the painter (Placemaker's "Polish gardens" entry).</summary>
         [SettingsUISection(SectionMain, GroupNeighbourhood)]
         [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public bool PolishExistingHouses { get; set; }
+        public bool PolishNewHouses { get; set; }
 
         /// <summary>Lawns grow to the shared fences (off: only the fences and hedges are joined).</summary>
         [SettingsUISection(SectionMain, GroupNeighbourhood)]
@@ -415,6 +416,19 @@ namespace Placemaker.Game.Settings
         [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
         public bool PolishGroundPaint { get; set; }
 
+        /// <summary>Every lot to no: fences, hedges and lawns back to the game's own, every bed, path and bush the polish gave taken away.</summary>
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIButton]
+        [SettingsUIConfirmation]
+        public bool RemoveAllPolish
+        {
+            set
+            {
+                try { global::Placemaker.Game.Neighbours.NeighbourPolishSystem.RemoveAll(); }
+                catch (Exception e) { Mod.Log.Error(e, "Placemaker: remove all polish failed"); }
+            }
+        }
+
         public bool PolishOff() => !NeighbourhoodPolish;
 
         public bool ParkingEconomyOff() => !ParkingEconomy;
@@ -453,7 +467,7 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Economy.ParkingEconomySystem.DefaultFee = DefaultParkingFee;
                 global::Placemaker.Game.Economy.ParkingCompanionSystem.CompanionEnabled = ExperimentalParkingCompanion;
                 global::Placemaker.Game.Economy.ParkingCompanionUpkeepSystem.UpkeepFactor = CompanionUpkeepFactor;
-                global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PolishExisting = PolishExistingHouses;
+                global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PolishNew = PolishNewHouses;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = NeighbourhoodPolish;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetOptions(new System.Collections.Generic.Dictionary<string, float>
                 {
@@ -508,7 +522,7 @@ namespace Placemaker.Game.Settings
             DecalsNeverCollide = true;
             SeeThroughDecals = true;
             NeighbourhoodPolish = false;   // experimental: on once it has been seen in the game
-            PolishExistingHouses = false;
+            PolishNewHouses = true;
             PolishLawns = true;
             PolishPaintedGardens = 33;
             PolishPlanting = true;

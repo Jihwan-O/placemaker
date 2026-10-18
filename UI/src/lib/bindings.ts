@@ -319,6 +319,8 @@ export const act = {
     setPanelCollapsed: (collapsed: boolean) => fire(Triggers.setPanelCollapsed, collapsed),
     goToStage: (stage: Stage) => fire(Triggers.goToStage, stage),
     primary: () => fire(Triggers.primary),
+    /** (PROTOCOL 25) The painter: Polish (true) or Unpolish (false) the lots in the area. */
+    polishStamp: (yes: boolean) => fire(Triggers.polishStamp, yes),
     undo: () => fire(Triggers.undo),
     redo: () => fire(Triggers.redo),
     setAreaMode: (mode: AreaMode) => fire(Triggers.setAreaMode, mode),

@@ -15,6 +15,7 @@ import { Btn, Icon, Segmented, Switch } from "../components/common";
 import { Slider } from "../controls/Slider";
 import { Tip } from "../lib/tips";
 import { Tile } from "./PresetBrowser";
+import { PainterCard } from "../components/PainterCard";
 import s from "./area.module.scss";
 
 type Tool = "draw" | "block" | "paint";
@@ -286,6 +287,7 @@ export const AreaStage = ({ state }: { state: ToolState }) => {
     const cols = layout.width >= 360 ? 3 : 1;
     return (
         <div className={s.stage} data-testid="stage-area">
+            <PainterCard state={state} />
             <div className={s.tools} data-testid="area-mode">
                 {modeOptions(t).map((o) => {
                     const on = o.value === tool;

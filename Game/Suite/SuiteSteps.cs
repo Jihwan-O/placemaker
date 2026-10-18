@@ -127,6 +127,7 @@ namespace Placemaker.Game.Suite
             {
                 if (_tool.Stage == ToolStage.Manage) _tool.GoToStage(ToolStage.Area);
                 if (_tool.SuiteHasSelection) _tool.ClearArea();
+                _tool.SuiteLeavePainter();   // a scenario starts on a type, never on the polish painter
                 _tool.SuiteResetHistory();
                 yield return Frames(2);
             }
@@ -312,6 +313,7 @@ namespace Placemaker.Game.Suite
                 case "setting": yield return StepSetting(st, step, rec); break;
                 case "preset": yield return StepPreset(st, step, rec); break;
                 case "lab": yield return StepLab(st, step, rec); break;
+                case "polish": yield return StepPolish(st, step, rec); break;
                 default: rec["error"] = "unknown step '" + what + "' (suite/schema.json lists the steps)"; break;
             }
         }

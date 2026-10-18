@@ -350,6 +350,7 @@ namespace Placemaker.Game.Tool
                     else StartMarkers(p.StepPath, p.MarkerKind);
                     break;
                 case PrimaryKind.CancelBuild: CancelBuild(); break;
+                case PrimaryKind.Polish: PolishStamp(true); break;
             }
         }
 

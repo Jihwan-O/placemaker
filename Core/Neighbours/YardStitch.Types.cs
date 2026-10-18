@@ -38,6 +38,10 @@ namespace Placemaker.Core.Neighbours
         /// <summary>False: only there so its neighbours are planned right (the game layer edits it in another pass); its
         /// lawn, beds and paths are not worked out.</summary>
         public bool Edit = true;
+        /// <summary>The lot's saved flag (the player's painter, "Polish new houses"). False: the lot stays exactly as the game
+        /// made it (none of its lines, lawns or pieces change, nothing is planted on it); a polished neighbour takes the whole
+        /// gap up to its lot edge and leans on its fence there. Two unpolished neighbours: nothing happens between them.</summary>
+        public bool Polished = true;
         /// <summary>A shop, office or works (not a home): the name of the paved surface covering most of its ground (its car
         /// park). Its extra land is filled with the same surface, not lawn. Null for homes (and buildings with no paving).</summary>
         public string MainSurface;
@@ -86,6 +90,8 @@ namespace Placemaker.Core.Neighbours
         public float2[] Gap;
         /// <summary>Pie slice: where this border runs on to (the point it meets the next border behind the houses), or null.</summary>
         public float2? Tip;
+        /// <summary>One of the two is unpolished: the border is that lot's own edge, the polished one takes the whole gap.</summary>
+        public bool Edge;
     }
 
     public sealed class StitchPlan

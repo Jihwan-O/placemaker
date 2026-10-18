@@ -76,6 +76,7 @@ namespace Placemaker.Game.Neighbours
                         m_Scale = new float3(1f), m_Intensity = 1f, m_Probability = 100, m_PrefabSubIndex = -1,
                         m_Age = 0.425f,   // grown, not a sapling (ToolUtils.GetRandomAge stage 2)
                     });
+                    NeighbourPolishSystem.PendingTags.Add(new NeighbourPolishSystem.PendingTag { Owner = r.Owner, Prefab = prefab, At = r.Position, Kind = PolishPieceKind.Garden, Frame = NeighbourPolishSystem.LotFrame });
                     TotalMade++;
                 }
             }

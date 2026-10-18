@@ -62,6 +62,19 @@ namespace Placemaker.Core.Tool
         public IReadOnlyDictionary<string, bool> LegendVisibility;
         /// <summary>(Area overhaul) contract: state.areaLegend — what the overlay shows while choosing the area (Core/Tool/AreaLegend).</summary>
         public List<Placemaker.Core.Build.PreviewLegend.Entry> AreaLegend;
+        /// <summary>(PROTOCOL 25) contract: state.painter — "Polish gardens" is the pick (null = not).</summary>
+        public PainterView Painter;
+    }
+
+    /// <summary>The neighbourhood-polish painter as the panel shows it.</summary>
+    public sealed class PainterView
+    {
+        /// <summary>Lots whose middle lies in the area, and how many of them are polished now.</summary>
+        public int Lots, Polished;
+        /// <summary>The master switch "Stitch neighbouring houses" (off: flags are kept, gardens change once it is on).</summary>
+        public bool FeatureOn;
+        /// <summary>"Polish new houses".</summary>
+        public bool NewHouses;
     }
 
     public sealed class RecipeListEntry
@@ -71,6 +84,10 @@ namespace Placemaker.Core.Tool
         public string Icon = "";
         public bool Custom;
         public string DescriptionKey = "";
+        /// <summary>(PROTOCOL 25) The neighbourhood-polish painter ("Polish gardens"): picked like a type, not one.</summary>
+        public bool Painter;
+        /// <summary>The group the shelf files it under when it has no generator (the painter: "neighbourhood").</summary>
+        public string Group = "";
     }
 
     public sealed class SummaryInput
@@ -104,7 +121,8 @@ namespace Placemaker.Core.Tool
         /// the UI needs something a previous DLL does not send or handle. The game reloads the UI file from disk but the
         /// DLL only on restart, so after an update they can disagree until the player restarts.
         /// </summary>
-        public const int Protocol = 24;   // area overhaul: brush.rules paths/bikes/tracks/gap/reach/zoning, areaLegend, Road nodes folded into Points
+        public const int Protocol = 25;   // the neighbourhood-polish painter: recipes[].painter, state.painter, primary "polish", trigger polishStamp
+        // 24 = area overhaul: brush.rules paths/bikes/tracks/gap/reach/zoning, areaLegend, Road nodes folded into Points
         // 23 = s43: brush.rules.walls (Paint bucket walls)
         // 22 = s45: summary.costBuckets (cost bar by friendly category)
         // 21 = s33: summary.permanentNeedsAck (ground paint alone is one info line, no checkbox)
@@ -186,6 +204,9 @@ namespace Placemaker.Core.Tool
                 foreach (var e in s.AreaLegend) al.Add(LegendEntryJson(e));
                 o.Set("areaLegend", al);
             }
+            if (s.Painter != null)
+                o.Set("painter", JsonValue.Obj().Set("lots", s.Painter.Lots).Set("polished", s.Painter.Polished)
+                    .Set("featureOn", s.Painter.FeatureOn).Set("newHouses", s.Painter.NewHouses));
             return o;
         }
 
@@ -227,7 +248,8 @@ namespace Placemaker.Core.Tool
             {
                 var ro = JsonValue.Obj().Set("id", r.Id).Set("name", r.Name).Set("icon", IconPath(r.Icon)).Set("custom", r.Custom);
                 if (!string.IsNullOrEmpty(r.DescriptionKey)) ro.Set("description", r.DescriptionKey);
-                var grp = GeneratorGroups.Of(GeneratorRegistry.Get(r.Id));
+                var grp = !string.IsNullOrEmpty(r.Group) ? r.Group : GeneratorGroups.Of(GeneratorRegistry.Get(r.Id));
+                if (r.Painter) ro.Set("painter", true);
                 if (!string.IsNullOrEmpty(grp)) ro.Set("group", grp);
                 if (!r.Custom && !string.IsNullOrEmpty(grp))
                 {

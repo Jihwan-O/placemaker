@@ -31,6 +31,9 @@ namespace Placemaker.Game.Suite
                 case "yards": yield return LabYards(st, step, rec); yield break;
                 case "yardscheck": LabYardsCheck(rec); yield break;
                 case "anatomy": LabAnatomy(st, rec); yield break;
+                case "polishflags": yield return LabPolishFlags(st, rec); yield break;
+                case "saveload": yield return LabSaveLoad(st, rec); yield break;
+                case "removeallpolish": yield return LabRemoveAllPolish(st, rec); yield break;
                 case "polishparts":
                 {
                     // which parts neighbourhood polish edits: lines, lawns, both, none (isolates a crash to one kind of edit)
@@ -128,6 +131,30 @@ namespace Placemaker.Game.Suite
                     int n = labShapes.LevelUp(pick);
                     rec["levelUp"] = n;
                     Mod.Log.Info($"Placemaker lab: {n} houses asked to level up");
+                    yield return Frames(10);
+                    yield break;
+                }
+                case "polishstamp":
+                {
+                    // what the painter's Polish (yes) or Unpolish (no) does, on the lots in the land (or its west or east half)
+                    bool yes = (bool?)step["yes"] ?? true;
+                    string side = ((string)step["side"] ?? "all").ToLowerInvariant();
+                    var b = st.S.Block;
+                    float midX = (b.X0 + b.X1) * 0.5f;
+                    var em = _world.EntityManager;
+                    var lots = new System.Collections.Generic.List<Entity>();
+                    using (var q = em.CreateEntityQuery(ComponentType.ReadOnly<global::Game.Buildings.Building>(), ComponentType.ReadOnly<global::Game.Objects.Transform>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>()))
+                    using (var all = q.ToEntityArray(Allocator.Temp))
+                        foreach (var e in all)
+                        {
+                            var p = em.GetComponentData<global::Game.Objects.Transform>(e).m_Position;
+                            if (p.x < b.X0 || p.x > b.X1 || p.z < b.Z0 || p.z > b.Z1) continue;
+                            if (side == "west" && p.x > midX || side == "east" && p.x < midX) continue;
+                            lots.Add(e);
+                        }
+                    Placemaker.Game.Neighbours.NeighbourPolishSystem.Stamp(lots, yes);
+                    rec["stamped"] = lots.Count;
+                    Mod.Log.Info($"Placemaker lab: {lots.Count} lots stamped {(yes ? "polished" : "back as the game made them")} ({side})");
                     yield return Frames(10);
                     yield break;
                 }

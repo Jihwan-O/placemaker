@@ -173,6 +173,7 @@ namespace Placemaker.Game.Tool
                 GhostPending = GhostPending,
                 LegendVisibility = LegendVisibility,
                 AreaLegend = _stage == ToolStage.Area ? AreaLegendNow() : null,
+                Painter = PainterState(),
             };
             return s;
         }

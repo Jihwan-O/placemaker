@@ -567,6 +567,21 @@ const Footer = ({
                         </div>
                     </Tip>
                 ) : null}
+                {p.action === "polish" ? (
+                    // (PROTOCOL 25) the painter's second button: the lots in the area back to as the game made them
+                    <button
+                        type="button"
+                        data-testid="polish-no"
+                        aria-disabled={enabled ? "false" : "true"}
+                        className={classNames(s.primary, s.primarySecond, { [s.primaryOff]: !enabled })}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (enabled) act.polishStamp(false);
+                        }}
+                    >
+                        <div className={s.primaryLabel}>{t("Placemaker.UI.Painter.Unpolish", "Unpolish")}</div>
+                    </button>
+                ) : null}
                 {!enabled && reason ? (
                     <Tip title={label} description={reason}>
                         {button}

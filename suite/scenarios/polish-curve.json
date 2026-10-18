@@ -13,7 +13,6 @@
         "roads": "none"
       },
       "steps": [
-        { "do": "setting", "name": "PolishExistingHouses", "value": true },
         { "do": "setting", "name": "NeighbourhoodPolish", "value": false },
         { "do": "lab", "op": "street", "shape": "arc", "radius": 90, "from": 0, "to": 180 },
         { "do": "grow", "seconds": 120 },
@@ -30,6 +29,7 @@
           "shotMode": "render"
         },
         { "do": "setting", "name": "NeighbourhoodPolish", "value": true },
+        { "do": "lab", "op": "polishStamp", "yes": true },
         { "do": "wait", "seconds": 2 },
         { "do": "lab", "op": "polishStats" },
         { "do": "shot", "name": "after-top", "camera": { "target": "area", "view": "top" },
@@ -64,7 +64,6 @@
         "roads": "none"
       },
       "steps": [
-        { "do": "setting", "name": "PolishExistingHouses", "value": true },
         { "do": "setting", "name": "NeighbourhoodPolish", "value": false },
         { "do": "lab", "op": "street", "shape": "straight", "length": 240 },
         { "do": "grow", "seconds": 120 },
@@ -75,6 +74,7 @@
           "shotMode": "render"
         },
         { "do": "setting", "name": "NeighbourhoodPolish", "value": true },
+        { "do": "lab", "op": "polishStamp", "yes": true },
         { "do": "wait", "seconds": 2 },
         { "do": "lab", "op": "polishStats" },
         { "do": "shot", "name": "after-top", "camera": { "target": "area", "view": "top" },

@@ -73,8 +73,10 @@ namespace Placemaker.Game.Overlay
             if (_toolSystem.activeTool != _tool)
             {
                 if (_wasDrawing) { _fill.ClearAll(); _wasDrawing = false; }
+                PolishedShown = 0;
                 return;
             }
+            if (!_tool.Painter) PolishedShown = 0;
             _wasDrawing = true;
             try
             {
@@ -87,6 +89,7 @@ namespace Placemaker.Game.Overlay
                 if (_tool.Stage == ToolStage.Manage) DrawManage(buffer, w);
                 else
                 {
+                    if (_tool.Painter) DrawPolishedLots();
                     if (_tool.Stage == ToolStage.Design || _tool.Stage == ToolStage.Review || _tool.Stage == ToolStage.Building)
                         DrawPlan(buffer, w, detail);
                     DrawSelection(buffer, w);

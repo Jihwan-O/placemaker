@@ -193,7 +193,7 @@ namespace Placemaker.Game.Tool
 
         private void UpdatePlanning()
         {
-            bool canPlan = _shape != null && _recipe != null && _stage != ToolStage.Building;
+            bool canPlan = _shape != null && _recipe != null && _stage != ToolStage.Building && !_painter;   // the painter plans nothing
             if (!canPlan)
             {
                 if (_plan != null || _requestedRevision >= 0)
@@ -397,6 +397,7 @@ namespace Placemaker.Game.Tool
                 MarkerModeActive = _markerKind != null,
                 Editing = _editingGroup > 0,
                 GestureActive = _gesture != Gesture.None || _previewBase != null,
+                Painter = _painter,
             };
             var u = Unready();
             if (u != null)

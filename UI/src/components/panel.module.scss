@@ -712,3 +712,18 @@
     background-color: rgba(255, 181, 71, 0.14);
     @include border(1rem, rgba(255, 181, 71, 0.5));
 }
+
+// (PROTOCOL 25) The painter's Unpolish beside Polish: a quieter button, a little gap before the primary.
+.primaryRow > .primarySecond {
+    flex: 0 0 auto;
+    margin-right: 6rem;
+}
+
+.primarySecond {
+    background-color: rgba(255, 255, 255, 0.14);
+    color: #eaf2f6;
+    box-shadow: none;
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.24);
+    }
+}

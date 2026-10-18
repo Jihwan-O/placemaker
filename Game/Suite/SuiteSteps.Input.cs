@@ -205,6 +205,8 @@ namespace Placemaker.Game.Suite
 
         private IEnumerator StepArea(ScenarioState st, JObject step, JObject rec)
         {
+            // a lab step (a street, a bulldozer) may have left the runner's own tool active: Placemaker's tool picks the area
+            if (!_tool.IsActive) yield return OpenTool();
             var b = st.S.Block;
             bool abs = (bool?)step["abs"] ?? false;
             string tool = ((string)step["tool"] ?? "bucket").ToLowerInvariant();

@@ -1,0 +1,59 @@
+@use "../styles/tokens" as *;
+
+// (PROTOCOL 25) The neighbourhood-polish painter's card: what it does, what the area holds, and the master switch.
+.card {
+    @include col;
+    min-width: 0;
+    margin: 4rem 0 6rem 0;
+    padding: 7rem 8rem;
+    border-radius: $radius;
+    background-color: rgba(159, 216, 107, 0.1);
+    @include border(1rem, rgba(159, 216, 107, 0.35));
+}
+
+.title {
+    @include row;
+    min-width: 0;
+    font-size: $fs;
+    font-weight: bold;
+}
+
+.titleText {
+    margin-left: 5rem;
+}
+
+.line {
+    min-width: 0;
+    margin-top: 3rem;
+    font-size: $fs-s;
+    color: $c-text-dim;
+}
+
+.count {
+    @include row;
+    min-width: 0;
+    margin-top: 5rem;
+    font-size: $fs-s;
+}
+
+.swatch {
+    width: 10rem;
+    height: 10rem;
+    margin-right: 5rem;
+    border-radius: 2rem;
+    background-color: rgba(120, 220, 90, 0.75);
+}
+
+.off {
+    @include row;
+    min-width: 0;
+    margin-top: 5rem;
+    font-size: $fs-s;
+    color: $c-warning;
+}
+
+.offText {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 4rem;
+}

@@ -23,6 +23,7 @@ export const CATEGORY_COLOR: Record<string, string> = {
     shops: "#ff7c9c",
     beach: "#4fb8e8",
     industry: "#a9b4bd",
+    neighbourhood: "#9fd86b",
     other: "#c9d3da",
 };
 
@@ -44,6 +45,7 @@ export const CATEGORY_ICON: Record<string, string> = {
     shops: "shop",
     beach: "waves",
     industry: "factory",
+    neighbourhood: "shrub",
     other: "layers",
 };
 
@@ -100,6 +102,7 @@ const TYPE_ICON: Record<string, string> = {
     roads: "roads",
     wetland: "reeds",
     zenGarden: "zen",
+    polishGardens: "sparkle",
 };
 
 export function typeIcon(id: string, group: string): string {

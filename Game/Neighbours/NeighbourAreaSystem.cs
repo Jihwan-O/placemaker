@@ -33,6 +33,8 @@ namespace Placemaker.Game.Neighbours
             public float2[] Ring;
             /// <summary>The house that owns it (Entity.Null: free-standing).</summary>
             public Entity Owner;
+            /// <summary>What it is to the polish (tagged PolishPiece when the game made it, so Unpolish finds it after a load).</summary>
+            public PolishPieceKind Kind;
         }
 
         public static readonly List<Request> Queue = new List<Request>();
@@ -81,6 +83,8 @@ namespace Placemaker.Game.Neighbours
                     nodes.Add(nodes[0]);
                     EntityManager.AddComponent<Updated>(def);
                     EntityManager.AddComponent<Deleted>(def);
+                    if (r.Owner != Entity.Null)
+                        NeighbourPolishSystem.PendingTags.Add(new NeighbourPolishSystem.PendingTag { Owner = r.Owner, Prefab = prefab, At = c, Kind = r.Kind, Frame = NeighbourPolishSystem.LotFrame });
                     TotalMade++;
                 }
             }

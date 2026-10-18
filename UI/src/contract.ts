@@ -12,7 +12,7 @@ export const GROUP = "Placemaker";
  * together. The game reloads this UI file from disk but loads the DLL only at start, so right after an
  * update they can disagree: the panel then shows "Restart the game" (absent = a DLL older than s15).
  */
-export const PROTOCOL = 24;
+export const PROTOCOL = 25;
 
 // ─────────────────────────── Values (C# → UI) ───────────────────────────
 
@@ -73,7 +73,7 @@ export interface LocText { key: string; args?: (string | number)[] }
 
 export interface PrimaryAction {
   /** What pressing the main button (or Enter) does now. */
-  action: "none" | "toDesign" | "toReview" | "build" | "placeMarkers" | "cancelBuild" | "finishEdit";
+  action: "none" | "toDesign" | "toReview" | "build" | "placeMarkers" | "cancelBuild" | "finishEdit" | "polish";
   label: LocText;
   enabled: boolean;
   /** Why disabled, shown as tooltip and inline hint. */
@@ -139,6 +139,20 @@ export interface ToolState {
   /** (PROTOCOL 24, area overhaul) The legend while choosing the area: what the overlay shows for the current tool
    *  (ids "area:*": outline, fill, doors = closed gaps, reach, stops, painted, fence, leftOut, node). Area stage only. */
   areaLegend?: LegendEntry[];
+  /** (PROTOCOL 25) The neighbourhood-polish painter ("Polish gardens") is the pick: the area is stamped (primary "polish"
+   *  = Polish, trigger polishStamp(false) = Unpolish), never built. Absent = not the painter. */
+  painter?: PainterState;
+}
+
+/** (PROTOCOL 25) The painter as the panel shows it. */
+export interface PainterState {
+  /** Lots whose middle lies in the area, and how many of them are polished now. */
+  lots: number;
+  polished: number;
+  /** The master switch "Stitch neighbouring houses" (off: the flags are kept, gardens change once it is on). */
+  featureOn: boolean;
+  /** "Polish new houses". */
+  newHouses: boolean;
 }
 
 /** One control, mirrors Core.ControlSchema. */
@@ -265,6 +279,8 @@ export interface RecipeInfo {
   category?: string;
   /** (core) Hidden by the shelf (its category is hidden or the category hides it): not in the picker or its search. */
   shelved?: boolean;
+  /** (PROTOCOL 25) The neighbourhood-polish painter ("polishGardens"): picked like a type, but it stamps lots, it builds nothing. */
+  painter?: boolean;
 }
 
 /** (core) A Make-row category of the central shelf, in Make-row order. */
@@ -525,6 +541,7 @@ export const Triggers = {
 
   goToStage: "goToStage",                   // (stage: Stage) — only if in state.reachable
   primary: "primary",                       // () — same as Enter
+  polishStamp: "polishStamp",               // (yes: boolean) — (PROTOCOL 25) the painter: Polish (true, = primary) / Unpolish (false) the lots in the area
   undo: "undo",                             // ()
   redo: "redo",                             // ()
 

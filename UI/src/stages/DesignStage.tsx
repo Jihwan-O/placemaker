@@ -24,6 +24,7 @@ import { Btn, Icon, Section, Switch } from "../components/common";
 import { ControlList, controlsSummary } from "../controls/Controls";
 import { useAssetName } from "../components/picker";
 import { BarMode, PresetBar, Tile, TypeBrowser } from "./PresetBrowser";
+import { PainterCard } from "../components/PainterCard";
 import s from "./design.module.scss";
 
 export const layerName = (t: TFunc, l: LayerType) => t(l.name, humanize(l.name || l.id));
@@ -539,7 +540,9 @@ export const DesignStage = ({ catalog, design, state }: { catalog: Catalog; desi
                 <TypeBrowser catalog={catalog} design={design} onNew={() => setMode("saveAs")} />
             </ErrorBoundary>
             <PlacesInside />
-            {!root ? (
+            {state.painter ? (
+                <PainterCard state={state} />
+            ) : !root ? (
                 <div className={s.emptyNote}>{t("Placemaker.UI.PickRecipe", "Pick a type")}</div>
             ) : (
                 <div className={s.options} data-testid="options">

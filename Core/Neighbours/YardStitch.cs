@@ -288,7 +288,7 @@ namespace Placemaker.Core.Neighbours
             Dictionary<long, (float2 A, float2 B)> moved, Func<StitchLine, (float2 A, float2 B)> current)
         {
             float maxDepth = s.Knob("pieReach", 60f);     // how far behind the lots two borders may meet at all
-            float runOn = s.Knob("pieDepth", 18f);        // how far a border runs on; meeting closer than that = a point
+            float runOn = s.Knob("pieDepth", 8f);        // how far a border runs on; meeting closer than that = a point
             var side = plan.Pairs.Where(p => !p.Rear).ToList();
             var slices = new List<(StitchHouse H, StitchPair L, StitchPair R)>();
             foreach (var h in houses)
@@ -333,8 +333,12 @@ namespace Placemaker.Core.Neighbours
                     var first = backs.OrderByDescending(l => math.distance(l.A, l.B)).First();
                     // keep its direction: the end nearer the back-left corner goes to the left border's end
                     bool aLeft = math.distance(first.A, h.BackLeft) < math.distance(first.B, h.BackLeft);
-                    moved[first.Id] = aLeft ? (tipL, tipR) : (tipR, tipL);
-                    foreach (var l in backs) if (l.Id != first.Id) plan.HideLines.Add(l.Id);
+                    var join = aLeft ? (tipL, tipR) : (tipR, tipL);
+                    if (NaturalStretch(current(first), join, s, maxTurnDegrees: 40f, maxGrowth: s.Knob("pieDepth", 8f) * 2.5f))
+                    {
+                        moved[first.Id] = join;
+                        foreach (var l in backs) if (l.Id != first.Id) plan.HideLines.Add(l.Id);
+                    }
                 }
                 float c = s.LawnContact;
                 var slice = new[] { h.ToWorld(new float2(-h.HalfLot.x, -h.HalfLot.y + c)), left.Back, tipL, tipR, right.Back, h.ToWorld(new float2(h.HalfLot.x, -h.HalfLot.y + c)) };
@@ -481,6 +485,17 @@ namespace Placemaker.Core.Neighbours
             return d > 2f * other.HalfLot.y ? border(h, z) : other.ToWorld(new float2(otherSide * other.HalfLot.x, other.HalfLot.y - d));
         }
 
+        /// <summary>A line's new place reads as the same fence carried on: it turns at most a little and grows at most a little.</summary>
+        private static bool NaturalStretch((float2 A, float2 B) was, (float2 A, float2 B) next, StitchSettings s, float maxTurnDegrees = 20f, float maxGrowth = -1f)
+        {
+            if (maxGrowth < 0f) maxGrowth = s.Knob("maxStretch", 12f);
+            float l0 = math.distance(was.A, was.B), l1 = math.distance(next.A, next.B);
+            if (l1 - l0 > maxGrowth) return false;
+            if (l0 < 0.5f || l1 < 0.5f) return true;
+            float cos = math.dot((was.B - was.A) / l0, (next.B - next.A) / l1);
+            return cos >= math.cos(math.radians(maxTurnDegrees));
+        }
+
         private static float Deep(StitchHouse a, StitchHouse b) => math.max(a.HalfLot.y, b.HalfLot.y);
 
         /// <summary>A house's side edge (+1 right, -1 left) followed from its street edge to <paramref name="halfDepth"/> × 2 deep.</summary>
@@ -512,7 +527,10 @@ namespace Placemaker.Core.Neighbours
                 if (onA == onB) continue;   // neither end on this side, or the whole line on it (a side line)
                 // an end at a lot corner goes exactly to the border's front or back point
                 float Z(float z) => math.abs(z - h.HalfLot.y) < s.EdgeTolerance ? h.HalfLot.y : math.abs(z + h.HalfLot.y) < s.EdgeTolerance ? -h.HalfLot.y : z;
-                moved[l.Id] = onA ? (border(h, Z(la.y)), c.B) : (c.A, border(h, Z(lb.y)));
+                var next = onA ? (border(h, Z(la.y)), c.B) : (c.A, border(h, Z(lb.y)));
+                // only a natural continuation: the fence keeps its direction and grows a little (never a long diagonal)
+                if (!NaturalStretch(c, next, s)) continue;
+                moved[l.Id] = next;
             }
         }
 

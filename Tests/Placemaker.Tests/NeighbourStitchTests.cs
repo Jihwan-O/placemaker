@@ -176,13 +176,13 @@ namespace Placemaker.Tests
         [Fact]
         public void Houses_inside_a_small_circle_get_pie_slices_that_meet_in_the_middle()
         {
-            // eight houses inside a ring road, facing out to it, backs close to the centre (front edges on radius 60, backs on 12)
+            // eight houses inside a ring road, facing out to it, backs close to the centre (front edges on radius 54, backs on 6)
             var houses = new List<StitchHouse>();
             for (int i = 0; i < 8; i++)
             {
                 float ang = i * math.PI * 2f / 8f;
                 var dir = new float2(math.cos(ang), math.sin(ang));
-                var h = House(i + 1, dir * 36f, dir);
+                var h = House(i + 1, dir * 30f, dir);
                 // lawns along the back edge (as many houses have)
                 h.Lawns[0].Ring = new[] { h.ToWorld(new float2(-7f, -23f)), h.ToWorld(new float2(7f, -23f)), h.ToWorld(new float2(7f, -12f)), h.ToWorld(new float2(-7f, -12f)) };
                 houses.Add(h);
@@ -201,7 +201,7 @@ namespace Placemaker.Tests
         [Fact]
         public void A_big_middle_keeps_its_back_fences_joined_up_around_a_shared_green()
         {
-            // shallow lots (16 m deep) on a big ring: the borders run on 18 m, the back fences join their ends, the middle is shared
+            // shallow lots (16 m deep) on a big ring: the borders run on 8 m, the back fences join their ends, the middle is shared
             var houses = new List<StitchHouse>();
             for (int i = 0; i < 10; i++)
             {
@@ -215,9 +215,9 @@ namespace Placemaker.Tests
             var plan = YardStitch.Plan(houses);
             Assert.Contains(plan.Notes, n => n.Contains("pie slices"));
             Assert.Contains(plan.Notes, n => n.Contains("shared green"));
-            // every back fence now joins two border ends (moved, not hidden), and the ends sit ~18 m behind the lots
+            // every back fence now joins two border ends (moved, not hidden), and the ends sit ~8 m behind the lots
             for (int i = 1; i <= 10; i++) Assert.True(plan.MoveLines.ContainsKey(i * 10L + 3), $"back fence of {i} not joined");
-            foreach (var p in plan.Pairs.Where(p => !p.Rear)) Assert.True(math.abs(math.length(p.Tip.Value) - 32f) < 4f, $"end at radius {math.length(p.Tip.Value)}");
+            foreach (var p in plan.Pairs.Where(p => !p.Rear)) Assert.True(math.abs(math.length(p.Tip.Value) - 42f) < 3f, $"end at radius {math.length(p.Tip.Value)}");
             Assert.Single(plan.Commons);
         }
 

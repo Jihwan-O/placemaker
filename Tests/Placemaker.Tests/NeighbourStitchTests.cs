@@ -100,7 +100,10 @@ namespace Placemaker.Tests
             var plan = YardStitch.Plan(new[] { a, b });
             Assert.Single(plan.Pairs);
             Assert.Equal(21L, plan.Pairs[0].KeptLine);
-            Assert.Contains(11L, plan.HideLines);
+            // a's fence leaves the shared side: b's garden (made as deep as a's) had no back line, so the freed fence closes it
+            Assert.DoesNotContain(11L, plan.HideLines);
+            var reused = plan.MoveLines[11L];
+            Assert.True(math.abs(b.ToLocal(reused.A).y - b.ToLocal(reused.B).y) < 0.05f && b.ToLocal(reused.A).y < -b.HalfLot.y, $"a's fence at {reused.A} {reused.B}");
         }
 
         [Fact]

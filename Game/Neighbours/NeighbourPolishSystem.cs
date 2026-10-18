@@ -291,9 +291,8 @@ namespace Placemaker.Game.Neighbours
             // shared land in the middle of a ring: a lawn with a mulch bed in its centre
             foreach (var common in plan.Commons)
             {
-                var inset = Placemaker.Core.Geometry.Poly.Offset(common, 0.5f);
-                if (inset.Count == 0) continue;
-                NeighbourAreaSystem.Queue.Add(new NeighbourAreaSystem.Request { Name = Settings.Extra.ContainsKey("noCommonLawn") ? "" : "Grass Surface 01", Ring = inset[0] });
+                // already half a metre in from the fences and cleaned into a shape the game draws (YardStitch.Commons)
+                NeighbourAreaSystem.Queue.Add(new NeighbourAreaSystem.Request { Name = Settings.Extra.ContainsKey("noCommonLawn") ? "" : "Grass Surface 01", Ring = common });
                 var c = float2.zero;
                 foreach (var p in common) c += p;
                 c /= common.Length;

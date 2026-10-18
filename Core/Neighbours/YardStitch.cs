@@ -83,6 +83,8 @@ namespace Placemaker.Core.Neighbours
             // deepest lot (at most maxDeepen further), so back fences line up and a ring's middle is an even shape
             var rowDeepen = new float[n];
             var ringCut = new Cut[n];   // set: the house is on the inside of a closed ring
+            var ringOf = Enumerable.Repeat(-1, n).ToArray();
+            int rings = 0;
             var seen = new bool[n];
             for (int i = 0; i < n; i++)
             {
@@ -118,9 +120,11 @@ namespace Placemaker.Core.Neighbours
                         back = math.max(back, 4f);
                         foreach (int k in row)
                         {
+                            ringOf[k] = rings;
                             ringCut[k] = new Cut { P = centre + houses[k].Forward * back, D = houses[k].Right };
                             rowDeepen[k] = 2f * houses[k].HalfLot.y + 200f;   // as far as it takes: the ring line cuts it
                         }
+                        rings++;
                         continue;
                     }
                 }
@@ -449,7 +453,7 @@ namespace Placemaker.Core.Neighbours
             }
 
             // ── 5. the middle a ring of houses leaves: one shared green ──
-            Commons(houses, plots, left, right, plan, s);
+            Commons(houses, plots, ringOf, plan, s);
 
             // ── 6. a moved line never runs through a house: it stops at the house ──
             TrimAtHouses(houses, plan, moved, s);
@@ -506,42 +510,33 @@ namespace Placemaker.Core.Neighbours
 
         // ───────────── the middle of a ring ─────────────
 
-        private static void Commons(IReadOnlyList<StitchHouse> houses, float2[][] plots, int[] left, int[] right, StitchPlan plan, StitchSettings s)
+        /// <summary>
+        /// The land a closed ring of houses encloses (only a ring seen whole: a pass that sees part of it plans no green),
+        /// inside the back edges and outside every plot: one shared green, its outline cleaned into a shape the game takes.
+        /// </summary>
+        private static void Commons(IReadOnlyList<StitchHouse> houses, float2[][] plots, int[] ringOf, StitchPlan plan, StitchSettings s)
         {
-            // houses whose neighbours' street directions part (their backs close in: the inside of a curve or a circle)
-            var ends = new List<float2>();
-            int inner = 0;
-            for (int i = 0; i < houses.Count; i++)
+            foreach (var members in Enumerable.Range(0, houses.Count).Where(i => ringOf[i] >= 0).GroupBy(i => ringOf[i]).Select(g => g.ToList()))
             {
-                if (left[i] < 0 || right[i] < 0) continue;
-                var h = houses[i];
-                if (math.dot(houses[left[i]].Forward - houses[right[i]].Forward, h.Right) > -0.05f) continue;
-                if (!BackEdge(h, plots[i], out var e0, out var e1)) continue;
-                ends.Add(e0);
-                ends.Add(e1);
-                inner++;
+                if (members.Count < 4) continue;
+                var ends = new List<float2>();
+                foreach (int i in members) if (BackEdge(houses[i], plots[i], out var e0, out var e1)) { ends.Add(e0); ends.Add(e1); }
+                if (ends.Count < 8) continue;
+                var c = ends.Aggregate(float2.zero, (acc, p) => acc + p) / ends.Count;
+                var ring = Poly.Normalize(ends.OrderBy(p => math.atan2(p.y - c.y, p.x - c.x)).ToArray());
+                if (ring.Count == 0) continue;
+                var taken = plots.Where(p => p != null).Select(p => new Region(Ccw(p))).ToList();
+                var piece = Poly.Boolean(new[] { ring.OrderByDescending(r => r.Area).First() }, taken, BoolOp.Difference).OrderByDescending(r => r.Area).FirstOrDefault();
+                if (piece == null || piece.Area < 30f) continue;
+                // half a metre in from the fences, cleaned (no slivers, no needle points) so the game draws it
+                var inset = Poly.Offset(piece.HasHoles ? Poly.CutHoles(piece, 0f).First() : piece.Outer, 0.5f).OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                if (inset == null) continue;
+                var green = Placemaker.Core.Build.AreaRings.PrepareSurface(Poly.Simplify(inset, 0.1f), Placemaker.Core.Build.AreaRings.SurfaceMinNodeDistance)
+                    .OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                if (green == null || green.Length < 3) continue;
+                plan.Commons.Add(green);
+                plan.Notes.Add($"a shared green in the middle ({Poly.Area(green):F0} m²)");
             }
-            if (inner < 4) return;
-            var c = ends.Aggregate(float2.zero, (acc, p) => acc + p) / ends.Count;
-            var byAngle = ends.OrderBy(p => math.atan2(p.y - c.y, p.x - c.x)).ToList();
-            float biggestGap = 0f;
-            for (int i = 0; i < byAngle.Count; i++)
-            {
-                float a0 = math.atan2(byAngle[i].y - c.y, byAngle[i].x - c.x);
-                float a1 = i + 1 < byAngle.Count ? math.atan2(byAngle[i + 1].y - c.y, byAngle[i + 1].x - c.x) : math.atan2(byAngle[0].y - c.y, byAngle[0].x - c.x) + 2f * math.PI;
-                biggestGap = math.max(biggestGap, a1 - a0);
-            }
-            if (biggestGap > math.radians(s.Knob("ringGapDegrees", 80f))) return;
-            // the ring the back edges draw (a gap between two unpaired houses is bridged straight), minus every plot
-            var ring = Poly.Normalize(byAngle.ToArray());
-            if (ring.Count == 0) return;
-            var taken = plots.Where(p => p != null).Select(p => (IReadOnlyList<float2>)Ccw(p)).ToList();
-            var pieces = Poly.Boolean(new[] { ring.OrderByDescending(r => r.Area).First() }, taken.Select(t => new Region(t.ToArray())), BoolOp.Difference);
-            var piece = pieces.OrderByDescending(r => r.Area).FirstOrDefault();
-            if (piece == null || piece.Area < 30f) return;
-            var outer = piece.HasHoles ? Poly.CutHoles(piece, 0f).First() : piece.Outer;
-            plan.Commons.Add(outer);
-            plan.Notes.Add($"a shared green in the middle ({Poly.Area(outer):F0} m²)");
         }
 
         // ───────────── ground paint ─────────────

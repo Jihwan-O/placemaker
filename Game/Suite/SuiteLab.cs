@@ -30,6 +30,7 @@ namespace Placemaker.Game.Suite
                 case "street": yield return LabStreet(st, step, rec); yield break;
                 case "yards": yield return LabYards(st, step, rec); yield break;
                 case "yardscheck": LabYardsCheck(rec); yield break;
+                case "anatomy": LabAnatomy(st, rec); yield break;
             }
             var shapes = _world.GetExistingSystemManaged<SuiteLabShapeSystem>();
             if (shapes == null) { rec["error"] = "lab: the shape system is not registered"; yield break; }

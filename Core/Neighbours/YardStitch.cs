@@ -103,9 +103,23 @@ namespace Placemaker.Core.Neighbours
             SnapToBorder(a, +1, Border, s, moved, current, sideA);
             SnapToBorder(b, -1, Border, s, moved, current, sideB);
 
-            // lawns that reach the shared side grow up to the border
-            GrowLawns(a, +1, Border, s, plan, lawnNow);
-            GrowLawns(b, -1, Border, s, plan, lawnNow);
+            // lawns that reach the shared side grow up to the border, around either house's driveway and paving
+            var avoid = a.Hard.Concat(b.Hard).ToList();
+            bool grewA = GrowLawns(a, +1, Border, s, plan, lawnNow, avoid);
+            bool grewB = GrowLawns(b, -1, Border, s, plan, lawnNow, avoid);
+            // a house with no lawn on the shared side leaves its half bare: the neighbour's lawn takes the whole gap
+            if (s.Knob("takeWholeGap", 1f) > 0.5f)
+            {
+                if (grewA && !grewB) GrowLawns(a, +1, (h, z) => FarEdge(b, -1, h, z, Border), s, plan, lawnNow, avoid.Concat(b.Lawns.Select(l => lawnNow[l.Id])).ToList());
+                if (grewB && !grewA) GrowLawns(b, -1, (h, z) => FarEdge(a, +1, h, z, Border), s, plan, lawnNow, avoid.Concat(a.Lawns.Select(l => lawnNow[l.Id])).ToList());
+            }
+        }
+
+        /// <summary>The other house's lot edge at the same distance from the street; past its depth, the border.</summary>
+        private static float2 FarEdge(StitchHouse other, int otherSide, StitchHouse h, float z, Func<StitchHouse, float, float2> border)
+        {
+            float d = h.HalfLot.y - z;
+            return d > 2f * other.HalfLot.y ? border(h, z) : other.ToWorld(new float2(otherSide * other.HalfLot.x, other.HalfLot.y - d));
         }
 
         private static float Deep(StitchHouse a, StitchHouse b) => math.max(a.HalfLot.y, b.HalfLot.y);
@@ -143,8 +157,10 @@ namespace Placemaker.Core.Neighbours
             }
         }
 
-        private static void GrowLawns(StitchHouse h, int side, Func<StitchHouse, float, float2> border, StitchSettings s, StitchPlan plan, Dictionary<long, float2[]> lawnNow)
+        private static bool GrowLawns(StitchHouse h, int side, Func<StitchHouse, float, float2> border, StitchSettings s, StitchPlan plan, Dictionary<long, float2[]> lawnNow,
+            List<float2[]> avoid)
         {
+            bool grew = false;
             float x = side * h.HalfLot.x;
             foreach (var lawn in h.Lawns)
             {
@@ -173,6 +189,18 @@ namespace Placemaker.Core.Neighbours
                 var parts = Poly.Boolean(new[] { (IReadOnlyList<float2>)band }, new[] { (IReadOnlyList<float2>)Ccw(beyond) }, BoolOp.Intersection, FillRule.NonZero);
                 if (parts.Count == 0) continue;
                 var piece = parts.OrderByDescending(r => r.Area).First().Outer;
+                if (avoid != null && avoid.Count > 0)
+                {
+                    var (lo, hi) = (math.min(math.min(band[0], band[1]), math.min(band[2], band[3])), math.max(math.max(band[0], band[1]), math.max(band[2], band[3])));
+                    var near = avoid.Where(r => r.Length >= 3 && r.Any(p => p.x >= lo.x - 1f && p.x <= hi.x + 1f && p.y >= lo.y - 1f && p.y <= hi.y + 1f)).Select(r => (IReadOnlyList<float2>)Ccw(r)).ToList();
+                    if (near.Count > 0)
+                    {
+                        var cut = Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(piece) }, near, BoolOp.Difference, FillRule.NonZero);
+                        if (cut.Count == 0) continue;
+                        // the piece that still touches the lawn
+                        piece = cut.OrderByDescending(r => r.Area).First().Outer;
+                    }
+                }
                 if (Poly.Area(piece) < 1f) continue;
                 var merged = Poly.Boolean(new[] { Ccw(ring) }, new[] { Ccw(piece) }, BoolOp.Union);
                 if (merged.Count == 0) continue;
@@ -185,7 +213,9 @@ namespace Placemaker.Core.Neighbours
                 plan.LawnAddedM2 += Poly.Area(grown) - Poly.Area(ring);
                 lawnNow[lawn.Id] = grown;
                 plan.Lawns[lawn.Id] = grown;
+                grew = true;
             }
+            return grew;
         }
 
         private static float2[] Ccw(float2[] r) => Poly.IsCcw(r) ? r : r.Reverse().ToArray();

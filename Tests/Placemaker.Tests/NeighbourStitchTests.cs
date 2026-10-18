@@ -103,6 +103,32 @@ namespace Placemaker.Tests
         }
 
         [Fact]
+        public void A_lawn_takes_the_whole_gap_when_the_neighbour_has_none_there_but_never_covers_its_driveway()
+        {
+            // a wedge (as on the outside of a curve); b's lawn sits on its far side, and b's driveway runs along the shared side
+            float2 At(float angle) => 64f * new float2(math.cos(angle), math.sin(angle));
+            float2 Facing(float angle) => -new float2(math.cos(angle), math.sin(angle));
+            float a0 = math.radians(90f), a1 = a0 + 0.45f;
+            var a = House(1, At(a0), Facing(a0));
+            var b = House(2, At(a1), Facing(a1));
+            b.Lawns[0].Ring = new[] { b.ToWorld(new float2(2f, -23f)), b.ToWorld(new float2(7.4f, -23f)), b.ToWorld(new float2(7.4f, 0f)), b.ToWorld(new float2(2f, 0f)) };
+            var drive = new[] { b.ToWorld(new float2(-8f, 24f)), b.ToWorld(new float2(-4f, 24f)), b.ToWorld(new float2(-4f, -6f)), b.ToWorld(new float2(-8f, -6f)) };
+            b.Hard.Add(drive);
+            var plan = YardStitch.Plan(new[] { a, b });
+            Assert.True(plan.Lawns.ContainsKey(15L), "a's lawn grows");
+            Assert.False(plan.Lawns.ContainsKey(25L), "b's lawn is not on the shared side");
+            var grown = plan.Lawns[15L];
+            // it reaches (almost) b's lot edge behind the driveway, past the border…
+            var pair = plan.Pairs[0];
+            var bEdge = b.ToWorld(new float2(-8f, -15f));
+            var mid = math.lerp(pair.Front, pair.Back, (24f + 15f) / 48f);
+            Assert.True(Poly.Contains(grown, bEdge + (mid - bEdge) * 0.15f), "a's lawn should reach b's edge where b has nothing");
+            // …and never covers b's driveway
+            Assert.False(Poly.Contains(grown, b.ToWorld(new float2(-6f, -2f))), "a's lawn covers b's driveway");
+            Assert.True(SurfaceAcceptance.IsAccepted(grown));
+        }
+
+        [Fact]
         public void A_house_behind_another_is_not_its_side_neighbour()
         {
             var a = House(1, new float2(0f, 0f), new float2(0f, 1f));

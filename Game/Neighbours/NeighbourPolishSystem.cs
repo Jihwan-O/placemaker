@@ -280,7 +280,18 @@ namespace Placemaker.Game.Neighbours
                 {
                     var area = sa.m_Area;
                     if (!EntityManager.Exists(area) || !EntityManager.HasComponent<global::Game.Areas.Surface>(area) || !EntityManager.HasBuffer<global::Game.Areas.Node>(area)) continue;
-                    if (!IsGrass(EntityManager.GetComponentData<PrefabRef>(area).m_Prefab)) continue;
+                    if (!IsGrass(EntityManager.GetComponentData<PrefabRef>(area).m_Prefab))
+                    {
+                        // driveway, paving, sand: grown lawns go around it
+                        var hard = EntityManager.GetBuffer<global::Game.Areas.Node>(area, true);
+                        if (hard.Length >= 3)
+                        {
+                            var r = new float2[hard.Length];
+                            for (int i = 0; i < r.Length; i++) r[i] = hard[i].m_Position.xz;
+                            sh.Hard.Add(r);
+                        }
+                        continue;
+                    }
                     if (!_lawnOriginal.TryGetValue(area, out var ring))
                     {
                         var nodes = EntityManager.GetBuffer<global::Game.Areas.Node>(area, true);

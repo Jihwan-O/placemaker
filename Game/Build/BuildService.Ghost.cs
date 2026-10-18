@@ -118,6 +118,9 @@ namespace Placemaker.Game.Build
             }
         }
 
+        /// <summary>The ghost service's own state, for the tool's stuck-ghost log line.</summary>
+        public string GhostDebug => $"ghost step {_gStep}, wanted {_gWanted}, emitting {_gEmitting}, content {_gHasContent}, build step {_step}, last pump {UnityEngine.Time.frameCount - _gLastPump} frames ago";
+
         /// <summary>Ghost status (IGhostPreview.Status; explicit because IBuildService.Status is the build's).</summary>
         public GhostStatus GhostState => ((IGhostPreview)this).Status;
 

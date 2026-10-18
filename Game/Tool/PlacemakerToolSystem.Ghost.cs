@@ -33,6 +33,15 @@ namespace Placemaker.Game.Tool
         public SketchObjects SketchObjects => _preview.Objects;
         public bool GhostAvailable => _ghost.Available;
 
+        // Stuck-ghost safety net: a ghost that stays pending this long with no build running is asked for again
+        // (twice), then this plan revision falls back to the sketch, so the panel never says "Updating preview…" for
+        // ever (a failed instant build once left every later scenario of a game-runner batch waiting on it).
+        private const float GhostStuckSeconds = 30f;
+        private const int GhostStuckRetries = 2;
+        private float _ghostPendingSince = -1f;
+        private int _ghostKicks;
+        private int _ghostGaveUpRevision = -2;
+
         private int _ghostDropped;
         /// <summary>Objects the game cancelled in the shown ghost (collisions); 0 when no ghost is shown.</summary>
         public int GhostDropped => _ghostDropped;
@@ -82,13 +91,14 @@ namespace Placemaker.Game.Tool
                     PlanAvailable = _plan != null,
                     PlanRevision = rev,
                     PlanStale = PlanStale,
-                    GhostAvailable = _ghost.Available,
+                    GhostAvailable = _ghost.Available && rev != _ghostGaveUpRevision,
                     GhostShownRevision = status.ShownRevision,
                     GhostBusy = status.Phase == GhostPhase.Pending,
                 };
                 var d = _previewModes.Step(input);
                 if (d.Command == GhostCommand.Show) _ghost.Show(_plan, d.ShowRevision);
                 else if (d.Command == GhostCommand.Hide) _ghost.Hide();
+                WatchStuckGhost(d.GhostPending, rev, status);
                 if (d.Selected != _preview.Selected || d.GhostPending != _preview.GhostPending || d.Objects != _preview.Objects || d.Effective != _preview.Effective) Touch();
                 _preview = d;
                 clear = _ghost.Pump();
@@ -100,6 +110,28 @@ namespace Placemaker.Game.Tool
             if (_closeAfterGhost > 0 && --_closeAfterGhost == 0 && m_ToolSystem != null && m_ToolSystem.activeTool == this)
                 m_ToolSystem.activeTool = m_DefaultToolSystem;
             return clear ? ApplyMode.Clear : ApplyMode.None;
+        }
+
+        private void WatchStuckGhost(bool pending, int rev, GhostStatus status)
+        {
+            float now = UnityEngine.Time.realtimeSinceStartup;
+            if (!pending || _building)
+            {
+                _ghostPendingSince = -1f;
+                if (!pending) _ghostKicks = 0;
+                return;
+            }
+            if (_ghostPendingSince < 0f) { _ghostPendingSince = now; return; }
+            if (now - _ghostPendingSince < GhostStuckSeconds) return;
+            bool retry = _ghostKicks < GhostStuckRetries;
+            Mod.Log.Warn($"Placemaker: the ghost preview has been pending for {now - _ghostPendingSince:F0} s (stage {_stage}, plan revision {rev}, "
+                + $"service {status.Phase}, requested {status.RequestedRevision}, shown {status.ShownRevision}"
+                + $"{(GhostPreview.Service is Placemaker.Game.Build.BuildService b ? ", " + b.GhostDebug : "")}): "
+                + (retry ? "asking for it again" : "showing the sketch for this plan instead"));
+            if (retry) { _ghost.Hide(); _previewModes.Forget(); _ghostKicks++; }
+            else { _ghostGaveUpRevision = rev; _ghostKicks = 0; }
+            _ghostPendingSince = -1f;
+            Touch();
         }
 
         /// <summary>Hide now (leaving the tool, build start). The service clears its definitions; the next tool's Clear removes the temporaries.</summary>

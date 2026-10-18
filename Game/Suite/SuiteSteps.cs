@@ -202,18 +202,56 @@ namespace Placemaker.Game.Suite
 
         private static bool IsHard(string what) => what == "area" || what == "type" || what == "build" || what == "preview";
 
-        /// <summary>The tool takes no new scene until nothing is building, planning or emitting a ghost (bounded).</summary>
+        /// <summary>
+        /// The tool takes no new scene until nothing is building, planning or emitting a ghost. Stuck for 20 s (a preview
+        /// that never finishes) → closed and reopened once, as a person would; still stuck → the batch stops at once with
+        /// the reason, instead of every later scenario waiting on the same stuck tool (a 35-build batch once spent 34 min so).
+        /// </summary>
         private IEnumerator Idle(JObject res)
         {
             float t0 = Time.realtimeSinceStartup;
-            yield return Until(() => !_tool.Building && !_tool.Planning && !_tool.GhostPending, 60f, "tool idle");
+            bool IsIdle() => !_tool.Building && !_tool.Planning && !_tool.GhostPending;
+            yield return Until(IsIdle, _tool.Building ? 60f : 20f, "tool idle");
+            if (_timedOut && !_tool.Building)
+            {
+                string stuck = ToolState();
+                res["toolReset"] = stuck;
+                Say($"tool not idle after 20 s ({stuck}): closing and reopening it");
+                yield return CloseTool();
+                yield return Frames(30);
+                yield return OpenTool();
+                yield return Until(IsIdle, 45f, "tool idle after reopening it");
+                if (!_timedOut) Say("tool idle again after reopening it");
+            }
             res["idleWaitMs"] = Math.Round((Time.realtimeSinceStartup - t0) * 1000f);
             if (_timedOut)
             {
                 res["status"] = "tool-not-idle";
-                res["refused"] = $"tool not idle after 60 s (building {_tool.Building}, planning {_tool.Planning}, ghost pending {_tool.GhostPending})";
-                if (_tool.Building) _abortBatch = "a build was still running when the next scenario started: every later result would be contaminated";
+                res["refused"] = $"tool not idle ({ToolState()})";
+                _abortBatch = _tool.Building
+                    ? "a build was still running when the next scenario started: every later result would be contaminated"
+                    : $"the Placemaker tool stayed busy even after closing and reopening it ({ToolState()}): every later scenario would wait on it";
             }
+        }
+
+        private string ToolState() =>
+            $"building {_tool.Building}, planning {_tool.Planning}, ghost pending {_tool.GhostPending}, stage {_tool.Stage}, active {_tool.IsActive}"
+            + (Placemaker.Game.Preview.GhostPreview.Service is Placemaker.Game.Build.BuildService b ? ", " + b.GhostDebug : "");
+
+        /// <summary>The build button is greyed out for a reason no waiting can change (plan errors, money, no area or type).</summary>
+        private bool PlanBlocked(out string why)
+        {
+            var p = _tool.SuitePrimaryInfo();
+            why = null;
+            if (p.Enabled) return false;
+            switch (p.Reason)
+            {
+                case "Placemaker.Reason.PlanErrors": case "Placemaker.Reason.NoMoney": case "Placemaker.Reason.BuildUnavailable":
+                case "Placemaker.Reason.NoArea": case "Placemaker.Reason.NoRecipe": case "Placemaker.Reason.CloseArea": case "Placemaker.Reason.GroupsUnavailable":
+                    why = p.Reason + " " + _tool.SuiteUnreadyText();
+                    return true;
+            }
+            return false;
         }
 
         private string _abortBatch;
@@ -317,7 +355,7 @@ namespace Placemaker.Game.Suite
         }
 
         /// <summary>The ghost is emitted (Ghost mode effective, nothing pending) and its temporaries stopped changing.</summary>
-        private IEnumerator WaitGhost(JObject rec, float timeout = 120f)
+        private IEnumerator WaitGhost(JObject rec, float timeout = 45f)
         {
             float t0 = Time.realtimeSinceStartup;
             yield return Until(() => _tool.PreviewModeEffective == PreviewMode.Ghost && !_tool.GhostPending, timeout, "ghost");

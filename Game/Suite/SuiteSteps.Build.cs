@@ -44,7 +44,8 @@ namespace Placemaker.Game.Suite
             if (when == "settled")
             {
                 yield return WaitPlan(st, rec, always: true);
-                if (_tool.PreviewModeSelected == PreviewMode.Ghost && (_tool.GhostPending || _tool.PreviewModeEffective != PreviewMode.Ghost)) yield return WaitGhost(rec);
+                // a plan that cannot be built has no ghost worth waiting for: the greyed-out button is reported below at once
+                if (!PlanBlocked(out _) && _tool.PreviewModeSelected == PreviewMode.Ghost && (_tool.GhostPending || _tool.PreviewModeEffective != PreviewMode.Ghost)) yield return WaitGhost(rec);
             }
             else if (when == "planready") yield return WaitPlan(st, rec, always: true);
             else if (when == "ghostpending")

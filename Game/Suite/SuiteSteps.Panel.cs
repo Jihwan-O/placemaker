@@ -337,7 +337,8 @@ namespace Placemaker.Game.Suite
             }
             yield return WaitFor(rec, "review", () => _tool.Stage == ToolStage.Review, 15f);
             yield return WaitPlan(st, rec, always: true);
-            if (_tool.PreviewModeSelected == PreviewMode.Ghost) yield return WaitGhost(rec);
+            if (PlanBlocked(out string blocked)) { rec["ghostSkipped"] = "the plan cannot be built (" + blocked + "): no ghost to wait for"; rec["previewMode"] = "sketch"; }
+            else if (_tool.PreviewModeSelected == PreviewMode.Ghost) yield return WaitGhost(rec);
             else rec["previewMode"] = "sketch";
             rec["issues"] = Issues(rec);
             rec["planCost"] = Math.Round(_tool.PlanCost);

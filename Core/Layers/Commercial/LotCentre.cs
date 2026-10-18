@@ -40,7 +40,14 @@ namespace Placemaker.Core.Layers.Commercial
         public const string FootpathBehindKey = K + "Issue.FootpathBehind";
 
         /// <summary>The layout, else an error saying what the site lacks. True when laid out.</summary>
+        [ThreadStatic] private static Dictionary<string, List<(float score, float tl, float a, float b, float2 gate)>> _scans;
         protected static bool LotCentre(LayerContext ctx, Mall mall, List<StreetShops.Run> runs, LotLayout o)
+        {
+            _scans = new Dictionary<string, List<(float score, float tl, float a, float b, float2 gate)>>();
+            return LotCentreIn(ctx, mall, runs, o);
+        }
+
+        private static bool LotCentreIn(LayerContext ctx, Mall mall, List<StreetShops.Run> runs, LotLayout o)
         {
             mall.LotFirstMode = true;
             if (CompactLot(ctx, mall, runs, o)) { ctx.Plan.Facts[LotFact] = 1; return true; }
@@ -174,15 +181,20 @@ namespace Placemaker.Core.Layers.Commercial
                     float tg = math.dot(g.At - r.A, r.In);
                     if (tg <= tMax - back && tg >= tMin + front) lines.Add((tg, g.At));
                 }
-                for (float tl = tMax - back; tl >= tMin + front; tl -= 2f) lines.Add((tl, new float2(float.NaN)));
+                for (float tl = tMax - back; tl >= tMin + front; tl -= 3f) lines.Add((tl, new float2(float.NaN)));
                 // Every line that holds a row, scored: shop ground and lot in balance, less the land left over behind the row (a
                 // round site's rim holds a short row; deeper in, its chord is long); the best few are composed.
-                var cand = new List<(float score, float tl, float a, float b, float2 gate)>();
+                // (scanned once per frame and plot depth: the frames' ranking and the real pass share it)
+                string key = r.A.x.ToString("R") + "," + r.A.y.ToString("R") + "," + r.In.x.ToString("R") + "," + r.In.y.ToString("R") + "," + cells;
+                if (!_scans.TryGetValue(key, out var cand))
+                {
+                cand = new List<(float score, float tl, float a, float b, float2 gate)>();
+                _scans[key] = cand;
                 foreach (var (tl, gate) in lines)
                 {
                     // The longest stretch along this line where the lane, its plots and a strip of lot in front are all inside.
                     float a = float.NaN, b = float.NaN, ca = float.NaN;
-                    for (float s = sMin; s <= sMax + 1f; s += 1f)
+                    for (float s = sMin; s <= sMax + 2f; s += 2f)
                     {
                         bool ok = s <= sMax && mall.Region.Contains(r.At(s, tl - h - 6f)) && mall.Region.Contains(r.At(s, tl)) && mall.Region.Contains(r.At(s, tl + back))
                             // and clear of the first zone rows of a city street behind or beside the plots (the street's own zone block
@@ -191,7 +203,7 @@ namespace Placemaker.Core.Layers.Commercial
                         if (ok) { if (float.IsNaN(ca)) ca = s; }
                         else if (!float.IsNaN(ca))
                         {
-                            if (float.IsNaN(a) || s - ca > b - a) { a = ca; b = s - 1f; }
+                            if (float.IsNaN(a) || s - ca > b - a) { a = ca; b = s - 2f; }
                             ca = float.NaN;
                         }
                     }
@@ -209,6 +221,8 @@ namespace Placemaker.Core.Layers.Commercial
                     float waste = SliceArea(mall, r, sMin, sMax, tl + back + 2f, tMax + 5f);
                     cand.Add((shops + lot - 0.5f * math.abs(shops - lot) - waste, tl, a, b, gate));
                 }
+                }
+                cand = new List<(float score, float tl, float a, float b, float2 gate)>(cand);
                 if (cand.Count == 0) continue;
                 // The U (shops down the sides too) first, on the deepest line that holds a row: no land left behind it.
                 var deep = cand[0];
@@ -638,6 +652,7 @@ namespace Placemaker.Core.Layers.Commercial
                     bag.Values["rowAngle"] = (double)(ang + rot);
                     bag.Values["perimeterRoad"] = ring;
                     var t = mall.PlanLot(lot, entries, bag, salt + (uint)rot + (ring ? 7u : 0u), true);
+                   
                     if (t == null || NetFit.Violations(t.Sub.Nets, t.Site).Count > 0 || Mall.Warns(t)) continue;
                     t.Sub.Issues.RemoveAll(i => i.Key != null && i.Key.EndsWith("PerimeterRoadDropped"));   // our choice to try, not the player's
                     // An aisle ending in a turning circle reads as a dead end (the user: "how do the cars even get in there"): each

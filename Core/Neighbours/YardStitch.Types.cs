@@ -38,6 +38,9 @@ namespace Placemaker.Core.Neighbours
         /// <summary>False: only there so its neighbours are planned right (the game layer edits it in another pass); its
         /// lawn, beds and paths are not worked out.</summary>
         public bool Edit = true;
+        /// <summary>A shop, office or works (not a home) whose ground is mostly one paved surface (its car park): the name of
+        /// that surface. Its extra land is filled with the same surface, not lawn. Null for homes.</summary>
+        public string MainSurface;
 
         public float2 Right => new float2(Forward.y, -Forward.x);
         public float2 ToLocal(float2 w) { var d = w - Position; return new float2(math.dot(d, Right), math.dot(d, Forward)); }

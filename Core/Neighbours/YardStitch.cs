@@ -533,15 +533,30 @@ namespace Placemaker.Core.Neighbours
                 var ext = Poly.Boolean(new[] { (IReadOnlyList<float2>)plot }, new[] { (IReadOnlyList<float2>)Ccw(Lot(h)) }, BoolOp.Difference, FillRule.NonZero);
                 if (ext.Sum(r => r.Area) < 1f) continue;
                 var hard0 = houses.SelectMany(o => o.Hard).Where(r => r != null && r.Length >= 3 && Overlaps(plot, r)).Select(r => new Region(Ccw(r))).Concat(beds[i]).ToList();
-                // variety, as streets are: some gardens (about a third) keep their own lawn and the rest of their new land is
-                // painted (lush ground, soft edges) rather than drawn as lawn
+                // a shop, office or works: its extra land in the surface most of its ground already is (its car park), not lawn
+                if (!string.IsNullOrEmpty(h.MainSurface) && s.Knob("pavedFill", 1f) > 0.5f)
+                {
+                    var spare = Poly.Boolean(lawnLand[i], new[] { new Region(Ccw(Lot(h))) }, BoolOp.Difference);
+                    var off = hard0.Concat(h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3).Select(l => new Region(Ccw(l.Ring)))).ToList();
+                    if (off.Count > 0) spare = Poly.Boolean(spare, off, BoolOp.Difference);
+                    foreach (var r in spare.Where(r => r.Area >= 10f))
+                    {
+                        var ring = Prepared(r.HasHoles ? Poly.CutHoles(r, 0f).First() : r.Outer);
+                        if (ring != null) plan.Paths.Add((h.Id, ring, h.MainSurface));
+                    }
+                    plan.Notes.Add($"{h.Id}: its extra land in {h.MainSurface}");
+                    continue;
+                }
+                // variety, as streets are: some gardens (about a third) are painted, not drawn: the house's own grass surfaces
+                // are tucked away under the house and the whole garden (minus the paving) is painted lush with soft edges
                 if (Hash((ulong)h.Id ^ 0x9A1D7UL) % 100 < (uint)s.Knob("paintedGardens", 33f))
                 {
-                    var bare = Poly.Boolean(lawnLand[i], new[] { new Region(Ccw(Lot(h))) }, BoolOp.Difference);
-                    var keepOff = hard0.Concat(h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3).Select(l => new Region(Ccw(l.Ring)))).ToList();
-                    if (keepOff.Count > 0) bare = Poly.Boolean(bare, keepOff, BoolOp.Difference);
-                    foreach (var r in bare.Where(r => r.Area >= 6f))
+                    var garden = hard0.Count > 0 ? Poly.Boolean(lawnLand[i], hard0, BoolOp.Difference) : lawnLand[i];
+                    foreach (var r in garden.Where(r => r.Area >= 6f))
                         Paint(plan, r.Outer, (int)s.Knob("lushLayer", 2f), s.Knob("gardenPaint", 0.85f), 1.6f, 1.4f, 5f, (uint)(h.Id * 2246822519L) ^ (uint)Poly.Area(r.Outer));
+                    var under = UnderHouse(h);
+                    if (under != null && s.Knob("hideOwnLawn", 1f) > 0.5f)
+                        foreach (var l in h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3)) plan.Lawns[l.Id] = under;
                     plan.Notes.Add($"{h.Id}: a painted garden");
                     continue;
                 }
@@ -606,6 +621,24 @@ namespace Placemaker.Core.Neighbours
                 }
             }
 
+            // ground paint past the gardens' outer edges, blending them into the land around (lush, soft, uneven)
+            if (s.Knob("paint", 1f) > 0.5f && s.Knob("blendWidth", 7f) > 0.5f)
+            {
+                float bw = s.Knob("blendWidth", 7f);
+                for (int i = 0; i < n; i++)
+                {
+                    if (!touched[i] || !houses[i].Edit) continue;
+                    var grown = Poly.Offset(Ccw(plots[i]), -bw).OrderByDescending(r => Poly.Area(r)).FirstOrDefault();
+                    if (grown == null) continue;
+                    var lo = grown.Aggregate(new float2(float.MaxValue), math.min);
+                    var hi = grown.Aggregate(new float2(float.MinValue), math.max);
+                    var others = Enumerable.Range(0, n).Where(k => plots[k] != null && plots[k].Any(p => p.x >= lo.x && p.x <= hi.x && p.y >= lo.y && p.y <= hi.y))
+                        .Select(k => new Region(Ccw(plots[k]))).ToList();
+                    var band = Poly.Boolean(new[] { new Region(grown) }, others, BoolOp.Difference);
+                    foreach (var r in band.Where(r => r.Area >= 8f))
+                        Paint(plan, r.Outer, (int)s.Knob("lushLayer", 2f), s.Knob("blendStrength", 0.6f), bw * 0.7f, 2.2f, 7f, (uint)(houses[i].Id * 40503L) ^ 0xB1EDu);
+                }
+            }
             Stage("lawns");
             // ── 5. the middle a ring of houses leaves: one shared green ──
             Commons(houses, plots, ringOf, plan, s);
@@ -723,7 +756,7 @@ namespace Placemaker.Core.Neighbours
             int maxBushes = (int)s.Knob("bushesPerGarden", 14f);
             for (int i = 0; i < houses.Count; i++)
             {
-                if (!touched[i] || !houses[i].Edit) continue;
+                if (!touched[i] || !houses[i].Edit || !string.IsNullOrEmpty(houses[i].MainSurface)) continue;
                 var h = houses[i];
                 var plot = Ccw(plots[i]);
                 // only gardens the stitching made bigger: a lot left as it was keeps the game's own planting
@@ -848,7 +881,7 @@ namespace Placemaker.Core.Neighbours
             for (int i = 0; i < houses.Count; i++)
             {
                 var h = houses[i];
-                if (!touched[i] || !h.Edit || h.Footprint == null || h.Footprint.Length < 3) continue;
+                if (!touched[i] || !h.Edit || !string.IsNullOrEmpty(h.MainSurface) || h.Footprint == null || h.Footprint.Length < 3) continue;
                 uint hash = Hash((ulong)h.Id * 0x2545F4914F6CDD1DUL);
                 if (hash % 100 >= (uint)s.Knob("pathChance", 45f)) continue;
                 var plot = Ccw(plots[i]);
@@ -974,6 +1007,18 @@ namespace Placemaker.Core.Neighbours
                 else { plan.Beds[k] = (house, fitted); beds.Add(new Region(Ccw(fitted))); }
             }
             plan.Bushes.RemoveAll(b => b.House == h.Id && b.Kind < FirstRock && !plan.Beds.Any(bd => bd.House == h.Id && Poly.Contains(bd.Ring, b.Position)));
+        }
+
+        /// <summary>A small triangle well inside the house's outline: where a garden's own grass is tucked away (drawn under the
+        /// house, so not seen; given back as it was when the garden is no longer painted).</summary>
+        private static float2[] UnderHouse(StitchHouse h)
+        {
+            if (h.Footprint == null || h.Footprint.Length < 3) return null;
+            var c = Poly.Centroid(h.Footprint);
+            if (!Poly.Contains(h.Footprint, c)) return null;
+            var f = h.Forward;
+            var r = h.Right;
+            return Ccw(new[] { c + f * 0.6f, c - f * 0.3f + r * 0.52f, c - f * 0.3f - r * 0.52f });
         }
 
         private static uint Hash(ulong x)

@@ -121,8 +121,15 @@ are edited after they are placed (Game/Neighbours, Core/Neighbours/YardStitch, 1
   50 m), plans it on a worker thread with the houses within 90 m as context, and writes it when done; up to 3 patches far
   apart are planned at once. The house grid and each house's description are kept between passes. A town of 309 houses
   switched on at once: done in 7.9 s, 8.1 ms average frame, worst 59 ms (was 114 s with scattered batches).
-* **Options** (settings panel, Neighbourhood polish): lawns up to the fences, painted gardens (share, default 33 %), beds
-  and bushes, garden paths and walkways, rocks, ground paint.
+* **Options** (settings panel, Neighbourhood polish): polish houses already standing (off by default: switching it on or
+  loading a city only polishes houses that spawn or are rebuilt from then on, and the neighbours they join), lawns up to
+  the fences, painted gardens (share, default 33 %), shops keep their own paving, beds and bushes, garden paths and
+  walkways, rocks, ground paint.
+* **Painted gardens**: the house's own grass surfaces are tucked away (moved to a small triangle under the house, so
+  given back as they were when the garden is no longer painted) and the whole garden minus the paving is painted lush.
+* **Shops, offices and works** (not homes): the surface covering most of their ground (their car park) fills their extra
+  land, as an owned surface; no lawn, beds or garden paths.
+* **Blending**: every garden gets a soft lush band of paint 7 m past its outer edges (outside every plot).
 * A pass plans with every house within 110 m of the houses that changed but edits only those within 40 m, so a house at
   the edge of a pass is never planned without its neighbours.
 * Offline replay: lab op "polishDump" records the houses as the planner sees them; tools/hot/Replay-Polish.ps1 -Run <run>

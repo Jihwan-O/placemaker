@@ -40,6 +40,9 @@ namespace Placemaker.Game.Neighbours
     {
         /// <summary>Setting "Stitch neighbouring houses".</summary>
         public static bool FeatureEnabled;
+        /// <summary>Setting "Polish houses already standing": switched on (or a city loaded), every house is looked at; off,
+        /// only houses that spawn or are rebuilt from then on (and the neighbours they join).</summary>
+        public static bool PolishExisting;
         /// <summary>Game runner: which parts are edited (both by default).</summary>
         public static bool EditLines = true, EditLawns = true;
         /// <summary>The stitching rules (the game runner can change them live and ask for a redo).</summary>
@@ -153,13 +156,18 @@ namespace Placemaker.Game.Neighbours
             {
                 if (!_wasEnabled || s_redo)
                 {
+                    // switched on (or a city loaded with it on): every house once when standing houses are polished too;
+                    // otherwise only the new ones as they come. Options changed: the houses polished so far, again.
+                    bool redo = s_redo && _wasEnabled;
                     s_redo = false;
-                    // switched on (or a city loaded with it on): every house once, a few per pass
                     _wasEnabled = true;
-                    using (var all = _houses.ToEntityArray(Allocator.Temp)) foreach (var e in all) _dirty.Add(e);
+                    if (PolishExisting)
+                        using (var all = _houses.ToEntityArray(Allocator.Temp)) foreach (var e in all) _dirty.Add(e);
+                    else if (redo)
+                        foreach (var e in _polished) if (EntityManager.Exists(e)) _dirty.Add(e);
                     _described.Clear();
                     _gridStale = true;
-                    Mod.Log.Info($"Placemaker neighbourhood polish: on, {_dirty.Count} buildings to look at.");
+                    Mod.Log.Info($"Placemaker neighbourhood polish: on, {_dirty.Count} buildings to look at{(PolishExisting ? "" : " (new houses as they come)")}.");
                 }
                 CollectChanged();
                 ++_frame;
@@ -399,6 +407,7 @@ namespace Placemaker.Game.Neighbours
             int asked = pend.Asked, clusterCount = pend.Cluster;
             _houseOf.Clear();
             foreach (var kv in pend.HouseOf) _houseOf[kv.Key] = kv.Value;
+            foreach (var id in coreIds) if (_houseOf.TryGetValue(id, out var ph)) _polished.Add(ph);
             _lawnPrefabOf.Clear();
             foreach (var kv in pend.LawnPrefabOf) _lawnPrefabOf[kv.Key] = kv.Value;
             if (TotalPasses < 6)
@@ -583,11 +592,28 @@ namespace Placemaker.Game.Neighbours
                         global::Game.Objects.ObjectUtils.LocalToWorld(ot, new float3(gb.max.x, 0f, gb.max.z)).xz, global::Game.Objects.ObjectUtils.LocalToWorld(ot, new float3(gb.min.x, 0f, gb.max.z)).xz,
                     });
                 }
+            // a shop, office or works: which surface covers most of its ground (its car park)
+            bool home = true;
+            if (EntityManager.HasComponent<SpawnableBuildingData>(h.Prefab))
+            {
+                var zone = EntityManager.GetComponentData<SpawnableBuildingData>(h.Prefab).m_ZonePrefab;
+                if (zone != Entity.Null && EntityManager.HasComponent<ZoneData>(zone))
+                    home = EntityManager.GetComponentData<ZoneData>(zone).m_AreaType == global::Game.Zones.AreaType.Residential;
+            }
+            var surfaceArea = new Dictionary<string, float>();
             if (EntityManager.HasBuffer<global::Game.Areas.SubArea>(h.E))
                 foreach (var sa in EntityManager.GetBuffer<global::Game.Areas.SubArea>(h.E, true))
                 {
                     var area = sa.m_Area;
                     if (!EntityManager.Exists(area) || !EntityManager.HasComponent<global::Game.Areas.Surface>(area) || !EntityManager.HasBuffer<global::Game.Areas.Node>(area)) continue;
+                    if (!home)
+                    {
+                        var sn = EntityManager.GetBuffer<global::Game.Areas.Node>(area, true);
+                        float a2 = 0f;
+                        for (int i = 0; i < sn.Length; i++) { var p = sn[i].m_Position.xz; var q = sn[(i + 1) % sn.Length].m_Position.xz; a2 += p.x * q.y - q.x * p.y; }
+                        var nm = NameOf(EntityManager.GetComponentData<PrefabRef>(area).m_Prefab);
+                        surfaceArea[nm] = (surfaceArea.TryGetValue(nm, out var had) ? had : 0f) + math.abs(a2) * 0.5f;
+                    }
                     if (!IsGrass(EntityManager.GetComponentData<PrefabRef>(area).m_Prefab))
                     {
                         // driveway, paving, sand: grown lawns go around it
@@ -613,6 +639,11 @@ namespace Placemaker.Game.Neighbours
                     if (lawnsOf != null) lawnsOf[id] = area;
                     sh.Lawns.Add(new StitchLawn { Id = id, Ring = ring });
                 }
+            if (!home && surfaceArea.Count > 0)
+            {
+                var main = surfaceArea.OrderByDescending(kv => kv.Value).First().Key;
+                if (main.IndexOf("grass", StringComparison.OrdinalIgnoreCase) < 0 && main.IndexOf("lawn", StringComparison.OrdinalIgnoreCase) < 0) sh.MainSurface = main;
+            }
             return sh;
         }
 
@@ -620,12 +651,14 @@ namespace Placemaker.Game.Neighbours
 
         private readonly Dictionary<Entity, Bounds3?> _modelBounds = new Dictionary<Entity, Bounds3?>();
         private readonly Dictionary<long, Entity> _houseOf = new Dictionary<long, Entity>();
+        /// <summary>Houses a plan has edited (new houses only: an options change plans these again).</summary>
+        private readonly HashSet<Entity> _polished = new HashSet<Entity>();
 
         /// <summary>The cached description with this pass's Edit flag (the lists are shared: the planner only reads them).</summary>
         private static StitchHouse Copy(StitchHouse h, bool edit) => new StitchHouse
         {
             Id = h.Id, Position = h.Position, Forward = h.Forward, HalfLot = h.HalfLot, Lines = h.Lines, Lawns = h.Lawns, Hard = h.Hard,
-            Footprint = h.Footprint, Props = h.Props, Edit = edit,
+            Footprint = h.Footprint, Props = h.Props, Edit = edit, MainSurface = h.MainSurface,
         };
         /// <summary>What each house was given (beds, paths, bushes) by the last plan that edited it: by prefab name and centre.</summary>
         private readonly Dictionary<Entity, List<(string Name, float2 At)>> _planted = new Dictionary<Entity, List<(string, float2)>>();

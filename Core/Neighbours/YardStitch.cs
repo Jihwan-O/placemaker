@@ -20,69 +20,6 @@ using Unity.Mathematics;
 
 namespace Placemaker.Core.Neighbours
 {
-    public sealed class StitchLine
-    {
-        public long Id;
-        public string Name;
-        public float2 A, B;
-    }
-
-    public sealed class StitchLawn
-    {
-        public long Id;
-        public float2[] Ring;
-    }
-
-    public sealed class StitchHouse
-    {
-        public long Id;
-        public float2 Position;
-        /// <summary>Unit direction to the house's street (local +z).</summary>
-        public float2 Forward;
-        /// <summary>Half the lot: (width, depth) / 2 in metres.</summary>
-        public float2 HalfLot;
-        public List<StitchLine> Lines = new List<StitchLine>();
-        public List<StitchLawn> Lawns = new List<StitchLawn>();
-
-        public float2 Right => new float2(Forward.y, -Forward.x);
-        public float2 ToLocal(float2 w) { var d = w - Position; return new float2(math.dot(d, Right), math.dot(d, Forward)); }
-        public float2 ToWorld(float2 l) => Position + Right * l.x + Forward * l.y;
-        public float2 FrontRight => ToWorld(new float2(HalfLot.x, HalfLot.y));
-        public float2 FrontLeft => ToWorld(new float2(-HalfLot.x, HalfLot.y));
-        public float2 BackRight => ToWorld(new float2(HalfLot.x, -HalfLot.y));
-        public float2 BackLeft => ToWorld(new float2(-HalfLot.x, -HalfLot.y));
-    }
-
-    public sealed class StitchSettings
-    {
-        /// <summary>Largest gap between two neighbours' front corners that still makes them a pair (m).</summary>
-        public float MaxFrontGap = 10f;
-        /// <summary>Largest gap between their back corners (wedges on curves widen to the back) (m).</summary>
-        public float MaxBackGap = 32f;
-        /// <summary>How far from a lot edge a line still counts as lying on it (m).</summary>
-        public float EdgeTolerance = 1.3f;
-        /// <summary>Below this gap (m) the lots touch: only the duplicate line goes, nothing moves.</summary>
-        public float TouchingGap = 0.6f;
-        /// <summary>A lawn reaching this close to the shared edge grows to the border (m).</summary>
-        public float LawnContact = 1.6f;
-    }
-
-    public sealed class StitchPair
-    {
-        public long Left, Right;
-        public float2 Front, Back;
-        public float FrontGap, BackGap;
-        public long KeptLine = -1;
-    }
-
-    public sealed class StitchPlan
-    {
-        public readonly List<StitchPair> Pairs = new List<StitchPair>();
-        public readonly HashSet<long> HideLines = new HashSet<long>();
-        public readonly Dictionary<long, (float2 A, float2 B)> MoveLines = new Dictionary<long, (float2, float2)>();
-        public readonly Dictionary<long, float2[]> Lawns = new Dictionary<long, float2[]>();
-        public float LawnAddedM2;
-    }
 
     public static class YardStitch
     {
@@ -110,7 +47,11 @@ namespace Placemaker.Core.Neighbours
                 {
                     if (ReferenceEquals(a, b) || math.dot(a.Forward, b.Forward) < 0.5f) continue;
                     if (math.dot(b.Position - a.Position, a.Right) <= 0f) continue;
-                    float fg = math.distance(a.FrontRight, b.FrontLeft), bg = math.distance(a.BackRight, b.BackLeft);
+                    // side by side, not one behind the other: their street edges line up (lots start at the street, depths differ)
+                    var frontA = a.Position + a.Forward * a.HalfLot.y;
+                    var frontB = b.Position + b.Forward * b.HalfLot.y;
+                    if (math.abs(math.dot(frontB - frontA, a.Forward)) > s.MaxFrontOffset) continue;
+                    float fg = math.distance(a.FrontRight, b.FrontLeft), bg = math.distance(BackAt(a, +1, Deep(a, b)), BackAt(b, -1, Deep(a, b)));
                     if (fg > s.MaxFrontGap || bg > s.MaxBackGap || fg >= bestGap) continue;
                     best = b;
                     bestGap = fg;
@@ -128,12 +69,15 @@ namespace Placemaker.Core.Neighbours
             var pair = new StitchPair
             {
                 Left = a.Id, Right = b.Id,
-                Front = (a.FrontRight + b.FrontLeft) * 0.5f, Back = (a.BackRight + b.BackLeft) * 0.5f,
-                FrontGap = math.distance(a.FrontRight, b.FrontLeft), BackGap = math.distance(a.BackRight, b.BackLeft),
+                Front = (a.FrontRight + b.FrontLeft) * 0.5f, Back = (BackAt(a, +1, Deep(a, b)) + BackAt(b, -1, Deep(a, b))) * 0.5f,
+                FrontGap = math.distance(a.FrontRight, b.FrontLeft), BackGap = math.distance(BackAt(a, +1, Deep(a, b)), BackAt(b, -1, Deep(a, b))),
             };
             plan.Pairs.Add(pair);
             bool touching = pair.FrontGap < s.TouchingGap && pair.BackGap < s.TouchingGap;
-            float2 Border(StitchHouse h, float localZ) => math.lerp(pair.Front, pair.Back, math.saturate((h.HalfLot.y - localZ) / (2f * h.HalfLot.y)));
+            // the border runs the deeper lot's full depth; a point at local z of either house sits at the same distance from
+            // the street along it (a shallow neighbour's back corner lands part way down)
+            float deep = 2f * Deep(a, b);
+            float2 Border(StitchHouse h, float localZ) => math.lerp(pair.Front, pair.Back, math.saturate((h.HalfLot.y - localZ) / deep));
 
             // the side lines on the shared side: a's right edge (+x), b's left edge (-x)
             var sideA = SideLines(a, +1, s).ToList();
@@ -154,16 +98,20 @@ namespace Placemaker.Core.Neighbours
             }
             if (touching) return;
 
-            // back and front lines ending at the pair's corners meet the border
-            Snap(a, a.BackRight, pair.Back, s, moved, current, sideA);
-            Snap(a, a.FrontRight, pair.Front, s, moved, current, sideA);
-            Snap(b, b.BackLeft, pair.Back, s, moved, current, sideB);
-            Snap(b, b.FrontLeft, pair.Front, s, moved, current, sideB);
+            // every other line ending on the shared side (back and front fences at the corners, the short pieces that join
+            // an inset hedge to the side) follows to the same place on the border
+            SnapToBorder(a, +1, Border, s, moved, current, sideA);
+            SnapToBorder(b, -1, Border, s, moved, current, sideB);
 
             // lawns that reach the shared side grow up to the border
             GrowLawns(a, +1, Border, s, plan, lawnNow);
             GrowLawns(b, -1, Border, s, plan, lawnNow);
         }
+
+        private static float Deep(StitchHouse a, StitchHouse b) => math.max(a.HalfLot.y, b.HalfLot.y);
+
+        /// <summary>A house's side edge (+1 right, -1 left) followed from its street edge to <paramref name="halfDepth"/> × 2 deep.</summary>
+        private static float2 BackAt(StitchHouse h, int side, float halfDepth) => h.ToWorld(new float2(side * h.HalfLot.x, h.HalfLot.y - 2f * halfDepth));
 
         private static IEnumerable<StitchLine> SideLines(StitchHouse h, int side, StitchSettings s)
         {
@@ -176,15 +124,22 @@ namespace Placemaker.Core.Neighbours
             }
         }
 
-        private static void Snap(StitchHouse h, float2 corner, float2 target, StitchSettings s, Dictionary<long, (float2 A, float2 B)> moved,
+        private static void SnapToBorder(StitchHouse h, int side, Func<StitchHouse, float, float2> border, StitchSettings s, Dictionary<long, (float2 A, float2 B)> moved,
             Func<StitchLine, (float2 A, float2 B)> current, List<StitchLine> sideLines)
         {
+            float x = side * h.HalfLot.x;
             foreach (var l in h.Lines)
             {
                 if (sideLines.Contains(l)) continue;
+                // the line's ORIGINAL ends decide (a line moved for the other side keeps that move at its other end)
+                var la = h.ToLocal(l.A);
+                var lb = h.ToLocal(l.B);
                 var c = current(l);
-                if (math.distance(c.A, corner) < s.EdgeTolerance) moved[l.Id] = (target, c.B);
-                else if (math.distance(c.B, corner) < s.EdgeTolerance) moved[l.Id] = (c.A, target);
+                bool onA = math.abs(la.x - x) < s.EdgeTolerance, onB = math.abs(lb.x - x) < s.EdgeTolerance;
+                if (onA == onB) continue;   // neither end on this side, or the whole line on it (a side line)
+                // an end at a lot corner goes exactly to the border's front or back point
+                float Z(float z) => math.abs(z - h.HalfLot.y) < s.EdgeTolerance ? h.HalfLot.y : math.abs(z + h.HalfLot.y) < s.EdgeTolerance ? -h.HalfLot.y : z;
+                moved[l.Id] = onA ? (border(h, Z(la.y)), c.B) : (c.A, border(h, Z(lb.y)));
             }
         }
 
@@ -209,8 +164,17 @@ namespace Placemaker.Core.Neighbours
                 {
                     h.ToWorld(new float2(inner, zmax)), border(h, zmax), border(h, zmin), h.ToWorld(new float2(inner, zmin)),
                 };
-                if (Poly.Area(band) < 1f) continue;
-                var merged = Poly.Boolean(new[] { Ccw(ring) }, new[] { Ccw(band) }, BoolOp.Union);
+                // where lots overlap (the back of a curve's inside) the border crosses the lot edge: only the part beyond the edge
+                var beyond = new[]
+                {
+                    h.ToWorld(new float2(inner, h.HalfLot.y + 50f)), h.ToWorld(new float2(inner + side * 200f, h.HalfLot.y + 50f)),
+                    h.ToWorld(new float2(inner + side * 200f, -h.HalfLot.y - 50f)), h.ToWorld(new float2(inner, -h.HalfLot.y - 50f)),
+                };
+                var parts = Poly.Boolean(new[] { (IReadOnlyList<float2>)band }, new[] { (IReadOnlyList<float2>)Ccw(beyond) }, BoolOp.Intersection, FillRule.NonZero);
+                if (parts.Count == 0) continue;
+                var piece = parts.OrderByDescending(r => r.Area).First().Outer;
+                if (Poly.Area(piece) < 1f) continue;
+                var merged = Poly.Boolean(new[] { Ccw(ring) }, new[] { Ccw(piece) }, BoolOp.Union);
                 if (merged.Count == 0) continue;
                 var main = merged.OrderByDescending(r => r.Area).First();
                 if (main.HasHoles) continue;

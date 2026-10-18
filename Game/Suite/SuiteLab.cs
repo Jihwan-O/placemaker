@@ -41,6 +41,71 @@ namespace Placemaker.Game.Suite
                     Mod.Log.Info("Placemaker lab: neighbourhood polish edits " + parts);
                     yield break;
                 }
+                case "hotload":
+                {
+                    // a newer YardStitch (tools/hot/Build-Hot.ps1) becomes the neighbourhood-polish planner in this running game
+                    string path = (string)step["path"];
+                    try
+                    {
+                        var asm = System.Reflection.Assembly.LoadFile(path);
+                        var type = asm.GetType("Placemaker.Core.Neighbours.YardStitch", true);
+                        var method = type.GetMethod("Plan", new[] { typeof(System.Collections.Generic.IReadOnlyList<Placemaker.Core.Neighbours.StitchHouse>), typeof(Placemaker.Core.Neighbours.StitchSettings) });
+                        if (method == null) { rec["error"] = "lab: hot planner has no Plan(houses, settings)"; yield break; }
+                        Placemaker.Game.Neighbours.NeighbourPolishSystem.Planner = (Func<System.Collections.Generic.IReadOnlyList<Placemaker.Core.Neighbours.StitchHouse>, Placemaker.Core.Neighbours.StitchSettings, Placemaker.Core.Neighbours.StitchPlan>)
+                            Delegate.CreateDelegate(typeof(Func<System.Collections.Generic.IReadOnlyList<Placemaker.Core.Neighbours.StitchHouse>, Placemaker.Core.Neighbours.StitchSettings, Placemaker.Core.Neighbours.StitchPlan>), method);
+                        Placemaker.Game.Neighbours.NeighbourPolishSystem.Redo();
+                        rec["loaded"] = asm.GetName().Name;
+                        Mod.Log.Info("Placemaker lab: hot planner " + asm.GetName().Name + " loaded from " + path + ", every house again");
+                    }
+                    catch (Exception e) { rec["error"] = "lab: hotload failed: " + e.GetType().Name + ": " + e.Message; yield break; }
+                    yield return Frames(20);
+                    yield break;
+                }
+                case "polishsettings":
+                {
+                    // stitching rules changed in the running game (no rebuild, no relaunch), then every house again
+                    var set = Placemaker.Game.Neighbours.NeighbourPolishSystem.Settings;
+                    var applied = new JObject();
+                    if (step["settings"] is JObject values)
+                        foreach (var p in values.Properties())
+                        {
+                            var field = set.GetType().GetField(p.Name);
+                            if (field == null || field.Name == "Extra") set.Extra[p.Name] = (float)p.Value;   // a knob for a hot planner
+                            else field.SetValue(set, p.Value.ToObject(field.FieldType));
+                            applied[p.Name] = p.Value;
+                        }
+                    rec["settings"] = applied;
+                    Placemaker.Game.Neighbours.NeighbourPolishSystem.Redo();
+                    Mod.Log.Info("Placemaker lab: stitching rules " + applied.ToString(Newtonsoft.Json.Formatting.None) + ", every house again");
+                    yield return Frames(20);
+                    yield break;
+                }
+                case "touchhouses":
+                {
+                    // the game rebuilds every house's fence lines in the land (as after a move or level-up): the polish must put
+                    // its edits back in the same frame
+                    var b = st.S.Block;
+                    var em = _world.EntityManager;
+                    int n = 0;
+                    // inside the runner's tool update (ToolUpdate): the Modification systems of the same frame see the Updated
+                    yield return ApplyWithFixtureTool(t =>
+                    {
+                        using (var q = em.CreateEntityQuery(ComponentType.ReadOnly<global::Game.Buildings.Building>(), ComponentType.ReadOnly<global::Game.Objects.Transform>(), ComponentType.Exclude<global::Game.Common.Deleted>(), ComponentType.Exclude<global::Game.Tools.Temp>()))
+                        using (var all = q.ToEntityArray(Unity.Collections.Allocator.Temp))
+                            foreach (var e in all)
+                            {
+                                var p = em.GetComponentData<global::Game.Objects.Transform>(e).m_Position;
+                                if (p.x < b.X0 || p.x > b.X1 || p.z < b.Z0 || p.z > b.Z1) continue;
+                                em.AddComponent<global::Game.Common.Updated>(e);
+                                n++;
+                            }
+                        return n;
+                    }, "touch houses");
+                    rec["touched"] = n;
+                    Mod.Log.Info($"Placemaker lab: {n} houses updated (their fence lines rebuilt by the game)");
+                    yield return Frames(30);
+                    yield break;
+                }
                 case "polishstats":
                 {
                     // neighbourhood polish totals since the game started (Game/Neighbours/NeighbourPolishSystem)

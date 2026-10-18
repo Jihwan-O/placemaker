@@ -40,6 +40,14 @@ namespace Placemaker.Game.Neighbours
         public static bool FeatureEnabled;
         /// <summary>Game runner: which parts are edited (both by default).</summary>
         public static bool EditLines = true, EditLawns = true;
+        /// <summary>The stitching rules (the game runner can change them live and ask for a redo).</summary>
+        public static StitchSettings Settings = new StitchSettings();
+        /// <summary>The planner (the game runner's lab op "hotload" swaps in a newer YardStitch without a relaunch).</summary>
+        public static Func<IReadOnlyList<StitchHouse>, StitchSettings, StitchPlan> Planner = YardStitch.Plan;
+        private static bool s_redo;
+
+        /// <summary>Every house again with the current rules (lines and lawns no longer planned go back to the game's own).</summary>
+        public static void Redo() => s_redo = true;
 
         private const int HousesPerPass = 48;
         private const float ClusterRadius = 70f;
@@ -91,8 +99,9 @@ namespace Placemaker.Game.Neighbours
             if (!FeatureEnabled) { _wasEnabled = false; return; }
             try
             {
-                if (!_wasEnabled)
+                if (!_wasEnabled || s_redo)
                 {
+                    s_redo = false;
                     // switched on (or a city loaded with it on): every house once, a few per pass
                     _wasEnabled = true;
                     using (var all = _houses.ToEntityArray(Allocator.Temp)) foreach (var e in all) _dirty.Add(e);
@@ -179,7 +188,7 @@ namespace Placemaker.Game.Neighbours
             var lanesOf = new Dictionary<long, (Entity Lane, float3 A, float3 B)>();
             var lawnsOf = new Dictionary<long, Entity>();
             foreach (int i in cluster) stitch.Add(Describe(houses[i], lanesOf, lawnsOf));
-            var plan = YardStitch.Plan(stitch);
+            var plan = Planner(stitch, Settings);
             if (TotalPasses < 6)
                 Mod.Log.Info($"Placemaker neighbourhood polish pass {TotalPasses + 1}: {done.Count} houses asked, {cluster.Count} in their neighbourhoods, {plan.Pairs.Count} pairs, "
                     + $"{plan.MoveLines.Count} lines to move, {plan.HideLines.Count} to hide, {plan.Lawns.Count} lawns{(EditLines ? "" : " (lines off)")}{(EditLawns ? "" : " (lawns off)")}");

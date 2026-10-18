@@ -69,6 +69,48 @@ namespace Placemaker.Tests
         }
 
         [Fact]
+        public void Inside_of_a_curve_wedges_open_to_the_street_and_are_stitched_too()
+        {
+            // inside of a curve: houses face away from the centre, fronts on radius 82, backs on 34: the gap is widest at the street
+            float2 At(float angle) => 58f * new float2(math.cos(angle), math.sin(angle));
+            float2 Facing(float angle) => new float2(math.cos(angle), math.sin(angle));
+            float a0 = math.radians(90f), a1 = a0 - 0.42f;   // facing outward, a's right is clockwise
+            var a = House(1, At(a0), Facing(a0));
+            var b = House(2, At(a1), Facing(a1));
+            Assert.True(math.dot(b.Position - a.Position, a.Right) > 0f);
+            var plan = YardStitch.Plan(new[] { a, b });
+            Assert.Single(plan.Pairs);
+            var pair = plan.Pairs[0];
+            Assert.True(pair.FrontGap > pair.BackGap, $"front {pair.FrontGap} back {pair.BackGap}");
+            Assert.Equal(22L, pair.KeptLine);
+            Assert.Contains(11L, plan.HideLines);
+            Assert.True(plan.MoveLines.ContainsKey(22L));
+            // the lawns sit at the back, where the lots almost meet: whatever they gain stays on their own side
+            foreach (var r in plan.Lawns.Values) Assert.True(SurfaceAcceptance.IsAccepted(r));
+        }
+
+        [Fact]
+        public void A_shallow_house_beside_a_deep_one_is_its_neighbour()
+        {
+            // both lots start at the street (z = 24 front edge); b is only 16 m deep, so its centre sits 16 m nearer the street
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            var b = new StitchHouse { Id = 2, Position = new float2(20f, 16f), Forward = new float2(0f, 1f), HalfLot = new float2(8f, 8f) };
+            b.Lines.Add(new StitchLine { Id = 21, Name = "HedgeHigh01", A = b.ToWorld(new float2(-7.9f, 7.9f)), B = b.ToWorld(new float2(-7.9f, -7.9f)) });
+            var plan = YardStitch.Plan(new[] { a, b });
+            Assert.Single(plan.Pairs);
+            Assert.Equal(21L, plan.Pairs[0].KeptLine);
+            Assert.Contains(11L, plan.HideLines);
+        }
+
+        [Fact]
+        public void A_house_behind_another_is_not_its_side_neighbour()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            var b = House(2, new float2(12f, -40f), new float2(0f, 1f));
+            Assert.Empty(YardStitch.Plan(new[] { a, b }).Pairs);
+        }
+
+        [Fact]
         public void Houses_across_the_street_are_never_a_pair()
         {
             var a = House(1, new float2(0f, 0f), new float2(0f, 1f));

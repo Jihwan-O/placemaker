@@ -1,0 +1,77 @@
+// Placemaker neighbourhood polish — the data YardStitch plans with (kept apart from the algorithm so the game runner can
+// load a newer YardStitch into a running game: tools/hot, lab op "hotload").
+
+using System.Collections.Generic;
+using Unity.Mathematics;
+
+namespace Placemaker.Core.Neighbours
+{
+    public sealed class StitchLine
+    {
+        public long Id;
+        public string Name;
+        public float2 A, B;
+    }
+
+    public sealed class StitchLawn
+    {
+        public long Id;
+        public float2[] Ring;
+    }
+
+    public sealed class StitchHouse
+    {
+        public long Id;
+        public float2 Position;
+        /// <summary>Unit direction to the house's street (local +z).</summary>
+        public float2 Forward;
+        /// <summary>Half the lot: (width, depth) / 2 in metres.</summary>
+        public float2 HalfLot;
+        public List<StitchLine> Lines = new List<StitchLine>();
+        public List<StitchLawn> Lawns = new List<StitchLawn>();
+
+        public float2 Right => new float2(Forward.y, -Forward.x);
+        public float2 ToLocal(float2 w) { var d = w - Position; return new float2(math.dot(d, Right), math.dot(d, Forward)); }
+        public float2 ToWorld(float2 l) => Position + Right * l.x + Forward * l.y;
+        public float2 FrontRight => ToWorld(new float2(HalfLot.x, HalfLot.y));
+        public float2 FrontLeft => ToWorld(new float2(-HalfLot.x, HalfLot.y));
+        public float2 BackRight => ToWorld(new float2(HalfLot.x, -HalfLot.y));
+        public float2 BackLeft => ToWorld(new float2(-HalfLot.x, -HalfLot.y));
+    }
+
+    public sealed class StitchSettings
+    {
+        /// <summary>Largest gap between two neighbours' front corners that still makes them a pair (m); the inside of a curve opens to the street.</summary>
+        public float MaxFrontGap = 24f;
+        /// <summary>Largest gap between their back corners (wedges on curves widen to the back) (m).</summary>
+        public float MaxBackGap = 32f;
+        /// <summary>How far two side neighbours' street edges may be apart along the street's normal (m).</summary>
+        public float MaxFrontOffset = 8f;
+        /// <summary>How far from a lot edge a line still counts as lying on it (m).</summary>
+        public float EdgeTolerance = 1.3f;
+        /// <summary>Below this gap (m) the lots touch: only the duplicate line goes, nothing moves.</summary>
+        public float TouchingGap = 0.6f;
+        /// <summary>A lawn reaching this close to the shared edge grows to the border (m).</summary>
+        public float LawnContact = 1.6f;
+        /// <summary>Knobs a hot-loaded YardStitch reads before they get a field of their own (lab op "polishSettings").</summary>
+        public Dictionary<string, float> Extra = new Dictionary<string, float>();
+        public float Knob(string name, float fallback) => Extra != null && Extra.TryGetValue(name, out var v) ? v : fallback;
+    }
+
+    public sealed class StitchPair
+    {
+        public long Left, Right;
+        public float2 Front, Back;
+        public float FrontGap, BackGap;
+        public long KeptLine = -1;
+    }
+
+    public sealed class StitchPlan
+    {
+        public readonly List<StitchPair> Pairs = new List<StitchPair>();
+        public readonly HashSet<long> HideLines = new HashSet<long>();
+        public readonly Dictionary<long, (float2 A, float2 B)> MoveLines = new Dictionary<long, (float2, float2)>();
+        public readonly Dictionary<long, float2[]> Lawns = new Dictionary<long, float2[]>();
+        public float LawnAddedM2;
+    }
+}

@@ -104,7 +104,10 @@ namespace Placemaker.Core.Layers.Commercial
                 {
                     // Every entrance the player placed must lead somewhere: a layout that leaves one unconnected loses to one that does not.
                     int lost = 0; foreach (var g in gates) if ((g.Cars || g.Kind == ShopEntrances.Footpath) && g.Landed == "none") { lost++; lostMask += 1 << g.Index; }
-                    score = math.max(1f, 2f * mall.ShopArea() + 26f * mall.Stalls - 100000f * lost);
+                    // Shops and parking in balance (the user: "maybe 50 % shops, 50 % parking lot"): all the ground they take, less half
+                    // the difference between them (a stall with its share of aisle is about 26 m²).
+                    float shops = mall.ShopArea(), lot = 26f * mall.Stalls;
+                    score = math.max(1f, shops + lot - 0.5f * math.abs(shops - lot) - 100000f * lost);
                 }
                 tries.Add(math.round(score) + lostMask * 0.01f);
                 planMark.Restore(ctx.Plan); mall.Rewind(mallMark); mall.ResetDesign(); mall.RowHolds.Clear(); mall.Gates = gates;
@@ -143,6 +146,9 @@ namespace Placemaker.Core.Layers.Commercial
                     if (tg <= tMax - back && tg >= tMin + front) lines.Add((tg, g.At));
                 }
                 for (float tl = tMax - back; tl >= tMin + front; tl -= 2f) lines.Add((tl, new float2(float.NaN)));
+                // Every line that holds a row, scored: shop ground and lot in balance, less the land left over behind the row (a
+                // round site's rim holds a short row; deeper in, its chord is long); the best few are composed.
+                var cand = new List<(float score, float tl, float a, float b, float2 gate)>();
                 foreach (var (tl, gate) in lines)
                 {
                     // The longest stretch along this line where the lane, its plots and a strip of lot in front are all inside.
@@ -169,8 +175,14 @@ namespace Placemaker.Core.Layers.Commercial
                         if (sg > 0.5f * (a + b)) b = math.min(b, sg - h - 6f); else a = math.max(a, sg + h + 6f);
                         if (b - a < 3f * Mall.Cell + 2f * h + 2f) continue;
                     }
-                    if (Compose(ctx, mall, r, o, tl, a, b, cells, h, asset, sMin, sMax, tMin)) return true;
+                    float shops = (b - a) * d;
+                    float lot = SliceArea(mall, r, sMin, sMax, tMin - 5f, tl - h);
+                    float waste = SliceArea(mall, r, sMin, sMax, tl + back + 2f, tMax + 5f);
+                    cand.Add((shops + lot - 0.5f * math.abs(shops - lot) - waste, tl, a, b, gate));
                 }
+                cand.Sort((x, y) => y.score.CompareTo(x.score));
+                for (int c = 0; c < cand.Count && c < 6; c++)
+                    if (Compose(ctx, mall, r, o, cand[c].tl, cand[c].a, cand[c].b, cells, h, asset, sMin, sMax, tMin)) return true;
             }
             return false;
         }
@@ -324,6 +336,14 @@ namespace Placemaker.Core.Layers.Commercial
             catch (Exception) { return ring; }
         }
 
+        /// <summary>Area (m²) of the site between t0 and t1 in frame <paramref name="r"/>.</summary>
+        private static float SliceArea(Mall mall, StreetShops.Run r, float s0, float s1, float t0, float t1)
+        {
+            if (t1 <= t0) return 0f;
+            try { float a = 0f; foreach (var p in Poly.Intersection(mall.Region.Ring, Mall.Rect(r, s0 - 5f, s1 + 5f, t0, t1))) if (p?.Outer != null) a += Poly.Area(p.Outer); return a; }
+            catch (Exception) { return 0f; }
+        }
+
         /// <summary>Below this rise and fall (m) under the lot the ground is not reshaped at all.</summary>
         private const float FlatRelief = 1.0f;
 
@@ -373,6 +393,14 @@ namespace Placemaker.Core.Layers.Commercial
                 var strip = Poly.EnsureCcw(new[] { g.At - n * 1.5f, q - n * 1.5f, q + n * 1.5f, g.At + n * 1.5f });
                 bool blocked = false;
                 foreach (var shop in mall.Shops) if (StreetShops.ConvexOverlap(shop, strip, 0.05f)) { blocked = true; break; }
+                // Clear of every other net (a walk ending on a lot's drive: the game clipped the ground under the two, a 4.6 m pit in the
+                // game runner's circle): 4 m from any of them but where it leaves the sidewalk.
+                foreach (var net in ctx.Plan.Nets)
+                {
+                    if (blocked) break;
+                    for (float u = 0.25f; u <= 1.001f; u += 0.25f)
+                        if (math.sqrt(SegmentIndex.DistSq(math.lerp(g.At, q, u), net.A.xz, net.D.xz)) < 4f) { blocked = true; break; }
+                }
                 if (blocked || mall.PathChain(new List<float2> { g.At, q }, -g.In, null) == null) continue;
                 g.Landed = "walk";
                 ctx.Plan.Issues.RemoveAll(i => i.Key == Mall.NoLaneKey && i.Args != null && i.Args.Length > 0 && i.Args[0] is int k && k == g.Index + 1);

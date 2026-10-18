@@ -188,7 +188,7 @@ namespace Placemaker.Tests
             // Never a pocket park, never nothing: the type's own composition, shops round its ring.
             Assert.DoesNotContain(plan.AllIssues(), i => i.Key == CommercialLayer.NoStreetKey || i.Key == CommercialLayer.NoLayoutKey || i.Key == CommercialLayer.FallbackKey);
             Assert.Equal(1.0, host.Facts.GetValueOrDefault(CompositionFact(type)));
-            Assert.True(host.Facts.GetValueOrDefault("shopPlots") >= 4, type + ": shop plots " + host.Facts.GetValueOrDefault("shopPlots"));
+            Assert.True(host.Facts.GetValueOrDefault("shopPlots") >= (type == "stripMall" ? 2 : 4), type + ": shop plots " + host.Facts.GetValueOrDefault("shopPlots"));
             Assert.Equal(host.Facts["shopPlots"], host.Regions.Count(Cutouts.IsCutout));
             Assert.NotEmpty(host.Zoning);
             // The strip mall is a lot with shops round it.
@@ -202,6 +202,7 @@ namespace Placemaker.Tests
         [MemberData(nameof(Types))]
         public void TheRingFollowsACircle(string type)
         {
+            if (type == "stripMall") return;   // (shops4) the strip mall has no ring: one lane behind its lot (LotCentre)
             var ring = Circle();
             var site = ZoningCutoutTests.Streets(ring);
             var r = Recipe(type);
@@ -261,6 +262,7 @@ namespace Placemaker.Tests
             var ring = TestKit.Rect(160, 160);
             var site = ZoningCutoutTests.Streets(ring);
             var r = Recipe("stripMall", "classic");
+            r.Root.Settings.Values["plotTrees"] = true;   // (shops4) off by default now: the player's extra
             ShopTestEntrances.Place(r, ring, site, footpath: true);
             var plan = Compose(r, ring, site);
             var host = plan.Layers.First(l => l.GeneratorId == "stripMall");

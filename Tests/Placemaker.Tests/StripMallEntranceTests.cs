@@ -93,7 +93,7 @@ namespace Placemaker.Tests
                     var nrm = new float2(-d.y, d.x);
                     corridors.Add(new[] { p0 + d * edge - nrm * 4.5f, p0 + d * len - nrm * 4.5f, p0 + d * len + nrm * 4.5f, p0 + d * edge + nrm * 4.5f });
                 }
-            Assert.NotEmpty(corridors);
+            // (shops4) The strip mall's own lane need not join a street (the lot does): the hollow check below still holds.
 
             // No hollow anywhere on the site or in the lanes' approaches (3 m neighbourhood, 10 cm).
             bool Covered(float2 p) => region.Contains(p) || corridors.Any(c => Poly.Contains(c, p));

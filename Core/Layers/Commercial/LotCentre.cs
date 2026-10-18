@@ -94,24 +94,28 @@ namespace Placemaker.Core.Layers.Commercial
             var gates = mall.Gates;
             float bestScore = 0f; int bestK = -1;
             var frames = Frames(ctx, mall, runs);
+            var tries = new List<float>();
             // Every frame is planned and scored (shop ground plus stalls), then the best planned again for real.
             for (int k = 0; k < frames.Count; k++)
             {
                 ctx.Check();
-                float score = 0f;
+                float score = 0f; int lostMask = 0;
                 if (CompactIn(ctx, mall, frames[k], o))
                 {
                     // Every entrance the player placed must lead somewhere: a layout that leaves one unconnected loses to one that does not.
-                    int lost = 0; foreach (var g in gates) if ((g.Cars || g.Kind == ShopEntrances.Footpath) && g.Landed == "none") lost++;
-                    score = math.max(1f, mall.ShopArea() + 26f * mall.Stalls - 100000f * lost);
+                    int lost = 0; foreach (var g in gates) if ((g.Cars || g.Kind == ShopEntrances.Footpath) && g.Landed == "none") { lost++; lostMask += 1 << g.Index; }
+                    score = math.max(1f, 2f * mall.ShopArea() + 26f * mall.Stalls - 100000f * lost);
                 }
-                ctx.Plan.Facts["compactTry" + k] = math.round(score);
+                tries.Add(math.round(score) + lostMask * 0.01f);
                 planMark.Restore(ctx.Plan); mall.Rewind(mallMark); mall.ResetDesign(); mall.RowHolds.Clear(); mall.Gates = gates;
                 foreach (var g in gates) g.Landed = "none";
                 if (score > bestScore) { bestScore = score; bestK = k; }
             }
             if (bestK < 0) return false;
-            return CompactIn(ctx, mall, frames[bestK], o);
+            bool ok = CompactIn(ctx, mall, frames[bestK], o);
+            ctx.Plan.Facts["compactFrames"] = frames.Count; ctx.Plan.Facts["compactFrame"] = bestK;
+            for (int k = 0; k < tries.Count; k++) ctx.Plan.Facts["compactTry" + k] = tries[k];
+            return ok;
         }
 
         /// <summary>
@@ -171,76 +175,153 @@ namespace Placemaker.Core.Layers.Commercial
             return false;
         }
 
+        /// <summary>
+        /// The layout behind lane line <paramref name="tl"/>: the back row, and on deep sites as many double rows as fit between bands of
+        /// lot two aisles deep at least (the user: "maybe 50 % shops, 50 % parking lot ... for larger areas it just seems like a big
+        /// wasteland of parking and one or two shops"). Most rows first.
+        /// </summary>
         private static bool Compose(LayerContext ctx, Mall mall, StreetShops.Run r, LotLayout o, float tl, float a, float b, int cells, float h, AssetRef asset,
             float sMin, float sMax, float tMin)
         {
-            var planMark = PlanMark.Of(ctx.Plan); var mallMark = mall.Mark();
-            bool Fail(int step) { planMark.Restore(ctx.Plan); mall.Rewind(mallMark); mall.RowHolds.Clear(); ctx.Plan.Facts["compactFail"] = step; return false; }
             float d = cells * Mall.Cell, zo = Mall.ZoneOffset(h);
+            float island = 2f * (zo + d) + 2f * h;
+            float lotMin = Mall.LotDepth(2) + 2f;
+            float front = (tl - h) - tMin;
+            int kMax = math.clamp((int)math.floor((front - lotMin) / (lotMin + island)), 0, 8);
+            for (int k = kMax; k >= 0; k--)
+                if (ComposeRows(ctx, mall, r, o, tl, a, b, cells, h, asset, sMin, sMax, tMin, k)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// <paramref name="k"/> double rows: each a block of shops back to back, ringed by its own lane (the shops face the lots on
+        /// both sides), set evenly between the front lot and the back row. Every band of lot between is one lot entered from the lanes
+        /// either side (their ends and corners: no dead end); the front band also from the player's entrances.
+        /// </summary>
+        private static bool ComposeRows(LayerContext ctx, Mall mall, StreetShops.Run r, LotLayout o, float tl, float a, float b, int cells, float h, AssetRef asset,
+            float sMin, float sMax, float tMin, int k)
+        {
+            var planMark = PlanMark.Of(ctx.Plan); var mallMark = mall.Mark();
+            bool Fail(int step) { planMark.Restore(ctx.Plan); mall.Rewind(mallMark); mall.RowHolds.Clear(); foreach (var g in mall.Gates) g.Landed = "none"; ctx.Plan.Facts["compactFail"] = step; return false; }
+            float d = cells * Mall.Cell, zo = Mall.ZoneOffset(h);
+            float span = 2f * (zo + d), island = span + 2f * h;
             var lane = mall.Connect(Mall.End.Free(r.At(a, tl)), null, Mall.End.Free(r.At(b, tl)), NetRole.Alley, asset, h);
             if (lane == null) return Fail(1);
             if (mall.HoldRow(Mall.Rect(r, a + h + 0.5f, b - h - 0.5f, tl + h, tl + zo + d + 1f)) == null) return Fail(2);
-            // The lot: the site in front of the lane.
-            float2[] lot;
-            try { lot = Mall.Largest(Poly.Intersection(mall.Region.Ring, Mall.Rect(r, sMin - 5f, sMax + 5f, tMin - 5f, tl - h - 0.3f)), 300f); }
-            catch (Exception) { lot = null; }
-            if (lot == null) return Fail(3);
-            // Car entrances and footpaths on the lot's own edge come in through the lot (the parking planner's connectors, as the
-            // parking type); the others are routed to the lane.
-            var entries = new List<(float2 at, string kind)>();
+
+            // ── the double rows ──
+            float front = (tl - h) - tMin;
+            float band = (front - k * island) / (k + 1);
+            var loops = new List<(Mall.Lane loop, float y1, float y2, float ia, float ib)>();
+            for (int j = 0; j < k; j++)
+            {
+                float y1 = tMin + (j + 1) * band + j * island + h, y2 = y1 + span;
+                // the longest stretch where the ring and its lots either side stay inside the site
+                float ia = float.NaN, ib = float.NaN, ca = float.NaN;
+                for (float s = sMin; s <= sMax + 1f; s += 1f)
+                {
+                    bool ok = s <= sMax;
+                    if (ok) foreach (float t in new[] { y1 - h - 6f, y1, y1 + zo + d, y2, y2 + h + 6f }) if (!mall.Region.Contains(r.At(s, t)) || mall.KerbMargin(r.At(s, t), r.In) > 0f) { ok = false; break; }
+                    if (ok) { if (float.IsNaN(ca)) ca = s; }
+                    else if (!float.IsNaN(ca)) { if (float.IsNaN(ia) || s - ca > ib - ia) { ia = ca; ib = s - 1f; } ca = float.NaN; }
+                }
+                if (float.IsNaN(ia)) return Fail(10);
+                // a planted end and room to walk round it, not a lane along the street
+                ia += 8f; ib -= 8f;
+                if (ib - ia < 6f * Mall.Cell + 2f * h) return Fail(11);
+                var loop = mall.Loop(r.At(ia, y1), new[] { r.At(ib, y1), r.At(ib, y2), r.At(ia, y2) }, NetRole.Alley, asset, h);
+                if (loop == null) return Fail(12);
+                if (mall.HoldRow(Mall.Rect(r, ia + h + 0.5f, ib - h - 0.5f, y1 + h, y1 + zo + d)) == null) return Fail(13);
+                if (mall.HoldRow(Mall.Rect(r, ia + h + 0.5f, ib - h - 0.5f, y2 - zo - d, y2 - h)) == null) return Fail(14);
+                loops.Add((loop, y1, y2, ia, ib));
+            }
+
+            // ── the lots: one band in front of each row ──
+            var bands = new List<(float2[] ring, List<(float2 at, string kind)> entries)>();
+            void Stubs(List<(float2 at, string kind)> e, float s0, float s1, float t)
+            {
+                // the lane's ends (its end nodes or the ring's corners become corners of the lot's aisles), then one per 80 m on long rows
+                e.Add((r.At(s0 + 0.5f, t), "alley"));
+                e.Add((r.At(s1 - 0.5f, t), "alley"));
+                float len = s1 - s0;
+                int n = len > 160f ? (int)math.floor(len / 80f) : 1;
+                for (int q = 1; q < n; q++) e.Add((r.At(s0 + len * q / n, t), "alley"));
+            }
+            for (int j = 0; j <= k; j++)
+            {
+                float lo = j == 0 ? tMin - 5f : loops[j - 1].y2 + h + 0.3f;
+                float hi = j == k ? tl - h - 0.3f : loops[j].y1 - h - 0.3f;
+                float2[] lot;
+                try { lot = Mall.Largest(Poly.Intersection(mall.Region.Ring, Mall.Rect(r, sMin - 5f, sMax + 5f, lo, hi)), 300f); }
+                catch (Exception) { lot = null; }
+                if (lot == null) return Fail(3);
+                var e = new List<(float2 at, string kind)>();
+                if (j == k) Stubs(e, a, b, hi); else Stubs(e, loops[j].ia, loops[j].ib, hi);
+                if (j > 0) Stubs(e, loops[j - 1].ia, loops[j - 1].ib, lo);
+                bands.Add((lot, e));
+            }
+
+            // Car entrances and footpaths on the front lot's own edge come in through it (the parking planner's connectors, as the
+            // parking type); the others are routed to the nearest lane.
             var rest = new List<ShopEntrances.Gate>();
+            bool cars = false;
+            float frontHi = k == 0 ? tl - h - 0.3f : loops[0].y1 - h - 0.3f;
             foreach (var g in mall.Gates)
             {
-                if ((g.Cars || g.Kind == ShopEntrances.Footpath) && Poly.DistanceToBoundary(lot, g.At) < 1.5f && math.dot(g.At - r.A, r.In) < tl - h - 4f)
-                { entries.Add((g.At, g.Kind)); g.Landed = "lot"; }
+                if ((g.Cars || g.Kind == ShopEntrances.Footpath) && Poly.DistanceToBoundary(bands[0].ring, g.At) < 1.5f && math.dot(g.At - r.A, r.In) < frontHi - 4f)
+                { bands[0].entries.Add((g.At, g.Kind)); g.Landed = "lot"; if (g.Cars) cars = true; }
                 else rest.Add(g);
             }
-            bool cars = false;
-            foreach (var (_, kind) in entries) if (ShopEntrances.ForCars(kind)) cars = true;
-            // Ways onto the lane from the lot (its aisles reach the shops' lane): one per 40 m of lane.
-            float len = b - a;
-            // Its ends first (the lane's end nodes become corners of the lot's aisles: no dead end), then one per 80 m between on long rows (each costs a cell of shops).
-            entries.Add((r.At(a + 0.5f, tl - h - 0.3f), "alley"));
-            entries.Add((r.At(b - 0.5f, tl - h - 0.3f), "alley"));
-            int n = len > 160f ? (int)math.floor(len / 80f) : 1;
-            for (int k = 1; k < n; k++) entries.Add((r.At(a + len * k / n, tl - h - 0.3f), "alley"));
             var all = mall.Gates;
             mall.Gates = rest;
             try { mall.RouteGates(); }
             finally { mall.Gates = all; }
-            int landed = 0; foreach (var g in all) if (g.Landed != "none") landed++;
-            ctx.Plan.Facts["gates"] = all.Count;
-            ctx.Plan.Facts["gatesLanded"] = landed;
-            // The drives and driveways routed above took their corridors: the lot keeps off them (it overlapped them, and its level
-            // ground replaced a driveway's ramp at the kerb). The largest part is the lot; the entrances on the others stay on it.
-            if (mall.Taken.Count > 0)
+
+            // The ground is painted, never reshaped (the user: "try to only use painting"); a lot is levelled only on a real slope.
+            mall.Grading = false;
+            var lots = new List<Mall.LotTry>();
+            for (int j = 0; j < bands.Count; j++)
             {
-                var clip = new List<IReadOnlyList<float2>>();
-                foreach (var tk in mall.Taken) clip.Add(Poly.EnsureCcw(tk));
-                try
-                {
-                    float2[] cut = null; float ca = 0f;
-                    foreach (var p in Poly.Boolean(new[] { (IReadOnlyList<float2>)lot }, clip, BoolOp.Difference))
-                        if (p?.Outer != null && p.Holes.Count == 0 && Poly.Area(p.Outer) > ca) { ca = Poly.Area(p.Outer); cut = Poly.EnsureCcw(Poly.Clean(p.Outer, 0.05f)); }
-                    if (cut != null && cut.Length >= 3) lot = cut;
-                }
-                catch (Exception) { }
+                // The drives and driveways routed above took their corridors: the lot keeps off them.
+                var lot = Minus(bands[j].ring, mall.Taken);
+                var parking = Mall.Parking(ctx);
+                if (Relief(ctx, lot) < FlatRelief && StreetsLevel(ctx, mall)) { parking.Values["grading"] = false; ctx.Plan.Facts["flatGround"] = 1; }
+                var t = BestLot(mall, lot, bands[j].entries, parking, Hashing.Mix(ctx.Seed, 0xC0Cu + (uint)j));
+                if (t == null) return Fail(4);
+                mall.CommitLot(t);
+                lots.Add(t);
             }
-            // The ground: the user wants it painted, not reshaped. Land that varies less than a metre under the lot is left exactly as it
-            // is (no lot tiers, no sculpt round the lanes and plots); only a real slope gets the lot levelled.
-            var parking = Mall.Parking(ctx);
-            if (Relief(ctx, lot) < FlatRelief && StreetsLevel(ctx, mall)) { parking.Values["grading"] = false; mall.Grading = false; ctx.Plan.Facts["flatGround"] = 1; }
-            var t = BestLot(mall, lot, entries, parking, Hashing.Mix(ctx.Seed, 0xC0Cu));
             // No car entrance yet (the preview before the player places one: Build waits for it) is fine; placed ones must reach.
             bool anyCars = false; foreach (var g in mall.Gates) if (g.Cars) anyCars = true;
-            if (t == null || (anyCars && !cars && !LaneReached(mall))) return Fail(4);
-            mall.CommitLot(t);
+            if (anyCars && !cars && !LaneReached(mall)) return Fail(5);
+            WalksToTheLot(ctx, mall, lots[0].Ring);
+            ctx.Plan.Facts["gates"] = mall.Gates.Count;
+
+            // ── the shops ──
             mall.ReleaseRows();
-            mall.LaneRows(lane, cells, null, +1, 0f, 0f, o.MaxPiece, 2);
-            if (mall.Shops.Count == 0) return Fail(5);
-            ctx.Plan.Facts[StripMallLayer.RowsFact] = 1;
+            int rows = mall.LaneRows(lane, cells, null, +1, 0f, 0f, o.MaxPiece, 2) > 0 ? 1 : 0;
+            foreach (var (loop, _, _, _, _) in loops) rows += mall.LaneRows(loop, cells, null, +1, 0f, 0f, o.MaxPiece, 2, i => i % 2 == 0) > 0 ? 2 : 0;
+            if (mall.Shops.Count == 0) return Fail(6);
+            ctx.Plan.Facts[StripMallLayer.RowsFact] = rows;
+            ctx.Plan.Facts["doubleRows"] = k;
             ctx.Plan.Facts["compactDepth"] = math.round(tl - tMin);
             return true;
+        }
+
+        /// <summary>The largest simple part of <paramref name="ring"/> outside everything in <paramref name="taken"/> (the ring itself when nothing cuts it).</summary>
+        private static float2[] Minus(float2[] ring, List<float2[]> taken)
+        {
+            if (taken.Count == 0) return ring;
+            var clip = new List<IReadOnlyList<float2>>();
+            foreach (var tk in taken) clip.Add(Poly.EnsureCcw(tk));
+            try
+            {
+                float2[] cut = null; float ca = 0f;
+                foreach (var p in Poly.Boolean(new[] { (IReadOnlyList<float2>)ring }, clip, BoolOp.Difference))
+                    if (p?.Outer != null && p.Holes.Count == 0 && Poly.Area(p.Outer) > ca) { ca = Poly.Area(p.Outer); cut = Poly.EnsureCcw(Poly.Clean(p.Outer, 0.05f)); }
+                return cut != null && cut.Length >= 3 ? cut : ring;
+            }
+            catch (Exception) { return ring; }
         }
 
         /// <summary>Below this rise and fall (m) under the lot the ground is not reshaped at all.</summary>
@@ -273,6 +354,31 @@ namespace Placemaker.Core.Layers.Commercial
                     lo = math.min(lo, hgt); hi = math.max(hi, hgt);
                 }
             return hi > lo ? hi - lo : 0f;
+        }
+
+        /// <summary>
+        /// A footpath entrance that found no way to the shop lane without cutting through the row of shops (beside or behind it)
+        /// walks into the parking lot instead: a short path from the sidewalk to the lot's nearest edge, people cross the lot to the
+        /// shops as they would in a real one. Its warning goes.
+        /// </summary>
+        private static void WalksToTheLot(LayerContext ctx, Mall mall, float2[] lot)
+        {
+            foreach (var g in mall.Gates)
+            {
+                if (g.Kind != ShopEntrances.Footpath || g.Landed != "none") continue;
+                var q = Poly.ClosestPointOnBoundary(lot, g.At, out _, out _);
+                float len = math.distance(q, g.At);
+                if (len < 2f || len > 30f) continue;
+                var dir = (q - g.At) / len; var n = new float2(-dir.y, dir.x);
+                var strip = Poly.EnsureCcw(new[] { g.At - n * 1.5f, q - n * 1.5f, q + n * 1.5f, g.At + n * 1.5f });
+                bool blocked = false;
+                foreach (var shop in mall.Shops) if (StreetShops.ConvexOverlap(shop, strip, 0.05f)) { blocked = true; break; }
+                if (blocked || mall.PathChain(new List<float2> { g.At, q }, -g.In, null) == null) continue;
+                g.Landed = "walk";
+                ctx.Plan.Issues.RemoveAll(i => i.Key == Mall.NoLaneKey && i.Args != null && i.Args.Length > 0 && i.Args[0] is int k && k == g.Index + 1);
+            }
+            int landed = 0; foreach (var g in mall.Gates) if (g.Landed != "none") landed++;
+            ctx.Plan.Facts["gatesLanded"] = landed;
         }
 
         /// <summary>Did a gate routed to the lane land (cars reach the shops through it when no entrance opens onto the lot)?</summary>

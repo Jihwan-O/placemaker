@@ -500,9 +500,13 @@ namespace Placemaker.Core.Layers.Commercial
                             foreach (var p in parts)
                             {
                                 if (Good(p)) { res.Add(p); continue; }
-                                // a sliver under a metre wide (a seam along a lane's edge, which the lane covers) is left out
+                                // A tile's corner cut a few centimetres from a vertex (an edge the game refuses): that vertex merged away.
+                                var fixedPart = Poly.Clean(p, 2f * SurfaceAcceptance.MinEdge);
+                                if (fixedPart.Length >= 3 && Good(fixedPart)) { res.Add(fixedPart); continue; }
+                                // a sliver under a metre wide (a seam along a lane's edge, which the lane covers) is left out, and so is a
+                                // piece under 40 m² the game would refuse anyway (the build skips it: nothing is lost by leaving it out)
                                 float per = 0f; for (int k = 0; k < p.Length; k++) per += math.distance(p[k], p[(k + 1) % p.Length]);
-                                if (Poly.Area(p) >= 3f && 2f * Poly.Area(p) / math.max(per, 0.01f) >= 0.5f) res.Add(p);
+                                if (Poly.Area(p) >= 40f && 2f * Poly.Area(p) / math.max(per, 0.01f) >= 0.5f) res.Add(p);
                             }
                         }
                     }

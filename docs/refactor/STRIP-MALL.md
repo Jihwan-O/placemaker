@@ -29,6 +29,20 @@ stalls were built (game run `shops4-base`). The leftover pieces were drawn as la
 - **Big sites**: double rows (shops back to back, ringed by their own lane, three cells deep) between bands of lot one
   aisle pair deep: about half shops on 300 x 280 m. **Mid-size sites (over 2.2 ha)** too shallow for a double row: the U
   (side rows of smaller shops), unless an entrance is on a side.
+- **The split (2026-10-18).** The user, of the build above on a 190 x 180 m block with the plaza: "strip malls look like
+  they're 90 % parking lot, 10 % buildings. Shouldn't it be kind of more of a split?" Measured offline with the game's
+  16 m shop lanes: shops 11 % of the site, asphalt 58 % (the U and the double rows never came in: the U was off with a
+  square, the double row needed 9 m more depth). Now every layout behind the best lane lines is estimated from its
+  geometry and the most even one is planned first (`Variants`, `Estimate`, `Even` in `LotCentre.cs`): double rows (0 to
+  8, shops three or two cells deep), the U on or off (its side rows four, three or two cells deep), with or without the
+  square, combined (a U round double rows on big sites). The lot counts only its whole aisle bays; the bands between
+  rows are whole bays and the front band takes the rest, and the line may sit a little short of the back so the lot
+  ends at the shops' lane instead of leaving a strip of grass before them. A layout that plans out well short of its
+  estimate (an entrance behind the row took its shops) is taken back and the next tried. Offline (shops / asphalt): the
+  user's block 24 / 27 % (was 11 / 58), 220 x 220 m 26 / 32 %, 300 x 280 m 26 / 27 %; a 150 x 140 m block keeps its
+  single row (16-20 % shops: the back street's zone margin and the lot leave no room for more). Plan facts `estShops`,
+  `estLot`, `evenPlanned`, `sideCells`, `midCells`. Offline renders: `Tests/Placemaker.Tests/StripMallSplitTests.cs` (Probe)
+  (`PM_PROBE_OUT`); game scenarios: `.forensics/split/gen.js`.
 - **Ground**: nothing is reshaped on land that rises and falls less than 1 m under the lot; on a slope only the lot is
   levelled (parking grading); lanes are never laid steeper than 8 % (else "too steep"). Lawn is terrain paint kept 2 m off
   every road (it was a lawn surface that spilled onto roads).

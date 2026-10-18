@@ -211,7 +211,7 @@ namespace Placemaker.Game.Suite
             if (_timedOut)
             {
                 res["status"] = "tool-not-idle";
-                res["refused"] = $"tool not idle after 60 s (building {_tool.Building}, planning {_tool.Planning}, ghost pending {_tool.GhostPending})";
+                res["refused"] = $"tool not idle after 60 s (building {_tool.Building}, planning {_tool.Planning}, ghost pending {_tool.GhostPending}: {_tool.GhostDebug})";
                 if (_tool.Building) _abortBatch = "a build was still running when the next scenario started: every later result would be contaminated";
             }
         }
@@ -319,7 +319,9 @@ namespace Placemaker.Game.Suite
         private IEnumerator WaitGhost(JObject rec, float timeout = 120f)
         {
             float t0 = Time.realtimeSinceStartup;
-            yield return Until(() => _tool.PreviewModeEffective == PreviewMode.Ghost && !_tool.GhostPending, timeout, "ghost");
+            // (shops4) a refused plan (an error: Build waits) shows no ghost: nothing to wait for
+            yield return Until(() => (_tool.PreviewModeEffective == PreviewMode.Ghost && !_tool.GhostPending) || (_tool.PlanRefused && !_tool.Planning), timeout, "ghost");
+            if (_tool.PlanRefused) { rec["ghost"] = "none: the plan is refused"; yield break; }
             bool timedOut = _timedOut;
             int last = -1, still = 0;
             float until = Time.realtimeSinceStartup + 30f;

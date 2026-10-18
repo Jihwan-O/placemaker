@@ -489,7 +489,7 @@ namespace Placemaker.Game.Build
                 if (rings.Count == 0)
                 {
                     if (first) NoteSkip(surface ? "Placemaker.Build.Skipped.Surface" : "Placemaker.Build.Skipped.Area", at);
-                    Mod.Log.Info($"Placemaker skipped a {(surface ? "surface" : "area")} ring the game would reject ({ring.Length} nodes, d={d:0.###}).");
+                    Mod.Log.Info($"Placemaker skipped a {(surface ? "surface" : "area")} ring the game would reject ({ring.Length} nodes, d={d:0.###}; {w.GeneratorId} layer {w.Layer} #{w.Index}, first violation at node {AreaRings.FirstViolation(ring2, d + AreaRings.Margin)}): {string.Join(" ", System.Linq.Enumerable.Select(ring2, p => $"({p.x:F2},{p.y:F2})"))}.");
                     return;
                 }
                 if (first) NoteSkip(surface ? "Placemaker.Build.Repaired.Surface" : "Placemaker.Build.Repaired.Area", at, IssueSeverity.Info);

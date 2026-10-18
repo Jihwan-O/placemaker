@@ -37,9 +37,7 @@
       "neighbourhood",
       "rearAlley",
       "bigBox",
-      "plazaRow",
-      "parkRow",
-      "pondRow"
+      "parkRow"
     ],
     "marketSquare": [
       "weekly",

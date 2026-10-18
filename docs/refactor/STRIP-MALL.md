@@ -36,7 +36,7 @@ stalls were built (game run `shops4-base`). The leftover pieces were drawn as la
   plain sentence with the metres needed), "too steep", "footpath behind the shops". A refused plan shows no ghost (the
   panel said "Updating preview..." for ever before).
 - **Extras off by default** (walkways, plaza, pads, water, plot trees, building sites). New extra: **Square** in the middle
-  of the back row: plaza / park / garden / pond. Presets `plazaRow`, `parkRow`, `pondRow` (hidden until seen in the game).
+  of the back row: plaza / park / garden / pond. Presets `plazaRow` and `pondRow` (shown: seen in the game, runs `shops4-it8`, `shops4-it9`) and `parkRow` (hidden: its small loop walk still reads oddly).
 
 ## The shelf
 
@@ -44,9 +44,14 @@ Only the strip mall (classic) shows in Shops & squares while it is perfected (`R
 mall park, market square and big box are hidden, code kept: they come back as variations of this layout (mall park = the
 square as a park, district = denser rows, market = the square as a market).
 
+## Planning time
+
+The preview planner's limit is 60 s now (was 12 s; the user: slow is fine while the panel shows it is planning). Big sites
+plan in 1-3 s in the game after the row-line scans were cached.
+
 ## Game runs (`C:\Users\jack\cs2-area-tool\.forensics\suite\runs\`)
 
-`shops4-base` (before), `shops4-it3` .. `shops4-it7`. Scenario generator: `.forensics/shops4/gen.js` (styles x lands x
+`shops4-base` (before), `shops4-it3` .. `shops4-it9` (it7: 27 builds, every shape and the odd-entrance sets). Scenario generator: `.forensics/shops4/gen.js` (styles x lands x
 entrance sets: block, tiny 40x30, small 72x55, thin 170x32, triangle, odd concave, L, circle, big, mid, long, 6 % slope;
 `oneway`, `corners`, `back` entrance sets). Offline renders: `.forensics/shops4/gal.sh` (land-tri-*, land-odd-* added to
 the gallery).

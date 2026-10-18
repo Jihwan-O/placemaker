@@ -51,7 +51,11 @@ namespace Placemaker.Game.Neighbours
 
         // a pass costs ~0.6 ms per house asked (its neighbourhood included): 16 keeps a pass near 10 ms, every 4th frame
         private const int HousesPerPass = 16;
-        private const float ClusterRadius = 70f;
+        // a plot depends on houses up to ~2 lots away (and a ring's shared green on the whole ring): the pass plans with
+        // everything within ClusterRadius but edits only houses within CoreRadius of a dirty one, so a house at the edge of
+        // a pass (its neighbours not in it) is never planned half-blind and reset
+        private const float ClusterRadius = 110f;
+        private const float CoreRadius = 40f;
         private const float Cell = 64f;
 
         private EntityQuery _changedFences;
@@ -146,6 +150,23 @@ namespace Placemaker.Game.Neighbours
             public int2 Lot;
         }
 
+        /// <summary>Game runner (lab op "polishDump"): every finished house in a box as the planner sees it, for offline replays.</summary>
+        public List<StitchHouse> DescribeIn(float2 min, float2 max)
+        {
+            var list = new List<StitchHouse>();
+            using (var all = _houses.ToEntityArray(Allocator.Temp))
+                foreach (var e in all)
+                {
+                    if (EntityManager.HasComponent<global::Game.Objects.UnderConstruction>(e)) continue;
+                    var prefab = EntityManager.GetComponentData<PrefabRef>(e).m_Prefab;
+                    if (!EntityManager.HasComponent<SpawnableBuildingData>(prefab) || !EntityManager.HasComponent<BuildingData>(prefab)) continue;
+                    var t = EntityManager.GetComponentData<global::Game.Objects.Transform>(e);
+                    if (math.any(t.m_Position.xz < min) || math.any(t.m_Position.xz > max)) continue;
+                    list.Add(Describe(new House { E = e, T = t, Prefab = prefab, Lot = EntityManager.GetComponentData<BuildingData>(prefab).m_LotSize }, null, null));
+                }
+            return list;
+        }
+
         private void Pass()
         {
             var sw = Stopwatch.StartNew();
@@ -170,6 +191,7 @@ namespace Placemaker.Game.Neighbours
 
             // this pass: up to HousesPerPass dirty houses and everything within ClusterRadius of them
             var cluster = new HashSet<int>();
+            var core = new HashSet<int>();
             var done = new List<Entity>();
             foreach (var e in _dirty)
             {
@@ -177,11 +199,15 @@ namespace Placemaker.Game.Neighbours
                 done.Add(e);
                 if (!index.TryGetValue(e, out int i)) continue;   // gone, or still being built: its lanes come back as Created later
                 var p = houses[i].T.m_Position.xz;
-                for (int dx = -1; dx <= 1; dx++)
-                    for (int dz = -1; dz <= 1; dz++)
+                for (int dx = -2; dx <= 2; dx++)
+                    for (int dz = -2; dz <= 2; dz++)
                         if (grid.TryGetValue(Key(p + new float2(dx, dz) * Cell), out var near))
                             foreach (int j in near)
-                                if (math.distance(houses[j].T.m_Position.xz, p) <= ClusterRadius) cluster.Add(j);
+                            {
+                                float d = math.distance(houses[j].T.m_Position.xz, p);
+                                if (d <= ClusterRadius) cluster.Add(j);
+                                if (d <= CoreRadius) core.Add(j);
+                            }
             }
             foreach (var e in done) _dirty.Remove(e);
             if (cluster.Count == 0) return;
@@ -189,7 +215,14 @@ namespace Placemaker.Game.Neighbours
             var stitch = new List<StitchHouse>();
             var lanesOf = new Dictionary<long, (Entity Lane, float3 A, float3 B)>();
             var lawnsOf = new Dictionary<long, Entity>();
-            foreach (int i in cluster) stitch.Add(Describe(houses[i], lanesOf, lawnsOf));
+            _houseOf.Clear();
+            _lawnPrefabOf.Clear();
+            var coreIds = new HashSet<long>();
+            foreach (int i in cluster)
+            {
+                stitch.Add(Describe(houses[i], core.Contains(i) ? lanesOf : null, core.Contains(i) ? lawnsOf : null));
+                if (core.Contains(i)) coreIds.Add(Id(houses[i].E));
+            }
             var plan = Planner(stitch, Settings);
             if (TotalPasses < 6)
                 foreach (var note in plan.Notes) Mod.Log.Info("Placemaker neighbourhood polish: " + note);
@@ -243,19 +276,31 @@ namespace Placemaker.Game.Neighbours
                 long key = (long)math.round(paint.Ring[0].x * 4f) * 73856093L ^ (long)math.round(paint.Ring[0].z * 4f) * 19349663L ^ paint.Layer;
                 if (_painted.Add(key)) NeighbourPaintSystem.Queue.Add(paint);
             }
+            // land no lawn of its house reaches: a lawn the house owns (of the house's own kind, else its neighbours' kind)
+            if (EditLawns && plan.NewLawns.Count > 0)
+            {
+                var usual = System.Linq.Enumerable.FirstOrDefault(System.Linq.Enumerable.Select(System.Linq.Enumerable.OrderByDescending(System.Linq.Enumerable.GroupBy(_lawnPrefabOf.Values, p => p), g => System.Linq.Enumerable.Count(g)), g => g.Key));
+                foreach (var (house, ring) in plan.NewLawns)
+                {
+                    if (!coreIds.Contains(house) || !_houseOf.TryGetValue(house, out var owner)) continue;
+                    var prefab = _lawnPrefabOf.TryGetValue(house, out var own) ? own : usual;
+                    NeighbourAreaSystem.Queue.Add(new NeighbourAreaSystem.Request { Prefab = prefab, Name = "Grass Surface 01", Ring = ring, Owner = owner });
+                    _newLawns++;
+                }
+            }
             // shared land in the middle of a ring: a lawn with a mulch bed in its centre
             foreach (var common in plan.Commons)
             {
                 var inset = Placemaker.Core.Geometry.Poly.Offset(common, 0.5f);
                 if (inset.Count == 0) continue;
-                NeighbourAreaSystem.Queue.Add((Settings.Extra.ContainsKey("noCommonLawn") ? "" : "Grass Surface 01", inset[0]));
+                NeighbourAreaSystem.Queue.Add(new NeighbourAreaSystem.Request { Name = Settings.Extra.ContainsKey("noCommonLawn") ? "" : "Grass Surface 01", Ring = inset[0] });
                 var c = float2.zero;
                 foreach (var p in common) c += p;
                 c /= common.Length;
                 float r = math.clamp(math.sqrt(Placemaker.Core.Geometry.Poly.Area(common)) / 6f, 2f, 5f);
                 var bed = new float2[10];
                 for (int i = 0; i < bed.Length; i++) { float ang = i * math.PI * 2f / bed.Length; bed[i] = c + new float2(math.cos(ang), math.sin(ang)) * r * (i % 2 == 0 ? 1f : 0.82f); }
-                NeighbourAreaSystem.Queue.Add(("Forestry Surface 01", bed));
+                NeighbourAreaSystem.Queue.Add(new NeighbourAreaSystem.Request { Name = "Forestry Surface 01", Ring = bed });
             }
             _pairs += plan.Pairs.Count;
             _lawnM2 += plan.LawnAddedM2;
@@ -305,9 +350,10 @@ namespace Placemaker.Game.Neighbours
                 }
                 else continue;   // ours, and its original is unknown: leave it
                 long id = Id(lane);
-                lanesOf[id] = (lane, a, b);
+                if (lanesOf != null) lanesOf[id] = (lane, a, b);
                 sh.Lines.Add(new StitchLine { Id = id, Name = NameOf(lanePrefab), A = a.xz, B = b.xz });
             }
+            _houseOf[sh.Id] = h.E;
             if (EntityManager.HasBuffer<global::Game.Areas.SubArea>(h.E))
                 foreach (var sa in EntityManager.GetBuffer<global::Game.Areas.SubArea>(h.E, true))
                 {
@@ -334,7 +380,8 @@ namespace Placemaker.Game.Neighbours
                         _lawnOriginal[area] = ring;
                     }
                     long id = Id(area);
-                    lawnsOf[id] = area;
+                    if (!_lawnPrefabOf.ContainsKey(sh.Id)) _lawnPrefabOf[sh.Id] = EntityManager.GetComponentData<PrefabRef>(area).m_Prefab;
+                    if (lawnsOf != null) lawnsOf[id] = area;
                     sh.Lawns.Add(new StitchLawn { Id = id, Ring = ring });
                 }
             return sh;
@@ -343,6 +390,9 @@ namespace Placemaker.Game.Neighbours
         // ───────────── helpers ─────────────
 
         private readonly Dictionary<Entity, Bounds3?> _modelBounds = new Dictionary<Entity, Bounds3?>();
+        private readonly Dictionary<long, Entity> _houseOf = new Dictionary<long, Entity>();
+        private readonly Dictionary<long, Entity> _lawnPrefabOf = new Dictionary<long, Entity>();
+        private int _newLawns;
 
         /// <summary>The house model's own bounds (its meshes), not the collision box (which covers the whole lot).</summary>
         private bool ModelBounds(Entity prefab, out Bounds3 bounds)

@@ -104,7 +104,7 @@ namespace Placemaker.Tests
         }
 
         [Fact]
-        public void A_lawn_takes_the_whole_gap_when_the_neighbour_has_none_there_but_never_covers_its_driveway()
+        public void A_lawn_fills_its_plot_up_to_the_shared_fence_and_never_covers_the_neighbours_driveway()
         {
             // a wedge (as on the outside of a curve); b's lawn sits on its far side, and b's driveway runs along the shared side
             float2 At(float angle) => 64f * new float2(math.cos(angle), math.sin(angle));
@@ -115,18 +115,22 @@ namespace Placemaker.Tests
             b.Lawns[0].Ring = new[] { b.ToWorld(new float2(2f, -23f)), b.ToWorld(new float2(7.4f, -23f)), b.ToWorld(new float2(7.4f, 0f)), b.ToWorld(new float2(2f, 0f)) };
             var drive = new[] { b.ToWorld(new float2(-8f, 24f)), b.ToWorld(new float2(-4f, 24f)), b.ToWorld(new float2(-4f, -6f)), b.ToWorld(new float2(-8f, -6f)) };
             b.Hard.Add(drive);
-            var settings = new StitchSettings();
-            settings.Extra["lawnReach"] = 60f;   // this wedge is wide: let the lawn reach all the way
-            var plan = YardStitch.Plan(new[] { a, b }, settings);
+            var plan = YardStitch.Plan(new[] { a, b });
             Assert.True(plan.Lawns.ContainsKey(15L), "a's lawn grows");
-            Assert.False(plan.Lawns.ContainsKey(25L), "b's lawn is not on the shared side");
+            // b's lawn fills its own plot too, around its driveway
+            Assert.True(plan.Lawns.ContainsKey(25L));
+            Assert.False(Poly.Contains(plan.Lawns[25L], b.ToWorld(new float2(-6f, -2f))), "b's lawn covers its driveway");
+            float sideOfB = Side(plan.Pairs[0].Front, plan.Pairs[0].Back, b.Position);
+            foreach (var p in plan.Lawns[25L]) Assert.True(Side(plan.Pairs[0].Front, plan.Pairs[0].Back, p) * math.sign(sideOfB) > -0.5f, "b's lawn crosses the shared fence");
             var grown = plan.Lawns[15L];
-            // it reaches (almost) b's lot edge behind the driveway, past the border…
             var pair = plan.Pairs[0];
-            var bEdge = b.ToWorld(new float2(-8f, -15f));
-            var mid = math.lerp(pair.Front, pair.Back, (24f + 15f) / 48f);
-            Assert.True(Poly.Contains(grown, bEdge + (mid - bEdge) * 0.15f), "a's lawn should reach b's edge where b has nothing");
-            // …and never covers b's driveway
+            // it reaches the shared fence half way down the wedge…
+            var onBorder = math.lerp(pair.Front, pair.Back, 0.75f);
+            var aEdge = a.ToWorld(new float2(8f, -12f));
+            Assert.True(Poly.Contains(grown, math.lerp(aEdge, onBorder, 0.9f)), "a's lawn should reach the shared fence");
+            // …never past it, and never over b's driveway
+            float sideOfA = Side(pair.Front, pair.Back, a.Position);
+            foreach (var p in grown) Assert.True(Side(pair.Front, pair.Back, p) * math.sign(sideOfA) > -0.5f, "a's lawn crosses the shared fence");
             Assert.False(Poly.Contains(grown, b.ToWorld(new float2(-6f, -2f))), "a's lawn covers b's driveway");
             Assert.True(SurfaceAcceptance.IsAccepted(grown));
         }
@@ -160,9 +164,8 @@ namespace Placemaker.Tests
             a.Lawns[0].Ring = new[] { a.ToWorld(new float2(-7f, -23f)), a.ToWorld(new float2(7f, -23f)), a.ToWorld(new float2(7f, -10f)), a.ToWorld(new float2(-7f, -10f)) };
             b.Lawns[0].Ring = new[] { b.ToWorld(new float2(-7f, -23f)), b.ToWorld(new float2(7f, -23f)), b.ToWorld(new float2(7f, -10f)), b.ToWorld(new float2(-7f, -10f)) };
             var plan = YardStitch.Plan(new[] { a, b });
-            var rear = plan.Pairs.Single(p => p.Rear);
-            // b's back line is a hedge (its "right" kind), a's a fence: the hedge is kept on the middle line (z = 28)
-            Assert.Equal(23L, rear.KeptLine);
+            Assert.Single(plan.Pairs, p => p.Rear);
+            // both back lines go onto the middle line (z = 28); b's is a hedge (its "right" kind), a's a fence: the hedge stays
             Assert.Contains(13L, plan.HideLines);
             var kept = plan.MoveLines[23L];
             Assert.True(math.abs(kept.A.y - 28f) < 0.01f && math.abs(kept.B.y - 28f) < 0.01f, $"kept back line at {kept.A} {kept.B}");
@@ -174,7 +177,42 @@ namespace Placemaker.Tests
         }
 
         [Fact]
-        public void Houses_inside_a_small_circle_get_pie_slices_that_meet_in_the_middle()
+        public void Back_to_back_rows_of_different_widths_meet_on_one_middle_line_with_no_doubled_fence()
+        {
+            // a city block's middle: three 16 m lots facing south, two 24 m lots facing north behind them, 10 m between backs
+            var houses = new List<StitchHouse>();
+            for (int i = 0; i < 3; i++) houses.Add(House(i + 1, new float2(i * 16f, 0f), new float2(0f, -1f)));
+            for (int i = 0; i < 2; i++)
+            {
+                var h = new StitchHouse { Id = i + 4, Position = new float2(4f + i * 24f, 58f), Forward = new float2(0f, 1f), HalfLot = new float2(12f, 24f) };
+                h.Lines.Add(new StitchLine { Id = (i + 4) * 10 + 3, Name = "HedgeHigh01", A = h.ToWorld(new float2(11.9f, -23.9f)), B = h.ToWorld(new float2(-11.9f, -23.9f)) });
+                h.Lines.Add(new StitchLine { Id = (i + 4) * 10 + 1, Name = "FenceResidentialHigh01", A = h.ToWorld(new float2(11.9f, 23.9f)), B = h.ToWorld(new float2(11.9f, -23.9f)) });
+                houses.Add(h);
+            }
+            var plan = YardStitch.Plan(houses);
+            Assert.True(plan.Pairs.Count(p => p.Rear) >= 2);
+            // every back line still drawn lies on the middle line (y = 29)
+            var backs = new List<(float2 A, float2 B)>();
+            foreach (var h in houses)
+                foreach (var l in h.Lines.Where(l => l.Id % 10 == 3 && !plan.HideLines.Contains(l.Id)))
+                {
+                    var m = plan.MoveLines.TryGetValue(l.Id, out var mv) ? mv : (l.A, l.B);
+                    Assert.True(math.abs(m.A.y - 29f) < 0.05f && math.abs(m.B.y - 29f) < 0.05f, $"back line {l.Id} at {m.A} {m.B}");
+                    backs.Add(m);
+                }
+            // no two of them overlap (one fence or hedge along any stretch of the middle line)
+            for (int i = 0; i < backs.Count; i++)
+                for (int j = i + 1; j < backs.Count; j++)
+                {
+                    float o = math.min(math.max(backs[i].A.x, backs[i].B.x), math.max(backs[j].A.x, backs[j].B.x)) - math.max(math.min(backs[i].A.x, backs[i].B.x), math.min(backs[j].A.x, backs[j].B.x));
+                    Assert.True(o < 0.6f, $"two back lines overlap by {o:F1} m");
+                }
+            // and together they cover the shared stretch (the hedges win over the fences)
+            Assert.True(backs.Sum(b => math.distance(b.A, b.B)) > 44f, $"back lines cover {backs.Sum(b => math.distance(b.A, b.B)):F1} m");
+        }
+
+        [Fact]
+        public void Houses_inside_a_small_circle_get_slices_that_stop_at_a_shared_green()
         {
             // eight houses inside a ring road, facing out to it, backs close to the centre (front edges on radius 54, backs on 6)
             var houses = new List<StitchHouse>();
@@ -183,19 +221,38 @@ namespace Placemaker.Tests
                 float ang = i * math.PI * 2f / 8f;
                 var dir = new float2(math.cos(ang), math.sin(ang));
                 var h = House(i + 1, dir * 30f, dir);
-                // lawns along the back edge (as many houses have)
-                h.Lawns[0].Ring = new[] { h.ToWorld(new float2(-7f, -23f)), h.ToWorld(new float2(7f, -23f)), h.ToWorld(new float2(7f, -12f)), h.ToWorld(new float2(-7f, -12f)) };
+                // back gardens reaching from the house to (past) where the ring line will be
+                h.Lawns[0].Ring = new[] { h.ToWorld(new float2(-7f, -12f)), h.ToWorld(new float2(7f, -12f)), h.ToWorld(new float2(7f, 2f)), h.ToWorld(new float2(-7f, 2f)) };
                 houses.Add(h);
             }
             var plan = YardStitch.Plan(houses);
             Assert.Equal(8, plan.Pairs.Count(p => !p.Rear));
-            Assert.Contains(plan.Notes, n => n.Contains("pie slices"));
-            // every border runs on to a tip near the centre
-            foreach (var p in plan.Pairs.Where(p => !p.Rear)) Assert.True(p.Tip.HasValue && math.length(p.Tip.Value) < 6f, $"tip {p.Tip}");
-            // back fences across the slices are gone, lawns grew towards the centre
-            for (int i = 1; i <= 8; i++) Assert.Contains(i * 10L + 3, plan.HideLines);
+            // the slices stop at one ring line, half the street's radius out (27 m along each house's axis): no long thin
+            // points, a shared green inside
+            foreach (var p in plan.Pairs.Where(p => !p.Rear)) Assert.True(math.abs(math.length(p.Back) - 27f / math.cos(math.radians(22.5f))) < 1f, $"shared fence ends at radius {math.length(p.Back)}");
+            Assert.Contains(plan.Notes, n => n.Contains("shared green"));
+            Assert.Single(plan.Commons);
+            // each back fence lies on the ring line, from one shared fence to the next
+            for (int i = 1; i <= 8; i++)
+            {
+                var m = plan.MoveLines[i * 10L + 3];
+                var h = houses[i - 1];
+                Assert.True(math.abs(math.dot(m.A, h.Forward) - 27f) < 0.05f && math.abs(math.dot(m.B, h.Forward) - 27f) < 0.05f, $"back fence of {i} at {m.A} {m.B}");
+                Assert.True(math.distance(m.A, m.B) > 20f, $"back fence of {i} only {math.distance(m.A, m.B):F1} m");
+            }
+            // lawns stay in their slice and stop at the ring line
             Assert.True(plan.Lawns.Count >= 6, $"{plan.Lawns.Count} lawns grew");
-            Assert.True(plan.Lawns.Values.All(r => r.Min(p => math.length(p)) < 10f), "lawns reach (near) the centre");
+            foreach (var kv in plan.Lawns)
+            {
+                var h = houses.Single(x => x.Id * 10 + 5 == kv.Key);
+                foreach (var p in kv.Value)
+                {
+                    float ang = math.degrees(math.abs(math.atan2(math.dot(p, h.Right), math.dot(p, h.Forward))));
+                    Assert.True(ang < 22.5f + 2f, $"lawn of {h.Id} leaves its slice ({ang:F1}°)");
+                    Assert.True(math.dot(p, h.Forward) > 26.5f, $"lawn of {h.Id} crosses the ring line");
+                }
+            }
+            Assert.True(plan.Lawns.Values.All(r => SurfaceAcceptance.IsAccepted(r)));
         }
 
         [Fact]
@@ -213,12 +270,19 @@ namespace Placemaker.Tests
                 houses.Add(h);
             }
             var plan = YardStitch.Plan(houses);
-            Assert.Contains(plan.Notes, n => n.Contains("pie slices"));
             Assert.Contains(plan.Notes, n => n.Contains("shared green"));
-            // every back fence now joins two border ends (moved, not hidden), and the ends sit ~8 m behind the lots
-            for (int i = 1; i <= 10; i++) Assert.True(plan.MoveLines.ContainsKey(i * 10L + 3), $"back fence of {i} not joined");
-            foreach (var p in plan.Pairs.Where(p => !p.Rear)) Assert.True(math.abs(math.length(p.Tip.Value) - 42f) < 3f, $"end at radius {math.length(p.Tip.Value)}");
+            // every back fence moves onto the ring line (half the street's radius: 33 m) and reaches both shared fences, so
+            // together they close the ring
+            for (int i = 1; i <= 10; i++)
+            {
+                Assert.True(plan.MoveLines.ContainsKey(i * 10L + 3), $"back fence of {i} not joined");
+                var m = plan.MoveLines[i * 10L + 3];
+                var h = houses[i - 1];
+                Assert.True(math.abs(math.dot(m.A, h.Forward) - 33f) < 0.05f && math.abs(math.dot(m.B, h.Forward) - 33f) < 0.05f, $"back fence of {i} at {m.A} {m.B}");
+            }
+            foreach (var p in plan.Pairs.Where(p => !p.Rear)) Assert.True(plan.MoveLines.Values.Count(m => math.distance(m.A, p.Back) < 0.05f || math.distance(m.B, p.Back) < 0.05f) >= 2, "a shared fence's back end meets no back fence");
             Assert.Single(plan.Commons);
+            Assert.True(Poly.Area(plan.Commons[0]) > 3000f, $"shared green {Poly.Area(plan.Commons[0]):F0} m²");
         }
 
         [Fact]

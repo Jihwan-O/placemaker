@@ -56,6 +56,20 @@ namespace Placemaker.Game.Suite
                     for (int i = 0; i < n; i++) curves.Add(NetUtils.StraightCurve(P(math.lerp(p, q, i / (float)n)), P(math.lerp(p, q, (i + 1) / (float)n))));
                 }
             }
+            else if (shape == "culdesac")
+            {
+                // a dead-end street off a cross street (a T): the game rounds the dead end into a turning circle
+                float len = (float?)step["length"] ?? 110f, cross = (float?)step["cross"] ?? 180f, yaw = math.radians((float?)step["yaw"] ?? 90f);
+                var c = Pt(step["at"], b, false);
+                var dir = new float2(math.cos(yaw), math.sin(yaw));
+                var side = new float2(-dir.y, dir.x);
+                var start = c - dir * (len * 0.5f);
+                var end = c + dir * (len * 0.5f);
+                int ns = (int)math.ceil(len / 75f);
+                for (int k = 0; k < ns; k++) curves.Add(NetUtils.StraightCurve(P(math.lerp(start, end, k / (float)ns)), P(math.lerp(start, end, (k + 1) / (float)ns))));
+                curves.Add(NetUtils.StraightCurve(P(start - side * (cross * 0.5f)), P(start)));
+                curves.Add(NetUtils.StraightCurve(P(start), P(start + side * (cross * 0.5f))));
+            }
             else if (shape == "straight")
             {
                 float len = (float?)step["length"] ?? 220f, yaw = math.radians((float?)step["yaw"] ?? 0f);
@@ -111,7 +125,9 @@ namespace Placemaker.Game.Suite
             foreach (var c in curves) for (int i = 0; i <= 16; i++) { var p = MathUtils.Position(c, i / 16f).xz; lo = math.min(lo, p); hi = math.max(hi, p); }
             lo -= 62f; hi += 62f;
             string zoneName = (string)step["zone"] ?? "NA Residential Low";
-            if (!_fixture.Prefabs.TryGetValue(zoneName, out var zone) && !_fixture.Prefabs.TryGetValue("EU Residential Low", out zone)) { rec["error"] = "lab: no zone prefab " + zoneName; yield break; }
+            // the same zone in the other theme when this one has none (NA and EU name most zones alike)
+            string other = zoneName.StartsWith("NA ") ? "EU " + zoneName.Substring(3) : zoneName.StartsWith("EU ") ? "NA " + zoneName.Substring(3) : zoneName;
+            if (!_fixture.Prefabs.TryGetValue(zoneName, out var zone) && !_fixture.Prefabs.TryGetValue(other, out zone)) { rec["error"] = "lab: no zone prefab " + zoneName; yield break; }
             yield return ApplyWithFixtureTool(t =>
             {
                 var def = t.NewDefinition();

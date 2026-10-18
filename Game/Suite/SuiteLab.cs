@@ -106,6 +106,53 @@ namespace Placemaker.Game.Suite
                     yield return Frames(30);
                     yield break;
                 }
+                case "levelup":
+                {
+                    // every finished house in the land (or a share of them) goes up a level, as the simulation would: the
+                    // polish must fit the new model's fences and lawn (run "grow" after it so the simulation builds them)
+                    var labShapes = _world.GetExistingSystemManaged<SuiteLabShapeSystem>();
+                    if (labShapes == null) { rec["error"] = "lab: the shape system is not registered"; yield break; }
+                    var b = st.S.Block;
+                    float share = (float?)step["share"] ?? 1f;
+                    var em = _world.EntityManager;
+                    var pick = new System.Collections.Generic.List<Entity>();
+                    var rnd = new Unity.Mathematics.Random(0x5EEDu);
+                    using (var q = em.CreateEntityQuery(ComponentType.ReadOnly<global::Game.Buildings.Building>(), ComponentType.ReadOnly<global::Game.Buildings.BuildingCondition>(), ComponentType.ReadOnly<global::Game.Objects.Transform>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>(), ComponentType.Exclude<global::Game.Objects.UnderConstruction>()))
+                    using (var all = q.ToEntityArray(Allocator.Temp))
+                        foreach (var e in all)
+                        {
+                            var p = em.GetComponentData<global::Game.Objects.Transform>(e).m_Position;
+                            if (p.x < b.X0 || p.x > b.X1 || p.z < b.Z0 || p.z > b.Z1) continue;
+                            if (rnd.NextFloat() <= share) pick.Add(e);
+                        }
+                    int n = labShapes.LevelUp(pick);
+                    rec["levelUp"] = n;
+                    Mod.Log.Info($"Placemaker lab: {n} houses asked to level up");
+                    yield return Frames(10);
+                    yield break;
+                }
+                case "polishdump":
+                {
+                    // every house in the land as the polish planner sees it (tools: Tests NeighbourReplay draws plans offline)
+                    var sys = _world.GetExistingSystemManaged<Placemaker.Game.Neighbours.NeighbourPolishSystem>();
+                    if (sys == null) { rec["error"] = "lab: neighbourhood polish is not registered"; yield break; }
+                    var b = st.S.Block;
+                    var arr = new JArray();
+                    JArray P(float2 p) => new JArray(Math.Round(p.x, 3), Math.Round(p.y, 3));
+                    JArray Ring(float2[] r) => r == null ? null : new JArray(r.Select(p => (object)P(p)).ToArray());
+                    foreach (var h in sys.DescribeIn(new float2(b.X0, b.Z0), new float2(b.X1, b.Z1)))
+                        arr.Add(new JObject
+                        {
+                            ["id"] = h.Id, ["pos"] = P(h.Position), ["fwd"] = P(h.Forward), ["half"] = P(h.HalfLot),
+                            ["lines"] = new JArray(h.Lines.Select(l => (object)new JObject { ["id"] = l.Id, ["name"] = l.Name, ["a"] = P(l.A), ["b"] = P(l.B) }).ToArray()),
+                            ["lawns"] = new JArray(h.Lawns.Select(l => (object)new JObject { ["id"] = l.Id, ["ring"] = Ring(l.Ring) }).ToArray()),
+                            ["hard"] = new JArray(h.Hard.Select(r => (object)Ring(r)).ToArray()),
+                            ["footprint"] = Ring(h.Footprint),
+                        });
+                    rec["houses"] = arr;
+                    Mod.Log.Info($"Placemaker lab: polish dump of {arr.Count} houses");
+                    yield break;
+                }
                 case "polishstats":
                 {
                     // neighbourhood polish totals since the game started (Game/Neighbours/NeighbourPolishSystem)

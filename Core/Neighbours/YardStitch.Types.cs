@@ -91,5 +91,10 @@ namespace Placemaker.Core.Neighbours
         public readonly List<Placemaker.Core.PlannedPaint> Paints = new List<Placemaker.Core.PlannedPaint>();
         /// <summary>Shared land no house takes (the middle inside a ring of slices): ground detail goes here.</summary>
         public readonly List<float2[]> Commons = new List<float2[]>();
+        /// <summary>Each stitched house's plot (its share of the land; fences and lawn follow its edges), by house id.</summary>
+        public readonly Dictionary<long, float2[]> Plots = new Dictionary<long, float2[]>();
+        /// <summary>Lawns to add, owned by a house: for a house with none (gravel yards), and for the part of a plot its own
+        /// lawn cannot reach (a driveway splits it). The game layer creates them as the house's own surfaces.</summary>
+        public readonly List<(long House, float2[] Ring)> NewLawns = new List<(long, float2[])>();
     }
 }

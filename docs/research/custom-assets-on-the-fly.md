@@ -78,6 +78,47 @@ drawn. Findings:
   update): hide them and lay free-standing ones along the stitched borders (one shared hedge between neighbours, a hedge
   closing each curve wedge), plant bushes/trees along them, and stretch lawns only up to those borders.
 
+## 6. Neighbourhood polish (built: setting "Stitch neighbouring houses", off by default)
+
+The answer to "modify houses on the fly so they snap together": the game's own houses are never replaced; their own parts
+are edited after they are placed (Game/Neighbours, Core/Neighbours/YardStitch, 12 tests):
+* **One plot per house first** (version 2, after "lawns and fences each doing their own thing look wrong"): the lot,
+  widened on each side with a neighbour to the middle line between the two lots (the shared edge on a straight street,
+  the bisector of a curve's wedge), deepened to the middle line with a house behind it (back to back) or facing it
+  side-on (the corners of a block, where two streets' houses meet; one side may face several houses). A row of side
+  neighbours shares one back line (a shallow lot reaches the row's deepest, at most 16 m further). The inside of a closed
+  ring (a circle street) stops at one ring line at half the street's radius (never through a house): even slices round
+  a shared green, not long points. A rectangle cut by straight lines: convex, no overlaps, never into the part of a lot
+  another house keeps.
+* **Fence and hedge lines** are utility lanes (UtilityTypes.Fence) owned by the house, and they go on the plot's edges:
+  one line per shared side (the nicer, hedge > fence > wall; the other becomes a 2 cm stub, drawn as nothing), the back
+  line on the plot's back edge. A line ending on the lot edge where the plot reaches further carries on to the plot edge
+  (≤ 20° turn, ≤ 12 m longer; straight on up to 30 m). No line leaves its plot; two lines on one another (back to back)
+  keep the nicer. A moved line stops at a house model.
+* **Lawns** (the house's own Grass Surface) fill the plot once it reaches past the lot, around every driveway and paving,
+  never past the plot: lawn and fence share their edges. Land no lawn of the house reaches (a gravel-yard house, the far
+  side of a driveway) gets a lawn OWNED by the house (a permanent area with the house as its owner: listed among its own
+  areas, deleted with it, made again after a rebuild). A hole (a patio ringed by lawn) is opened with a 0.4 m slit where
+  it shows least (through the house costs nothing).
+* **The middle of a ring**: the land the back edges enclose, minus every plot, is one shared green (vanilla lawn + a
+  mulch bed, permanent definitions as zone spawns are made).
+* **Ground paint** (terrain materials, as builds paint): dry-grass fades (8 m) from every fitted lawn into the field,
+  meadow on shared greens and wedges with no lawn, worn dirt where a shared side meets the back fence and the street.
+  Vanilla has no decorative ground decals (docs/DECALS.md); decals from the player's packs could be added on top but
+  cannot be seen in the game runner (clean profile).
+* A pass plans with every house within 110 m of the houses that changed but edits only those within 40 m, so a house at
+  the edge of a pass is never planned without its neighbours.
+* Offline replay: lab op "polishDump" records the houses as the planner sees them; tools/hot/Replay-Polish.ps1 -Run <run>
+  replays the planner on them and draws each plan (plots, lawns, fences, hidden lines) in seconds.
+  suite/scenarios/polish-more.json adds a very tight curve (R 30), a dead-end street, medium density, row houses, high
+  density, low commercial and a level-up (lab op "levelUp": the game's own debug level-up).
+* Re-applied in the same frame whenever the game rebuilds a house's lanes (construction end, level-up, any Updated):
+  NeighbourPolishSystem runs in Modification4B after LaneSystem; lawn writes wait for the next frame before
+  Areas.GeometrySystem (Modification2B) — writing them later crashed the game natively.
+* Fast loop: tools/hot/Send-Hot.ps1 builds YardStitch.cs alone and loads it into the open game (lab op "hotload"); live
+  knobs via lab op "polishSettings"; suite/scenarios/polish-shapes.json runs a tight curve, a gentle curve, a full circle
+  and a square block in one launch (~1.5 min in an open game).
+
 ## 4. What a mod could do, in order of risk
 
 1. **Context-aware placement (low risk, no new assets)**: on spawn or level-up pick the variant that fits (neighbours,

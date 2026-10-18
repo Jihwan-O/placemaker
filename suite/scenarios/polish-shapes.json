@@ -13,6 +13,7 @@
         { "do": "setting", "name": "NeighbourhoodPolish", "value": true },
         { "do": "wait", "seconds": 4 },
         { "do": "lab", "op": "polishStats" },
+        { "do": "lab", "op": "polishDump" },
         { "do": "shot", "name": "after-top", "camera": { "target": "area", "view": "top" }, "shotMode": "render" },
         { "do": "shot", "name": "after-45", "camera": { "target": "point", "at": [0, 40], "view": "oblique", "pitch": 50, "distance": 110 }, "shotMode": "render" }
       ]
@@ -28,6 +29,7 @@
         { "do": "setting", "name": "NeighbourhoodPolish", "value": true },
         { "do": "wait", "seconds": 4 },
         { "do": "lab", "op": "polishStats" },
+        { "do": "lab", "op": "polishDump" },
         { "do": "shot", "name": "after-top", "camera": { "target": "area", "view": "top" }, "shotMode": "render" },
         { "do": "shot", "name": "after-45", "camera": { "target": "point", "at": [0, 80], "view": "oblique", "pitch": 50, "distance": 110 }, "shotMode": "render" }
       ]
@@ -43,6 +45,7 @@
         { "do": "setting", "name": "NeighbourhoodPolish", "value": true },
         { "do": "wait", "seconds": 4 },
         { "do": "lab", "op": "polishStats" },
+        { "do": "lab", "op": "polishDump" },
         { "do": "shot", "name": "after-top", "camera": { "target": "area", "view": "top" }, "shotMode": "render" },
         { "do": "shot", "name": "after-centre", "camera": { "target": "point", "at": [0, 0], "view": "oblique", "pitch": 55, "distance": 110 }, "shotMode": "render" }
       ]
@@ -58,6 +61,7 @@
         { "do": "setting", "name": "NeighbourhoodPolish", "value": true },
         { "do": "wait", "seconds": 4 },
         { "do": "lab", "op": "polishStats" },
+        { "do": "lab", "op": "polishDump" },
         { "do": "shot", "name": "after-top", "camera": { "target": "area", "view": "top" }, "shotMode": "render" },
         { "do": "shot", "name": "after-centre", "camera": { "target": "point", "at": [0, 0], "view": "oblique", "pitch": 55, "distance": 110 }, "shotMode": "render" }
       ]

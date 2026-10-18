@@ -1,10 +1,12 @@
 // Placemaker neighbourhood polish — ground surfaces on shared land no house takes (GPL-3.0).
 //
-// The middle a ring of pie slices leaves (YardStitch StitchPlan.Commons) becomes a small shared green: a lawn and a mulch
-// bed, vanilla surfaces (the base game has no decorative ground decals: docs/DECALS.md). They are created the way the game
-// creates permanent pieces (ZoneSpawnSystem): a CreationDefinition flagged Permanent with the ring as nodes, Updated and
-// Deleted, just before GenerateAreasSystem (Modification1) turns it into a real surface in the same frame. Free-standing,
-// saved with the city; one per spot (an existing surface of the same kind with the same centre is left alone).
+// The middle a ring of houses leaves (YardStitch StitchPlan.Commons) becomes a shared green: a lawn and a mulch bed, vanilla
+// surfaces (the base game has no decorative ground decals: docs/DECALS.md). A house with land no lawn of its own reaches
+// (StitchPlan.NewLawns: a gravel yard, the far side of a driveway) gets a lawn OWNED by the house: it is listed among the
+// house's own areas (SubAreaReferencesSystem) and deleted with it. Both are created the way the game creates permanent
+// pieces (ZoneSpawnSystem): a CreationDefinition flagged Permanent (with the owner, when there is one) and the ring as nodes,
+// Updated and Deleted, just before GenerateAreasSystem (Modification1) turns it into a real surface in the same frame. One
+// per spot (an existing surface of the same kind with the same centre is left alone).
 
 using System;
 using System.Collections.Generic;
@@ -23,7 +25,17 @@ namespace Placemaker.Game.Neighbours
 {
     public sealed partial class NeighbourAreaSystem : GameSystemBase
     {
-        public static readonly List<(string Prefab, float2[] Ring)> Queue = new List<(string, float2[])>();
+        public sealed class Request
+        {
+            /// <summary>The surface prefab; when Entity.Null, the vanilla one called <see cref="Name"/>.</summary>
+            public Entity Prefab;
+            public string Name;
+            public float2[] Ring;
+            /// <summary>The house that owns it (Entity.Null: free-standing).</summary>
+            public Entity Owner;
+        }
+
+        public static readonly List<Request> Queue = new List<Request>();
         public static int TotalMade;
 
         private PrefabSystem _prefabs;
@@ -47,16 +59,20 @@ namespace Placemaker.Game.Neighbours
             {
                 if (_byName == null) Index();
                 var heights = _terrain.GetHeightData(true);
-                foreach (var (name, ring) in Queue)
+                foreach (var r in Queue)
                 {
-                    if (ring == null || ring.Length < 3 || !_byName.TryGetValue(name, out var prefab)) continue;
+                    var ring = r.Ring;
+                    var prefab = r.Prefab;
+                    if (ring == null || ring.Length < 3 || (prefab == Entity.Null && (string.IsNullOrEmpty(r.Name) || !_byName.TryGetValue(r.Name, out prefab)))) continue;
+                    if (r.Owner != Entity.Null && (!EntityManager.Exists(r.Owner) || EntityManager.HasComponent<Deleted>(r.Owner))) continue;
                     var c = float2.zero;
                     foreach (var p in ring) c += p;
                     c /= ring.Length;
                     long key = ((long)math.round(c.x) << 32) ^ (uint)(int)math.round(c.y) ^ ((long)prefab.Index << 20);
-                    if (!_made.Add(key) || Exists(prefab, c)) continue;
+                    // free-standing ones once per spot; owned ones whenever the house has lost theirs (a rebuild deletes it)
+                    if ((r.Owner == Entity.Null && !_made.Add(key)) || Exists(prefab, c)) continue;
                     var def = EntityManager.CreateEntity();
-                    EntityManager.AddComponentData(def, new CreationDefinition { m_Prefab = prefab, m_Flags = CreationFlags.Permanent });
+                    EntityManager.AddComponentData(def, new CreationDefinition { m_Prefab = prefab, m_Owner = r.Owner, m_Flags = CreationFlags.Permanent });
                     var nodes = EntityManager.AddBuffer<Node>(def);
                     foreach (var p in ring) nodes.Add(new Node(new float3(p.x, TerrainUtils.SampleHeight(ref heights, new float3(p.x, 0f, p.y)), p.y), float.MinValue));
                     nodes.Add(nodes[0]);

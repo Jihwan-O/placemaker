@@ -114,7 +114,7 @@ namespace Placemaker.Core.Decals
                 ["urbanFarm"] = P(L, Ga, Wk, Pa, Gr),
                 // Lots, commerce
                 ["parking"] = P(L, Pk, Tr, Pa),
-                ["stripMall"] = P(L, Pk, Pv, Tr, Pa),
+                ["stripMall"] = P(L, Pk, Pv, Tr, Pa, Gr, Ga),   // (shops4) ground and garden wear too: the user saw no decals
                 ["shoppingPlaza"] = P(L, Pv, Pk, Tr, Pa),
                 ["outdoorMall"] = P(L, Pv, Tr, Pa, Pk),
                 ["shopsPark"] = P(L, Pv, Tr, Pa, Gr, Pl),

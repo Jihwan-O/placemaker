@@ -44,7 +44,7 @@ namespace Placemaker.Core.Layers.Commercial
             // path going nowhere"); the extras stay for the player to add.
             // (shops4) A square in the middle of the row of shops: a plaza, a small park or a garden (off by default).
             Shared(c.Choice("square", "none", ControlTier.More, "extras", "none", "plaza", "park", "garden", "pond")).Tip();
-            ExtrasControls(c, walkways: false, plaza: false, bikes: "none", trucks: 0, pads: false, designed: false, hedges: true, sites: false, worn: false, water: "none", plotTrees: false);
+            ExtrasControls(c, walkways: false, plaza: false, bikes: "none", trucks: 0, pads: false, designed: false, hedges: true, sites: true, worn: false, water: "none", plotTrees: false);
             c.Fixed("style");
         }
 

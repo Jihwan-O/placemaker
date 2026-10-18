@@ -701,17 +701,27 @@ namespace Placemaker.Core.Layers.Commercial
         }
 
         /// <summary>
-        /// (shops4) The lawn of a planted piece. The lot-first strip mall paints it (terrain paint, 2 m in from the piece's edge so
-        /// it never reaches a road: the user, "grass patches going onto the roads ... we've moved on to terrain paint"); the other
-        /// layouts keep their lawn surface.
+        /// (shops4) The ground of a planted piece. The lot-first strip mall paints it (terrain paint, never a lawn surface: the user,
+        /// "grass patches going onto the roads ... we've moved on to terrain paint"); the other layouts keep their lawn surface.
         /// </summary>
         public void Lawn(float2[] ring)
         {
             if (!LotFirstMode) { Ctx.Surface(ring, SurfaceRole.Grass, new AssetRef(""), AssetCategories.SurfaceGrass); return; }
+            // Heavy, textured ground (the user: "texture terrain across the board, even heavy amounts, like sand or dirt"): dry grass over
+            // the whole piece, dirt and sand patches, lusher tufts. It also covers the flat stripes the zone block strips leave along the
+            // city streets (a lot area takes the grass detail off the ground under it).
             try
             {
-                foreach (var part in Poly.Offset(Poly.EnsureCcw(ring), 2f, OffsetJoin.Miter))
-                    if (part?.Outer != null && part.Outer.Length >= 3 && Poly.Area(part.Outer) >= 20f) PaintKit().Fill(part.Outer, TerrainMaterials.Lush, 0.5f, 1.5f, 0.8f, 6f);
+                var kit = PaintKit();
+                foreach (var part in Poly.Offset(Poly.EnsureCcw(ring), 0.5f, OffsetJoin.Miter))
+                {
+                    if (part?.Outer == null || part.Outer.Length < 3 || Poly.Area(part.Outer) < 20f) continue;
+                    var p = part.Outer;
+                    kit.Fill(p, TerrainMaterials.Dry, 0.8f, 1.5f, 1.6f, 9f);
+                    kit.Speckle(p, TerrainMaterials.Dirt, 0.85f, 9f, 0.38f, 0.35f, 1.5f);
+                    kit.Speckle(p, TerrainMaterials.Sand, 0.7f, 15f, 0.16f, 0.4f, 1.5f);
+                    kit.Speckle(p, TerrainMaterials.Lush, 0.6f, 6f, 0.25f, 0.3f, 1.5f);
+                }
             }
             catch (Exception) { }
         }

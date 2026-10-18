@@ -248,6 +248,9 @@ namespace Placemaker.Core.Layers.Commercial
                     foreach (var v in Variants(ctx, mall, r, o, tried[li].tl, tried[li].a, tried[li].b, cells, h, sMin, sMax, tMin))
                         opts.Add((Even(v.Shops, v.Lot) - v.Waste - OffLot * (plain - v.Landed), li, v));
                 if (opts.Count == 0) continue;
+                // A double row out in the lot loses a quarter to a half of its plots in the game (bare patches between the shops);
+                // inside the U it zones every one: where a U fits, no double row outside one (game run send-split-1018-114959).
+                if (opts.Exists(op => op.v.SideCells > 0)) opts.RemoveAll(op => op.v.SideCells == 0 && op.v.K > 0);
                 opts.Sort((x, y) => y.score.CompareTo(x.score));
                 if (estimate) { est = opts[0].score; return true; }
                 // Planned in that order. One that comes out well short of its estimate (an entrance behind the row took its shops,

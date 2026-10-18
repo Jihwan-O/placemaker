@@ -49,8 +49,10 @@ stalls were built (game run `shops4-base`). The leftover pieces were drawn as la
   double row inside the U zoned every planned cell (220 x 220 m 241 / 241, 300 x 280 m 370 / 370), one out in the lot
   without the U lost 21-47 % (the user's block 158 -> 114, 400 x 160 m with three of them 324 -> 172), the same loss
   the double rows had before (`shops4-it19`: 468 -> 372). Both rows of the island lose cells at the same spots; the
-  log blames the game's depth rule and lot zone blockers. The estimate counts those rows at three quarters
-  (`DoubleRowZoned`), so the U wins where it fits; the cause is not found yet.
+  log blames the game's depth rule and lot zone blockers. Where a U fits, no double row stands outside one (run
+  `send-split-1018-114959`: the user's block with the plaza became the U, 128 / 128 cells; the classic preset there still
+  took a double row in the lot, 178 -> 130, before this rule); where none fits, those rows count at three quarters
+  (`DoubleRowZoned`). The cause is not found yet.
 - **Ground**: nothing is reshaped on land that rises and falls less than 1 m under the lot; on a slope only the lot is
   levelled (parking grading); lanes are never laid steeper than 8 % (else "too steep"). Lawn is terrain paint kept 2 m off
   every road (it was a lawn surface that spilled onto roads).

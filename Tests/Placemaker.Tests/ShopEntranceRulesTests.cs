@@ -43,7 +43,7 @@ namespace Placemaker.Tests
             Composer.Compose(r, new AreaShape { Ring = ring, Source = AreaSource.Drawn }, site, CancellationToken.None);
 
         private static string CompositionFact(string type) =>
-            type == "stripMall" ? StripMallLayer.CentreFact : type == "mallPark" ? MallParkLayer.RingFact : MallDistrictLayer.RingFact;
+            type == "stripMall" ? CommercialLayer.LotFact : type == "mallPark" ? MallParkLayer.RingFact : MallDistrictLayer.RingFact;
 
         // ───────────── Build waits for a way in for cars; nothing is suggested ─────────────
 

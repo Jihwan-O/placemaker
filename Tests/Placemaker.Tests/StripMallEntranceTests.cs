@@ -62,7 +62,8 @@ namespace Placemaker.Tests
             Assert.False(plan.HasErrors, ctx);
             var final = LotGradingTests.Final(plan, ground);
             var host = plan.Layers.First(l => l.GeneratorId == "stripMall");
-            var lanes = host.Nets.Where(n => n.Role == NetRole.Alley || n.Role == NetRole.Street).ToList();
+            // (shops4) The mall's own lanes; a lot's short driveway stub (street to the lot's edge) is the parking planner's, graded by it.
+            var lanes = host.Nets.Where(n => (n.Role == NetRole.Alley || n.Role == NetRole.Street) && math.distance(n.A.xz, n.D.xz) > 12f).ToList();
             var region = LayerRegion.From(Poly.To2D(ring));
             var corridors = new List<float2[]>();
 

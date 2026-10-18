@@ -46,6 +46,8 @@ namespace Placemaker.Game.Build
             updateSystem.UpdateBefore<global::Placemaker.Game.Neighbours.NeighbourLawnSystem, global::Game.Areas.GeometrySystem>(SystemUpdatePhase.Modification2B);
             // its ground paint: one terrain-material stamp per frame (as a build's paint step)
             updateSystem.UpdateAt<global::Placemaker.Game.Neighbours.NeighbourPaintSystem>(SystemUpdatePhase.ToolUpdate);
+            // its shared-green surfaces: permanent definitions right before GenerateAreasSystem (as zone spawns are made)
+            updateSystem.UpdateBefore<global::Placemaker.Game.Neighbours.NeighbourAreaSystem, global::Game.Tools.GenerateAreasSystem>(SystemUpdatePhase.Modification1);
 
             // ── Groups ─────────────────────────────────────────────────────────────────
             // Removal marks Deleted in PreTool: SubElementDeleteSystem (PostTool) cascades and

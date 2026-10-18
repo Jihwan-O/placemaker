@@ -145,15 +145,23 @@ namespace Placemaker.Core.Neighbours
                     Feather = fade, Noise = 1.2f, NoiseScale = 6f, Seed = (uint)(kv.Key * 2654435761L),
                 });
             }
-            // the land between two lots that no lawn covers reads as meadow, not as a hole
+            // the land between two lots that no lawn covers reads as meadow, not as a hole: side gaps, the strip between
+            // back-to-back lots, and the pie slices behind houses inside a circle
             foreach (var pair in plan.Pairs)
             {
+                if (pair.Gap == null && pair.Rear)
+                {
+                    // the strip between the two back edges, along the middle line
+                    var d = math.normalizesafe(pair.Back - pair.Front);
+                    var n = new float2(-d.y, d.x) * (pair.FrontGap * 0.5f + 1f);
+                    pair.Gap = new[] { pair.Front - n, pair.Back - n, pair.Back + n, pair.Front + n };
+                }
                 if (pair.Gap == null || Poly.Area(pair.Gap) < 20f) continue;
                 var region = Poly.Normalize(Ccw(pair.Gap));
                 if (region.Count == 0) continue;
                 plan.Paints.Add(new Placemaker.Core.PlannedPaint
                 {
-                    Ring = region[0].Outer.Select(p => new float3(p.x, 0f, p.y)).ToArray(), Layer = 1, Strength = s.Knob("meadowStrength", 0.45f),
+                    Ring = region[0].Outer.Select(p => new float3(p.x, 0f, p.y)).ToArray(), Layer = 1, Strength = s.Knob("meadowStrength", 0.7f),
                     Feather = 2.5f, Noise = 1.5f, NoiseScale = 7f, Seed = (uint)((pair.Left * 17 + pair.Right * 3) & 0x7fffffff),
                 });
             }
@@ -171,7 +179,7 @@ namespace Placemaker.Core.Neighbours
                     }
                     plan.Paints.Add(new Placemaker.Core.PlannedPaint
                     {
-                        Ring = blob, Layer = 3, Strength = s.Knob("dirtStrength", 0.35f), Feather = r * 0.8f, Noise = r * 0.3f, NoiseScale = 3f,
+                        Ring = blob, Layer = 3, Strength = s.Knob("dirtStrength", 0.55f), Feather = r * 0.8f, Noise = r * 0.3f, NoiseScale = 3f,
                         Seed = (uint)((pair.Left * 31 + pair.Right) & 0x7fffffff),
                     });
                 }
@@ -279,7 +287,8 @@ namespace Placemaker.Core.Neighbours
         private static void PieSlices(IReadOnlyList<StitchHouse> houses, StitchSettings s, StitchPlan plan, Dictionary<long, float2[]> lawnNow,
             Dictionary<long, (float2 A, float2 B)> moved, Func<StitchLine, (float2 A, float2 B)> current)
         {
-            float maxDepth = s.Knob("pieDepth", 60f);
+            float maxDepth = s.Knob("pieReach", 60f);     // how far behind the lots two borders may meet at all
+            float runOn = s.Knob("pieDepth", 18f);        // how far a border runs on; meeting closer than that = a point
             var side = plan.Pairs.Where(p => !p.Rear).ToList();
             var slices = new List<(StitchHouse H, StitchPair L, StitchPair R)>();
             foreach (var h in houses)
@@ -294,6 +303,14 @@ namespace Placemaker.Core.Neighbours
                     if (!p.Tip.HasValue || math.distance(p.Back, x) < math.distance(p.Back, p.Tip.Value)) p.Tip = x;
                 slices.Add((h, left, right));
             }
+            // real cul-de-sacs: a border runs on a little and the house's back fence joins the two ends (a point only when
+            // the borders meet within that run)
+            foreach (var p in side)
+            {
+                if (!p.Tip.HasValue) continue;
+                float toTip = math.distance(p.Back, p.Tip.Value);
+                if (toTip > runOn) p.Tip = p.Back + math.normalizesafe(p.Back - p.Front) * runOn;
+            }
             foreach (var p in side)
             {
                 if (!p.Tip.HasValue || p.KeptLine < 0) continue;
@@ -306,10 +323,19 @@ namespace Placemaker.Core.Neighbours
             }
             foreach (var (h, left, right) in slices)
             {
-                // no back fence across a slice
-                foreach (var l in EdgeLines(h, back: true, s)) plan.HideLines.Add(l.Id);
                 var tipL = left.Tip ?? left.Back;
                 var tipR = right.Tip ?? right.Back;
+                // the back fence joins the two border ends (gone where they meet in a point)
+                var backs = EdgeLines(h, back: true, s).ToList();
+                if (backs.Count == 0 || math.distance(tipL, tipR) < 1f) foreach (var l in backs) plan.HideLines.Add(l.Id);
+                else
+                {
+                    var first = backs.OrderByDescending(l => math.distance(l.A, l.B)).First();
+                    // keep its direction: the end nearer the back-left corner goes to the left border's end
+                    bool aLeft = math.distance(first.A, h.BackLeft) < math.distance(first.B, h.BackLeft);
+                    moved[first.Id] = aLeft ? (tipL, tipR) : (tipR, tipL);
+                    foreach (var l in backs) if (l.Id != first.Id) plan.HideLines.Add(l.Id);
+                }
                 float c = s.LawnContact;
                 var slice = new[] { h.ToWorld(new float2(-h.HalfLot.x, -h.HalfLot.y + c)), left.Back, tipL, tipR, right.Back, h.ToWorld(new float2(h.HalfLot.x, -h.HalfLot.y + c)) };
                 foreach (var lawn in h.Lawns)
@@ -330,6 +356,41 @@ namespace Placemaker.Core.Neighbours
                     lawnNow[lawn.Id] = grown;
                     plan.Lawns[lawn.Id] = grown;
                     break;
+                }
+            }
+            foreach (var (h, left, right) in slices)
+            {
+                var tipL = left.Tip ?? left.Back;
+                var tipR = right.Tip ?? right.Back;
+                var region = Poly.Normalize(new[] { h.BackLeft, left.Back, tipL, tipR, right.Back, h.BackRight }.Distinct().ToArray());
+                if (region.Count == 0 || region[0].Area < 20f) continue;
+                plan.Paints.Add(new Placemaker.Core.PlannedPaint
+                {
+                    Ring = region[0].Outer.Select(p => new float3(p.x, 0f, p.y)).ToArray(), Layer = 1, Strength = s.Knob("meadowStrength", 0.7f),
+                    Feather = 2.5f, Noise = 1.5f, NoiseScale = 7f, Seed = (uint)(h.Id & 0x7fffffff),
+                });
+            }
+            // the middle the slices leave inside a ring (they surround it): a shared green, painted
+            if (slices.Count >= 4)
+            {
+                var ends = side.Where(p => p.Tip.HasValue).Select(p => p.Tip.Value).ToList();
+                var c = ends.Aggregate(float2.zero, (acc, p) => acc + p) / math.max(1, ends.Count);
+                var angles = ends.Select(p => math.atan2(p.y - c.y, p.x - c.x)).OrderBy(x => x).ToList();
+                float biggestGap = 0f;
+                for (int i = 0; i < angles.Count; i++) biggestGap = math.max(biggestGap, (i + 1 < angles.Count ? angles[i + 1] : angles[0] + 2f * math.PI) - angles[i]);
+                if (biggestGap < math.radians(80f))
+                {
+                    var hull = Placemaker.Core.Build.AreaRings.ConvexHull(ends);
+                    if (hull != null && hull.Length >= 3 && Poly.Area(hull) > 30f)
+                    {
+                        plan.Paints.Add(new Placemaker.Core.PlannedPaint
+                        {
+                            Ring = hull.Select(p => new float3(p.x, 0f, p.y)).ToArray(), Layer = 1, Strength = s.Knob("meadowStrength", 0.7f),
+                            Feather = 3f, Noise = 2f, NoiseScale = 8f, Seed = 0x51CEu,
+                        });
+                        plan.Commons.Add(hull);
+                        plan.Notes.Add($"a shared green in the middle ({Poly.Area(hull):F0} m²)");
+                    }
                 }
             }
             if (slices.Count > 0) plan.Notes.Add($"{slices.Count} pie slices");

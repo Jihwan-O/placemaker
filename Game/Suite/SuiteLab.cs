@@ -117,7 +117,9 @@ namespace Placemaker.Game.Suite
                     rec["linesHidden"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalHidden;
                     rec["lawnsGrown"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalLawns;
                     rec["lawnM2"] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalLawnM2);
-                    Mod.Log.Info("Placemaker lab: polish stats " + new JObject { ["passes"] = rec["passes"], ["pairs"] = rec["pairs"], ["moved"] = rec["linesMoved"], ["hidden"] = rec["linesHidden"], ["lawns"] = rec["lawnsGrown"], ["m2"] = rec["lawnM2"] }.ToString(Newtonsoft.Json.Formatting.None));
+                    rec["paintStamps"] = Placemaker.Game.Neighbours.NeighbourPaintSystem.TotalStamps;
+                    rec["surfacesMade"] = Placemaker.Game.Neighbours.NeighbourAreaSystem.TotalMade;
+                    Mod.Log.Info("Placemaker lab: polish stats " + new JObject { ["passes"] = rec["passes"], ["pairs"] = rec["pairs"], ["moved"] = rec["linesMoved"], ["hidden"] = rec["linesHidden"], ["lawns"] = rec["lawnsGrown"], ["m2"] = rec["lawnM2"], ["paintStamps"] = rec["paintStamps"], ["surfaces"] = rec["surfacesMade"] }.ToString(Newtonsoft.Json.Formatting.None));
                     yield break;
                 }
             }

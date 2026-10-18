@@ -174,15 +174,15 @@ namespace Placemaker.Tests
         }
 
         [Fact]
-        public void Houses_inside_a_circle_get_pie_slices_that_meet_in_the_middle()
+        public void Houses_inside_a_small_circle_get_pie_slices_that_meet_in_the_middle()
         {
-            // eight houses inside a ring road, facing out to it, backs towards the centre (front edges on radius 66)
+            // eight houses inside a ring road, facing out to it, backs close to the centre (front edges on radius 60, backs on 12)
             var houses = new List<StitchHouse>();
             for (int i = 0; i < 8; i++)
             {
                 float ang = i * math.PI * 2f / 8f;
                 var dir = new float2(math.cos(ang), math.sin(ang));
-                var h = House(i + 1, dir * 42f, dir);
+                var h = House(i + 1, dir * 36f, dir);
                 // lawns along the back edge (as many houses have)
                 h.Lawns[0].Ring = new[] { h.ToWorld(new float2(-7f, -23f)), h.ToWorld(new float2(7f, -23f)), h.ToWorld(new float2(7f, -12f)), h.ToWorld(new float2(-7f, -12f)) };
                 houses.Add(h);
@@ -196,6 +196,29 @@ namespace Placemaker.Tests
             for (int i = 1; i <= 8; i++) Assert.Contains(i * 10L + 3, plan.HideLines);
             Assert.True(plan.Lawns.Count >= 6, $"{plan.Lawns.Count} lawns grew");
             Assert.True(plan.Lawns.Values.All(r => r.Min(p => math.length(p)) < 10f), "lawns reach (near) the centre");
+        }
+
+        [Fact]
+        public void A_big_middle_keeps_its_back_fences_joined_up_around_a_shared_green()
+        {
+            // shallow lots (16 m deep) on a big ring: the borders run on 18 m, the back fences join their ends, the middle is shared
+            var houses = new List<StitchHouse>();
+            for (int i = 0; i < 10; i++)
+            {
+                float ang = i * math.PI * 2f / 10f;
+                var dir = new float2(math.cos(ang), math.sin(ang));
+                var h = new StitchHouse { Id = i + 1, Position = dir * 58f, Forward = dir, HalfLot = new float2(8f, 8f) };
+                h.Lines.Add(new StitchLine { Id = (i + 1) * 10 + 1, Name = "HedgeHigh01", A = h.ToWorld(new float2(7.9f, 7.9f)), B = h.ToWorld(new float2(7.9f, -7.9f)) });
+                h.Lines.Add(new StitchLine { Id = (i + 1) * 10 + 3, Name = "FenceResidentialHigh01", A = h.ToWorld(new float2(7.9f, -7.9f)), B = h.ToWorld(new float2(-7.9f, -7.9f)) });
+                houses.Add(h);
+            }
+            var plan = YardStitch.Plan(houses);
+            Assert.Contains(plan.Notes, n => n.Contains("pie slices"));
+            Assert.Contains(plan.Notes, n => n.Contains("shared green"));
+            // every back fence now joins two border ends (moved, not hidden), and the ends sit ~18 m behind the lots
+            for (int i = 1; i <= 10; i++) Assert.True(plan.MoveLines.ContainsKey(i * 10L + 3), $"back fence of {i} not joined");
+            foreach (var p in plan.Pairs.Where(p => !p.Rear)) Assert.True(math.abs(math.length(p.Tip.Value) - 32f) < 4f, $"end at radius {math.length(p.Tip.Value)}");
+            Assert.Single(plan.Commons);
         }
 
         [Fact]

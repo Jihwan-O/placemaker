@@ -49,7 +49,8 @@ namespace Placemaker.Game.Neighbours
         /// <summary>Every house again with the current rules (lines and lawns no longer planned go back to the game's own).</summary>
         public static void Redo() => s_redo = true;
 
-        private const int HousesPerPass = 48;
+        // a pass costs ~0.6 ms per house asked (its neighbourhood included): 16 keeps a pass near 10 ms, every 4th frame
+        private const int HousesPerPass = 16;
         private const float ClusterRadius = 70f;
         private const float Cell = 64f;
 
@@ -241,6 +242,20 @@ namespace Placemaker.Game.Neighbours
             {
                 long key = (long)math.round(paint.Ring[0].x * 4f) * 73856093L ^ (long)math.round(paint.Ring[0].z * 4f) * 19349663L ^ paint.Layer;
                 if (_painted.Add(key)) NeighbourPaintSystem.Queue.Add(paint);
+            }
+            // shared land in the middle of a ring: a lawn with a mulch bed in its centre
+            foreach (var common in plan.Commons)
+            {
+                var inset = Placemaker.Core.Geometry.Poly.Offset(common, 0.5f);
+                if (inset.Count == 0) continue;
+                NeighbourAreaSystem.Queue.Add((Settings.Extra.ContainsKey("noCommonLawn") ? "" : "Grass Surface 01", inset[0]));
+                var c = float2.zero;
+                foreach (var p in common) c += p;
+                c /= common.Length;
+                float r = math.clamp(math.sqrt(Placemaker.Core.Geometry.Poly.Area(common)) / 6f, 2f, 5f);
+                var bed = new float2[10];
+                for (int i = 0; i < bed.Length; i++) { float ang = i * math.PI * 2f / bed.Length; bed[i] = c + new float2(math.cos(ang), math.sin(ang)) * r * (i % 2 == 0 ? 1f : 0.82f); }
+                NeighbourAreaSystem.Queue.Add(("Forestry Surface 01", bed));
             }
             _pairs += plan.Pairs.Count;
             _lawnM2 += plan.LawnAddedM2;

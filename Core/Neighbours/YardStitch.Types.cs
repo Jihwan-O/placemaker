@@ -89,5 +89,7 @@ namespace Placemaker.Core.Neighbours
         public readonly List<string> Notes = new List<string>();
         /// <summary>Ground paint that blends the stitched yards into the land around them (terrain materials, permanent).</summary>
         public readonly List<Placemaker.Core.PlannedPaint> Paints = new List<Placemaker.Core.PlannedPaint>();
+        /// <summary>Shared land no house takes (the middle inside a ring of slices): ground detail goes here.</summary>
+        public readonly List<float2[]> Commons = new List<float2[]>();
     }
 }

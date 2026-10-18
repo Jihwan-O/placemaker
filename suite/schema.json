@@ -43,7 +43,8 @@
     "redo": { "keys": ["via"], "enums": { "via": ["key", "panel"] } },
     "key": { "keys": ["key"], "enums": { "key": ["enter", "esc", "undo", "redo"] } },
     "anarchy": { "keys": ["on"] },
-    "setting": { "keys": ["name", "value"] }
+    "setting": { "keys": ["name", "value"] },
+    "lab": { "keys": ["op", "shape", "points", "at", "size", "height", "yaw", "material", "seed", "radius", "from", "to", "length", "road", "zone", "reach", "depth", "closeups", "apply"], "enums": { "op": ["mesh", "materials", "street", "yards", "yardsCheck"], "shape": ["box", "wedge", "polygon", "tower", "arch", "arc", "straight"] } }
   },
   "camera": {
     "keys": ["target", "view", "index", "yaw", "pitch", "distance", "fov", "at", "abs"],

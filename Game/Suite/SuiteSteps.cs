@@ -273,6 +273,7 @@ namespace Placemaker.Game.Suite
                 case "anarchy": yield return StepAnarchy(st, step, rec); break;
                 case "setting": yield return StepSetting(st, step, rec); break;
                 case "preset": yield return StepPreset(st, step, rec); break;
+                case "lab": yield return StepLab(st, step, rec); break;
                 default: rec["error"] = "unknown step '" + what + "' (suite/schema.json lists the steps)"; break;
             }
         }

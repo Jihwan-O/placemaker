@@ -482,6 +482,26 @@ namespace Placemaker.Core.Layers.Commercial
                 if (t.Synthetic.TryGetValue(n.EndAttach, out var s1)) { SnapOnto(s1.lane, s1.seg, ref n.D, ref n.C); OntoNode(s1.lane, ref n.D, ref n.C); AddJoin(s1.lane, n.D.xz); n.EndAttach = -1; }
             }
             sub.Regions.Clear();
+            // (shops4) The lot's planted islands and edge strips as painted ground, not grass surfaces (the user: "paint all the grass
+            // and then texture it in different areas"): mulch and dirt with green tufts round the trees. The asphalt is laid in spans
+            // that leave the islands out, so the bare ground shows there.
+            if (LotFirstMode)
+            {
+                var kit = PaintKit();
+                for (int i = sub.Surfaces.Count - 1; i >= 0; i--)
+                {
+                    var sf = sub.Surfaces[i];
+                    if (sf.Role != SurfaceRole.Grass) continue;
+                    var r2 = Poly.To2D(sf.Ring);
+                    if (r2.Length >= 3 && Poly.Area(r2) >= 2f)
+                    {
+                        kit.Fill(r2, TerrainMaterials.Dirt, 1f, 0.6f, 0.6f, 4f);
+                        kit.Speckle(r2, TerrainMaterials.Lush, 0.85f, 3f, 0.35f, 0.3f, 0.6f);
+                        kit.Speckle(r2, TerrainMaterials.Dry, 0.7f, 5f, 0.2f, 0.3f, 0.6f);
+                    }
+                    sub.Surfaces.RemoveAt(i);
+                }
+            }
             sub.Issues.RemoveAll(i => i.Severity == IssueSeverity.Error || i.Key == "Placemaker.Parking.Issue.NoEntrance");
             Merge(sub);
             // (s25) The lot graded itself (level tiers on a slope): the rest of the mall plans on that ground.

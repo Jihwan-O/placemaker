@@ -346,10 +346,11 @@ namespace Placemaker.Core.Layers.Commercial
             }
             var all = mall.Gates;
             mall.Gates = rest;
+            int takenBefore = mall.Taken.Count;
             try { mall.RouteGates(); }
             finally { mall.Gates = all; }
             mall.Grading = false;
-            lot = Minus(lot, mall.Taken);
+            lot = Minus(lot, mall.Taken.GetRange(takenBefore, mall.Taken.Count - takenBefore));
             var parking = Mall.Parking(ctx);
             if (Relief(ctx, lot) < FlatRelief && StreetsLevel(ctx, mall)) { parking.Values["grading"] = false; ctx.Plan.Facts["flatGround"] = 1; }
             var t = BestLot(mall, lot, entries, parking, Hashing.Mix(ctx.Seed, 0xC1Cu));
@@ -462,6 +463,7 @@ namespace Placemaker.Core.Layers.Commercial
             }
             var all = mall.Gates;
             mall.Gates = rest;
+            int takenBefore = mall.Taken.Count;
             try { mall.RouteGates(); }
             finally { mall.Gates = all; }
 
@@ -470,8 +472,9 @@ namespace Placemaker.Core.Layers.Commercial
             var lots = new List<Mall.LotTry>();
             for (int j = 0; j < bands.Count; j++)
             {
-                // The drives and driveways routed above took their corridors: the lot keeps off them.
-                var lot = Minus(bands[j].ring, mall.Taken);
+                // The drives and driveways routed above took their corridors: the lot keeps off them (only them: cut by the lanes'
+                // own corridors too, a band came out with a slanted sliver the asphalt left out under its stalls, "grassy parking spots").
+                var lot = Minus(bands[j].ring, mall.Taken.GetRange(takenBefore, mall.Taken.Count - takenBefore));
                 var parking = Mall.Parking(ctx);
                 if (Relief(ctx, lot) < FlatRelief && StreetsLevel(ctx, mall)) { parking.Values["grading"] = false; ctx.Plan.Facts["flatGround"] = 1; }
                 var t = BestLot(mall, lot, bands[j].entries, parking, Hashing.Mix(ctx.Seed, 0xC0Cu + (uint)j));
@@ -654,7 +657,8 @@ namespace Placemaker.Core.Layers.Commercial
                     var t = mall.PlanLot(lot, entries, bag, salt + (uint)rot + (ring ? 7u : 0u), true);
                    
                     if (t == null || NetFit.Violations(t.Sub.Nets, t.Site).Count > 0 || Mall.Warns(t)) continue;
-                    t.Sub.Issues.RemoveAll(i => i.Key != null && i.Key.EndsWith("PerimeterRoadDropped"));   // our choice to try, not the player's
+                    t.Sub.Issues.RemoveAll(i => i.Key != null && i.Key.EndsWith("PerimeterRoadDropped"));
+                    if (BaysOffAsphalt(t.Sub) > 0) continue;   // a stall marking on grass ("grassy parking spots"): another variant   // our choice to try, not the player's
                     // An aisle ending in a turning circle reads as a dead end (the user: "how do the cars even get in there"): each
                     // costs the stalls of a short row.
                     int dead = DeadEnds(t.Sub.Nets);
@@ -662,6 +666,22 @@ namespace Placemaker.Core.Layers.Commercial
                     if (score > bestScore) { bestScore = score; best = t; }
                 }
             return best;
+        }
+
+        /// <summary>Stall markings whose middle lies on no asphalt surface of the lot (the asphalt left out there, the marking not).</summary>
+        private static int BaysOffAsphalt(AreaPlan sub)
+        {
+            var asphalt = new List<float2[]>();
+            foreach (var sf in sub.Surfaces) if (sf.Role == SurfaceRole.Asphalt) asphalt.Add(Poly.To2D(sf.Ring));
+            int off = 0;
+            foreach (var ob in sub.Objects)
+            {
+                if (ob.Role != ObjectRole.ParkingBay) continue;
+                bool on = false;
+                foreach (var a in asphalt) if (Poly.Contains(a, ob.Position.xz)) { on = true; break; }
+                if (!on) off++;
+            }
+            return off;
         }
 
         /// <summary>Net ends no other net shares and that attach to no street or lane: aisles that stop in a turning circle.</summary>

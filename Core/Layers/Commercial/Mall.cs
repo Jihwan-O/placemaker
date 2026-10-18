@@ -700,12 +700,28 @@ namespace Placemaker.Core.Layers.Commercial
             return clearance < 9f;
         }
 
+        /// <summary>
+        /// (shops4) The lawn of a planted piece. The lot-first strip mall paints it (terrain paint, 2 m in from the piece's edge so
+        /// it never reaches a road: the user, "grass patches going onto the roads ... we've moved on to terrain paint"); the other
+        /// layouts keep their lawn surface.
+        /// </summary>
+        public void Lawn(float2[] ring)
+        {
+            if (!LotFirstMode) { Ctx.Surface(ring, SurfaceRole.Grass, new AssetRef(""), AssetCategories.SurfaceGrass); return; }
+            try
+            {
+                foreach (var part in Poly.Offset(Poly.EnsureCcw(ring), 2f, OffsetJoin.Miter))
+                    if (part?.Outer != null && part.Outer.Length >= 3 && Poly.Area(part.Outer) >= 20f) PaintKit().Fill(part.Outer, TerrainMaterials.Lush, 0.5f, 1.5f, 0.8f, 6f);
+            }
+            catch (Exception) { }
+        }
+
         /// <summary>A planted buffer: lawn and a loose line of trees, no paths (strips beside lanes and rows).</summary>
         public void Buffer(float2[] ring, uint salt)
         {
             var region = LayerRegion.From(ring);
             if (region == null) return;
-            Ctx.Surface(ring, SurfaceRole.Grass, new AssetRef(""), AssetCategories.SurfaceGrass);
+            Lawn(ring);
             var rng = Hashing.Rng(Hashing.Mix(Ctx.Seed, salt), "buffer");
             var placed = new List<float2>();
             float step = 4f;

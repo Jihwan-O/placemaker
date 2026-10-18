@@ -368,6 +368,9 @@ namespace Placemaker.Core.Layers.Commercial
         /// <summary>(shops2) After the rows of stores, the rest of the site is lots (no access alleys or street rows across the front lot).</summary>
         protected override void LotFirst(LayerContext ctx, Mall mall, List<StreetShops.Run> runs)
         {
+            // (shops4) The lot-first layout planned its lots itself; opening a shut-in leftover by giving back a shop plot (OpenAccess)
+            // took every shop of an odd site.
+            if (mall.LotFirstMode) return;
             if (!ctx.Plan.Facts.ContainsKey(RowsFact) && !ctx.Plan.Facts.ContainsKey(CentreFact)) { base.LotFirst(ctx, mall, runs); return; }
             // Every bay between the rails and rungs is a whole lot: no budget shared out (a share cut a bay's lot short by the
             // crescents beside a round block that never become lots, and planted the rest).

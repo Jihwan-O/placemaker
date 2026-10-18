@@ -487,6 +487,27 @@ namespace Placemaker.Core.Layers.Commercial
             // that leave the islands out, so the bare ground shows there.
             if (LotFirstMode)
             {
+                // The asphalt as convex pieces: the game split one big many-sided lot ring into triangles with a long sliver missing,
+                // grass showing under a row of stalls (game runner, 300 x 280 m site). A convex piece has no such sliver.
+                for (int i = sub.Surfaces.Count - 1; i >= 0; i--)
+                {
+                    var sf = sub.Surfaces[i];
+                    if (sf.Role != SurfaceRole.Asphalt || sf.Ring.Length <= 4) continue;
+                    var r2 = Poly.To2D(sf.Ring);
+                    if (Poly.IsConvex(r2)) continue;
+                    List<float2[]> parts;
+                    try { parts = ConvexDecomposition.Decompose(r2, true); }
+                    catch (Exception) { continue; }
+                    if (parts == null || parts.Count < 2) continue;
+                    bool ok = true;
+                    // (a part the game would refuse: a sliver under 3 m² is left out, a bigger one keeps the ring whole)
+                    parts.RemoveAll(p => (!SurfaceAcceptance.IsAccepted(p) || !Build.AreaRings.IsValid(p, Build.AreaRings.SurfaceMinNodeDistance + Build.AreaRings.Margin)) && Poly.Area(p) < 3f);
+                    foreach (var p in parts) if (!SurfaceAcceptance.IsAccepted(p) || !Build.AreaRings.IsValid(p, Build.AreaRings.SurfaceMinNodeDistance + Build.AreaRings.Margin)) { ok = false; break; }
+                    if (!ok) continue;
+                    sub.Surfaces.RemoveAt(i);
+                    foreach (var p in parts)
+                        sub.Surfaces.Insert(i, new PlannedSurface { Ring = Poly.To3D(p, q => sub.HeightAfter != null ? sub.HeightAfter(q) : Ctx.H(q)), Role = sf.Role, Asset = sf.Asset, Control = sf.Control, Category = sf.Category });
+                }
                 var kit = PaintKit();
                 for (int i = sub.Surfaces.Count - 1; i >= 0; i--)
                 {

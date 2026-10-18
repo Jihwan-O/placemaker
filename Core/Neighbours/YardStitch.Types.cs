@@ -72,6 +72,10 @@ namespace Placemaker.Core.Neighbours
         public bool Rear;
         /// <summary>Its line edits were undone: a moved line would have crossed a house.</summary>
         public bool Reverted;
+        /// <summary>The land between the two lots (side pairs): painted as meadow where no lawn covers it.</summary>
+        public float2[] Gap;
+        /// <summary>Pie slice: where this border runs on to (the point it meets the next border behind the houses), or null.</summary>
+        public float2? Tip;
     }
 
     public sealed class StitchPlan
@@ -83,5 +87,7 @@ namespace Placemaker.Core.Neighbours
         public float LawnAddedM2;
         /// <summary>Why pairs formed or not, and what was undone (the game runner logs them).</summary>
         public readonly List<string> Notes = new List<string>();
+        /// <summary>Ground paint that blends the stitched yards into the land around them (terrain materials, permanent).</summary>
+        public readonly List<Placemaker.Core.PlannedPaint> Paints = new List<Placemaker.Core.PlannedPaint>();
     }
 }

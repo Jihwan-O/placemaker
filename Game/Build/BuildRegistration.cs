@@ -44,6 +44,8 @@ namespace Placemaker.Game.Build
             updateSystem.UpdateAt<global::Placemaker.Game.Neighbours.NeighbourPolishSystem>(SystemUpdatePhase.Modification4B);
             // its lawn edits: next frame, before Areas.GeometrySystem re-triangulates Updated surfaces (Modification2B)
             updateSystem.UpdateBefore<global::Placemaker.Game.Neighbours.NeighbourLawnSystem, global::Game.Areas.GeometrySystem>(SystemUpdatePhase.Modification2B);
+            // its ground paint: one terrain-material stamp per frame (as a build's paint step)
+            updateSystem.UpdateAt<global::Placemaker.Game.Neighbours.NeighbourPaintSystem>(SystemUpdatePhase.ToolUpdate);
 
             // ── Groups ─────────────────────────────────────────────────────────────────
             // Removal marks Deleted in PreTool: SubElementDeleteSystem (PostTool) cascades and

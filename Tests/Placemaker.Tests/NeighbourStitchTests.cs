@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Placemaker.Core.Geometry;
 using Placemaker.Core.Neighbours;
@@ -114,7 +115,9 @@ namespace Placemaker.Tests
             b.Lawns[0].Ring = new[] { b.ToWorld(new float2(2f, -23f)), b.ToWorld(new float2(7.4f, -23f)), b.ToWorld(new float2(7.4f, 0f)), b.ToWorld(new float2(2f, 0f)) };
             var drive = new[] { b.ToWorld(new float2(-8f, 24f)), b.ToWorld(new float2(-4f, 24f)), b.ToWorld(new float2(-4f, -6f)), b.ToWorld(new float2(-8f, -6f)) };
             b.Hard.Add(drive);
-            var plan = YardStitch.Plan(new[] { a, b });
+            var settings = new StitchSettings();
+            settings.Extra["lawnReach"] = 60f;   // this wedge is wide: let the lawn reach all the way
+            var plan = YardStitch.Plan(new[] { a, b }, settings);
             Assert.True(plan.Lawns.ContainsKey(15L), "a's lawn grows");
             Assert.False(plan.Lawns.ContainsKey(25L), "b's lawn is not on the shared side");
             var grown = plan.Lawns[15L];
@@ -129,7 +132,7 @@ namespace Placemaker.Tests
         }
 
         [Fact]
-        public void A_border_that_would_run_through_a_house_leaves_that_pair_as_it_was()
+        public void A_border_line_that_would_run_through_a_house_stops_at_the_house()
         {
             float2 At(float angle) => 64f * new float2(math.cos(angle), math.sin(angle));
             float2 Facing(float angle) => -new float2(math.cos(angle), math.sin(angle));
@@ -139,10 +142,12 @@ namespace Placemaker.Tests
             // b's house is wider than its lot on a's side: it reaches over the border
             b.Footprint = new[] { b.ToWorld(new float2(-14f, 10f)), b.ToWorld(new float2(6f, 10f)), b.ToWorld(new float2(6f, -10f)), b.ToWorld(new float2(-14f, -10f)) };
             var plan = YardStitch.Plan(new[] { a, b });
-            Assert.True(plan.Pairs[0].Reverted);
-            Assert.DoesNotContain(11L, plan.HideLines);
-            Assert.False(plan.MoveLines.ContainsKey(22L));
-            Assert.Contains(plan.Notes, n => n.Contains("cross house 2"));
+            // the hedge is still kept on the border, but no piece of it lies inside b's house
+            Assert.True(plan.MoveLines.ContainsKey(22L));
+            var kept = plan.MoveLines[22L];
+            float inside = Poly.ClipSegmentToPolygon(b.Footprint, kept.A, kept.B).Sum(x => math.distance(x.a, x.b));
+            Assert.True(inside < 0.05f, $"{inside} m of the hedge inside the house");
+            Assert.Contains(plan.Notes, n => n.Contains("stop at a house"));
         }
 
         [Fact]
@@ -166,6 +171,31 @@ namespace Placemaker.Tests
             Assert.True(plan.Lawns[25L].Min(p => p.y) < 28.5f);
             // a's right fence ends at its back corner: it now reaches the middle line too
             Assert.True(math.abs(plan.MoveLines[11L].B.y - 28f) < 0.01f);
+        }
+
+        [Fact]
+        public void Houses_inside_a_circle_get_pie_slices_that_meet_in_the_middle()
+        {
+            // eight houses inside a ring road, facing out to it, backs towards the centre (front edges on radius 66)
+            var houses = new List<StitchHouse>();
+            for (int i = 0; i < 8; i++)
+            {
+                float ang = i * math.PI * 2f / 8f;
+                var dir = new float2(math.cos(ang), math.sin(ang));
+                var h = House(i + 1, dir * 42f, dir);
+                // lawns along the back edge (as many houses have)
+                h.Lawns[0].Ring = new[] { h.ToWorld(new float2(-7f, -23f)), h.ToWorld(new float2(7f, -23f)), h.ToWorld(new float2(7f, -12f)), h.ToWorld(new float2(-7f, -12f)) };
+                houses.Add(h);
+            }
+            var plan = YardStitch.Plan(houses);
+            Assert.Equal(8, plan.Pairs.Count(p => !p.Rear));
+            Assert.Contains(plan.Notes, n => n.Contains("pie slices"));
+            // every border runs on to a tip near the centre
+            foreach (var p in plan.Pairs.Where(p => !p.Rear)) Assert.True(p.Tip.HasValue && math.length(p.Tip.Value) < 6f, $"tip {p.Tip}");
+            // back fences across the slices are gone, lawns grew towards the centre
+            for (int i = 1; i <= 8; i++) Assert.Contains(i * 10L + 3, plan.HideLines);
+            Assert.True(plan.Lawns.Count >= 6, $"{plan.Lawns.Count} lawns grew");
+            Assert.True(plan.Lawns.Values.All(r => r.Min(p => math.length(p)) < 10f), "lawns reach (near) the centre");
         }
 
         [Fact]

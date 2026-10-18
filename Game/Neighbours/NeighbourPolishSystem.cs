@@ -63,6 +63,7 @@ namespace Placemaker.Game.Neighbours
         private readonly Dictionary<Entity, bool> _grassPrefab = new Dictionary<Entity, bool>();
         private readonly Dictionary<Entity, string> _names = new Dictionary<Entity, string>();
         private readonly HashSet<Entity> _dirty = new HashSet<Entity>();
+        private readonly HashSet<long> _painted = new HashSet<long>();
         private bool _wasEnabled;
         private int _frame, _errors;
         // totals since the last log line
@@ -234,6 +235,12 @@ namespace Placemaker.Game.Neighbours
                 var nodes = new float3[ring.Length];
                 for (int i = 0; i < ring.Length; i++) nodes[i] = Ground(ring[i]);
                 NeighbourLawnSystem.Queue.Add((lawn, nodes));
+            }
+            // ground paint: once per stitched pair (painting again would change nothing, but costs a raster)
+            foreach (var paint in plan.Paints)
+            {
+                long key = (long)math.round(paint.Ring[0].x * 4f) * 73856093L ^ (long)math.round(paint.Ring[0].z * 4f) * 19349663L ^ paint.Layer;
+                if (_painted.Add(key)) NeighbourPaintSystem.Queue.Add(paint);
             }
             _pairs += plan.Pairs.Count;
             _lawnM2 += plan.LawnAddedM2;

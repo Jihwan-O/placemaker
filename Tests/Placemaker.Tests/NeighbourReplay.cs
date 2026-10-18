@@ -81,6 +81,7 @@ namespace Placemaker.Tests
             foreach (var r in e.GetProperty("hard").EnumerateArray()) { var ring = Ring(r); if (ring != null) h.Hard.Add(ring); }
             if (e.TryGetProperty("footprint", out var fp)) h.Footprint = Ring(fp);
             if (e.TryGetProperty("main", out var main) && main.ValueKind == JsonValueKind.String) h.MainSurface = main.GetString();
+            if (e.TryGetProperty("zone", out var zone) && zone.ValueKind == JsonValueKind.String) h.Zone = zone.GetString();
             if (e.TryGetProperty("props", out var props)) foreach (var r in props.EnumerateArray()) { var ring = Ring(r); if (ring != null) h.Props.Add(ring); }
             return h;
         }

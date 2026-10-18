@@ -41,6 +41,8 @@ namespace Placemaker.Core.Neighbours
         /// <summary>A shop, office or works (not a home): the name of the paved surface covering most of its ground (its car
         /// park). Its extra land is filled with the same surface, not lawn. Null for homes (and buildings with no paving).</summary>
         public string MainSurface;
+        /// <summary>What the building is: "home", "shop", "office" or "industry" (null: unknown, treated as a home).</summary>
+        public string Zone;
 
         public float2 Right => new float2(Forward.y, -Forward.x);
         public float2 ToLocal(float2 w) { var d = w - Position; return new float2(math.dot(d, Right), math.dot(d, Forward)); }
@@ -54,11 +56,11 @@ namespace Placemaker.Core.Neighbours
     public sealed class StitchSettings
     {
         /// <summary>Largest gap between two neighbours' front corners that still makes them a pair (m); the inside of a curve opens to the street.</summary>
-        public float MaxFrontGap = 40f;
+        public float MaxFrontGap = 48f;
         /// <summary>Largest gap between their back corners (wedges on curves widen to the back) (m).</summary>
-        public float MaxBackGap = 52f;
+        public float MaxBackGap = 64f;
         /// <summary>How far two side neighbours' street edges may be apart along the street's normal (m).</summary>
-        public float MaxFrontOffset = 8f;
+        public float MaxFrontOffset = 10f;
         /// <summary>How far from a lot edge a line still counts as lying on it (m).</summary>
         public float EdgeTolerance = 1.3f;
         /// <summary>Below this gap (m) the lots touch: only the duplicate line goes, nothing moves.</summary>

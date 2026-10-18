@@ -129,7 +129,16 @@ are edited after they are placed (Game/Neighbours, Core/Neighbours/YardStitch, 1
   given back as they were when the garden is no longer painted) and the whole garden minus the paving is painted lush.
 * **Shops, offices and works** (not homes): the surface covering most of their ground (their car park) fills their extra
   land, as an owned surface; no lawn, beds or garden paths.
-* **Blending**: every garden gets a soft lush band of paint 7 m past its outer edges (outside every plot).
+* **Blending**: the gardens of a pass as one shape, grown outward with rounded corners into a near band (12 m) and a
+  wider, fainter one (22 m), minus every plot, painted lush with uneven edges: round every polished house, joined or not.
+* **Joining from farther**: side neighbours pair up to 48 m apart at the street, 64 m at the back, 10 m out of line.
+* **Around a shallow lot**: between two lots much deeper than it (straight street), a shallow lot keeps its depth; the
+  land behind it goes to the deep neighbours, split down its middle by a fence (one the stitching freed).
+* **No crossings**: a line running within 1.2 m alongside a nicer one, or crossing it, loses that stretch (corners and Ts
+  kept), checked again after every move.
+* **Features** in big new garden land (about half the gardens): a rock garden, a sand pit with a bench, a wild corner
+  (logs, big bushes, lush paint), or a bench nook with a flower bed; next to industry a storage yard (rubble, pallets,
+  crates, barrels) on worn ground. Neighbours' garden paths meet where their shared fence reaches the back.
 * A pass plans with every house within 110 m of the houses that changed but edits only those within 40 m, so a house at
   the edge of a pass is never planned without its neighbours.
 * Offline replay: lab op "polishDump" records the houses as the planner sees them; tools/hot/Replay-Polish.ps1 -Run <run>

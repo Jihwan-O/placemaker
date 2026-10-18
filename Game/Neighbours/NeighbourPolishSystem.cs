@@ -601,7 +601,11 @@ namespace Placemaker.Game.Neighbours
             {
                 var zone = EntityManager.GetComponentData<SpawnableBuildingData>(h.Prefab).m_ZonePrefab;
                 if (zone != Entity.Null && EntityManager.HasComponent<ZoneData>(zone))
-                    home = EntityManager.GetComponentData<ZoneData>(zone).m_AreaType == global::Game.Zones.AreaType.Residential;
+                {
+                    var zd = EntityManager.GetComponentData<ZoneData>(zone);
+                    home = zd.m_AreaType == global::Game.Zones.AreaType.Residential;
+                    sh.Zone = home ? "home" : zd.m_AreaType == global::Game.Zones.AreaType.Commercial ? "shop" : zd.IsOffice() ? "office" : "industry";
+                }
             }
             var surfaceArea = new Dictionary<string, float>();
             if (EntityManager.HasBuffer<global::Game.Areas.SubArea>(h.E))
@@ -661,7 +665,7 @@ namespace Placemaker.Game.Neighbours
         private static StitchHouse Copy(StitchHouse h, bool edit) => new StitchHouse
         {
             Id = h.Id, Position = h.Position, Forward = h.Forward, HalfLot = h.HalfLot, Lines = h.Lines, Lawns = h.Lawns, Hard = h.Hard,
-            Footprint = h.Footprint, Props = h.Props, Edit = edit, MainSurface = h.MainSurface,
+            Footprint = h.Footprint, Props = h.Props, Edit = edit, MainSurface = h.MainSurface, Zone = h.Zone,
         };
         /// <summary>What each house was given (beds, paths, bushes) by the last plan that edited it: by prefab name and centre.</summary>
         private readonly Dictionary<Entity, List<(string Name, float2 At)>> _planted = new Dictionary<Entity, List<(string, float2)>>();

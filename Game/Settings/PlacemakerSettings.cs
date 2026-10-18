@@ -395,6 +395,11 @@ namespace Placemaker.Game.Settings
         [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
         public bool PolishPlanting { get; set; }
 
+        /// <summary>Something in big new garden land: a rock garden, a sand pit, a wild corner, a bench nook; a storage yard by industry.</summary>
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public bool PolishFeatures { get; set; }
+
         /// <summary>Garden paths in some big gardens, walkways between some houses.</summary>
         [SettingsUISection(SectionMain, GroupNeighbourhood)]
         [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
@@ -456,6 +461,7 @@ namespace Placemaker.Game.Settings
                     ["paintedGardens"] = PolishPaintedGardens,
                     ["plant"] = PolishPlanting ? 1f : 0f,
                     ["pavedFill"] = PolishPavedFill ? 1f : 0f,
+                    ["features"] = PolishFeatures ? 1f : 0f,
                     ["pathChance"] = PolishPaths ? 45f : 0f,
                     ["alleyChance"] = PolishPaths ? 45f : 0f,
                     ["rockChance"] = PolishRocks ? 12f : 0f,
@@ -507,6 +513,7 @@ namespace Placemaker.Game.Settings
             PolishPaintedGardens = 33;
             PolishPlanting = true;
             PolishPavedFill = true;
+            PolishFeatures = true;
             PolishPaths = true;
             PolishRocks = true;
             PolishGroundPaint = true;

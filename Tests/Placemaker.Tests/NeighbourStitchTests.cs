@@ -150,7 +150,10 @@ namespace Placemaker.Tests
                 h.Footprint = new[] { h.ToWorld(new float2(-5f, 2f)), h.ToWorld(new float2(5f, 2f)), h.ToWorld(new float2(5f, 14f)), h.ToWorld(new float2(-5f, 14f)) };
                 h.Hard.Add(new[] { h.ToWorld(new float2(-8f, 24f)), h.ToWorld(new float2(-4f, 24f)), h.ToWorld(new float2(-4f, 2f)), h.ToWorld(new float2(-8f, 2f)) });
             }
-            var plan = YardStitch.Plan(houses, MiddleLine());
+            var settings = MiddleLine();
+            settings.Extra["features"] = 0f;   // beds and their bushes only (features: their own test)
+            settings.Extra["rockChance"] = 0f;
+            var plan = YardStitch.Plan(houses, settings);
             Assert.NotEmpty(plan.Beds);
             Assert.NotEmpty(plan.Bushes);
             foreach (var (house, ring) in plan.Beds)
@@ -174,7 +177,7 @@ namespace Placemaker.Tests
             }
             Assert.True(plan.Bushes.GroupBy(b => b.House).All(g => g.Count() <= 14));
             // the same houses plant the same garden every time
-            var again = YardStitch.Plan(houses, MiddleLine());
+            var again = YardStitch.Plan(houses, settings);
             Assert.Equal(plan.Bushes.Select(b => b.Position), again.Bushes.Select(b => b.Position));
         }
 
@@ -217,6 +220,58 @@ namespace Placemaker.Tests
             Assert.True(plan.Bushes.Count >= 3);
         }
 
+
+        [Fact]
+        public void Two_deep_lots_meet_behind_a_shallow_one_between_them()
+        {
+            // a straight street: 48 m deep, 16 m deep, 48 m deep, touching, street edges in line (z = 24 in world)
+            var l = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            var m = new StitchHouse { Id = 2, Position = new float2(16f, 16f), Forward = new float2(0f, 1f), HalfLot = new float2(8f, 8f) };
+            m.Lines.Add(new StitchLine { Id = 21, Name = "FenceResidentialHigh01", A = m.ToWorld(new float2(-7.9f, 7.9f)), B = m.ToWorld(new float2(-7.9f, -7.9f)) });
+            m.Lines.Add(new StitchLine { Id = 23, Name = "FenceResidentialHigh01", A = m.ToWorld(new float2(7.9f, -7.9f)), B = m.ToWorld(new float2(-7.9f, -7.9f)) });
+            var r = House(3, new float2(32f, 0f), new float2(0f, 1f));
+            var plan = YardStitch.Plan(new[] { l, m, r }, MiddleLine());
+            Assert.Contains(plan.Notes, x => x.Contains("meet behind 2"));
+            // the land behind the shallow lot (y 8 down to -24) is the deep neighbours': left half to 1, right half to 3
+            Assert.True(Poly.Contains(plan.Plots[1], new float2(12f, -10f)), "left half behind the shallow lot is not 1's");
+            Assert.True(Poly.Contains(plan.Plots[3], new float2(20f, -10f)), "right half behind the shallow lot is not 3's");
+            // a line down the middle behind it
+            Assert.Contains(plan.MoveLines.Values, mv => math.abs(mv.A.x - 16f) < 0.05f && math.abs(mv.B.x - 16f) < 0.05f && math.abs(mv.A.y - mv.B.y) > 20f);
+            // no line runs across the land behind it from street to back on the old lot edges (x = 8 or 24 below y = 8)
+            foreach (var mv in plan.MoveLines.Values.Concat(new[] { l, m, r }.SelectMany(h => h.Lines).Where(x => !plan.HideLines.Contains(x.Id) && !plan.MoveLines.ContainsKey(x.Id)).Select(x => (x.A, x.B))))
+                foreach (float x in new[] { 8f, 24f })
+                    if (math.abs(mv.A.x - x) < 1.2f && math.abs(mv.B.x - x) < 1.2f) Assert.True(math.min(mv.A.y, mv.B.y) > 7f, $"a line on x {x} runs on behind the shallow lot: {mv.A} {mv.B}");
+        }
+
+        [Fact]
+        public void Big_new_garden_land_gets_a_feature_inside_its_own_garden_clear_of_the_house_and_paving()
+        {
+            float2 At(float angle) => 64f * new float2(math.cos(angle), math.sin(angle));
+            float2 Facing(float angle) => -new float2(math.cos(angle), math.sin(angle));
+            float c = math.radians(90f);
+            var houses = new[] { House(1, At(c + 0.55f), Facing(c + 0.55f)), House(2, At(c), Facing(c)), House(3, At(c - 0.55f), Facing(c - 0.55f)) };
+            foreach (var h in houses)
+            {
+                h.Footprint = new[] { h.ToWorld(new float2(-5f, 2f)), h.ToWorld(new float2(5f, 2f)), h.ToWorld(new float2(5f, 14f)), h.ToWorld(new float2(-5f, 14f)) };
+                h.Hard.Add(new[] { h.ToWorld(new float2(-8f, 24f)), h.ToWorld(new float2(-4f, 24f)), h.ToWorld(new float2(-4f, 2f)), h.ToWorld(new float2(-8f, 2f)) });
+            }
+            var settings = MiddleLine();
+            settings.Extra["featureChance"] = 100f;
+            var plan = YardStitch.Plan(houses, settings);
+            var named = new[] { "rock garden", "sand pit", "wild corner", "bench nook" };
+            Assert.Contains(plan.Notes, x => named.Any(x.Contains));
+            // every object stands in its own house's garden, never on a house or a driveway
+            foreach (var (house, p, _, _) in plan.Bushes)
+            {
+                Assert.True(Poly.Contains(plan.Plots[house], p), $"an object of {house} outside its garden");
+                foreach (var h in houses)
+                {
+                    Assert.False(Poly.Contains(h.Footprint, p), $"an object on house {h.Id}");
+                    Assert.False(Poly.Contains(h.Hard[0], p), $"an object on the driveway of {h.Id}");
+                }
+            }
+            Assert.True(plan.Paths.All(pt => SurfaceAcceptance.IsAccepted(pt.Ring)));
+        }
 
         [Fact]
         public void A_border_line_that_would_run_through_a_house_stops_at_the_house()

@@ -80,6 +80,7 @@ namespace Placemaker.Tests
             foreach (var l in e.GetProperty("lawns").EnumerateArray()) h.Lawns.Add(new StitchLawn { Id = l.GetProperty("id").GetInt64(), Ring = Ring(l.GetProperty("ring")) });
             foreach (var r in e.GetProperty("hard").EnumerateArray()) { var ring = Ring(r); if (ring != null) h.Hard.Add(ring); }
             if (e.TryGetProperty("footprint", out var fp)) h.Footprint = Ring(fp);
+            if (e.TryGetProperty("main", out var main) && main.ValueKind == JsonValueKind.String) h.MainSurface = main.GetString();
             if (e.TryGetProperty("props", out var props)) foreach (var r in props.EnumerateArray()) { var ring = Ring(r); if (ring != null) h.Props.Add(ring); }
             return h;
         }

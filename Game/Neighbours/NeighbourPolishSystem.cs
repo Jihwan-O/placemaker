@@ -465,6 +465,7 @@ namespace Placemaker.Game.Neighbours
                 if (_painted.Add(key)) NeighbourPaintSystem.Queue.Add(paint);
             }
             // land no lawn of its house reaches: a lawn the house owns (of the house's own kind, else its neighbours' kind)
+            var newLawnNames = new List<(long House, string Name, float2 At)>();
             if (EditLawns && plan.NewLawns.Count > 0)
             {
                 var usual = System.Linq.Enumerable.FirstOrDefault(System.Linq.Enumerable.Select(System.Linq.Enumerable.OrderByDescending(System.Linq.Enumerable.GroupBy(_lawnPrefabOf.Values, p => p), g => System.Linq.Enumerable.Count(g)), g => g.Key));
@@ -473,6 +474,7 @@ namespace Placemaker.Game.Neighbours
                     if (!coreIds.Contains(house) || !_houseOf.TryGetValue(house, out var owner)) continue;
                     var prefab = _lawnPrefabOf.TryGetValue(house, out var own) ? own : usual;
                     NeighbourAreaSystem.Queue.Add(new NeighbourAreaSystem.Request { Prefab = prefab, Name = "Grass Surface 01", Ring = ring, Owner = owner });
+                    newLawnNames.Add((house, prefab != Entity.Null ? NameOf(prefab) : "Grass Surface 01", Centre(ring)));
                     _newLawns++;
                 }
             }
@@ -483,6 +485,7 @@ namespace Placemaker.Game.Neighbours
                 var want = new Dictionary<long, List<(string Name, float2 At)>>();
                 void Want(long house, string name, float2 at) { if (!want.TryGetValue(house, out var l)) want[house] = l = new List<(string, float2)>(); l.Add((name, at)); }
                 foreach (var (house, ring) in plan.Beds) Want(house, "Forestry Surface 01", Centre(ring));
+                foreach (var (house, name, at) in newLawnNames) Want(house, name, at);
                 foreach (var (house, ring, surface) in plan.Paths) Want(house, surface, Centre(ring));
                 foreach (var (house, at, yaw, kind) in plan.Bushes) if (kind >= 0 && kind < YardStitch.BushKinds.Length) Want(house, YardStitch.BushKinds[kind], at);
                 foreach (var id in coreIds)
@@ -606,6 +609,7 @@ namespace Placemaker.Game.Neighbours
                 {
                     var area = sa.m_Area;
                     if (!EntityManager.Exists(area) || !EntityManager.HasComponent<global::Game.Areas.Surface>(area) || !EntityManager.HasBuffer<global::Game.Areas.Node>(area)) continue;
+                    if (Ours(h, area)) continue;   // a piece the polish made (planned again from scratch, never planned around)
                     if (!home)
                     {
                         var sn = EntityManager.GetBuffer<global::Game.Areas.Node>(area, true);
@@ -639,11 +643,10 @@ namespace Placemaker.Game.Neighbours
                     if (lawnsOf != null) lawnsOf[id] = area;
                     sh.Lawns.Add(new StitchLawn { Id = id, Ring = ring });
                 }
-            if (!home && surfaceArea.Count > 0)
-            {
-                var main = surfaceArea.OrderByDescending(kv => kv.Value).First().Key;
-                if (main.IndexOf("grass", StringComparison.OrdinalIgnoreCase) < 0 && main.IndexOf("lawn", StringComparison.OrdinalIgnoreCase) < 0) sh.MainSurface = main;
-            }
+            // not a home: its most-used paved surface (a shop with more lawn than car park still joins its neighbours in paving)
+            if (!home)
+                sh.MainSurface = surfaceArea.Where(kv => kv.Key.IndexOf("grass", StringComparison.OrdinalIgnoreCase) < 0 && kv.Key.IndexOf("lawn", StringComparison.OrdinalIgnoreCase) < 0)
+                    .OrderByDescending(kv => kv.Value).Select(kv => kv.Key).FirstOrDefault();
             return sh;
         }
 
@@ -662,6 +665,31 @@ namespace Placemaker.Game.Neighbours
         };
         /// <summary>What each house was given (beds, paths, bushes) by the last plan that edited it: by prefab name and centre.</summary>
         private readonly Dictionary<Entity, List<(string Name, float2 At)>> _planted = new Dictionary<Entity, List<(string, float2)>>();
+
+        /// <summary>
+        /// A surface the polish made for this house, not one of the house's own: one the last plan recorded (by kind and centre),
+        /// or one centred outside the house's lot (the game's own pieces always lie inside it; after a load the record is empty).
+        /// </summary>
+        private bool Ours(House h, Entity area)
+        {
+            if (_lawnOriginal.ContainsKey(area)) return false;   // the house's own lawn, grown by the polish
+            var nodes = EntityManager.GetBuffer<global::Game.Areas.Node>(area, true);
+            if (nodes.Length < 3) return false;
+            var c = float2.zero;
+            for (int i = 0; i < nodes.Length; i++) c += nodes[i].m_Position.xz;
+            c /= nodes.Length;
+            var fwd = math.normalizesafe(math.mul(h.T.m_Rotation, new float3(0f, 0f, 1f)).xz, new float2(0f, 1f));
+            var right = new float2(fwd.y, -fwd.x);
+            var d = c - h.T.m_Position.xz;
+            var half = (float2)h.Lot * 4f;
+            if (math.abs(math.dot(d, right)) > half.x + 0.5f || math.abs(math.dot(d, fwd)) > half.y + 0.5f) return true;
+            if (_planted.TryGetValue(h.E, out var mine))
+            {
+                var name = NameOf(EntityManager.GetComponentData<PrefabRef>(area).m_Prefab);
+                foreach (var (n, at) in mine) if (math.distance(at, c) < 0.6f && string.Equals(n, name, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
 
         private static float2 Centre(float2[] ring)
         {

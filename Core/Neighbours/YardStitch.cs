@@ -134,7 +134,8 @@ namespace Placemaker.Core.Neighbours
                         continue;
                     }
                 }
-                foreach (int k in row) rowDeepen[k] = ring ? 2f * (depth - houses[k].HalfLot.y) : math.min(2f * (depth - houses[k].HalfLot.y), s.Knob("maxDeepen", 24f));
+                // (never a shop, office or works: a paved slab behind a short shop reads as an empty car park)
+                foreach (int k in row) rowDeepen[k] = !string.IsNullOrEmpty(houses[k].MainSurface) ? 0f : ring ? 2f * (depth - houses[k].HalfLot.y) : math.min(2f * (depth - houses[k].HalfLot.y), s.Knob("maxDeepen", 24f));
             }
 
             float maxRear = s.Knob("maxRearGap", 24f);
@@ -537,14 +538,16 @@ namespace Placemaker.Core.Neighbours
                 if (!string.IsNullOrEmpty(h.MainSurface) && s.Knob("pavedFill", 1f) > 0.5f)
                 {
                     var spare = Poly.Boolean(lawnLand[i], new[] { new Region(Ccw(Lot(h))) }, BoolOp.Difference);
+                    float spare0 = spare.Sum(r => r.Area);
                     var off = hard0.Concat(h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3).Select(l => new Region(Ccw(l.Ring)))).ToList();
                     if (off.Count > 0) spare = Poly.Boolean(spare, off, BoolOp.Difference);
+                    int made = 0, failed = 0;
                     foreach (var r in spare.Where(r => r.Area >= 10f))
                     {
                         var ring = Prepared(r.HasHoles ? Poly.CutHoles(r, 0f).First() : r.Outer);
-                        if (ring != null) plan.Paths.Add((h.Id, ring, h.MainSurface));
+                        if (ring != null) { plan.Paths.Add((h.Id, ring, h.MainSurface)); made++; } else failed++;
                     }
-                    plan.Notes.Add($"{h.Id}: its extra land in {h.MainSurface}");
+                    plan.Notes.Add($"{h.Id}: its extra land in {h.MainSurface} ({made} pieces{(failed > 0 ? $", {failed} the game would not take" : "")}; land {spare.Sum(r => r.Area):F0} m² in {spare.Count}, {spare0:F0} m² before paving, plot {Poly.Area(plot):F0}, ext {ext.Sum(r => r.Area):F0}, landAll {lawnLand[i].Sum(r => r.Area):F0})");
                     continue;
                 }
                 // variety, as streets are: some gardens (about a third) are painted, not drawn: the house's own grass surfaces

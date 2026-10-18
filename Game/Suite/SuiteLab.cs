@@ -198,6 +198,7 @@ namespace Placemaker.Game.Suite
                             ["hard"] = new JArray(h.Hard.Select(r => (object)Ring(r)).ToArray()),
                             ["footprint"] = Ring(h.Footprint),
                             ["props"] = new JArray(h.Props.Select(r => (object)Ring(r)).ToArray()),
+                            ["main"] = h.MainSurface,
                         });
                     rec["houses"] = arr;
                     Mod.Log.Info($"Placemaker lab: polish dump of {arr.Count} houses");

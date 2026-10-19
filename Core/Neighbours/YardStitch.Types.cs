@@ -38,6 +38,9 @@ namespace Placemaker.Core.Neighbours
         /// <summary>False: only there so its neighbours are planned right (the game layer edits it in another pass); its
         /// lawn, beds and paths are not worked out.</summary>
         public bool Edit = true;
+        /// <summary>A house this plan does not edit (Edit false): its garden as another pass last wrote it. Fixed: the edited
+        /// gardens never take its land (their own lots excepted: StitchPlan.GardenClashes). Null: unknown (worked out).</summary>
+        public float2[] Garden;
         /// <summary>The lot's saved flag (the player's painter, "Polish new houses"). False: the lot stays exactly as the game
         /// made it (none of its lines, lawns or pieces change, nothing is planted on it); a polished neighbour takes the whole
         /// gap up to its lot edge and leans on its fence there. Two unpolished neighbours: nothing happens between them.</summary>
@@ -130,6 +133,9 @@ namespace Placemaker.Core.Neighbours
         public readonly List<float2[]> Commons = new List<float2[]>();
         /// <summary>Each stitched house's plot (its share of the land; fences and lawn follow its edges), by house id.</summary>
         public readonly Dictionary<long, float2[]> Plots = new Dictionary<long, float2[]>();
+        /// <summary>Houses not edited whose garden (StitchHouse.Garden) lies over an edited house's lot: planned again next,
+        /// so they give that land back.</summary>
+        public readonly List<long> GardenClashes = new List<long>();
         /// <summary>Lawns to add, owned by a house: for a house with none (gravel yards), and for the part of a plot its own
         /// lawn cannot reach (a driveway splits it). The game layer creates them as the house's own surfaces.</summary>
         public readonly List<(long House, float2[] Ring)> NewLawns = new List<(long, float2[])>();

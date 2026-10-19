@@ -589,6 +589,7 @@ namespace Placemaker.Game.Neighbours
         /// <summary>Another city: nothing in memory may name its entities.</summary>
         private void ForgetCity()
         {
+            _gardenOf.Clear();
             _areaCache = null;
             s_newAreas.Clear();
             _written.Clear();

@@ -148,6 +148,8 @@ namespace Placemaker.Game.Neighbours
         // ───────────── something new built near gardens ─────────────
 
         private EntityQuery _newNearby;
+        /// <summary>Each polished house's garden as last written (this session): fixed for the passes that do not edit it.</summary>
+        private readonly Dictionary<Entity, float2[]> _gardenOf = new Dictionary<Entity, float2[]>();
         private static int s_logPasses;
 
         private void CreateNearbyQuery()

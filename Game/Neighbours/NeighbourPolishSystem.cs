@@ -529,7 +529,10 @@ namespace Placemaker.Game.Neighbours
                 }
                 var flag = EntityManager.HasComponent<PolishedLot>(e) ? EntityManager.GetComponentData<PolishedLot>(e) : default;
                 var (options, theme) = flag.Yes ? PlannerLook(e, flag, d.House.Zone) : (null, ThemeFor(e, d.House.Zone));
-                stitch.Add(Copy(d.House, isCore, flag.Yes, theme, options));
+                var copy = Copy(d.House, isCore, flag.Yes, theme, options);
+                // a polished neighbour this pass does not edit keeps the garden it was last given: fixed for this plan
+                if (!isCore && flag.Yes && _gardenOf.TryGetValue(e, out var garden)) copy.Garden = garden;
+                stitch.Add(copy);
             }
             var planner = Planner;
             // the roads, paths, tracks and other buildings around the patch: never joined across, never reached onto, met
@@ -565,6 +568,14 @@ namespace Placemaker.Game.Neighbours
             var lanesOf = pend.LanesOf;
             var lawnsOf = pend.LawnsOf;
             var coreIds = pend.CoreIds;
+            // the gardens written now are the ones the next passes keep off; neighbours whose garden lies over a lot here
+            // are planned again
+            foreach (var id in coreIds)
+                if (pend.HouseOf.TryGetValue(id, out var he) && plan.Plots.TryGetValue(id, out var plotNow)) _gardenOf[he] = plotNow;
+            int clashes = 0;
+            foreach (var id in plan.GardenClashes)
+                if (pend.HouseOf.TryGetValue(id, out var ce) && EntityManager.Exists(ce) && IsYes(ce) && _dirty.Add(ce)) clashes++;
+            if (clashes > 0) Mod.Log.Info($"Placemaker neighbourhood polish: {clashes} gardens over a new lot planned again");
             var sw = pend.Clock;
             int asked = pend.Asked, clusterCount = pend.Cluster;
             _houseOf.Clear();

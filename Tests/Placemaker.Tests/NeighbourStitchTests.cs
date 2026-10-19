@@ -307,6 +307,41 @@ namespace Placemaker.Tests
                     Assert.True(math.length(p) > 28f, $"garden {id} runs out to {math.length(p):F0} m from the centre ({string.Join(" | ", plan.Notes)})");
         }
 
+        [Fact]
+        public void A_garden_written_by_another_pass_is_kept_off_and_one_over_a_new_lot_is_planned_again()
+        {
+            // houses grown one after another: a's garden (written by an earlier pass, big) reaches over where b now stands
+            var opts = new Dictionary<string, float>(PolishLooks.Defaults);
+            foreach (var k in PolishLooks.ReachKnobs) opts[k] = 150f;
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            var b = House(2, new float2(60f, 0f), new float2(0f, 1f));
+            a.Options = b.Options = opts;
+            a.Edit = false;
+            a.Garden = new[] { new float2(-8f, 24f), new float2(70f, 24f), new float2(70f, -90f), new float2(-8f, -90f) };
+            var plan = YardStitch.Plan(new[] { a, b }, MiddleLine());
+            Assert.True(plan.Plots.TryGetValue(2, out var plotB), "b's garden is planned");
+            float shared = Poly.Boolean(new[] { (IReadOnlyList<float2>)plotB }, new[] { (IReadOnlyList<float2>)a.Garden }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area);
+            // b keeps only its own lot out of a's garden (16 x 48 m, the part a's garden covers: x 52..68 of a's 70)
+            Assert.True(shared <= 16f * 48f + 2f, $"b's garden takes {shared:F0} m² of a's");
+            Assert.Contains(1L, plan.GardenClashes);
+        }
+
+        [Fact]
+        public void A_garden_written_by_another_pass_next_door_but_off_the_lot_is_no_clash()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            var b = House(2, new float2(40f, 0f), new float2(0f, 1f));
+            a.Edit = false;
+            a.Garden = new[] { new float2(-8f, 24f), new float2(20f, 24f), new float2(20f, -40f), new float2(-8f, -40f) };
+            var plan = YardStitch.Plan(new[] { a, b }, MiddleLine());
+            Assert.Empty(plan.GardenClashes);
+            if (plan.Plots.TryGetValue(2, out var plotB))
+            {
+                float shared = Poly.Boolean(new[] { (IReadOnlyList<float2>)plotB }, new[] { (IReadOnlyList<float2>)a.Garden }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area);
+                Assert.True(shared < 1f, $"b's garden takes {shared:F0} m² of a's");
+            }
+        }
+
         private static bool Overlap(float2[] a, float2[] b) =>
             Poly.Boolean(new[] { (IReadOnlyList<float2>)a }, new[] { (IReadOnlyList<float2>)b }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area) > 0.05f;
 

@@ -541,6 +541,7 @@ namespace Placemaker.Core.Neighbours
                 if (clipped > 0) plan.Notes.Add($"{clipped} gardens cut back clear of roads, paths and buildings");
             }
             FillGaps(houses, plots, touched, raw, kept, s, plan);
+            FixedGardens(houses, plots, touched, plan);
 
             // ── 3. fences on plot edges ──
             var moved = new Dictionary<long, (float2 A, float2 B)>();
@@ -2198,6 +2199,45 @@ namespace Placemaker.Core.Neighbours
             }
             if (filled > 0) plan.Notes.Add($"{filled} strips between gardens ({area:F0} m²) given to the garden beside them");
         }
+
+        /// <summary>
+        /// Gardens another pass wrote that this plan does not edit (StitchHouse.Garden) are fixed: an edited garden never takes
+        /// their land (its own lot is never cut; a fixed garden over it is reported in GardenClashes, so that neighbour is
+        /// planned again and gives it back), and their plots are those gardens, so fences meet them on their real edges.
+        /// Houses that grow fast one after another never end up with gardens through each other.
+        /// </summary>
+        private static void FixedGardens(IReadOnlyList<StitchHouse> houses, float2[][] plots, bool[] touched, StitchPlan plan)
+        {
+            int n = houses.Count;
+            var fixedIdx = Enumerable.Range(0, n).Where(j => !houses[j].Edit && houses[j].Polished && houses[j].Garden != null && houses[j].Garden.Length >= 3).ToList();
+            if (fixedIdx.Count == 0) return;
+            int cut = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (!houses[i].Edit || !touched[i] || plots[i] == null) continue;
+                var lot = Lot(houses[i]);
+                foreach (int j in fixedIdx)
+                {
+                    var g = Ccw(houses[j].Garden);
+                    if (OverlapArea(plots[i], g) < 1f) continue;
+                    if (OverlapArea(lot, g) > 2f && !plan.GardenClashes.Contains(houses[j].Id)) plan.GardenClashes.Add(houses[j].Id);
+                    var left = Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(plots[i]) }, new[] { (IReadOnlyList<float2>)g }, BoolOp.Difference, FillRule.NonZero);
+                    var withLot = Poly.Boolean(left.ToList(), new List<Region> { new Region(Ccw(lot)) }, BoolOp.Union);
+                    var keep = withLot.OrderByDescending(r => Poly.Contains(r.Outer, houses[i].Position) ? 1 : 0).ThenByDescending(r => r.Area).FirstOrDefault();
+                    if (keep == null) continue;
+                    var ring = keep.HasHoles ? Poly.CutHoles(keep, 0f).OrderByDescending(r => Poly.Area(r)).First() : keep.Outer;
+                    if (ring == null || ring.Length < 3 || Poly.Area(ring) < 1f) continue;
+                    plots[i] = Poly.Simplify(ring, 0.05f);
+                    cut++;
+                }
+            }
+            foreach (int j in fixedIdx) plots[j] = Ccw(houses[j].Garden);
+            if (cut > 0) plan.Notes.Add($"{cut} gardens kept off their neighbours' gardens");
+            if (plan.GardenClashes.Count > 0) plan.Notes.Add($"{plan.GardenClashes.Count} neighbours' gardens lie over a lot here: they are planned again");
+        }
+
+        private static float OverlapArea(IReadOnlyList<float2> a, IReadOnlyList<float2> b) =>
+            Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(a.ToArray()) }, new[] { (IReadOnlyList<float2>)Ccw(b.ToArray()) }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area);
 
         private static IEnumerable<IReadOnlyList<float2>> RingsOf(IEnumerable<Region> regions)
         {

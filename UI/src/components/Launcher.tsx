@@ -36,8 +36,8 @@ const PolishLauncherInner = () => {
     return (
         <Tip
             direction="down"
-            title={t("Placemaker.UI.Polish.Name", "Neighbourhood polish")}
-            description={t("Placemaker.UI.Polish.LauncherTip", "Pick buildings and polish their gardens: shared fences and hedges, lawns or painted ground, planting, by theme.")}
+            title={t("Placemaker.UI.Polish.Name", "Outgrow")}
+            description={t("Placemaker.UI.Polish.LauncherTip", "Pick buildings and outgrow their gardens: shared fences and hedges, lawns or painted ground, planting, by theme.")}
         >
             <div className={s.wrap} data-testid="polish-launcher" data-open={on ? "true" : "false"}>
                 <SafeFloatingButton src={icon("shrub")} selected={on} onSelect={act.togglePolish} className={s.button} />

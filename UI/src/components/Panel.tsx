@@ -318,7 +318,7 @@ function usePanelPosition() {
 /** The polish tool's steps: pick buildings, then polish them (nothing is planned or reviewed). */
 const POLISH_STAGES: { id: Stage; key: string; en: string }[] = [
     { id: "area", key: "Placemaker.UI.Stage.Area", en: "Area" },
-    { id: "design", key: "Placemaker.UI.Polish.StagePolish", en: "Polish" },
+    { id: "design", key: "Placemaker.UI.Polish.StagePolish", en: "Outgrow" },
 ];
 
 const StageBar = ({ state }: { state: ToolState }) => {
@@ -579,7 +579,7 @@ const Footer = ({
                     // Live polish: the selection polished again a moment after every change of the look or the selection
                     <Tip
                         title={t("Placemaker.UI.Polish.Live", "Live")}
-                        description={t("Placemaker.UI.Polish.LiveTip", "On: the buildings in the selection are polished again a moment after every change you make, and the selection stays. Unpolish puts them back.")}
+                        description={t("Placemaker.UI.Polish.LiveTip", "On: the buildings in the selection are outgrown again a moment after every change you make, and the selection stays. Remove outgrow puts them back.")}
                     >
                         <div className={s.liveChip} data-testid="polish-live-wrap" data-on={state.painter.live ? "true" : "false"}>
                             <Switch testId="polish-live" on={!!state.painter.live} onChange={(v) => act.polishLive(v)} />
@@ -599,7 +599,7 @@ const Footer = ({
                             if (enabled) act.polishStamp(false);
                         }}
                     >
-                        <div className={s.primaryLabel}>{t("Placemaker.UI.Painter.Unpolish", "Unpolish")}</div>
+                        <div className={s.primaryLabel}>{t("Placemaker.UI.Painter.Unpolish", "Remove outgrow")}</div>
                     </button>
                 ) : null}
                 {p.action === "build" ? (
@@ -822,7 +822,7 @@ export const PlacemakerPanel = () => {
                         <Icon name="grip" size={12} tint="dim" />
                     </div>
                 </Tip>
-                <Tip title={polish ? t("Placemaker.UI.Polish.Name", "Neighbourhood polish") : t("Placemaker.Name", "Placemaker")}>
+                <Tip title={polish ? t("Placemaker.UI.Polish.Name", "Outgrow") : t("Placemaker.Name", "Placemaker")}>
                     <div className={s.logo}>
                         <Icon name={polish ? "shrub" : "logo"} size={16} tint="accent" />
                     </div>
@@ -832,7 +832,7 @@ export const PlacemakerPanel = () => {
                     <PreviewToggle state={state} />
                 ) : (
                     <div className={s.title}>
-                        {polish ? t("Placemaker.UI.Polish.Name", "Neighbourhood polish") : state.stage === "manage" ? t("Placemaker.UI.Manage.Title", "Built with Placemaker") : t("Placemaker.Name", "Placemaker")}
+                        {polish ? t("Placemaker.UI.Polish.Name", "Outgrow") : state.stage === "manage" ? t("Placemaker.UI.Manage.Title", "Built with Placemaker") : t("Placemaker.Name", "Placemaker")}
                     </div>
                 )}
                 {state.editingGroup != null ? <div className={s.editingPill}>{t("Placemaker.UI.Editing", "Editing")}</div> : null}

@@ -333,6 +333,9 @@ namespace Placemaker.Game.Neighbours
                     }
                     TotalFlaggedNew++;
                     FlagsVersion++;
+                    // brand new (a level-up keeps its entity and never comes here): planned before everything else waiting
+                    if (_first.Count > 100000) _first.Clear();
+                    _first.Add(e);
                 }
         }
 
@@ -403,15 +406,17 @@ namespace Placemaker.Game.Neighbours
                 _described.Remove(lot);
                 if (y)
                 {
-                    // its plan edits the polished neighbours near it too (they are in the same pass)
+                    // its plan edits the polished neighbours near it too (they are in the same pass); the player's: first
                     _dirty.Add(lot);
+                    _first.Add(lot);
                     yes++;
                 }
                 else
                 {
                     if (Restore(lot)) restored++;
                     _dirty.Remove(lot);
-                    NeighboursDirty(lot, EntityManager.GetComponentData<global::Game.Objects.Transform>(lot).m_Position.xz);
+                    _first.Remove(lot);
+                    NeighboursDirty(lot, EntityManager.GetComponentData<global::Game.Objects.Transform>(lot).m_Position.xz, true);
                     no++;
                 }
             }
@@ -426,8 +431,8 @@ namespace Placemaker.Game.Neighbours
             _stampYes = _stampNo = _stampRestored = 0;
         }
 
-        /// <summary>The polished lots near a lot that changed (unpolished, rebuilt): planned again.</summary>
-        private void NeighboursDirty(Entity lot, float2 at)
+        /// <summary>The polished lots near a lot that changed (unpolished, rebuilt): planned again (first: before other waiting houses).</summary>
+        private void NeighboursDirty(Entity lot, float2 at, bool first = false)
         {
             EnsureGrid();
             for (int dx = -2; dx <= 2; dx++)
@@ -436,7 +441,11 @@ namespace Placemaker.Game.Neighbours
                         foreach (int j in near)
                         {
                             var h = _gridHouses[j];
-                            if (h.E != lot && math.distance(h.T.m_Position.xz, at) < GoneRadius && EntityManager.Exists(h.E) && IsYes(h.E)) _dirty.Add(h.E);
+                            if (h.E != lot && math.distance(h.T.m_Position.xz, at) < GoneRadius && EntityManager.Exists(h.E) && IsYes(h.E))
+                            {
+                                _dirty.Add(h.E);
+                                if (first) _first.Add(h.E);
+                            }
                         }
         }
 
@@ -453,6 +462,7 @@ namespace Placemaker.Game.Neighbours
                     _restoreQueue.Add(e);
                 }
             _dirty.Clear();
+            _first.Clear();
             _described.Clear();
             _removeAllCount = 0;
             Mod.Log.Info($"Placemaker neighbourhood polish: remove all polish: {was} polished lots set to no, {_restoreQueue.Count} lots to put back.");
@@ -597,6 +607,7 @@ namespace Placemaker.Game.Neighbours
             _lawnOriginal.Clear();
             _described.Clear();
             _dirty.Clear();
+            _first.Clear();
             _inFlight.Clear();
             _painted.Clear();
             _goneFlags.Clear();

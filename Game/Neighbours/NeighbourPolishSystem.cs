@@ -183,6 +183,10 @@ namespace Placemaker.Game.Neighbours
         private readonly Dictionary<Entity, bool> _grassPrefab = new Dictionary<Entity, bool>();
         private readonly Dictionary<Entity, string> _names = new Dictionary<Entity, string>();
         private readonly HashSet<Entity> _dirty = new HashSet<Entity>();
+        // the player's own work goes first (the user: "the player wants to see what they're building"): brand-new buildings
+        // (never a level-up), lots they outgrew or put back, what they built or bulldozed nearby, and the neighbours those
+        // change. Planned before every other waiting house; level-ups and Redo wait behind them.
+        private readonly HashSet<Entity> _first = new HashSet<Entity>();
         private readonly HashSet<long> _painted = new HashSet<long>();
         // the planner runs off the frame: a pass gathers the houses here, plans on a worker, and is applied when it is done
         // plans worked out on workers at once, each for its own patch of town (patches far enough apart never edit the same house)
@@ -212,6 +216,8 @@ namespace Placemaker.Game.Neighbours
             public Dictionary<long, Entity> HouseOf;
             public Dictionary<long, Entity> LawnPrefabOf;
             public int Asked, Cluster;
+            /// <summary>A plan of the player's own work: the neighbours it changes go first too.</summary>
+            public bool First;
             public Stopwatch Clock;
         }
         private int _frame, _errors;
@@ -331,6 +337,7 @@ namespace Placemaker.Game.Neighbours
                     {
                         var at = EntityManager.GetComponentData<global::Game.Objects.Transform>(g).m_Position.xz;
                         _dirty.Remove(g);
+                        _first.Remove(g);
                         _described.Remove(g);
                         for (int dx = -2; dx <= 2; dx++)
                             for (int dz = -2; dz <= 2; dz++)
@@ -338,7 +345,7 @@ namespace Placemaker.Game.Neighbours
                                     foreach (int j in near)
                                     {
                                         var h = _gridHouses[j];
-                                        if (h.E != g && math.distance(h.T.m_Position.xz, at) < GoneRadius && EntityManager.Exists(h.E)) _dirty.Add(h.E);
+                                        if (h.E != g && math.distance(h.T.m_Position.xz, at) < GoneRadius && EntityManager.Exists(h.E)) { _dirty.Add(h.E); _first.Add(h.E); }
                                     }
                     }
                     _gridStale = true;
@@ -450,7 +457,7 @@ namespace Placemaker.Game.Neighbours
                 {
                     _dirty.Remove(e);
                     _described.Remove(e);
-                    NeighboursDirty(e, houses[index[e]].T.m_Position.xz);
+                    NeighboursDirty(e, houses[index[e]].T.m_Position.xz, _first.Remove(e));
                 }
 
             // this pass: one patch of town. A waiting house far enough from the patches still being planned, and every
@@ -460,14 +467,20 @@ namespace Placemaker.Game.Neighbours
             var done = new List<Entity>();
             int seed = -1;
             var unknown = new List<Entity>();
-            foreach (var e in _dirty)
+            bool Clear(float2 at)
             {
-                if (!index.TryGetValue(e, out int i)) { unknown.Add(e); continue; }   // gone, or still being built: its lanes come back as Created later
-                var at = houses[i].T.m_Position.xz;
-                bool clear = true;
-                foreach (var f in _inFlight) if (math.distance(f.Seed, at) < 2f * (PatchRadius + CoreRadius) + 10f) { clear = false; break; }
-                if (clear) { seed = i; break; }
+                foreach (var f in _inFlight) if (math.distance(f.Seed, at) < 2f * (PatchRadius + CoreRadius) + 10f) return false;
+                return true;
             }
+            // the player's own work first; a house still being built waits in _first until its lanes come (then it is dirty)
+            foreach (var e in _first)
+                if (_dirty.Contains(e) && index.TryGetValue(e, out int i) && Clear(houses[i].T.m_Position.xz)) { seed = i; break; }
+            if (seed < 0)
+                foreach (var e in _dirty)
+                {
+                    if (!index.TryGetValue(e, out int i)) { unknown.Add(e); continue; }   // gone, or still being built: its lanes come back as Created later
+                    if (Clear(houses[i].T.m_Position.xz)) { seed = i; break; }
+                }
             foreach (var e in unknown) _dirty.Remove(e);
             if (seed < 0) return;
             var seedAt = houses[seed].T.m_Position.xz;
@@ -493,7 +506,8 @@ namespace Placemaker.Game.Neighbours
                                 if (d <= CoreRadius && IsYes(houses[j].E)) core.Add(j);   // only yes lots are edited
                             }
             }
-            foreach (var e in done) { _dirty.Remove(e); _described.Remove(e); }
+            bool first = false;
+            foreach (var e in done) { _dirty.Remove(e); _described.Remove(e); if (_first.Remove(e)) first = true; }
             if (cluster.Count == 0) return;
 
             var stitch = new List<StitchHouse>();
@@ -556,7 +570,7 @@ namespace Placemaker.Game.Neighbours
             _inFlight.Add(new Pending
             {
                 Stitch = stitch, LanesOf = lanesOf, LawnsOf = lawnsOf, OwnerOf = ownerOf, CoreIds = coreIds, HouseOf = new Dictionary<long, Entity>(_houseOf),
-                LawnPrefabOf = new Dictionary<long, Entity>(_lawnPrefabOf), Asked = done.Count, Cluster = cluster.Count, Clock = sw,
+                LawnPrefabOf = new Dictionary<long, Entity>(_lawnPrefabOf), Asked = done.Count, Cluster = cluster.Count, Clock = sw, First = first,
                 Seed = seedAt, Task = Task.Run(() => planner(stitch, settings)),
             });
         }
@@ -581,7 +595,11 @@ namespace Placemaker.Game.Neighbours
                 if (pend.HouseOf.TryGetValue(id, out var he) && plan.Plots.TryGetValue(id, out var plotNow)) _gardenOf[he] = plotNow;
             int clashes = 0;
             foreach (var id in plan.GardenClashes)
-                if (pend.HouseOf.TryGetValue(id, out var ce) && EntityManager.Exists(ce) && IsYes(ce) && _dirty.Add(ce)) clashes++;
+                if (pend.HouseOf.TryGetValue(id, out var ce) && EntityManager.Exists(ce) && IsYes(ce))
+                {
+                    if (_dirty.Add(ce)) clashes++;
+                    if (pend.First) _first.Add(ce);
+                }
             if (clashes > 0) Mod.Log.Info($"Placemaker neighbourhood polish: {clashes} gardens over a new lot planned again");
             var sw = pend.Clock;
             int asked = pend.Asked, clusterCount = pend.Cluster;

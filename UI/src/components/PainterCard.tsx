@@ -259,7 +259,7 @@ const LookBar = ({ p }: { p: PainterState }) => {
             {asking ? (
                 <Confirm
                     title={t("Placemaker.UI.Polish.DeleteTitle", "Delete this look?")}
-                    message={t("Placemaker.UI.Polish.DeleteMessage", "Buildings polished with “{0}” keep how they look until they are polished again; zones that used it follow their kind.", [look.name])}
+                    message={t("Placemaker.UI.Polish.DeleteMessage", "Buildings outgrown with “{0}” keep how they look until they are outgrown again; zones that used it follow their kind.", [look.name])}
                     confirm={t("Placemaker.UI.Polish.DeleteOk", "Delete")}
                     danger
                     onConfirm={() => {
@@ -288,8 +288,8 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
                 <div className={s.swatch} />
                 <div>
                     {hasArea
-                        ? t("Placemaker.UI.Painter.Count", "{0} buildings in the area · {1} polished", [p.lots, p.polished])
-                        : t("Placemaker.UI.Painter.Legend", "Green: polished buildings")}
+                        ? t("Placemaker.UI.Painter.Count", "{0} buildings in the area · {1} outgrown", [p.lots, p.polished])
+                        : t("Placemaker.UI.Painter.Legend", "Green: outgrown buildings")}
                 </div>
             </div>
             <div className={b.picker} data-testid="polish-style-picker" data-open="true">
@@ -336,7 +336,7 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
                 <div className={s.off} data-testid="polish-byzone-note">
                     <Icon name="info" size={12} tint="dim" />
                     <div className={s.offText}>
-                        {t("Placemaker.UI.Polish.ByZoneNote", "Each building gets the look its zone has. Set them in City (the button at the top), or pick a look here to polish the area with it.")}
+                        {t("Placemaker.UI.Polish.ByZoneNote", "Each building gets the look its zone has. Set them in City (the button at the top), or pick a look here to outgrow the area with it.")}
                     </div>
                 </div>
             ) : (
@@ -489,7 +489,7 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
     const city = p.city;
     const L = (id: string, en: string) => t("Placemaker.UI.Polish." + id, en);
     const status =
-        t("Placemaker.UI.Polish.Count", "{0} of {1} buildings polished", [city.polished, city.total]) +
+        t("Placemaker.UI.Polish.Count", "{0} of {1} buildings outgrown", [city.polished, city.total]) +
         (city.restoring > 0 ? " · " + t("Placemaker.UI.Polish.Restoring", "putting {0} back", [city.restoring]) : city.waiting > 0 ? " · " + t("Placemaker.UI.Polish.Working", "working through {0}", [city.waiting]) : "");
     const zones: PolishZone[] = p.zones ?? [];
     return (
@@ -592,7 +592,7 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                     message={
                         ask === "polishAll"
                             ? t("Placemaker.UI.Polish.PolishAll.ByZone", "All {0} buildings get their zone's look (zones set to Off are left out). It runs in the background a few buildings at a time, so the game keeps running smoothly; in a big city it takes a few minutes.", [city.total])
-                            : t("Placemaker.UI.Polish.UnpolishAll.Message", "All {0} polished gardens go back to how the game made them: fences, hedges and lawns back, the beds, paths, bushes and paving taken away (ground paint stays). It runs in the background a few hundred at a time.", [city.polished])
+                            : t("Placemaker.UI.Polish.UnpolishAll.Message", "All {0} outgrown gardens go back to how the game made them: fences, hedges and lawns back, the beds, paths, bushes and paving taken away (ground paint stays). It runs in the background a few hundred at a time.", [city.polished])
                     }
                     confirm={ask === "polishAll" ? L("PolishAll.Ok", "Polish all") : L("UnpolishAll.Ok", "Unpolish all")}
                     danger={ask === "unpolishAll"}

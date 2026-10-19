@@ -223,6 +223,7 @@ namespace Placemaker.Game.Neighbours
                                 var p = h.T.m_Position.xz;
                                 if (p.x < lo.x || p.y < lo.y || p.x > hi.x || p.y > hi.y || !EntityManager.Exists(h.E) || !IsYes(h.E)) continue;
                                 if (_dirty.Add(h.E)) marked++;
+                                _first.Add(h.E);   // the player's build: the gardens it changes go first
                             }
             }
             if (marked > 0)

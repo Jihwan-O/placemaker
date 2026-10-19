@@ -47,7 +47,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
         public const string StatCells = "Placemaker.Polish.Stat.Cells";
         public const string StatZone = "Placemaker.Polish.Stat.Zone.", StatExact = "Placemaker.Polish.Stat.ZoneExact";
         public static readonly string[] Patterns = { "mixed", "clumps", "even" };
-        public const int MaxDepth = 6, MaxWidth = 12;
+        public const int MaxDepth = 6, MaxWidth = 10;
 
         /// <summary>The zone slots: A's settings have plain ids, B's and C's Outgrow settings end in _B and _C.</summary>
         public static readonly string[] SlotNames = { "A", "B", "C" };

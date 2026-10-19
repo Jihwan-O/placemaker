@@ -4,7 +4,10 @@
 //     above or below it on a line to their part. One line per zone: its colour and icon, its type from a short menu (or an
 //     exact zone of the game), its lots' width and depth and the road widths it goes on (two-handle sliders), remove.
 //     "Mix in another zone", then how the lots mix.
-//   * Only edit existing: the zone types alone (each has its own Outgrow settings, below), nothing about placing.
+//   * Only edit existing: the zone types alone, nothing about placing.
+// A zone's lots are picked on a grid of cells (10 along the road, 6 deep, the road at the bottom): the smallest lot solid,
+// the biggest lot lighter; a click or drag moves the nearer corner.
+// Every zone line has its own Outgrow settings (how its lots grow past their borders), folded under it.
 // It writes the same settings the rows would (zoneA/B/C, zoneAssetA/B/C, shareA/B/C, …), so styles, undo, locks and
 // Randomize keep working.
 import React, { ReactNode, useLayoutEffect, useRef, useState } from "react";
@@ -13,13 +16,14 @@ import { LayerType, SettingValue, StepView } from "../contract";
 import { act, playSound } from "../lib/bindings";
 import { humanize, TFunc, useT } from "../lib/l10n";
 import { ControlEx, valueOf } from "../lib/schema";
-import { Icon, Segmented } from "../components/common";
+import { Icon } from "../components/common";
 import { useAssetList, usePicker } from "../components/picker";
 import z from "./zoneMix.module.scss";
 
 const SLOTS = ["A", "B", "C"] as const;
 type Slot = (typeof SLOTS)[number];
 const MAX_ROAD = 48;
+const GRID_W = 10, GRID_D = 6;
 
 /** The zone tool's colours, by zone type. */
 export const ZONE_COLOR: Record<string, string> = {
@@ -162,6 +166,91 @@ const RangeSlider = ({ lo, hi, min, max, testId, text, onCommit }: { lo: number;
     );
 };
 
+/**
+ * A zone's lots on a grid of cells, the road along the bottom: the smallest lot (solid) and the biggest (lighter), both
+ * from the road's corner. A click or drag moves the corner nearer to it; cells fade in and out as it moves.
+ */
+const LotGrid = ({ w0, w1, d0, d1, colour, testId, onCommit }: { w0: number; w1: number; d0: number; d1: number; colour: string; testId: string; onCommit: (w0: number, w1: number, d0: number, d1: number) => void }) => {
+    const { t } = useT();
+    const [drag, setDrag] = useState<[number, number, number, number] | null>(null);
+    const [hover, setHover] = useState<[number, number] | null>(null);
+    const gridRef = useRef<HTMLDivElement>(null);
+    const [a0, a1, b0, b1] = drag ?? [Math.min(w0, GRID_W), Math.min(w1, GRID_W), Math.min(d0, GRID_D), Math.min(d1, GRID_D)];
+    const cellAt = (clientX: number, clientY: number): [number, number] => {
+        const r = gridRef.current?.getBoundingClientRect();
+        if (!r || r.width <= 0) return [a1, b1];
+        const x = Math.min(GRID_W, Math.max(1, Math.ceil(((clientX - r.left) / r.width) * GRID_W)));
+        const y = Math.min(GRID_D, Math.max(1, Math.ceil(((r.bottom - clientY) / r.height) * GRID_D)));
+        return [x, y];
+    };
+    const onDown = (e: React.MouseEvent) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const [x, y] = cellAt(e.clientX, e.clientY);
+        // the nearer corner moves: the smallest lot's or the biggest lot's
+        const dMin = Math.hypot(x - a0, y - b0), dMax = Math.hypot(x - a1, y - b1);
+        const big = dMax < dMin || (dMax === dMin && (x > a1 || y > b1));
+        let cur: [number, number, number, number] = [a0, a1, b0, b1];
+        const apply = (px: number, py: number) => {
+            cur = big ? [Math.min(cur[0], px), px, Math.min(cur[2], py), py] : [px, Math.max(cur[1], px), py, Math.max(cur[3], py)];
+            setDrag(cur);
+        };
+        apply(x, y);
+        playSound("drag-slider");
+        const move = (ev: MouseEvent) => {
+            const [mx, my] = cellAt(ev.clientX, ev.clientY);
+            apply(mx, my);
+        };
+        const up = () => {
+            window.removeEventListener("mousemove", move);
+            window.removeEventListener("mouseup", up);
+            setDrag(null);
+            if (cur[0] !== w0 || cur[1] !== w1 || cur[2] !== d0 || cur[3] !== d1) onCommit(cur[0], cur[1], cur[2], cur[3]);
+        };
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", up);
+    };
+    const rowsOut: ReactNode[] = [];
+    for (let y = GRID_D; y >= 1; y--) {
+        const cells: ReactNode[] = [];
+        for (let x = 1; x <= GRID_W; x++) {
+            const inMin = x <= a0 && y <= b0, inMax = x <= a1 && y <= b1;
+            const corner = (x === a0 && y === b0) || (x === a1 && y === b1);
+            const hot = hover && hover[0] === x && hover[1] === y;
+            cells.push(
+                <div
+                    key={x}
+                    className={classNames(z.cell, { [z.cellMin]: inMin, [z.cellMax]: inMax && !inMin, [z.cellCorner]: corner, [z.cellHot]: hot })}
+                    style={inMax ? { backgroundColor: colour } : undefined}
+                />,
+            );
+        }
+        rowsOut.push(<div key={y} className={z.gridRow}>{cells}</div>);
+    }
+    const span = (p: number, q: number) => (p === q ? String(p) : p + "–" + q);
+    return (
+        <div className={z.lotGrid} data-testid={testId} data-w={a0 + "-" + a1} data-d={b0 + "-" + b1} title={t("Placemaker.UI.ZoneMix.GridTip", "Its lots, in zone cells (8 m), the road at the bottom: the solid block is the smallest lot, the lighter one the biggest; each lot picks a size between. Click or drag near a corner to move it.")}>
+            <div
+                className={z.grid}
+                ref={gridRef}
+                onMouseDown={onDown}
+                onMouseMove={(e) => {
+                    const c = cellAt(e.clientX, e.clientY);
+                    if (!hover || hover[0] !== c[0] || hover[1] !== c[1]) setHover(c);
+                }}
+                onMouseLeave={() => setHover(null)}
+            >
+                {rowsOut}
+            </div>
+            <div className={z.gridRoad} />
+            <div className={z.gridText}>
+                <span className={z.gridNum}>{span(a0, a1)}</span> {t("Placemaker.UI.ZoneMix.Wide", "wide")} · <span className={z.gridNum}>{span(b0, b1)}</span> {t("Placemaker.UI.ZoneMix.Deep", "deep")}
+            </div>
+        </div>
+    );
+};
+
 type Part = { key: string; sl: Slot | null; share: number; colour: string; name: string };
 
 /**
@@ -233,13 +322,14 @@ const ShareBar = ({ parts, onCommit, t }: { parts: Part[]; onCommit: (shares: Re
     let left = 0;
     let flip = 0;
     const labels = parts.map((p, i) => {
-        const text = p.name + " " + Math.round(shares[i]) + "%";
+        const pctText = Math.round(shares[i]) + "%";
+        const text = p.name + " " + pctText;
         const w = (shares[i] / 100) * width;
         const fits = w >= text.length * 6.4 * remPx + 10 * remPx;
         const centre = left + shares[i] / 2;
         left += shares[i];
         const place = fits || shares[i] <= 0 ? "in" : flip++ % 2 === 0 ? "above" : "below";
-        return { text, centre, place, colour: p.colour, empty: !p.sl, key: p.key };
+        return { text, name: p.name, pct: pctText, centre, place, colour: p.colour, empty: !p.sl, key: p.key };
     });
     const above = labels.some((l) => l.place === "above");
     const below = labels.some((l) => l.place === "below");
@@ -249,7 +339,12 @@ const ShareBar = ({ parts, onCommit, t }: { parts: Part[]; onCommit: (shares: Re
                 {parts.map((p, i) =>
                     shares[i] > 0 ? (
                         <div key={p.key} className={classNames(z.barPart, { [z.barEmpty]: !p.sl })} style={{ width: shares[i] + "%", backgroundColor: p.sl ? p.colour : undefined }} data-testid={"zonemix-part-" + p.key}>
-                            {labels[i].place === "in" ? <div className={z.barText}>{labels[i].text}</div> : null}
+                            {labels[i].place === "in" ? (
+                                <div className={z.barText}>
+                                    <span className={z.barName}>{labels[i].name}</span>
+                                    <span className={z.barPct}>{labels[i].pct}</span>
+                                </div>
+                            ) : null}
                         </div>
                     ) : null,
                 )}
@@ -264,14 +359,17 @@ const ShareBar = ({ parts, onCommit, t }: { parts: Part[]; onCommit: (shares: Re
                 .map((l) => (
                     <div key={"lbl" + l.key} className={classNames(z.callout, l.place === "above" ? z.calloutAbove : z.calloutBelow)} style={{ left: l.centre + "%" }}>
                         <div className={z.calloutLine} />
-                        <div className={z.calloutText}>{l.text}</div>
+                        <div className={z.calloutText}>
+                            <span className={z.barName}>{l.name}</span>
+                            <span className={z.barPct}>{l.pct}</span>
+                        </div>
                     </div>
                 ))}
         </div>
     );
 };
 
-export const ZoneMix = ({ step, layer, rows }: { step: StepView; layer: LayerType; rows: (ids: string[]) => ReactNode }) => {
+export const ZoneMix = ({ step, layer, rows, outgrow }: { step: StepView; layer: LayerType; rows: (ids: string[]) => ReactNode; outgrow: (slot: number) => ReactNode }) => {
     const { t } = useT();
     const picker = usePicker();
     const zones = useAssetList("zone");
@@ -279,6 +377,8 @@ export const ZoneMix = ({ step, layer, rows }: { step: StepView; layer: LayerTyp
     const { ctl, val, slots, used } = reader(step, layer);
     const set = (id: string, v: SettingValue) => act.setValue(step.path, id, v);
     const placing = val("zoneArea") === true;
+    const outgrowOn = val("shapeLots") !== false;
+    const [opened, setOpened] = useState<Record<string, boolean>>({});
 
     /** The game's zone of a type (the city's EU or NA one when both exist). */
     const zoneOf = (kind: string, asset: string) => {
@@ -418,72 +518,51 @@ export const ZoneMix = ({ step, layer, rows }: { step: StepView; layer: LayerTyp
 
     return (
         <div className={z.mix} data-testid="zonemix">
-            <Segmented
-                testId="zonemix-mode"
-                stretch
-                value={placing ? "zone" : "edit"}
-                onChange={(v) => set("zoneArea", v === "zone")}
-                options={[
-                    { value: "zone", label: t("Placemaker.UI.ZoneMix.ModeZone", "Zone empty land"), description: t("Placemaker.UI.ZoneMix.ModeZoneTip", "The empty zone cells of the area get these zones, as lots that start at the road; the buildings there outgrow their lots too.") },
-                    { value: "edit", label: t("Placemaker.UI.ZoneMix.ModeEdit", "Only edit existing"), description: t("Placemaker.UI.ZoneMix.ModeEditTip", "Nothing is zoned: the buildings in the area outgrow their lots, each zone type by its own settings below (a type not listed: the first one's).") },
-                ]}
-            />
+            <div className={z.mode} data-testid="zonemix-mode">
+                {[
+                    { id: "zone", on: placing, icon: "zone", label: t("Placemaker.UI.ZoneMix.ModeZone", "Zone empty land"), tip: t("Placemaker.UI.ZoneMix.ModeZoneTip", "The empty zone cells of the area get these zones, as lots that start at the road; the buildings there outgrow their lots too.") },
+                    { id: "edit", on: !placing, icon: "building", label: t("Placemaker.UI.ZoneMix.ModeEdit", "Only edit existing"), tip: t("Placemaker.UI.ZoneMix.ModeEditTip", "Nothing is zoned: the buildings in the area outgrow their lots, each zone type by its own settings (a type not listed: the first one's).") },
+                ].map((m) => (
+                    <button
+                        key={m.id}
+                        type="button"
+                        className={classNames(z.modeButton, { [z.modeOn]: m.on })}
+                        data-testid={"zonemix-mode-" + m.id}
+                        title={m.tip}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (!m.on) set("zoneArea", m.id === "zone");
+                        }}
+                    >
+                        <Icon name={m.icon} size={12} tint={m.on ? "light" : "dim"} />
+                        <div className={z.modeText}>{m.label}</div>
+                    </button>
+                ))}
+            </div>
+            {rows(["shapeLots"])}
             {placing ? <ShareBar parts={parts} onCommit={commitShares} t={t} /> : <div className={z.modeGap} />}
-            {used.map((x) => (
+            {used.map((x) => {
+                const open = outgrowOn && !!opened[x.sl];
+                return (
                 <div key={x.sl} className={z.zone} data-testid={"zonemix-zone-" + x.sl}>
                     <div className={z.line} data-testid={"zonemix-line-" + x.sl}>
                         <ZoneButton id={x.sl} kind={x.kind} asset={x.asset} />
-                        {placing ? (
-                            <div className={z.ranges}>
-                                <div className={z.range} title={t("Placemaker.UI.ZoneMix.WidthTip", "How wide its lots are along the road, in zone cells (8 m): each lot picks a width in this range.")}>
-                                    <div className={z.rangeLabel}>{t("Placemaker.UI.ZoneMix.W", "Width")}</div>
-                                    <RangeSlider
-                                        lo={x.w0}
-                                        hi={x.w1}
-                                        min={1}
-                                        max={12}
-                                        testId={"zonemix-width-" + x.sl}
-                                        text={(a, b) => (a === b ? String(a) : a + "–" + b)}
-                                        onCommit={(a, b) => {
-                                            if (a !== x.w0) set("widthMin" + x.sl, a);
-                                            if (b !== x.w1) set("widthMax" + x.sl, b);
-                                        }}
-                                    />
-                                </div>
-                                <div className={z.range} title={t("Placemaker.UI.ZoneMix.DepthTip", "How deep its lots go back from the road, in zone cells: each lot picks a depth in this range (6 at most).")}>
-                                    <div className={z.rangeLabel}>{t("Placemaker.UI.ZoneMix.D", "Depth")}</div>
-                                    <RangeSlider
-                                        lo={x.d0}
-                                        hi={x.d1}
-                                        min={1}
-                                        max={6}
-                                        testId={"zonemix-depth-" + x.sl}
-                                        text={(a, b) => (a === b ? String(a) : a + "–" + b)}
-                                        onCommit={(a, b) => {
-                                            if (a !== x.d0) set("depthMin" + x.sl, a);
-                                            if (b !== x.d1) set("depthMax" + x.sl, b);
-                                        }}
-                                    />
-                                </div>
-                                <div className={z.range} title={t("Placemaker.UI.ZoneMix.RoadTip", "The roads it goes on, by their width (a two-lane road is 16 m, four lanes 24 m, six lanes 32 m): its lots are only placed along roads this wide.")}>
-                                    <div className={z.rangeLabel}>{t("Placemaker.UI.ZoneMix.Roads", "Roads")}</div>
-                                    <RangeSlider
-                                        lo={x.r0}
-                                        hi={x.r1}
-                                        min={0}
-                                        max={MAX_ROAD}
-                                        testId={"zonemix-roads-" + x.sl}
-                                        text={roadText}
-                                        onCommit={(a, b) => {
-                                            if (a !== x.r0) set("roadMin" + x.sl, a);
-                                            if (b !== x.r1) set("roadMax" + x.sl, b);
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        ) : (
-                            <div className={z.flex} />
-                        )}
+                        <div className={z.flex} />
+                        {outgrowOn ? (
+                            <button
+                                type="button"
+                                className={classNames(z.outgrowButton, { [z.outgrowOn]: open })}
+                                data-testid={"zonemix-outgrow-" + x.sl}
+                                title={t("Placemaker.UI.ZoneMix.OutgrowTip", "How this zone's lots grow past their borders: reach, fences, lawns, ground, planting, paths.")}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpened({ ...opened, [x.sl]: !open });
+                                }}
+                            >
+                                <Icon name={open ? "chevronDown" : "chevronRight"} size={9} tint={open ? "accent" : "dim"} />
+                                <div className={z.outgrowText}>{t("Placemaker.UI.Outgrow", "Outgrow")}</div>
+                            </button>
+                        ) : null}
                         {used.length > 1 ? (
                             <button
                                 type="button"
@@ -502,8 +581,61 @@ export const ZoneMix = ({ step, layer, rows }: { step: StepView; layer: LayerTyp
                         )}
                     </div>
                     {menu === x.sl ? <Menu id={x.sl} kind={x.kind} /> : null}
+                    {placing ? (
+                        <div className={z.lots}>
+                            <LotGrid
+                                w0={x.w0}
+                                w1={x.w1}
+                                d0={x.d0}
+                                d1={x.d1}
+                                colour={colourOf(x.kind, x.asset)}
+                                testId={"zonemix-grid-" + x.sl}
+                                onCommit={(a0, a1, b0, b1) => {
+                                    if (a0 !== x.w0) set("widthMin" + x.sl, a0);
+                                    if (a1 !== x.w1) set("widthMax" + x.sl, a1);
+                                    if (b0 !== x.d0) set("depthMin" + x.sl, b0);
+                                    if (b1 !== x.d1) set("depthMax" + x.sl, b1);
+                                }}
+                            />
+                            <div className={z.lotsSide}>
+                                <div className={z.range} title={t("Placemaker.UI.ZoneMix.RoadTip", "The roads it goes on, by their width (a two-lane road is 16 m, four lanes 24 m, six lanes 32 m): its lots are only placed along roads this wide.")}>
+                                    <div className={z.rangeLabel}>{t("Placemaker.UI.ZoneMix.Roads", "Roads")}</div>
+                                    <RangeSlider
+                                        lo={x.r0}
+                                        hi={x.r1}
+                                        min={0}
+                                        max={MAX_ROAD}
+                                        testId={"zonemix-roads-" + x.sl}
+                                        text={roadText}
+                                        onCommit={(a, b) => {
+                                            if (a !== x.r0) set("roadMin" + x.sl, a);
+                                            if (b !== x.r1) set("roadMax" + x.sl, b);
+                                        }}
+                                    />
+                                </div>
+                                <div className={z.roadMarks}>
+                                    {[
+                                        { at: 16, label: t("Placemaker.UI.ZoneMix.Lanes2", "2 lanes") },
+                                        { at: 24, label: t("Placemaker.UI.ZoneMix.Lanes4", "4 lanes") },
+                                        { at: 32, label: t("Placemaker.UI.ZoneMix.Lanes6", "6 lanes") },
+                                    ].map((m) => (
+                                        <div key={m.at} className={z.roadMark} style={{ left: (m.at / MAX_ROAD) * 100 + "%" }}>
+                                            <div className={z.roadTick} />
+                                            <div className={z.roadMarkText}>{m.label}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+                    {open ? (
+                        <div className={z.outgrow} data-testid={"zonemix-outgrow-body-" + x.sl}>
+                            {outgrow(x.index)}
+                        </div>
+                    ) : null}
                 </div>
-            ))}
+                );
+            })}
             {used.length < SLOTS.length ? (
                 <button
                     type="button"

@@ -478,6 +478,38 @@ namespace Placemaker.Game.Suite
                 _summary["gitMismatch"] = $"the run is labelled git {_cfg.git} but the assembly says {asm}";
         }
 
+        /// <summary>
+        /// The dev menu's Test Mode as the user sets it every time (Game.Debug.DebugSystem "Test Mode"): full crime test mode,
+        /// superfast building and area-prop spawning, superfast leveling, superfast enter school, and Unlimited demands.
+        /// </summary>
+        private string PlaygroundTestMode()
+        {
+            var done = new List<string>();
+            void Try(string what, Action set)
+            {
+                try { set(); done.Add(what); }
+                catch (Exception e) { Say("playground test mode: " + what + " failed: " + e.Message); }
+            }
+            Try("full crime", () => _world.GetOrCreateSystemManaged<CrimeCheckSystem>().debugFullCrimeMode = true);
+            Try("building spawning", () => _world.GetOrCreateSystemManaged<ZoneSpawnSystem>().debugFastSpawn = true);
+            Try("area-prop spawning", () => _world.GetOrCreateSystemManaged<AreaSpawnSystem>().debugFastSpawn = true);
+            Try("leveling", () => _world.GetOrCreateSystemManaged<BuildingUpkeepSystem>().debugFastLeveling = true);
+            Try("enter school", () =>
+            {
+                _world.GetOrCreateSystemManaged<ApplyToSchoolSystem>().debugFastApplySchool = true;
+                _world.GetOrCreateSystemManaged<FindSchoolSystem>().debugFastFindSchool = true;
+            });
+            Try("unlimited demands", () =>
+            {
+                _world.GetOrCreateSystemManaged<ResidentialDemandSystem>().SetUnlimitedDemand(true);
+                _world.GetOrCreateSystemManaged<CommercialDemandSystem>().SetUnlimitedDemand(true);
+                _world.GetOrCreateSystemManaged<IndustrialDemandSystem>().SetUnlimitedDemand(true);
+            });
+            string line = string.Join(", ", done);
+            Say("playground test mode on: " + line);
+            return line;
+        }
+
         /// <summary>The user's playground: frame the grid at 45°, hand the mouse and keys back, unpause, and stay out of the way.</summary>
         private IEnumerator Playground()
         {
@@ -489,6 +521,7 @@ namespace Placemaker.Game.Suite
             yield return Guard(CameraTo(pivot, 25f, 45f, math.max(400f, span * 0.9f), rec, null), e => Say("playground camera: " + e.Message));
             PlacemakerToolSystem.SuiteInputOnly = false;   // the user's mouse and keys work again
             try { _world.GetOrCreateSystemManaged<SimulationSystem>().selectedSpeed = 1f; } catch (Exception e) { Say("playground speed: " + e.Message); }
+            rec["testMode"] = PlaygroundTestMode();
             _summary["playground"] = rec;
             Say("playground ready: the grid is framed, the controls are yours; the suite does nothing more");
             WriteSummary();

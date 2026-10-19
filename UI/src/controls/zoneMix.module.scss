@@ -10,7 +10,46 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 }
 
 .modeGap {
-    height: 8rem;
+    height: 6rem;
+}
+
+.mode {
+    @include row;
+    min-width: 0;
+    margin-bottom: 4rem;
+    padding: 2rem;
+    border-radius: 6rem;
+    background-color: rgba(0, 0, 0, 0.22);
+    @include border(1rem, $c-line);
+}
+
+.modeButton {
+    @include row;
+    justify-content: center;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 24rem;
+    border-radius: 4rem;
+    color: $c-text-dim;
+    font-size: $fs-s;
+    cursor: pointer;
+}
+
+.modeButton:hover {
+    color: $text;
+    background-color: $c-surface;
+}
+
+.modeOn {
+    color: #ffffff;
+    background-color: rgba(143, 209, 255, 0.2);
+    @include border(1rem, rgba(143, 209, 255, 0.6));
+}
+
+.modeText {
+    margin-left: 6rem;
+    font-weight: 600;
+    @include ellipsis;
 }
 
 // ── the land as a bar ──
@@ -58,17 +97,29 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 }
 
 .barText {
+    @include row;
     min-width: 0;
-    padding: 0 5rem;
-    font-size: 11rem;
-    font-weight: bold;
-    color: rgba(16, 21, 26, 0.9);
+    padding: 0 6rem;
+    font-size: 12rem;
+    color: #ffffff;
+    text-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.75);
     @include ellipsis;
+}
+
+.barName {
+    font-weight: 600;
+    @include ellipsis;
+}
+
+.barPct {
+    flex: 0 0 auto;
+    margin-left: 5rem;
+    opacity: 0.85;
 }
 
 .barEmpty .barText {
     color: $c-text-dim;
-    font-weight: normal;
+    text-shadow: none;
 }
 
 // a divider: a wide invisible grab area with a white grip
@@ -121,7 +172,8 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 }
 
 .calloutText {
-    font-size: 11rem;
+    @include row;
+    font-size: 12rem;
     color: #ffffff;
     white-space: nowrap;
 }
@@ -196,27 +248,30 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     background-color: $c-surface-strong;
 }
 
-// width, depth and roads side by side (wrapping on a narrow panel)
+// width, depth and roads: one even row of three under the zone's line
 .ranges {
     @include row;
-    flex: 1 1 auto;
-    flex-wrap: wrap;
     min-width: 0;
-    margin-left: 8rem;
+    margin: 2rem 0 2rem 0;
 }
 
 .range {
     @include row;
     flex: 1 1 0;
-    min-width: 130rem;
-    margin-right: 8rem;
+    min-width: 0;
+    margin-right: 14rem;
+}
+
+.range:last-child {
+    margin-right: 0;
 }
 
 .rangeLabel {
     flex: 0 0 auto;
-    margin-right: 5rem;
+    width: 40rem;
     font-size: 11rem;
     color: $c-text-dim;
+    @include ellipsis;
 }
 
 .rangeWrap {
@@ -263,12 +318,48 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 
 .rangeValue {
     flex: 0 0 auto;
-    width: 44rem;
-    margin-left: 5rem;
+    width: 46rem;
+    margin-left: 6rem;
     text-align: right;
     font-size: 11rem;
     color: #ffffff;
     @include ellipsis;
+}
+
+.outgrowButton {
+    @include row;
+    flex: 0 0 auto;
+    height: 22rem;
+    margin-right: 6rem;
+    padding: 0 8rem 0 6rem;
+    border-radius: $radius;
+    @include border(1rem, $c-line);
+    color: $text;
+    font-size: $fs-s;
+    cursor: pointer;
+}
+
+.outgrowButton:hover {
+    background-color: $c-surface-hover;
+}
+
+.outgrowOn {
+    background-color: rgba(143, 209, 255, 0.12);
+    @include border(1rem, rgba(143, 209, 255, 0.6));
+}
+
+.outgrowText {
+    margin-left: 5rem;
+}
+
+.outgrow {
+    @include col;
+    min-width: 0;
+    margin: 4rem 0 2rem 0;
+    padding: 4rem 0 0 10rem;
+    border-left-width: 2rem;
+    border-left-style: solid;
+    border-left-color: rgba(143, 209, 255, 0.35);
 }
 
 .remove {
@@ -382,32 +473,109 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     background-color: $c-surface-hover;
 }
 
-// ── Outgrow: a tab per zone ──
-.tabs {
+// ── a zone's lots: the grid (10 along the road, 6 deep, the road below) and its road widths beside it ──
+.lots {
     @include row;
-    flex-wrap: wrap;
+    align-items: flex-start;
     min-width: 0;
-    margin: 4rem 0 6rem 0;
+    margin: 4rem 0 2rem 0;
 }
 
-.tab {
-    @include row;
-    height: 22rem;
-    margin: 0 4rem 4rem 0;
-    padding: 0 9rem 0 6rem;
-    border-radius: $radius;
-    background-color: $c-surface;
-    @include border(1rem, $c-line);
-    color: $text;
-    font-size: $fs-s;
+.lotGrid {
+    @include col;
+    flex: 0 0 auto;
+    align-items: flex-start;
+}
+
+.grid {
+    @include col;
+    padding: 2rem;
+    border-radius: 3rem;
+    background-color: rgba(0, 0, 0, 0.2);
     cursor: pointer;
 }
 
-.tab:hover {
-    background-color: $c-surface-hover;
+.gridRow {
+    @include row;
 }
 
-.tabOn {
-    background-color: rgba(143, 209, 255, 0.18);
-    @include border(1rem, rgba(143, 209, 255, 0.75));
+.cell {
+    width: 14rem;
+    height: 11rem;
+    margin: 1rem;
+    border-radius: 2rem;
+    background-color: rgba(255, 255, 255, 0.07);
+    opacity: 1;
+    transition-property: background-color, opacity, transform;
+    transition-duration: 0.14s;
+}
+
+.cellMax {
+    opacity: 0.38;
+}
+
+.cellMin {
+    opacity: 1;
+}
+
+.cellCorner {
+    @include border(1rem, rgba(255, 255, 255, 0.95));
+}
+
+.cellHot {
+    transform: scale(1.18);
+}
+
+.gridRoad {
+    width: 100%;
+    height: 4rem;
+    margin-top: 1rem;
+    border-radius: 2rem;
+    background-color: rgba(200, 205, 210, 0.55);
+}
+
+.gridText {
+    margin-top: 3rem;
+    font-size: 11rem;
+    color: $c-text-dim;
+}
+
+.gridNum {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.lotsSide {
+    @include col;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 18rem 0 0 14rem;
+}
+
+.roadMarks {
+    position: relative;
+    height: 18rem;
+    margin: 0 52rem 0 40rem;
+}
+
+// a road width on the roads slider: a tick and its name
+.roadMark {
+    position: absolute;
+    top: 0;
+    @include col;
+    align-items: center;
+    width: 50rem;
+    margin-left: -25rem;
+}
+
+.roadTick {
+    width: 1rem;
+    height: 4rem;
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
+.roadMarkText {
+    font-size: 10rem;
+    color: $c-text-faint;
+    white-space: nowrap;
 }

@@ -759,7 +759,9 @@ export const PlacemakerPanel = () => {
     }
 
     // the neighbourhood-polish tool (its own button, state.painter): Placemaker's panel and steps, its own Design and Review
-    const polish = !!state.painter;
+    const polish = !!state.painter?.tool;
+    // a Zoning type (or the old painter): the City window
+    const cityAvailable = !!state.painter;
     const leftOut = !polish && (state.stage === "area" || state.stage === "review") ? <LeftOut audit={summary.audit} /> : null;
     let body: React.ReactNode = null;
     switch (state.stage) {
@@ -823,7 +825,7 @@ export const PlacemakerPanel = () => {
                     </Tip>
                 ) : null}
                 <div className={s.flex} />
-                {polish ? (
+                {cityAvailable ? (
                     <Btn
                         icon="building"
                         iconSize={13}
@@ -975,14 +977,14 @@ export const PlacemakerPanel = () => {
                                 )}
                             </div>
                         </div>
-                        {polish && cityOpen && !collapsed ? (
+                        {cityAvailable && cityOpen && !collapsed ? (
                             <div className={classNames(s.flyout, position.side === "left" ? s.flyoutLeft : s.flyoutRight)} data-testid="polish-city-flyout">
                                 <ErrorBoundary name="polish-city">
                                     <PolishCityCard state={state} onClose={() => setCityOpen(false)} />
                                 </ErrorBoundary>
                             </div>
                         ) : null}
-                        {!picker && !collapsed && !(polish && cityOpen) ? (
+                        {!picker && !collapsed && !(cityAvailable && cityOpen) ? (
                             <ErrorBoundary name="legend">
                                 <Legend state={state} summary={summary} side={position.side === "left" ? "left" : "right"} />
                             </ErrorBoundary>

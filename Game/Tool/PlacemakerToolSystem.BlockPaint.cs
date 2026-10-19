@@ -64,7 +64,7 @@ namespace Placemaker.Game.Tool
             _bpOpen ? c.Open && math.all(c.Seed == _bpSeed) : !c.Open && ReferenceEquals(c.Ring, _bpRing);
 
         /// <summary>The player's brush rules (Options / the panel's Stops at); plain Paint never reads them.</summary>
-        public BrushRules BrushRules => _painter && _painterRules != null ? _painterRules : PlayerBrushRules;
+        public BrushRules BrushRules => (_painter || _wasPolishType) && _painterRules != null ? _painterRules : PlayerBrushRules;
 
         /// <summary>The rules saved in the settings (the painter keeps its own copy for the session: PlacemakerToolSystem.Painter).</summary>
         private BrushRules PlayerBrushRules => _settings != null ? _settings.GetBrushRules() : BrushRules.Defaults();

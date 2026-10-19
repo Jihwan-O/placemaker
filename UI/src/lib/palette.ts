@@ -24,6 +24,7 @@ export const CATEGORY_COLOR: Record<string, string> = {
     beach: "#4fb8e8",
     industry: "#a9b4bd",
     neighbourhood: "#9fd86b",
+    zoning: "#9fd86b",
     other: "#c9d3da",
 };
 
@@ -46,6 +47,7 @@ export const CATEGORY_ICON: Record<string, string> = {
     beach: "waves",
     industry: "factory",
     neighbourhood: "shrub",
+    zoning: "zone",
     other: "layers",
 };
 
@@ -54,6 +56,15 @@ export const categoryIcon = (group: string) => CATEGORY_ICON[group] ?? "layers";
 
 /** Type glyphs by type (recipe / fill layer) id. Unknown types: the bundled glyph of their id, else the category's. */
 const TYPE_ICON: Record<string, string> = {
+    // the Zoning category's looks
+    polishGarden: "flower",
+    polishNatural: "rocks",
+    polishTidy: "topiary",
+    polishYard: "crate",
+    polishMeadow: "leaf",
+    polishRustic: "pickaxe",
+    polishCoastal: "waves",
+    polishManicured: "shrub",
     parking: "parking",
     parkingGarage: "car",
     stripMall: "shop",

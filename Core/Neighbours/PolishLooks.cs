@@ -65,6 +65,78 @@ namespace Placemaker.Core.Neighbours
         /// <summary>The knobs that say how far a garden reaches: the plan looks this far around its houses.</summary>
         public static readonly string[] ReachKnobs = { "sideReach", "maxFrontGap", "maxBackGap", "maxRearGap", "maxFacingGap", "maxDeepen", "hugReach", "openReach" };
 
+        public enum KnobKind { Toggle, Slider, Choice }
+
+        /// <summary>One setting of a look as the Zoning types' option rows show it (Core/Layers/Types/Zoning/PolishLookLayer).</summary>
+        public sealed class Knob
+        {
+            public readonly string Id, Group, Unit;
+            public readonly KnobKind Kind;
+            public readonly ControlTier Tier;
+            public readonly double Min, Max, Step;
+            public readonly string[] Options;
+
+            public Knob(string id, string group, KnobKind kind, ControlTier tier, double min = 0, double max = 1, double step = 1, string unit = "", string[] options = null)
+            {
+                Id = id; Group = group; Kind = kind; Tier = tier; Min = min; Max = max; Step = step; Unit = unit; Options = options ?? new string[0];
+            }
+        }
+
+        /// <summary>Every setting of a look, in the order the rows show them (groups: reach, fences, lawns, ground, planting, paths).
+        /// Choices of ground: 0 none, 1 dry grass, 2 lush, 3 dirt, 4 sand; fenceKind: 0 own, 1 low hedge, 2 tall hedge, 3 low fence, 4 tall fence.</summary>
+        public static readonly IReadOnlyList<Knob> Knobs = new[]
+        {
+            new Knob("sideReach", "reach", KnobKind.Slider, ControlTier.Essential, 0, 500, 1, "m"),
+            new Knob("maxFrontGap", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
+            new Knob("maxBackGap", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
+            new Knob("maxRearGap", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
+            new Knob("maxFacingGap", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
+            new Knob("maxDeepen", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
+            new Knob("hug", "reach", KnobKind.Toggle, ControlTier.Essential),
+            new Knob("hugReach", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
+            new Knob("openReach", "reach", KnobKind.Slider, ControlTier.Essential, 0, 500, 1, "m"),
+            new Knob("wrap", "reach", KnobKind.Toggle, ControlTier.More),
+            new Knob("closeBacks", "reach", KnobKind.Toggle, ControlTier.More),
+            new Knob("closeGardens", "fences", KnobKind.Toggle, ControlTier.Essential),
+            new Knob("fenceKind", "fences", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("lawns", "lawns", KnobKind.Toggle, ControlTier.Essential),
+            new Knob("lawnReach", "lawns", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
+            new Knob("paintedGardens", "lawns", KnobKind.Slider, ControlTier.Essential, 0, 100, 5, "%"),
+            new Knob("gardenPaint", "lawns", KnobKind.Slider, ControlTier.More, 0, 1, 0.05, ""),
+            new Knob("paint", "lawns", KnobKind.Toggle, ControlTier.More),
+            new Knob("blendWidth", "lawns", KnobKind.Slider, ControlTier.More, 0, 150, 1, "m"),
+            new Knob("blendFar", "lawns", KnobKind.Slider, ControlTier.More, 0, 250, 1, "m"),
+            new Knob("blendStrength", "lawns", KnobKind.Slider, ControlTier.More, 0, 1, 0.05, ""),
+            new Knob("gardenLayer", "ground", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("meadowLayer", "ground", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("meadowStrength", "ground", KnobKind.Slider, ControlTier.More, 0, 1, 0.05, ""),
+            new Knob("blendLayer", "ground", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("blendFarLayer", "ground", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("edgeLayer", "ground", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("edgeWidth", "ground", KnobKind.Slider, ControlTier.More, 0, 15, 0.5, "m"),
+            new Knob("edgeStrength", "ground", KnobKind.Slider, ControlTier.More, 0, 1, 0.05, ""),
+            new Knob("roadLayer", "ground", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("roadWidth", "ground", KnobKind.Slider, ControlTier.More, 0, 20, 0.5, "m"),
+            new Knob("roadStrength", "ground", KnobKind.Slider, ControlTier.More, 0, 1, 0.05, ""),
+            new Knob("rockLayer", "ground", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("rockGround", "ground", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("yardLayer", "ground", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("patchLayer", "ground", KnobKind.Choice, ControlTier.More, options: new[] { "0", "1", "2", "3", "4" }),
+            new Knob("patchChance", "ground", KnobKind.Slider, ControlTier.More, 0, 100, 5, "%"),
+            new Knob("plant", "planting", KnobKind.Toggle, ControlTier.Essential),
+            new Knob("bedChance", "planting", KnobKind.Slider, ControlTier.More, 0, 100, 5, "%"),
+            new Knob("bushesPerGarden", "planting", KnobKind.Slider, ControlTier.More, 0, 80, 1, "count"),
+            new Knob("features", "planting", KnobKind.Toggle, ControlTier.Essential),
+            new Knob("featureChance", "planting", KnobKind.Slider, ControlTier.More, 0, 100, 5, "%"),
+            new Knob("featureSpacing", "planting", KnobKind.Slider, ControlTier.More, 50, 3000, 50, "m2"),
+            new Knob("featureMinLand", "planting", KnobKind.Slider, ControlTier.More, 10, 600, 10, "m2"),
+            new Knob("rockChance", "planting", KnobKind.Slider, ControlTier.More, 0, 100, 5, "%"),
+            new Knob("pathChance", "paths", KnobKind.Slider, ControlTier.More, 0, 100, 5, "%"),
+            new Knob("alleys", "paths", KnobKind.Toggle, ControlTier.More),
+            new Knob("alleyChance", "paths", KnobKind.Slider, ControlTier.More, 0, 100, 5, "%"),
+            new Knob("pavedFill", "paths", KnobKind.Toggle, ControlTier.Essential),
+        };
+
         public static readonly string[] Themes = { "garden", "natural", "tidy", "yard" };
 
         /// <summary>The looks that ship with the mod (one per theme).</summary>

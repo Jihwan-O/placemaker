@@ -1,0 +1,13 @@
+{
+  "_about": "Make-row category 'Zoning' (Core/Tool/Shelf.cs): the looks of an area's buildings (Core/Layers/Types/Zoning/PolishLookLayer). Each type is a look (its option rows are every setting of the neighbourhood polish, its styles Compact / Standard / Sprawling and the player's own); Build polishes the buildings in the area. The City window (header button) sets each zone type's look for new buildings and polishes or unpolishes the whole city.",
+  "id": "zoning",
+  "name": "Zoning",
+  "order": 10,
+  "hidden": false,
+  "groups": [
+    "zoning"
+  ],
+  "types": [],
+  "hiddenTypes": [],
+  "hiddenStyles": {}
+}

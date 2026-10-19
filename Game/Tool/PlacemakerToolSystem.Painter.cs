@@ -340,7 +340,7 @@ namespace Placemaker.Game.Tool
         {
             get
             {
-                if (!_painter || _shape == null) return (0, 0);
+                if (!_painter && !_wasPolishType || _shape == null) return (0, 0);
                 if (!ReferenceEquals(_countShape, _shape) || _countFlags != NeighbourPolishSystem.FlagsVersion)
                 {
                     _countShape = _shape;
@@ -360,12 +360,13 @@ namespace Placemaker.Game.Tool
 
         private PainterView PainterState()
         {
-            if (!_painter) return null;
+            if (!_painter && !_wasPolishType) return null;
             var (lots, yes) = PainterCount;
             var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
             var v = new PainterView
             {
                 Lots = lots, Polished = yes, FeatureOn = NeighbourPolishSystem.FeatureEnabled, NewHouses = NeighbourPolishSystem.PolishNew, Theme = PainterLook,
+                Tool = _painter,
                 CityPolished = NeighbourPolishSystem.StatusPolished, CityTotal = NeighbourPolishSystem.StatusTotal,
                 Waiting = NeighbourPolishSystem.StatusWaiting, Restoring = NeighbourPolishSystem.StatusRestoring,
             };

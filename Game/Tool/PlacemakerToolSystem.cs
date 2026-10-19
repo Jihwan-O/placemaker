@@ -293,6 +293,7 @@ namespace Placemaker.Game.Tool
         private void FinishFrame()
         {
             CheckKeepOffSetting();
+            CheckPolishType();
             RebuildShapeIfDirty(false);
             UpdateLivePolish();
             UpdatePlanning();

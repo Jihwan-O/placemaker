@@ -90,6 +90,8 @@ namespace Placemaker.Core.Tool
         /// every knob's value in the rows and in the saved look.</summary>
         public string LookTheme = "garden", LookSavedTheme = "garden";
         public bool Modified;
+        /// <summary>The old polish painter tool (its own window); false: a Zoning type in Placemaker's panel (City window only).</summary>
+        public bool Tool;
         /// <summary>Live polish: the selection polished again after every change.</summary>
         public bool Live;
         public Dictionary<string, float> Values = new Dictionary<string, float>(), LookValues = new Dictionary<string, float>();
@@ -235,7 +237,7 @@ namespace Placemaker.Core.Tool
                         .Set("paths", p.Paths).Set("rocks", p.Rocks).Set("groundPaint", p.GroundPaint).Set("shopPaving", p.ShopPaving))
                     .Set("city", JsonValue.Obj().Set("homes", p.Homes ?? "garden").Set("shops", p.Shops ?? "tidy").Set("offices", p.Offices ?? "tidy").Set("industry", p.Industry ?? "yard")
                         .Set("polished", p.CityPolished).Set("total", p.CityTotal).Set("waiting", p.Waiting).Set("restoring", p.Restoring))
-                    .Set("lookTheme", p.LookTheme ?? "garden").Set("lookSavedTheme", p.LookSavedTheme ?? "garden").Set("modified", p.Modified).Set("live", p.Live)
+                    .Set("lookTheme", p.LookTheme ?? "garden").Set("lookSavedTheme", p.LookSavedTheme ?? "garden").Set("modified", p.Modified).Set("tool", p.Tool).Set("live", p.Live)
                     .Set("values", Knobs(p.Values)).Set("lookValues", Knobs(p.LookValues))
                     .Set("looks", Arr(p.Looks.Select(l => JsonValue.Obj().Set("id", l.Id).Set("name", l.Name).Set("custom", l.Custom).Set("theme", l.Theme))))
                     .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own).Set("icon", z.Icon ?? "")))));

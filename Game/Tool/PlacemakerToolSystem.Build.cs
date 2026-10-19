@@ -44,6 +44,8 @@ namespace Placemaker.Game.Tool
 
         private void StartBuild()
         {
+            // a Zoning type (a look): its buildings polished, nothing built
+            if (BuildPolish()) return;
             var svc = Services.Build;
             if (svc == null) { Flash(new LocText("Placemaker.Reason.BuildUnavailable")); return; }
             if (_plan == null || _shape == null || _recipe == null) return;

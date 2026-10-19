@@ -162,6 +162,8 @@ export interface PainterState {
   lookSavedTheme: string;
   /** The rows changed the look (not saved). */
   modified: boolean;
+  /** The old polish painter tool; false: a Zoning type in Placemaker's panel (only the City window). */
+  tool?: boolean;
   /** Live polish: the selection polished again a moment after every change (the switch beside Polish). */
   live?: boolean;
   /** Every setting of the look as the rows have it, and as the look has it (reset). */

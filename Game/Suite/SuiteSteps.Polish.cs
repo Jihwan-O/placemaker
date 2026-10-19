@@ -35,7 +35,7 @@ namespace Placemaker.Game.Suite
     {
         private IEnumerator StepPolish(ScenarioState st, JObject step, JObject rec)
         {
-            if (step["theme"] != null || step["option"] != null || step["city"] != null || step["open"] != null || step["close"] != null || step["click"] != null || step["clickText"] != null)
+            if (step["theme"] != null || step["knob"] != null || step["option"] != null || step["city"] != null || step["open"] != null || step["close"] != null || step["click"] != null || step["clickText"] != null)
             {
                 yield return PolishCard(st, step, rec);
                 yield break;
@@ -80,6 +80,14 @@ namespace Placemaker.Game.Suite
                 string theme = (string)step["theme"];
                 yield return UiAct(st, rec, "style " + theme, "polish-theme-" + theme, "polishTheme", new object[] { theme }, () => _tool.PainterTheme == theme, () => _tool.SetPainterTheme(theme));
                 rec["theme"] = _tool.PainterTheme;
+            }
+            if (step["knob"] != null)
+            {
+                // a setting of the look picked, as its row sets it
+                string id = (string)step["knob"];
+                double v = (double?)step["value"] ?? 1.0;
+                yield return UiAct(st, rec, "look " + id, null, "polishKnob", new object[] { id, v }, () => Math.Abs(_tool.PolishKnobValue(id) - v) < 0.01, () => _tool.SetPolishKnob(id, v));
+                rec["value"] = _tool.PolishKnobValue(id);
             }
             if (step["option"] != null && s != null)
             {

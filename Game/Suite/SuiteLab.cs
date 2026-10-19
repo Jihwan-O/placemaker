@@ -153,7 +153,9 @@ namespace Placemaker.Game.Suite
                             lots.Add(e);
                         }
                     string themeName = ((string)step["theme"] ?? "zone").ToLowerInvariant();
-                    Placemaker.Game.Neighbours.NeighbourPolishSystem.Stamp(lots, yes, (byte)Math.Max(0, Array.IndexOf(Placemaker.Game.Neighbours.NeighbourPolishSystem.ThemeNames, themeName)));
+                    // "theme": "painter": the polish tool's look as its rows have it (what its Polish gives)
+                    if (themeName == "painter") Placemaker.Game.Neighbours.NeighbourPolishSystem.Stamp(lots, yes, _tool.PainterTheme, yes ? _tool.PolishChanges : null);
+                    else Placemaker.Game.Neighbours.NeighbourPolishSystem.Stamp(lots, yes, (byte)Math.Max(0, Array.IndexOf(Placemaker.Game.Neighbours.NeighbourPolishSystem.ThemeNames, themeName)));
                     rec["stamped"] = lots.Count;
                     Mod.Log.Info($"Placemaker lab: {lots.Count} lots stamped {(yes ? "polished" : "back as the game made them")} ({side})");
                     yield return Frames(10);
@@ -172,7 +174,10 @@ namespace Placemaker.Game.Suite
                     {
                         var inLand = all.Where(e => { var p = em.GetComponentData<global::Game.Objects.Transform>(e).m_Position; return p.x >= b.X0 && p.x <= b.X1 && p.z >= b.Z0 && p.z <= b.Z1; })
                             .OrderBy(e => em.GetComponentData<global::Game.Objects.Transform>(e).m_Position.x).ThenBy(e => em.GetComponentData<global::Game.Objects.Transform>(e).m_Position.z).ToList();
-                        for (int i = 1; i < inLand.Count; i += every) victims.Add(inLand[i]);
+                        // "keep": n — only every n-th house stays (houses far apart); else every n-th goes
+                        int keep = (int?)step["keep"] ?? 0;
+                        if (keep > 1) { for (int i = 0; i < inLand.Count; i++) if (i % keep != 0) victims.Add(inLand[i]); }
+                        else for (int i = 1; i < inLand.Count; i += every) victims.Add(inLand[i]);
                     }
                     yield return ApplyWithFixtureTool(t =>
                     {

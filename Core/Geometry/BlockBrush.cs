@@ -122,8 +122,14 @@ namespace Placemaker.Core.Geometry
             float cellSize = BrushMask.DefaultCellSize, Func<float2, bool> blockedAt = null, float halfSize = OpenHalfSize, bool keepSide = true)
         {
             halfSize = math.max(10f, halfSize);
-            var box = new[] { centre + new float2(-halfSize, -halfSize), centre + new float2(halfSize, -halfSize),
-                              centre + new float2(halfSize, halfSize), centre + new float2(-halfSize, halfSize) };
+            return OpenBox(centre, centre - halfSize, centre + halfSize, obstacles, cellSize, blockedAt, keepSide);
+        }
+
+        /// <summary>The open-land brush over the box min..max (Paint area grows it as a stroke nears its edge).</summary>
+        public static BlockBrush OpenBox(float2 centre, float2 min, float2 max, IEnumerable<IReadOnlyList<float2>> obstacles,
+            float cellSize = BrushMask.DefaultCellSize, Func<float2, bool> blockedAt = null, bool keepSide = true)
+        {
+            var box = new[] { min, new float2(max.x, min.y), max, new float2(min.x, max.y) };
             var b = new BlockBrush(box, obstacles, cellSize, blockedAt) { IsOpen = true };
             if (keepSide) b.Allowed = b.Allowed.ConnectedComponent(centre);
             return b;

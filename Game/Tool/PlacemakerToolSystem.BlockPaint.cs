@@ -11,6 +11,9 @@
 // Gestures (same as Paint): drag = paint, right-drag = erase, plus Shift+drag = erase; Shift + move turns a square brush.
 // A paint stroke that starts outside the current fence starts a new selection there (the old one is one undo step
 // away). Erase strokes never switch.
+// No radius (2026-10-19, "it seems to have a radius limit"): the fill is the fence only where it is a closed block; where
+// it ran into the bucket's reach (open land) the stroke paints in the open work box instead, and that box grows (up to
+// MaxOpenSize a side) whenever the brush comes near its edge.
 
 using System;
 using System.Collections.Generic;
@@ -44,6 +47,12 @@ namespace Placemaker.Game.Tool
             public int IgnoreGroup;
             public float BuiltAt;
         }
+
+        /// <summary>Largest side (m) the open work box grows to.</summary>
+        public const float MaxOpenSize = 3000f;
+        /// <summary>The box grows when the brush comes this close (m, beyond its radius) to its edge.</summary>
+        private const float OpenGrowMargin = 80f;
+        private float2 _bpBoxMin, _bpBoxMax;
 
         /// <summary>Obstacles are re-read at most this often (s) between strokes: the city keeps growing.</summary>
         private const float BlockPaintRefresh = 5f;
@@ -118,6 +127,7 @@ namespace Placemaker.Game.Tool
                 if (held)
                 {
                     _bpStrokeFrames++;
+                    if (_in.HasHit && _gesture == Gesture.Paint && _bpOpen) GrowOpenBox(_in.Hit.xz, radius);
                     if (_in.HasHit)
                     {
                         int v = _bpMask.Version;
@@ -193,7 +203,8 @@ namespace Placemaker.Game.Tool
                 }
                 _bpMask.Clear();
                 _bpBrushed.Clear();
-                if (fill != null && fill.Status == FillStatus.Ok)
+                // a fill that ran into the reach is open land, not a block: no disc fence (the open box, below)
+                if (fill != null && fill.Status == FillStatus.Ok && !fill.HitReach)
                 {
                     _bpRing = fill.Ring;
                     _bpOpen = false;
@@ -205,6 +216,8 @@ namespace Placemaker.Game.Tool
                     _bpRing = null;
                     _bpOpen = true;
                     _bpDoors = null;
+                    _bpBoxMin = p - BlockBrush.OpenHalfSize;
+                    _bpBoxMax = p + BlockBrush.OpenHalfSize;
                 }
                 _bpSeed = p;
                 _hoverFace = null;
@@ -317,15 +330,40 @@ namespace Placemaker.Game.Tool
             return c;
         }
 
+        /// <summary>
+        /// The open work box reaches the brush: grown by OpenHalfSize past the brush on the side it neared (up to
+        /// MaxOpenSize a side), the fence rebuilt over it from the cached walls; the painted cells stay.
+        /// </summary>
+        private void GrowOpenBox(float2 at, float radius)
+        {
+            float m = radius + OpenGrowMargin;
+            if (at.x - m > _bpBoxMin.x && at.y - m > _bpBoxMin.y && at.x + m < _bpBoxMax.x && at.y + m < _bpBoxMax.y) return;
+            float2 min = math.min(_bpBoxMin, at - BlockBrush.OpenHalfSize), max = math.max(_bpBoxMax, at + BlockBrush.OpenHalfSize);
+            if (math.cmax(max - min) > MaxOpenSize) return;
+            _bpBoxMin = min;
+            _bpBoxMax = max;
+            _bpCtx = null;
+            var c = EnsureBlockPaintContext(false);
+            c?.Brush.Attach(_bpMask);
+            Mod.Log.Info($"Placemaker: Paint area box grown to {max.x - min.x:0} x {max.y - min.y:0} m");
+        }
+
         /// <summary>Open land / One block off: a work box around the start with every stop fenced out.</summary>
         private BlockPaintContext BuildOpenContext(BrushRules rules)
         {
-            float h = BlockBrush.OpenHalfSize;
-            float2 min = _bpSeed - h, max = _bpSeed + h;
+            // the box laid out at the stroke's start, as far as it has grown since (old selections: around the start)
+            float2 min = _bpBoxMin, max = _bpBoxMax;
+            if (!(max.x > min.x) || !(max.y > min.y) || math.any(_bpSeed < min) || math.any(_bpSeed > max))
+            {
+                min = _bpSeed - BlockBrush.OpenHalfSize;
+                max = _bpSeed + BlockBrush.OpenHalfSize;
+                _bpBoxMin = min;
+                _bpBoxMax = max;
+            }
             var walls = new List<BrushObstacle>();
             if (!rules.Anything) Walls.Counted(min, max, _editingGroup, rules, walls);
             var water = Walls.Water(min, max, _bpMask.CellSize, rules.ForOutline());
-            var brush = rules.Build(_bpSeed, null, walls, rules.WaterOn ? water : null, _bpMask.CellSize);
+            var brush = rules.Build(_bpSeed, null, walls, rules.WaterOn ? water : null, _bpMask.CellSize, min, max);
             var c = new BlockPaintContext { Ring = null, Open = true, Seed = _bpSeed, Block = null, Brush = brush };
             foreach (var w in walls)
                 if (w.Kind != BrushObstacleKind.Road && w.Kind != BrushObstacleKind.Path && w.Kind != BrushObstacleKind.Bike && w.Kind != BrushObstacleKind.Track)

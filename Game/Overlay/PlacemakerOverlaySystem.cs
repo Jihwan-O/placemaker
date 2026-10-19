@@ -399,8 +399,7 @@ namespace Placemaker.Game.Overlay
                 for (int i = 0; i < max; i++)
                 {
                     var (a, b) = _paintBoundary[i];
-                    var y = _tool.Cursor.y;
-                    buffer.DrawLine(Outline, new Line3.Segment(new float3(a.x, y, a.y), new float3(b.x, y, b.y)), w * 0.7f);
+                    buffer.DrawLine(Outline, new Line3.Segment(OnGround(a), OnGround(b)), w * 0.7f);
                 }
             }
             else Ring(buffer, shape.Ring, Outline, w);

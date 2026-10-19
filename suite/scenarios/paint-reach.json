@@ -1,0 +1,14 @@
+{
+  "_about": "Paint area without a radius limit: one 700 m stroke across open sloped land (longer than the old 500 m fill disc and the 600 m work box). The painted area should follow the whole stroke, drawn on the ground.",
+  "scenarios": [
+    {
+      "id": "paint-reach-open-slope",
+      "land": { "shape": "rect", "size": [800, 300], "ground": "slope", "grade": 8, "toward": "north", "roads": "none" },
+      "steps": [
+        { "do": "area", "tool": "paint", "size": 50, "cameraDistance": 900, "stroke": [[-350, -60], [-150, 40], [0, -20], [150, 50], [350, 0]] },
+        { "do": "camera", "target": "area", "view": "top", "shot": "painted", "shotMode": "overlay" },
+        { "do": "camera", "target": "area", "view": "oblique", "shot": "painted-45", "shotMode": "overlay" }
+      ]
+    }
+  ]
+}

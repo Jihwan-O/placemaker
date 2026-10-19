@@ -51,6 +51,26 @@ namespace Placemaker.Game.Overlay
             return list;
         }
 
+        // The ground under the painted cells (their corners lie on the 2 m brush grid): sampled once per corner, not per frame.
+        private readonly Dictionary<long, float> _groundAt = new Dictionary<long, float>();
+        private float _groundSince;
+
+        /// <summary>A painted point on the ground (drawn where it is painted; was at the cursor's height and moved with it).</summary>
+        private float3 OnGround(float2 p)
+        {
+            // the ground changes with every build: a cache older than a few seconds outside a stroke is read again
+            float now = UnityEngine.Time.realtimeSinceStartup;
+            if (!_tool.Painting && now - _groundSince > 3f) { _groundAt.Clear(); _groundSince = now; }
+            long k = ((long)(int)math.round(p.x * 4f) << 32) ^ (uint)(int)math.round(p.y * 4f);
+            if (!_groundAt.TryGetValue(k, out float y))
+            {
+                if (_groundAt.Count > 200000) _groundAt.Clear();
+                y = _tool.GroundAt(p);
+                _groundAt[k] = y;
+            }
+            return new float3(p.x, y, p.y);
+        }
+
         private void DrawBlockPaintMode(OverlayRenderSystem.Buffer buffer, float w, AreaShape shape)
         {
             var cur = _tool.BlockPaintCurrent;
@@ -77,7 +97,8 @@ namespace Placemaker.Game.Overlay
             }
 
             var hover = _tool.HoverFace;
-            if (hover?.Area != null && !_tool.Painting && _tool.BrushLive && _tool.LayerVisible(AreaLegend.Fence))
+            // (a fill that only stopped at the bucket's reach is open land: Paint area has no disc there, so none is shown)
+            if (hover?.Area != null && !(hover.Fill?.HitReach ?? false) && !_tool.Painting && _tool.BrushLive && _tool.LayerVisible(AreaLegend.Fence))
             {
                 Ring(buffer, hover.Area.Ring, HoverBlock, w * 0.7f, dashed: true);
                 DrawFillExtras(buffer, w, hover);
@@ -95,18 +116,17 @@ namespace Placemaker.Game.Overlay
             {
                 var preview = _tool.BlockPaintPreview;
                 int max = math.min(_bpBoundary.Count, 20000);
-                float y = _tool.Cursor.y;
                 var cellColor = preview != null ? OutlineDim : Outline;
                 for (int i = 0; i < max; i++)
                 {
                     var (a, b) = _bpBoundary[i];
-                    buffer.DrawLine(cellColor, new Line3.Segment(new float3(a.x, y, a.y), new float3(b.x, y, b.y)), w * (preview != null ? 0.45f : 0.7f));
+                    buffer.DrawLine(cellColor, new Line3.Segment(OnGround(a), OnGround(b)), w * (preview != null ? 0.45f : 0.7f));
                 }
                 if (preview != null && _tool.LayerVisible(AreaLegend.Painted))
                     for (int i = 0; i < preview.Length; i++)
                     {
                         float2 a = preview[i], b = preview[(i + 1) % preview.Length];
-                        buffer.DrawLine(Outline, new Line3.Segment(new float3(a.x, y, a.y), new float3(b.x, y, b.y)), w);
+                        buffer.DrawLine(Outline, new Line3.Segment(OnGround(a), OnGround(b)), w);
                     }
             }
             else if (_tool.LayerVisible(AreaLegend.Painted)) Ring(buffer, shape.Ring, Outline, w);

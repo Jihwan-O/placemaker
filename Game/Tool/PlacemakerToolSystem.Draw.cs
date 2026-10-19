@@ -39,6 +39,8 @@ namespace Placemaker.Game.Tool
         public int HoverEdge => _hoverEdge;
         public bool HoverClose => _hoverClose;
         public float3 Cursor => _cursor;
+        /// <summary>The ground height at p (the overlay draws what is painted on the ground, not at the cursor's height).</summary>
+        public float GroundAt(float2 p) => _site != null ? _site.SampleHeight(p) : _cursor.y;
         public bool CursorValid => _cursorValid;
         public PolygonEditor Draw => _draw;
         public bool EdgeDragging => _gesture == Gesture.DragEdge;

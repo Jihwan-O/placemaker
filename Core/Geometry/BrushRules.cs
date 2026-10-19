@@ -170,7 +170,7 @@ namespace Placemaker.Core.Geometry
         /// ignored, water only counts when Water is on.
         /// </summary>
         public BlockBrush Build(float2 start, IReadOnlyList<float2> block, IEnumerable<BrushObstacle> obstacles,
-            Func<float2, bool> underWater = null, float cellSize = BrushMask.DefaultCellSize)
+            Func<float2, bool> underWater = null, float cellSize = BrushMask.DefaultCellSize, float2? boxMin = null, float2? boxMax = null)
         {
             var r = Normalized();
             var rings = new List<IReadOnlyList<float2>>();
@@ -181,6 +181,7 @@ namespace Placemaker.Core.Geometry
             BlockBrush brush;
             if (r.LockOn && block != null && block.Count >= 3) brush = new BlockBrush(block, rings, cellSize, water);
             else if (rings.Count == 0 && water == null) brush = BlockBrush.Free(start, cellSize);
+            else if (boxMin.HasValue && boxMax.HasValue) brush = BlockBrush.OpenBox(start, boxMin.Value, boxMax.Value, rings, cellSize, water, keepSide: r.Stops(BrushObstacleKind.Road));
             else brush = BlockBrush.Open(start, rings, cellSize, water, BlockBrush.OpenHalfSize, keepSide: r.Stops(BrushObstacleKind.Road));
             brush.SnapDistance = r.Snap;
             brush.Smoothing = r.Smoothing;

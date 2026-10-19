@@ -575,9 +575,12 @@ namespace Placemaker.Game.Neighbours
             bool Skipped(long part) => pend.OwnerOf.TryGetValue(part, out var house) && skip.Contains(house);
             _lawnPrefabOf.Clear();
             foreach (var kv in pend.LawnPrefabOf) _lawnPrefabOf[kv.Key] = kv.Value;
-            if (TotalPasses < 6)
+            // the first passes of a city, and the passes right after something was built near gardens, are logged in full
+            bool logPass = TotalPasses < 6 || s_logPasses > 0;
+            if (s_logPasses > 0) s_logPasses--;
+            if (logPass)
                 foreach (var note in plan.Notes) Mod.Log.Info("Placemaker neighbourhood polish: " + note);
-            if (TotalPasses < 6)
+            if (logPass)
                 Mod.Log.Info($"Placemaker neighbourhood polish pass {TotalPasses + 1}: {asked} houses asked, {clusterCount} in their neighbourhoods ({stitch.Count(h => !h.Polished)} unpolished), {plan.Pairs.Count} pairs ({plan.Pairs.Count(p => p.Edge)} against an unpolished lot), "
                     + $"{plan.MoveLines.Count} lines to move, {plan.HideLines.Count} to hide, {plan.Lawns.Count} lawns{(EditLines ? "" : " (lines off)")}{(EditLawns ? "" : " (lawns off)")}{(skip.Count > 0 ? $", {skip.Count} unpolished meanwhile" : "")}");
 

@@ -148,6 +148,7 @@ namespace Placemaker.Game.Neighbours
         // ───────────── something new built near gardens ─────────────
 
         private EntityQuery _newNearby;
+        private static int s_logPasses;
 
         private void CreateNearbyQuery()
         {
@@ -217,7 +218,11 @@ namespace Placemaker.Game.Neighbours
                                 if (_dirty.Add(h.E)) marked++;
                             }
             }
-            if (marked > 0) Mod.Log.Info($"Placemaker neighbourhood polish: something new built nearby: {marked} gardens planned again");
+            if (marked > 0)
+            {
+                Mod.Log.Info($"Placemaker neighbourhood polish: something new built nearby: {marked} gardens planned again");
+                s_logPasses = 4;
+            }
         }
 
         /// <summary>A net edge's ground as a strip along its curve (its full width; ends square at its nodes).</summary>

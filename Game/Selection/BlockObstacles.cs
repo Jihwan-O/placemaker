@@ -132,7 +132,8 @@ namespace Placemaker.Game.Selection
         {
             var list = new List<BrushObstacle>();
             var bounds = new Bounds2(min, max);
-            try { Lots(bounds, 0, list); }
+            // our own owner lots count too: a build just made has its lot before its saved outline
+            try { Lots(bounds, 0, list, includeHelpers: true); }
             catch (Exception e) { Mod.Log.Warn("Placemaker: could not read areas: " + e.Message); }
             try { BuildReceipts(bounds, 0, list); }
             catch (Exception e) { Mod.Log.Warn("Placemaker: could not read other builds: " + e.Message); }
@@ -279,7 +280,7 @@ namespace Placemaker.Game.Selection
             finally { results.Dispose(); }
         }
 
-        private void Lots(Bounds2 bounds, int ignoreGroup, List<BrushObstacle> into)
+        private void Lots(Bounds2 bounds, int ignoreGroup, List<BrushObstacle> into, bool includeHelpers = false)
         {
             if (_areaSearch == null) return;
             var tree = _areaSearch.GetSearchTree(true, out var deps);
@@ -297,7 +298,7 @@ namespace Placemaker.Game.Selection
                     if (!_em.HasComponent<global::Game.Areas.Lot>(e) || !_em.HasBuffer<global::Game.Areas.Node>(e) || Skip(e, ignoreGroup)) continue;
                     // (s57) Our helper lots (owner "Placemaker Area", "Placemaker Zone Block") are never obstacles: cell-shaped, they can poke
                     // past the build. The build counts through its saved outline (BuildReceipts) only.
-                    if (IsHelperLot(e)) continue;
+                    if (!includeHelpers && IsHelperLot(e)) continue;
                     var nodes = _em.GetBuffer<global::Game.Areas.Node>(e, true);
                     if (nodes.Length < 3) continue;
                     var ring = new float2[nodes.Length];

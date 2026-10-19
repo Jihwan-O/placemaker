@@ -296,7 +296,7 @@ namespace Placemaker.Game.Tool
             Touch();
         }
 
-        /// <summary>Polish (yes) or Unpolish (no) the lots in the area. The selection goes; only the flags stay.</summary>
+        /// <summary>Polish (yes) or Unpolish (no) the lots in the area. The selection stays (press it again as often as wanted).</summary>
         public void PolishStamp(bool yes)
         {
             if (!_painter || _building) return;
@@ -312,7 +312,7 @@ namespace Placemaker.Game.Tool
             NeighbourPolishSystem.Stamp(lots, yes, PainterLook, yes ? LookChanges() : null);
             LastStamp = (lots.Count, yes);
             Mod.Log.Info($"Placemaker painter: {(yes ? "polish" : "unpolish")} {lots.Count} lots ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
-            ClearArea();
+            // the selection stays: Polish again (another look, changed settings) or Unpolish whenever
             Flash(new LocText(yes ? "Placemaker.Painter.Polished" : "Placemaker.Painter.Unpolished", lots.Count));
         }
 

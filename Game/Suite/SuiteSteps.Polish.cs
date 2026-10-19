@@ -54,11 +54,11 @@ namespace Placemaker.Game.Suite
             var panel = Bound(rec, "state")?["painter"];
             if (panel != null) rec["panel"] = panel;
             int stamps0 = NeighbourPolishSystem.TotalStampedYes + NeighbourPolishSystem.TotalStampedNo;
+            // the selection stays after a stamp: the stamp is seen in the totals
             if (yes)
-                yield return UiAct(st, rec, "Polish", "primary", "primary", null, () => !_tool.SuiteHasSelection, () => _tool.Primary());
+                yield return UiAct(st, rec, "Polish", "primary", "primary", null, () => NeighbourPolishSystem.TotalStampedYes + NeighbourPolishSystem.TotalStampedNo > stamps0 || _tool.LastStamp.Lots > 0 && _tool.FlashText?.Key == "Placemaker.Painter.Polished", () => _tool.Primary());
             else
-                yield return UiAct(st, rec, "Unpolish", "polish-no", "polishStamp", new object[] { false }, () => !_tool.SuiteHasSelection, () => _tool.PolishStamp(false));
-            if (_tool.SuiteHasSelection) { rec["error"] = "polish: the area is still there after the stamp" + (_tool.FlashText != null ? ": " + _tool.FlashText.Key : ""); yield break; }
+                yield return UiAct(st, rec, "Unpolish", "polish-no", "polishStamp", new object[] { false }, () => NeighbourPolishSystem.TotalStampedYes + NeighbourPolishSystem.TotalStampedNo > stamps0 || _tool.FlashText?.Key == "Placemaker.Painter.Unpolished", () => _tool.PolishStamp(false));
             yield return Until(() => NeighbourPolishSystem.TotalStampedYes + NeighbourPolishSystem.TotalStampedNo > stamps0, 5f, "stamp applied");
             rec["stamped"] = _tool.LastStamp.Lots;
             rec["yes"] = yes;

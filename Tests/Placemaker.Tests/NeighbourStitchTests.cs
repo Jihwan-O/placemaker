@@ -279,6 +279,34 @@ namespace Placemaker.Tests
                 }
         }
 
+        [Fact]
+        public void On_the_inside_of_a_curve_sprawling_gardens_end_before_they_turn_into_spikes()
+        {
+            // the Sprawling style's reach (the game runner's arc: long thin hedge spikes towards the curve's centre)
+            var opts = new Dictionary<string, float>(PolishLooks.Defaults)
+            {
+                ["sideReach"] = 250f, ["maxFrontGap"] = 200f, ["maxBackGap"] = 300f, ["maxRearGap"] = 150f, ["maxFacingGap"] = 120f,
+                ["maxDeepen"] = 150f, ["hugReach"] = 150f, ["openReach"] = 80f,
+            };
+            // lot centres on a circle of 80 m, facing out (the street outside them): their backs close in towards the centre
+            var houses = new List<StitchHouse>();
+            for (int k = 0; k < 5; k++)
+            {
+                float a = math.radians(60f) + k * 0.22f;
+                var dir = new float2(math.cos(a), math.sin(a));
+                var h = House(k + 1, dir * 80f, dir);
+                h.Options = opts;
+                houses.Add(h);
+            }
+            var plan = YardStitch.Plan(houses, MiddleLine());
+            Assert.NotEmpty(plan.Plots);
+            // 0.22 rad apart, a garden between two middle lines is 8 m wide 36 m from the centre: none reaches far past that (the
+            // two at the ends have open land beside them: they grow into it)
+            foreach (var (id, ring) in plan.Plots.Where(kv => kv.Key >= 2 && kv.Key <= 4))
+                foreach (var p in ring)
+                    Assert.True(math.length(p) > 28f, $"garden {id} runs out to {math.length(p):F0} m from the centre ({string.Join(" | ", plan.Notes)})");
+        }
+
         private static bool Overlap(float2[] a, float2[] b) =>
             Poly.Boolean(new[] { (IReadOnlyList<float2>)a }, new[] { (IReadOnlyList<float2>)b }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area) > 0.05f;
 

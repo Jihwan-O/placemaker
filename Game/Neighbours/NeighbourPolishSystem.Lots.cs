@@ -37,7 +37,7 @@ namespace Placemaker.Game.Neighbours
         /// <summary>Bumped whenever a lot's flag changes (the painter's overlay redraws).</summary>
         public static int FlagsVersion { get; private set; }
         /// <summary>For the game runner: totals since the game started.</summary>
-        public static int TotalStampedYes, TotalStampedNo, TotalRestored, TotalCarried, TotalFlaggedNew, TotalTagged;
+        public static int TotalStampedYes, TotalStampedNo, TotalRestored, TotalCarried, TotalFlaggedNew, TotalTagged, TotalByArea;
 
         /// <summary>The painter: these lots become polished (yes) or are put back (no); theme 0: each by its kind's setting.
         /// Applied from the next frame on, a few thousand a frame.</summary>
@@ -158,6 +158,7 @@ namespace Placemaker.Game.Neighbours
         {
             LotFrame++;
             RememberGoneFlags();
+            AreasUpdate();
             FlagNewLots();
             TagNewPieces();
             if (_sweepThemes) SweepThemes();
@@ -307,6 +308,7 @@ namespace Placemaker.Game.Neighbours
                     // a new lot: polished when the polish is on and new houses are, unless its zone's look is Off
                     var zoneLook = LookOfZone(prefab);
                     bool yes = FeatureEnabled && PolishNew && zoneLook != "off";
+                    bool carried = false;
                     for (int k = _goneFlags.Count - 1; k >= 0; k--)
                     {
                         var d = _goneFlags[k].At - t.m_Position.xz;
@@ -314,10 +316,20 @@ namespace Placemaker.Game.Neighbours
                         yes = _goneFlags[k].Yes;
                         _goneFlags.RemoveAt(k);
                         TotalCarried++;
+                        carried = true;
                         break;
                     }
-                    var look = yes ? LookById(zoneLook) ?? PolishLooks.BuiltIn[0] : null;
+                    // grown in an area zoned with a look (a Zoning type): that look and its changes
+                    var area = carried ? null : LookAreaAt(t.m_Position.xz);
+                    if (area != null) { yes = true; TotalByArea++; }
+                    var look = yes ? (area != null ? LookByHash(area.Look) : null) ?? LookById(zoneLook) ?? PolishLooks.BuiltIn[0] : null;
                     EntityManager.AddComponentData(e, yes ? new PolishedLot { Yes = true, Theme = (byte)Math.Max(1, Array.IndexOf(ThemeNames, look.Theme)), Look = PolishLooks.Hash(look.Id) } : new PolishedLot());
+                    if (area != null && area.Changes.Length > 0)
+                    {
+                        var buf = EntityManager.HasBuffer<PolishLookOverride>(e) ? EntityManager.GetBuffer<PolishLookOverride>(e) : EntityManager.AddBuffer<PolishLookOverride>(e);
+                        buf.Clear();
+                        foreach (var c in area.Changes) buf.Add(c);
+                    }
                     TotalFlaggedNew++;
                     FlagsVersion++;
                 }
@@ -577,6 +589,8 @@ namespace Placemaker.Game.Neighbours
         /// <summary>Another city: nothing in memory may name its entities.</summary>
         private void ForgetCity()
         {
+            _areaCache = null;
+            s_newAreas.Clear();
             _written.Clear();
             _lawnOriginal.Clear();
             _described.Clear();

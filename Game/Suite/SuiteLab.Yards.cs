@@ -125,6 +125,15 @@ namespace Placemaker.Game.Suite
             foreach (var c in curves) for (int i = 0; i <= 16; i++) { var p = MathUtils.Position(c, i / 16f).xz; lo = math.min(lo, p); hi = math.max(hi, p); }
             lo -= 62f; hi += 62f;
             string zoneName = (string)step["zone"] ?? "NA Residential Low";
+            if (zoneName == "none")
+            {
+                // the street's blocks left unzoned (a Zoning type zones them)
+                rec["pieces"] = curves.Count;
+                st.Ring = new[] { lo + 30f, new float2(hi.x - 30f, lo.y + 30f), hi - 30f, new float2(lo.x + 30f, hi.y - 30f) };
+                Event("build");
+                Mod.Log.Info($"Placemaker lab: street {shape} ({curves.Count} pieces of {roadName}), not zoned");
+                yield break;
+            }
             // the same zone in the other theme when this one has none (NA and EU name most zones alike)
             string other = zoneName.StartsWith("NA ") ? "EU " + zoneName.Substring(3) : zoneName.StartsWith("EU ") ? "NA " + zoneName.Substring(3) : zoneName;
             if (!_fixture.Prefabs.TryGetValue(zoneName, out var zone) && !_fixture.Prefabs.TryGetValue(other, out zone)) { rec["error"] = "lab: no zone prefab " + zoneName; yield break; }

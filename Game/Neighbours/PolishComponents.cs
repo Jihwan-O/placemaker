@@ -6,6 +6,8 @@
 //     ever edited. Level-ups keep the entity (and the flag); a replaced building gets the flag back by position.
 //   * PolishPiece on a surface or object the polish made for a house (bed, path, paving, owned lawn, bush, rock, shared
 //     green): after a load the polish still knows which of the house's pieces are its own, so Unpolish takes them away.
+//   * PolishLookArea (+ PolishLookAreaPoint, PolishLookOverride buffers) on a headless entity: an area zoned with a look
+//     (a Zoning type's "Zone this area"); buildings that grow in it get the look and its changes.
 //   * PolishLawnOriginal on one of the house's own lawns the polish reshaped: its nodes as the game made them, so Unpolish
 //     (and a later plan) gives the lawn back exactly, also after a load.
 
@@ -105,6 +107,44 @@ namespace Placemaker.Game.Neighbours
             reader.Read(out Knob);
             reader.Read(out Value);
         }
+    }
+
+    /// <summary>An area zoned with a look: buildings that grow in it get it (NeighbourPolishSystem.Areas).</summary>
+    public struct PolishLookArea : IComponentData, IQueryTypeParameter, ISerializable
+    {
+        public const int CurrentVersion = 1;
+        /// <summary>PolishLooks.Hash of the look's id.</summary>
+        public int Look;
+        /// <summary>Newer areas win where they overlap.</summary>
+        public int Order;
+        public float2 Min, Max;
+
+        public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
+        {
+            writer.Write(CurrentVersion);
+            writer.Write(Look);
+            writer.Write(Order);
+            writer.Write(Min);
+            writer.Write(Max);
+        }
+
+        public void Deserialize<TReader>(TReader reader) where TReader : IReader
+        {
+            reader.Read(out int version);
+            reader.Read(out Look);
+            reader.Read(out Order);
+            reader.Read(out Min);
+            reader.Read(out Max);
+        }
+    }
+
+    [InternalBufferCapacity(0)]
+    public struct PolishLookAreaPoint : IBufferElementData, ISerializable
+    {
+        public float2 Position;
+
+        public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter => writer.Write(Position);
+        public void Deserialize<TReader>(TReader reader) where TReader : IReader => reader.Read(out Position);
     }
 
     public struct PolishLawnOriginal : IBufferElementData, ISerializable

@@ -252,6 +252,7 @@ namespace Placemaker.Game.Neighbours
                 None = new[] { ComponentType.ReadOnly<Deleted>(), ComponentType.ReadOnly<Temp>() },
             });
             CreateLotQueries();
+            CreateAreaQueries();
         }
 
         [Preserve]

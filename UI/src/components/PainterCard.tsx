@@ -430,33 +430,50 @@ function zoneLabel(t: TFunc, id: string): { region: string; name: string } {
     return { region, name };
 }
 
-/** One zone type as the zoning toolbar shows it: its icon, its name, its look underneath (dim: its kind's). */
-const ZoneTile = ({ p, z, on, onClick }: { p: PainterState; z: PolishZone; on: boolean; onClick: () => void }) => {
+/** Zones of one name (EU and NA alike): one row. */
+type ZoneRowData = { key: string; name: string; icon: string; regions: string[]; zones: PolishZone[] };
+
+function zoneRows(t: TFunc, zones: PolishZone[]): ZoneRowData[] {
+    const rows = new Map<string, ZoneRowData>();
+    for (const z of zones) {
+        const { region, name } = zoneLabel(t, z.id);
+        const r = rows.get(name) ?? { key: z.id, name, icon: z.icon, regions: [], zones: [] };
+        if (region && !r.regions.includes(region)) r.regions.push(region);
+        if (!r.icon && z.icon) r.icon = z.icon;
+        r.zones.push(z);
+        rows.set(name, r);
+    }
+    // zones with the game's icon first (the zoning toolbar's), then the rest
+    return [...rows.values()].sort((a, b) => (a.icon ? 0 : 1) - (b.icon ? 0 : 1));
+}
+
+/** One zone type in a line: its icon, its name, EU / NA, its look on the right (dim: its kind's). */
+const ZoneRow = ({ p, r, on, onClick }: { p: PainterState; r: ZoneRowData; on: boolean; onClick: () => void }) => {
     const { t } = useT();
-    const { region, name } = zoneLabel(t, z.id);
+    const looks = [...new Set(r.zones.map((z) => z.look))];
+    const look = looks.length === 1 ? looks[0] : "";
+    const own = r.zones.some((z) => z.own);
     return (
-        <Tip title={name} description={(region ? region + " · " : "") + t("Placemaker.UI.Polish.ZoneTip", "Click to pick its look")}>
-            <button
-                type="button"
-                className={classNames(s.zoneTile, { [s.zoneTileOn]: on })}
-                data-testid={"polish-zone-" + z.id}
-                data-look={z.look}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onClick();
-                }}
-            >
-                <div className={s.zoneTop}>
-                    <Icon name={z.icon || "zone"} size={22} fallback="zone" />
-                    {region ? <div className={s.regionTag}>{region}</div> : null}
-                </div>
-                <div className={s.zoneName}>{name}</div>
-                <div className={classNames(s.zoneLook, { [s.zoneLookOwn]: z.own })}>
-                    <Icon name={z.look === "off" ? "eyeOff" : lookIcon(p, z.look)} size={9} tint={z.own ? "light" : "dim"} />
-                    <div className={s.zoneLookText}>{lookName(t, p, z.look)}</div>
-                </div>
-            </button>
-        </Tip>
+        <button
+            type="button"
+            className={classNames(s.zoneRow, { [s.zoneRowOn]: on })}
+            data-testid={"polish-zone-" + r.key}
+            data-look={look}
+            onClick={(e) => {
+                e.stopPropagation();
+                onClick();
+            }}
+        >
+            <Icon name={r.icon || "zone"} size={14} fallback="zone" />
+            <div className={s.zoneRowName}>{r.name}</div>
+            {r.regions.map((g) => (
+                <div key={g} className={s.regionTag}>{g}</div>
+            ))}
+            <div className={classNames(s.zoneLook, { [s.zoneLookOwn]: own })}>
+                <Icon name={look === "off" ? "eyeOff" : look ? lookIcon(p, look) : "layers"} size={9} tint={own ? "light" : "dim"} />
+                <div className={s.zoneLookText}>{look ? lookName(t, p, look) : t("Placemaker.UI.Polish.Mixed", "Mixed")}</div>
+            </div>
+        </button>
     );
 };
 
@@ -502,7 +519,6 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                             if (!list.length) return null;
                             const kindLook = String(city[k.city]);
                             const kindKey = "kind:" + k.id;
-                            const picked = list.find((z) => z.id === picking);
                             return (
                                 <Collapsible
                                     key={k.id}
@@ -534,17 +550,31 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                                             <LookChips p={p} value={kindLook} testId={"polish-kind-" + k.city + "-pick"} onPick={(v) => { if (v) act.polishCity(k.city, v); setPicking(null); }} />
                                         </div>
                                     ) : null}
-                                    <div className={s.zoneGrid}>
-                                        {list.map((z) => (
-                                            <ZoneTile key={z.id} p={p} z={z} on={picking === z.id} onClick={() => setPicking(picking === z.id ? null : z.id)} />
-                                        ))}
+                                    <div className={s.zoneList}>
+                                        {zoneRows(t, list).map((r) => {
+                                            const on = picking === r.key;
+                                            const looks = [...new Set(r.zones.map((z) => z.look))];
+                                            return (
+                                                <React.Fragment key={r.key}>
+                                                    <ZoneRow p={p} r={r} on={on} onClick={() => setPicking(on ? null : r.key)} />
+                                                    {on ? (
+                                                        <div className={s.pickBox}>
+                                                            <LookChips
+                                                                p={p}
+                                                                value={looks.length === 1 ? looks[0] : ""}
+                                                                inherit={r.zones.some((z) => z.own)}
+                                                                testId={"polish-zone-" + r.key + "-pick"}
+                                                                onPick={(v) => {
+                                                                    for (const z of r.zones) act.polishZone(z.id, v);
+                                                                    setPicking(null);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ) : null}
+                                                </React.Fragment>
+                                            );
+                                        })}
                                     </div>
-                                    {picked ? (
-                                        <div className={s.pickBox}>
-                                            <div className={s.pickTitle}>{zoneLabel(t, picked.id).name + (zoneLabel(t, picked.id).region ? " · " + zoneLabel(t, picked.id).region : "")}</div>
-                                            <LookChips p={p} value={picked.look} inherit={picked.own} testId={"polish-zone-" + picked.id + "-pick"} onPick={(v) => { act.polishZone(picked.id, v); setPicking(null); }} />
-                                        </div>
-                                    ) : null}
                                 </Collapsible>
                             );
                         })}

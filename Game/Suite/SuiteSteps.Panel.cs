@@ -112,8 +112,10 @@ namespace Placemaker.Game.Suite
             var stage0 = _tool.Stage;
             bool building0 = _tool.Building;
             string marker0 = _tool.MarkerKind;
+            int built0 = _tool.SuiteBuildsDone;
+            // a build done at once that keeps the selection (a Zoning look) counts by the builds done
             yield return UiAct(st, rec, label, "primary", "primary", null,
-                () => _tool.Stage != stage0 || _tool.Building != building0 || _tool.MarkerKind != marker0,
+                () => _tool.Stage != stage0 || _tool.Building != building0 || _tool.MarkerKind != marker0 || _tool.SuiteBuildsDone != built0,
                 () => _tool.Primary());
         }
 

@@ -5,6 +5,9 @@
 // houses in it), Design shows the look's rows and styles, Review counts the buildings. Build polishes them with the look and
 // the values the rows have (saved on each building: the look and every value its style changed), and the selection stays,
 // so it can be built again with another look or style.
+// "Zone this area" on: the plan has the zone cells; Build polishes the buildings there now, leaves a look area behind (the
+// buildings that grow in it get the look and the changes: NeighbourPolishSystem.Areas) and zones the cells as every build
+// does (a loose build: ordinary city zoning, no group).
 
 using System;
 using System.Collections.Generic;
@@ -64,7 +67,7 @@ namespace Placemaker.Game.Tool
         }
 
         /// <summary>Build for a Zoning type: the buildings in the area polished with the look and the rows' values. False when
-        /// the design is not a Zoning type (the normal build).</summary>
+        /// the design is not a Zoning type, or zones the area too (then the normal build zones it).</summary>
         private bool BuildPolish()
         {
             var layer = _recipe == null ? null : PolishLookLayer.Of(_recipe.Root.Layer);
@@ -72,12 +75,20 @@ namespace Placemaker.Game.Tool
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
             if (polish == null || _shape == null) return true;
             var lots = PainterLots(polish);
-            if (lots.Count == 0) { Flash(new LocText("Placemaker.Painter.NoLots")); return true; }
+            bool zoning = _plan != null && _plan.Layers.Any(l => l.Zoning.Count > 0);
+            if (lots.Count == 0 && !zoning) { Flash(new LocText("Placemaker.Painter.NoLots")); return true; }
             var look = (PolishLooks.BuiltIn.FirstOrDefault(l => l.Id == layer.LookId) ?? PolishLooks.BuiltIn[0]).Values();
             var values = PolishValues(layer);
             var changes = PolishLooks.Diff(values, look);
-            NeighbourPolishSystem.Stamp(lots, true, layer.LookId, changes.Count > 0 ? changes : null);
+            if (lots.Count > 0) NeighbourPolishSystem.Stamp(lots, true, layer.LookId, changes.Count > 0 ? changes : null);
             NeighbourPolishSystem.NoteReach(values);
+            if (zoning)
+            {
+                NeighbourPolishSystem.AddLookArea(_shape.Ring2D(), layer.LookId, changes.Count > 0 ? changes : null);
+                int cells = _plan.Layers.Sum(l => l.Zoning.Count);
+                Mod.Log.Info($"Placemaker zoning: {cells} zone cells to zone with {layer.LookId}, {lots.Count} buildings polished now ({changes.Count} settings changed from the look; {AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
+                return false;
+            }
             LastStamp = (lots.Count, true);
             Mod.Log.Info($"Placemaker zoning: {lots.Count} buildings polished with {layer.LookId} ({changes.Count} settings changed from the look; {AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
             Flash(new LocText("Placemaker.Polish.Built", lots.Count), 5f);

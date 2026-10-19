@@ -473,6 +473,24 @@ namespace Placemaker.Core.Neighbours
                 }
                 plots[i] = poly.Count >= 3 && Poly.Area(poly) > 1f ? poly.ToArray() : lot;
             }
+            // a garden never runs out into a spike (on the inside of a curve its sides close in behind it): it ends where it has
+            // become narrower than half its lot (at least minGardenWidth); the land past that is nobody's (FillGaps never sees it)
+            int narrowed = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (!touched[i] || plots[i] == null || raw[i] == null) continue;
+                var h = houses[i];
+                float minW = math.max(K(h, s, "minGardenWidth", 8f), h.HalfLot.x);
+                float? z = NarrowsAt(plots[i], h, minW);
+                if (z == null) continue;
+                var p = h.ToWorld(new float2(0f, z.Value));
+                var cutPlot = ClipHalfPlane(plots[i].ToList(), p, h.Right, h.Position);
+                if (cutPlot.Count < 3 || Poly.Area(cutPlot) < 1f) continue;
+                plots[i] = cutPlot.ToArray();
+                raw[i] = ClipHalfPlane(raw[i], p, h.Right, h.Position);
+                narrowed++;
+            }
+            if (narrowed > 0) plan.Notes.Add($"{narrowed} gardens end where they get narrow (no spikes)");
             var stepSplits = new List<(int I, int J, bool AFront, float2 Pa, float2 Pb, float2 S, float2 Inward, uint Hash)>();
             foreach (var (si, sj, aFront, deep, ph) in steps)
             {
@@ -1897,6 +1915,43 @@ namespace Placemaker.Core.Neighbours
         }
 
         /// <summary>Sutherland–Hodgman: the part of a convex polygon on the side of the line (p, d) where <paramref name="keep"/> lies.</summary>
+        /// <summary>
+        /// Going back from the back of the house's lot, the first depth (local z) where the garden is narrower than minW across
+        /// (and stays so for 3 m: a fence corner is no spike); null when it never gets that narrow.
+        /// </summary>
+        private static float? NarrowsAt(IReadOnlyList<float2> plot, StitchHouse h, float minW)
+        {
+            float zMin = float.MaxValue;
+            var local = new float2[plot.Count];
+            for (int k = 0; k < plot.Count; k++)
+            {
+                var d = plot[k] - h.Position;
+                local[k] = new float2(math.dot(d, h.Right), math.dot(d, h.Forward));
+                zMin = math.min(zMin, local[k].y);
+            }
+            float z0 = -h.HalfLot.y;
+            if (zMin > z0 - 4f) return null;
+            float? start = null;
+            for (float z = z0; z > zMin; z -= 1f)
+            {
+                float lo = float.MaxValue, hi = float.MinValue;
+                for (int k = 0; k < local.Length; k++)
+                {
+                    var a = local[k];
+                    var b = local[(k + 1) % local.Length];
+                    if ((a.y - z) * (b.y - z) > 0f || a.y == b.y) continue;
+                    float x = math.lerp(a.x, b.x, (z - a.y) / (b.y - a.y));
+                    lo = math.min(lo, x);
+                    hi = math.max(hi, x);
+                }
+                bool narrow = hi - lo < minW;
+                if (!narrow) { start = null; continue; }
+                start ??= z;
+                if (start.Value - z >= 3f) return start;
+            }
+            return start;
+        }
+
         private static List<float2> ClipHalfPlane(List<float2> poly, float2 p, float2 d, float2 keep)
         {
             float Side(float2 x) => d.x * (x.y - p.y) - d.y * (x.x - p.x);

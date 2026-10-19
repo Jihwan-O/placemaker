@@ -159,7 +159,7 @@
     border-radius: 4rem;
     background-color: rgba(255, 255, 255, 0.05);
     @include border(1rem, rgba(255, 255, 255, 0.12));
-    color: inherit;
+    color: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the text colour
     font-size: $fs-s;
     cursor: pointer;
 }
@@ -200,7 +200,7 @@
     border-radius: 4rem;
     background-color: rgba(255, 255, 255, 0.06);
     @include border(1rem, rgba(255, 255, 255, 0.14));
-    color: inherit;
+    color: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the text colour
     font-size: $fs-s;
     cursor: pointer;
 }
@@ -224,58 +224,56 @@
     color: $c-text-dim;
 }
 
-// zone types as the zoning toolbar shows them
-.zoneGrid {
-    @include row;
-    flex-wrap: wrap;
-    align-items: stretch;
+// zone types, one line each (EU and NA alike share a line)
+.zoneList {
+    @include col;
     min-width: 0;
-    margin: 2rem 0 4rem 0;
+    margin: 0 0 4rem 0;
 }
 
-.zoneTile {
-    @include col;
-    width: 31%;
-    margin: 0 2% 5rem 0;
-    padding: 5rem 5rem 4rem 5rem;
-    border-radius: 5rem;
-    background-color: rgba(255, 255, 255, 0.04);
-    @include border(1rem, rgba(255, 255, 255, 0.08));
-    color: inherit;
+.zoneRow {
+    @include row;
+    min-width: 0;
+    height: 22rem;
+    padding: 0 4rem;
+    border-radius: 3rem;
+    color: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the text colour
     text-align: left;
     cursor: pointer;
 }
 
-.zoneTileOn {
-    background-color: rgba(143, 209, 255, 0.12);
-    @include border(1rem, rgba(143, 209, 255, 0.75));
+.zoneRow:hover {
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
-.zoneTop {
-    @include row;
-    justify-content: space-between;
+.zoneRowOn {
+    background-color: rgba(143, 209, 255, 0.12);
+}
+
+.zoneRowName {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0 4rem 0 6rem;
+    font-size: 11rem;
+    @include ellipsis;
 }
 
 .regionTag {
-    padding: 0 4rem;
+    flex: 0 0 auto;
+    margin-right: 3rem;
+    padding: 0 3rem;
     border-radius: 3rem;
-    font-size: 10rem;
+    font-size: 9rem;
     font-weight: bold;
     color: $c-text-dim;
     background-color: rgba(255, 255, 255, 0.08);
 }
 
-.zoneName {
-    min-width: 0;
-    margin-top: 4rem;
-    font-size: 11rem;
-    line-height: 1.2;
-}
-
 .zoneLook {
     @include row;
-    min-width: 0;
-    margin-top: 4rem;
+    flex: 0 0 auto;
+    width: 74rem;
+    margin-left: 4rem;
     font-size: 10rem;
     color: $c-text-dim;
 }

@@ -388,6 +388,10 @@ namespace Placemaker.Game.Settings
         [SettingsUIHidden] public bool PolishGroundPaint { get; set; }
 
         public static readonly string[] PolishThemeValues = { "garden", "natural", "tidy", "yard", "off" };
+        /// <summary>Each zone type's look for new buildings and Polish the whole city (JSON: zone prefab → look id or "off").</summary>
+        [SettingsUIHidden] public string PolishZoneLooks { get; set; }
+        /// <summary>The look the polish tool had picked last ("zone": each building its zone's look).</summary>
+        [SettingsUIHidden] public string PolishLookLast { get; set; }
 
         public bool PolishOff() => !NeighbourhoodPolish;
 
@@ -430,6 +434,7 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PolishNew = PolishNewHouses;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = NeighbourhoodPolish;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetZoneThemes(PolishThemeHomes, PolishThemeShops, PolishThemeOffices, PolishThemeIndustry);
+                global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetZoneLooks(PolishZoneLooks);
                 {
                     byte parts = 0;
                     if (PolishLawns) parts |= global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PartLawns;

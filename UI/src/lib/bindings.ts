@@ -328,6 +328,12 @@ export const act = {
     polishOption: (id: string, value: number) => fire(Triggers.polishOption, id, value),
     /** A Whole city row of the painter card. */
     polishCity: (what: string, value = "") => fire(Triggers.polishCity, what, value),
+    /** A setting of the look picked in the polish tool. */
+    polishKnob: (id: string, value: number) => fire(Triggers.polishKnob, id, value),
+    /** save / saveAs (name) / rename (name) / delete / revert the look picked. */
+    polishLook: (what: string, arg = "") => fire(Triggers.polishLook, what, arg),
+    /** A zone type's look ("off"; "" = as its kind). */
+    polishZone: (zone: string, look: string) => fire(Triggers.polishZone, zone, look),
     undo: () => fire(Triggers.undo),
     redo: () => fire(Triggers.redo),
     setAreaMode: (mode: AreaMode) => fire(Triggers.setAreaMode, mode),

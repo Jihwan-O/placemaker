@@ -43,7 +43,7 @@ namespace Placemaker.Game.Tool
         {
             get
             {
-                if (_shape == null || _recipe == null || _stage == ToolStage.Building) return false;
+                if (_shape == null || _recipe == null || _painter || _stage == ToolStage.Building) return false;
                 return _worker.Busy || _planRevision != _inputRevision;
             }
         }

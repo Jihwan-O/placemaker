@@ -508,7 +508,8 @@ namespace Placemaker.Game.Neighbours
                     coreIds.Add(d.House.Id);
                 }
                 var flag = EntityManager.HasComponent<PolishedLot>(e) ? EntityManager.GetComponentData<PolishedLot>(e) : default;
-                stitch.Add(Copy(d.House, isCore, flag.Yes, ThemeFor(e, d.House.Zone), OptionsOf(flag)));
+                var (options, theme) = flag.Yes ? PlannerLook(e, flag, d.House.Zone) : (null, ThemeFor(e, d.House.Zone));
+                stitch.Add(Copy(d.House, isCore, flag.Yes, theme, options));
             }
             var planner = Planner;
             // the roads, paths, tracks and other buildings around the patch: never joined across, never reached onto, met

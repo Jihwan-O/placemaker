@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Unity.Mathematics;
 
 namespace Placemaker.Core.Tool
@@ -85,6 +86,15 @@ namespace Placemaker.Core.Tool
         /// lots waiting to be fitted, lots being put back.</summary>
         public string Homes = "garden", Shops = "tidy", Offices = "tidy", Industry = "yard";
         public int CityPolished, CityTotal, Waiting, Restoring;
+        /// <summary>The look picked (Theme holds its id): its base theme as the rows have it, whether the rows changed it,
+        /// every knob's value in the rows and in the saved look.</summary>
+        public string LookTheme = "garden", LookSavedTheme = "garden";
+        public bool Modified;
+        public Dictionary<string, float> Values = new Dictionary<string, float>(), LookValues = new Dictionary<string, float>();
+        /// <summary>Every look: id, name (a key for the built-in ones), the player's own, base theme.</summary>
+        public List<(string Id, string Name, bool Custom, string Theme)> Looks = new List<(string, string, bool, string)>();
+        /// <summary>Every zone type: prefab name, kind (home, shop, office, industry), its look ("off"), set for it (not its kind's).</summary>
+        public List<(string Id, string Kind, string Look, bool Own)> Zones = new List<(string, string, string, bool)>();
     }
 
     public sealed class RecipeListEntry
@@ -222,9 +232,27 @@ namespace Placemaker.Core.Tool
                     .Set("look", JsonValue.Obj().Set("painted", p.Painted).Set("lawns", p.Lawns).Set("planting", p.Planting).Set("features", p.Features)
                         .Set("paths", p.Paths).Set("rocks", p.Rocks).Set("groundPaint", p.GroundPaint).Set("shopPaving", p.ShopPaving))
                     .Set("city", JsonValue.Obj().Set("homes", p.Homes ?? "garden").Set("shops", p.Shops ?? "tidy").Set("offices", p.Offices ?? "tidy").Set("industry", p.Industry ?? "yard")
-                        .Set("polished", p.CityPolished).Set("total", p.CityTotal).Set("waiting", p.Waiting).Set("restoring", p.Restoring)));
+                        .Set("polished", p.CityPolished).Set("total", p.CityTotal).Set("waiting", p.Waiting).Set("restoring", p.Restoring))
+                    .Set("lookTheme", p.LookTheme ?? "garden").Set("lookSavedTheme", p.LookSavedTheme ?? "garden").Set("modified", p.Modified)
+                    .Set("values", Knobs(p.Values)).Set("lookValues", Knobs(p.LookValues))
+                    .Set("looks", Arr(p.Looks.Select(l => JsonValue.Obj().Set("id", l.Id).Set("name", l.Name).Set("custom", l.Custom).Set("theme", l.Theme))))
+                    .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own)))));
             }
             return o;
+        }
+
+        private static JsonValue Knobs(Dictionary<string, float> d)
+        {
+            var o = JsonValue.Obj();
+            if (d != null) foreach (var kv in d) o.Set(kv.Key, Math.Round(kv.Value, 4));
+            return o;
+        }
+
+        private static JsonValue Arr(IEnumerable<JsonValue> items)
+        {
+            var a = JsonValue.Arr();
+            foreach (var i in items) a.Add(i);
+            return a;
         }
 
         public static JsonValue Primary(PrimaryAction p)

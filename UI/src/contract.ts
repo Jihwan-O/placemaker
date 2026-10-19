@@ -155,10 +155,27 @@ export interface PainterState {
   newHouses: boolean;
   /** The theme Polish gives: "zone" (each house by its zone's setting), "garden", "natural", "tidy", "yard". */
   theme: string;
-  /** The look Polish gives (saved on each lot it polishes; new buildings get it too). */
-  look?: PolishLook;
-  /** The whole city: each kind's theme for new buildings, how many are polished, work left. */
+  /** The whole city: each kind's look for new buildings, how many are polished, work left. */
   city?: PolishCity;
+  /** The look picked is `theme` ("zone": each building its zone's look). Its base theme as the rows have it, as saved. */
+  lookTheme: string;
+  lookSavedTheme: string;
+  /** The rows changed the look (not saved). */
+  modified: boolean;
+  /** Every setting of the look as the rows have it, and as the look has it (reset). */
+  values?: Record<string, number>;
+  lookValues?: Record<string, number>;
+  /** Every look: the built-in ones (name is a key) and the player's own. */
+  looks?: { id: string; name: string; custom: boolean; theme: string }[];
+  /** Every zone type of the game: its look ("off": not polished) and whether it has its own (else its kind's). */
+  zones?: PolishZone[];
+}
+
+export interface PolishZone {
+  id: string;
+  kind: "home" | "shop" | "office" | "industry";
+  look: string;
+  own: boolean;
 }
 
 export interface PolishLook {
@@ -576,6 +593,9 @@ export const Triggers = {
   polishTheme: "polishTheme",               // (theme: string) — the theme the painter's Polish gives
   polishOption: "polishOption",             // (id: string, value: number) — the painter card's look rows (toggles 1/0, painted 0–100)
   polishCity: "polishCity",                 // (what: string, value: string) — on / newHouses / homes|shops|offices|industry / polishAll / unpolishAll
+  polishKnob: "polishKnob",                 // (id: string, value: number) — a setting of the look picked ("theme": base theme index)
+  polishLook: "polishLook",                 // (what: string, arg: string) — save / saveAs / rename / delete / revert the look picked
+  polishZone: "polishZone",                 // (zone: string, look: string) — a zone type's look ("off"; "" = its kind's)
   polishStamp: "polishStamp",               // (yes: boolean) — (PROTOCOL 25) the painter: Polish (true, = primary) / Unpolish (false) the lots in the area
   undo: "undo",                             // ()
   redo: "redo",                             // ()

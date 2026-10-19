@@ -28,7 +28,7 @@ import { ManageStage } from "../stages/ManageStage";
 import { Btn, Check, Icon, Keys, Segmented } from "./common";
 import { layoutFor, MAX_SHARE, MIN_REM, NARROW_REM, PanelLayoutContext, WIDE_DEFAULT_REM, WIDE_SCREEN_PX } from "../lib/layout";
 import { AssetPickerCard, PickerContext, PickerRequest } from "./picker";
-import { PolishDesign, PolishReview } from "./PainterCard";
+import { PolishCityCard, PolishDesign } from "./PainterCard";
 import s from "./panel.module.scss";
 
 const STAGES: { id: Stage; key: string; en: string }[] = [
@@ -315,13 +315,20 @@ function usePanelPosition() {
 
 // ───────────── pieces ─────────────
 
+/** The polish tool's steps: pick buildings, then polish them (nothing is planned or reviewed). */
+const POLISH_STAGES: { id: Stage; key: string; en: string }[] = [
+    { id: "area", key: "Placemaker.UI.Stage.Area", en: "Area" },
+    { id: "design", key: "Placemaker.UI.Polish.StagePolish", en: "Polish" },
+];
+
 const StageBar = ({ state }: { state: ToolState }) => {
     const { t } = useT();
-    const currentIndex = STAGES.findIndex((x) => x.id === (state.stage === "building" ? "review" : state.stage));
+    const STAGES_SHOWN = state.painter ? POLISH_STAGES : STAGES;
+    const currentIndex = STAGES_SHOWN.findIndex((x) => x.id === (state.stage === "building" ? "review" : state.stage));
     const locked = state.stage === "building";
     return (
         <div className={s.stageBar} data-testid="stage-bar">
-            {STAGES.map((st, i) => {
+            {STAGES_SHOWN.map((st, i) => {
                 const current = i === currentIndex;
                 const done = currentIndex > i;
                 const reachable = !locked && !current && state.reachable.includes(st.id);
@@ -677,6 +684,8 @@ export const PlacemakerPanel = () => {
     // Each open is a fresh card (its hover preview ends when it is replaced).
     const pickerSerial = useRef(0);
     const [ack, setAck] = useState(false);
+    // the polish tool's City window (beside the panel)
+    const [cityOpen, setCityOpen] = useState(false);
     const permKey = useMemo(() => JSON.stringify(summary.permanent), [summary.permanent]);
     const position = usePanelPosition();
     const layout = useMemo(() => layoutFor(position.width), [position.width]);
@@ -750,7 +759,7 @@ export const PlacemakerPanel = () => {
             break;
         case "review":
             body = (
-polish ? <PolishReview state={state} /> : <ReviewStage catalog={catalog} state={state} summary={summary} />
+<ReviewStage catalog={catalog} state={state} summary={summary} />
             );
             break;
         case "building":
@@ -796,12 +805,24 @@ polish ? <PolishReview state={state} /> : <ReviewStage catalog={catalog} state={
                     </div>
                 )}
                 {state.editingGroup != null ? <div className={s.editingPill}>{t("Placemaker.UI.Editing", "Editing")}</div> : null}
-                {state.planning && !showPreviewToggle ? (
+                {state.planning && !showPreviewToggle && !polish ? (
                     <Tip title={t("Placemaker.UI.Planning", "Planning…")}>
                         <div className={classNames(s.spinner, s.headSpinner)} data-testid="planning" />
                     </Tip>
                 ) : null}
                 <div className={s.flex} />
+                {polish ? (
+                    <Btn
+                        icon="building"
+                        iconSize={13}
+                        label={t("Placemaker.UI.Polish.CityButton", "City")}
+                        selected={cityOpen}
+                        title={t("Placemaker.UI.Polish.City", "Whole city")}
+                        description={t("Placemaker.UI.Polish.CityTip", "The polish on or off, new buildings, a look for each zone type, polish or unpolish every building.")}
+                        onClick={() => setCityOpen(!cityOpen)}
+                        testId="polish-city-open"
+                    />
+                ) : null}
                 {state.stage === "manage" ? null : <UndoRedo state={state} />}
                 {state.anarchy?.available ? (
                     <Btn
@@ -942,7 +963,14 @@ polish ? <PolishReview state={state} /> : <ReviewStage catalog={catalog} state={
                                 )}
                             </div>
                         </div>
-                        {!picker && !collapsed ? (
+                        {polish && cityOpen && !collapsed ? (
+                            <div className={classNames(s.flyout, position.side === "left" ? s.flyoutLeft : s.flyoutRight)} data-testid="polish-city-flyout">
+                                <ErrorBoundary name="polish-city">
+                                    <PolishCityCard state={state} onClose={() => setCityOpen(false)} />
+                                </ErrorBoundary>
+                            </div>
+                        ) : null}
+                        {!picker && !collapsed && !(polish && cityOpen) ? (
                             <ErrorBoundary name="legend">
                                 <Legend state={state} summary={summary} side={position.side === "left" ? "left" : "right"} />
                             </ErrorBoundary>

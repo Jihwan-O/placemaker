@@ -17,7 +17,7 @@ namespace Placemaker.Game.Neighbours
 {
     public struct PolishedLot : IComponentData, IQueryTypeParameter, ISerializable
     {
-        public const int CurrentVersion = 4;
+        public const int CurrentVersion = 5;
         public bool Yes;
         /// <summary>(v2) How the garden is dressed: 0 by the zone (the settings), 1 garden, 2 natural, 3 tidy, 4 yard
         /// (NeighbourPolishSystem.ThemeNames). Never renumber.</summary>
@@ -30,6 +30,9 @@ namespace Placemaker.Game.Neighbours
         /// settings.</summary>
         public bool Own;
         public byte Parts, Painted;
+        /// <summary>(v5) The look it was polished with (PolishLooks.Hash of its id; 0: none, a lot polished before looks).
+        /// The changes not saved to the look are in its PolishLookOverride buffer.</summary>
+        public int Look;
 
         public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
         {
@@ -40,6 +43,7 @@ namespace Placemaker.Game.Neighbours
             writer.Write(Own);
             writer.Write(Parts);
             writer.Write(Painted);
+            writer.Write(Look);
         }
 
         public void Deserialize<TReader>(TReader reader) where TReader : IReader
@@ -50,6 +54,7 @@ namespace Placemaker.Game.Neighbours
             if (version >= 3) reader.Read(out Picked); else Picked = Theme != 0;   // v2: only the painter gave a theme
             if (version >= 4) { reader.Read(out Own); reader.Read(out Parts); reader.Read(out Painted); }
             else { Own = false; Parts = 0; Painted = 0; }
+            if (version >= 5) reader.Read(out Look); else Look = 0;
         }
     }
 
@@ -82,6 +87,26 @@ namespace Placemaker.Game.Neighbours
     }
 
     [InternalBufferCapacity(0)]
+    /// <summary>A setting the lot was polished with that its look does not have (the look changed in the tool and not
+    /// saved): knob (PolishLooks.Hash of its name; "theme": the base theme's index) and value.</summary>
+    public struct PolishLookOverride : IBufferElementData, ISerializable
+    {
+        public int Knob;
+        public float Value;
+
+        public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
+        {
+            writer.Write(Knob);
+            writer.Write(Value);
+        }
+
+        public void Deserialize<TReader>(TReader reader) where TReader : IReader
+        {
+            reader.Read(out Knob);
+            reader.Read(out Value);
+        }
+    }
+
     public struct PolishLawnOriginal : IBufferElementData, ISerializable
     {
         public float3 Position;

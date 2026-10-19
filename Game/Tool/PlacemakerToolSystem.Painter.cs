@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using Placemaker.Core;
 using Placemaker.Core.Geometry;
+using Placemaker.Core.Neighbours;
 using Placemaker.Core.Tool;
 using Placemaker.Game.Neighbours;
 using Unity.Entities;
@@ -24,7 +25,95 @@ namespace Placemaker.Game.Tool
         public const string PainterId = "polishGardens";
 
         private bool _painter;
-        private string _painterTheme = "zone";
+        private string _painterTheme = null;   // the look picked ("zone": each building its zone's look); null: the last one
+        private Dictionary<string, float> _lookValues = new Dictionary<string, float>(PolishLooks.Defaults);
+        private string _lookTheme = "garden";
+
+        private string PainterLook
+        {
+            get
+            {
+                if (_painterTheme == null) SelectLook(global::Placemaker.Game.Tool.ToolRegistration.Settings?.PolishLookLast ?? "zone", remember: false);
+                return _painterTheme;
+            }
+        }
+
+        /// <summary>A look picked in the polish tool (its values become the rows'), or "zone".</summary>
+        private void SelectLook(string id, bool remember = true)
+        {
+            var look = id == "zone" ? null : NeighbourPolishSystem.LookById(id);
+            if (look == null && id != "zone") id = "zone";
+            _painterTheme = id;
+            _lookValues = look != null ? look.Values() : new Dictionary<string, float>(PolishLooks.Defaults);
+            _lookTheme = look?.Theme ?? "garden";
+            var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
+            if (remember && s != null && s.PolishLookLast != id) { s.PolishLookLast = id; s.ApplyAndSave(); }
+            Touch();
+        }
+
+        private PolishLook CurrentLook => NeighbourPolishSystem.LookById(PainterLook);
+
+        /// <summary>What the rows changed from the picked look (null: nothing), "theme" its base theme's index.</summary>
+        private Dictionary<string, float> LookChanges()
+        {
+            var look = CurrentLook;
+            if (look == null) return null;
+            var d = PolishLooks.Diff(_lookValues, look.Values());
+            if (_lookTheme != look.Theme) d["theme"] = Array.IndexOf(PolishLooks.Themes, _lookTheme);
+            return d.Count > 0 ? d : null;
+        }
+
+        /// <summary>A look row of the polish tool ("theme": the base theme's index).</summary>
+        public void SetPolishKnob(string id, double value)
+        {
+            if (id == "theme") { int t = (int)Math.Round(value); if (t >= 0 && t < PolishLooks.Themes.Length) _lookTheme = PolishLooks.Themes[t]; }
+            else if (PolishLooks.Defaults.ContainsKey(id)) _lookValues[id] = (float)value;
+            else return;
+            Touch();
+        }
+
+        /// <summary>The look's buttons: "save" (over the player's own look), "saveAs" (a new look named <paramref name="arg"/>),
+        /// "rename" (the picked look to <paramref name="arg"/>), "delete" (the picked look), "revert" (back to its saved values).</summary>
+        public void PolishLookAction(string what, string arg)
+        {
+            var look = CurrentLook;
+            switch (what)
+            {
+                case "save":
+                    if (look == null || !look.Custom) return;
+                    NeighbourPolishSystem.SaveLook(look.Id, look.Name, _lookTheme, _lookValues);
+                    SelectLook(look.Id);
+                    break;
+                case "saveAs":
+                    var id = NeighbourPolishSystem.SaveLook(null, string.IsNullOrWhiteSpace(arg) ? "My look" : arg, _lookTheme, _lookValues);
+                    SelectLook(id);
+                    break;
+                case "rename":
+                    if (look != null && look.Custom && NeighbourPolishSystem.RenameLook(look.Id, arg)) Touch();
+                    break;
+                case "delete":
+                    if (look != null && look.Custom && NeighbourPolishSystem.DeleteLook(look.Id))
+                    {
+                        var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
+                        if (s != null) { s.PolishZoneLooks = NeighbourPolishSystem.ZoneLooksJson(); s.ApplyAndSave(); }
+                        SelectLook("garden");
+                    }
+                    break;
+                case "revert":
+                    if (look != null) SelectLook(look.Id);
+                    break;
+            }
+        }
+
+        /// <summary>The City window: a zone type's look for new buildings and Polish the whole city ("off"; "" = as its kind).</summary>
+        public void SetPolishZoneLook(string zone, string look)
+        {
+            if (!string.IsNullOrEmpty(look) && look != "off" && NeighbourPolishSystem.LookById(look) == null) return;
+            NeighbourPolishSystem.SetZoneLook(zone, look);
+            var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
+            if (s != null) { s.PolishZoneLooks = NeighbourPolishSystem.ZoneLooksJson(); s.ApplyAndSave(); }
+            Touch();
+        }
 
         /// <summary>
         /// The polish tool's own button (next to Placemaker's): opens this tool as the polish painter, which the panel shows
@@ -42,14 +131,13 @@ namespace Placemaker.Game.Tool
         }
 
         /// <summary>For the game runner: the theme picked in the painter's Style row.</summary>
-        public string PainterTheme => _painterTheme;
+        public string PainterTheme => PainterLook;
 
         /// <summary>The theme the painter's Polish gives: "zone" (by each house's zone) or a theme name.</summary>
         public void SetPainterTheme(string theme)
         {
-            if (string.IsNullOrEmpty(theme) || Array.IndexOf(NeighbourPolishSystem.ThemeNames, theme) < 0 || theme == _painterTheme) return;
-            _painterTheme = theme;
-            Touch();
+            if (string.IsNullOrEmpty(theme) || theme == PainterLook) return;
+            SelectLook(theme);
         }
         private BrushRules _painterRules;
         private AreaShape _countShape;
@@ -140,7 +228,7 @@ namespace Placemaker.Game.Tool
                 case "on": s.NeighbourhoodPolish = on; break;
                 case "newHouses": s.PolishNewHouses = on; break;
                 case "homes": case "shops": case "offices": case "industry":
-                    if (Array.IndexOf(global::Placemaker.Game.Settings.PlacemakerSettings.PolishThemeValues, value) < 0) return;
+                    if (value != "off" && NeighbourPolishSystem.LookById(value) == null) return;
                     if (what == "homes") s.PolishThemeHomes = value;
                     else if (what == "shops") s.PolishThemeShops = value;
                     else if (what == "offices") s.PolishThemeOffices = value;
@@ -149,8 +237,8 @@ namespace Placemaker.Game.Tool
                 case "polishAll":
                     if (!s.NeighbourhoodPolish) s.NeighbourhoodPolish = true;
                     s.ApplyAndSave();
-                    NeighbourPolishSystem.PolishEverything((byte)Math.Max(0, Array.IndexOf(NeighbourPolishSystem.ThemeNames, _painterTheme)));
-                    Mod.Log.Info($"Placemaker painter: polish the whole city ({_painterTheme})");
+                    NeighbourPolishSystem.PolishEverything(0);
+                    Mod.Log.Info("Placemaker painter: polish the whole city (each building its zone's look)");
                     Flash(new LocText("Placemaker.Painter.CityPolishing"));
                     Touch();
                     return;
@@ -178,8 +266,8 @@ namespace Placemaker.Game.Tool
             // polishing is what the player asked for: the polish runs from now on (Whole city: Neighbourhood polish)
             var settings = global::Placemaker.Game.Tool.ToolRegistration.Settings;
             if (yes && settings != null && !settings.NeighbourhoodPolish) { settings.NeighbourhoodPolish = true; settings.ApplyAndSave(); }
-            // "By zone": each lot gets its kind's theme from the settings now; a theme button picks one for all of them
-            NeighbourPolishSystem.Stamp(lots, yes, (byte)Math.Max(0, Array.IndexOf(NeighbourPolishSystem.ThemeNames, _painterTheme)));
+            // "By zone": each lot gets its zone's look; a look picked: that look, and what the rows changed in it
+            NeighbourPolishSystem.Stamp(lots, yes, PainterLook, yes ? LookChanges() : null);
             LastStamp = (lots.Count, yes);
             Mod.Log.Info($"Placemaker painter: {(yes ? "polish" : "unpolish")} {lots.Count} lots ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
             ClearArea();
@@ -229,10 +317,21 @@ namespace Placemaker.Game.Tool
             var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
             var v = new PainterView
             {
-                Lots = lots, Polished = yes, FeatureOn = NeighbourPolishSystem.FeatureEnabled, NewHouses = NeighbourPolishSystem.PolishNew, Theme = _painterTheme,
+                Lots = lots, Polished = yes, FeatureOn = NeighbourPolishSystem.FeatureEnabled, NewHouses = NeighbourPolishSystem.PolishNew, Theme = PainterLook,
                 CityPolished = NeighbourPolishSystem.StatusPolished, CityTotal = NeighbourPolishSystem.StatusTotal,
                 Waiting = NeighbourPolishSystem.StatusWaiting, Restoring = NeighbourPolishSystem.StatusRestoring,
             };
+            var current = CurrentLook;
+            v.LookTheme = _lookTheme;
+            v.Modified = LookChanges() != null;
+            v.Values = new Dictionary<string, float>(_lookValues);
+            v.LookValues = current != null ? current.Values() : new Dictionary<string, float>(PolishLooks.Defaults);
+            v.LookSavedTheme = current?.Theme ?? "garden";
+            foreach (var l in NeighbourPolishSystem.Looks) v.Looks.Add((l.Id, l.Name, l.Custom, l.Theme));
+            var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
+            if (polish != null)
+                foreach (var (zone, kind) in polish.Zones())
+                    v.Zones.Add((zone, kind, NeighbourPolishSystem.ZoneLook(zone, kind), NeighbourPolishSystem.ZoneHasOwnLook(zone)));
             if (s != null)
             {
                 v.Painted = s.PolishPaintedGardens;

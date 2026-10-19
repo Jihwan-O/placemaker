@@ -223,7 +223,12 @@ const LotGrid = ({ w0, w1, d0, d1, colour, testId, onCommit, onDrag }: { w0: num
             <div className={z.grid} ref={gridRef} onMouseDown={onDown}>
                 {rowsOut}
             </div>
-            <div className={z.gridRoad} />
+            <div className={z.legend}>
+                <div className={z.legendSwatch} style={{ backgroundColor: colour }} />
+                <div className={z.legendText}>{t("Placemaker.UI.ZoneMix.Min", "min")}</div>
+                <div className={classNames(z.legendSwatch, z.legendLight)} style={{ backgroundColor: colour }} />
+                <div className={z.legendText}>{t("Placemaker.UI.ZoneMix.Max", "max lot")}</div>
+            </div>
         </div>
     );
 };
@@ -239,9 +244,20 @@ const ShareBar = ({ parts, onCommit, t }: { parts: Part[]; onCommit: (shares: Re
     const barRef = useRef<HTMLDivElement>(null);
     const [width, setWidth] = useState(0);
     const [drag, setDrag] = useState<number[] | null>(null);
+    // each label's width as drawn (hidden copies): a label goes in its part only when it really fits
+    const measureRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    const [textW, setTextW] = useState<Record<string, number>>({});
     useLayoutEffect(() => {
         const w = barRef.current?.getBoundingClientRect().width ?? 0;
         if (Math.abs(w - width) > 1) setWidth(w);
+        const next: Record<string, number> = {};
+        let changed = false;
+        for (const [k, el] of Object.entries(measureRefs.current)) {
+            if (!el) continue;
+            next[k] = el.getBoundingClientRect().width;
+            if (Math.abs((textW[k] ?? -10) - next[k]) > 1) changed = true;
+        }
+        if (changed) setTextW(next);
     });
     const shares = drag ?? parts.map((p) => p.share);
     // the dividers: after every zone part (the last one too, so the empty part can be dragged out of a full bar)
@@ -288,21 +304,15 @@ const ShareBar = ({ parts, onCommit, t }: { parts: Part[]; onCommit: (shares: Re
         window.addEventListener("mousemove", move);
         window.addEventListener("mouseup", up);
     };
-    // labels: inside when they fit, else above and below in turn
-    const remPx = (() => {
-        try {
-            return parseFloat(getComputedStyle(document.documentElement).fontSize) || 1;
-        } catch {
-            return 1;
-        }
-    })();
+    // labels: inside when they fit (measured), else above and below in turn
     let left = 0;
     let flip = 0;
     const labels = parts.map((p, i) => {
         const pctText = Math.round(shares[i]) + "%";
         const text = p.name + " " + pctText;
         const w = (shares[i] / 100) * width;
-        const fits = w >= text.length * 6.4 * remPx + 10 * remPx;
+        const need = textW[p.key];
+        const fits = need === undefined ? w > 120 : need + 6 <= w;
         const centre = left + shares[i] / 2;
         left += shares[i];
         const place = fits || shares[i] <= 0 ? "in" : flip++ % 2 === 0 ? "above" : "below";
@@ -312,6 +322,12 @@ const ShareBar = ({ parts, onCommit, t }: { parts: Part[]; onCommit: (shares: Re
     const below = labels.some((l) => l.place === "below");
     return (
         <div className={classNames(z.barBox, { [z.barBoxAbove]: above, [z.barBoxBelow]: below })} data-testid="zonemix-bar">
+            {labels.map((l) => (
+                <div key={"m" + l.key} className={classNames(z.barText, z.measure)} ref={(el) => (measureRefs.current[l.key] = el)}>
+                    <span className={z.barName}>{l.name}</span>
+                    <span className={z.barPct}>{l.pct}</span>
+                </div>
+            ))}
             <div className={z.bar} ref={barRef}>
                 {parts.map((p, i) =>
                     shares[i] > 0 ? (
@@ -506,7 +522,7 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                         if (on) setOpened({ ...opened, [zkey]: !open });
                     }}
                 >
-                    <div className={z.outgrowName}>{t("Placemaker.UI.Outgrow", "Outgrow")}</div>
+                    <div className={z.outgrowName}>{t("Placemaker.UI.ZoneMix.OutgrowSettings", "Outgrow settings")}</div>
                     <Icon name={open ? "chevronDown" : "chevronRight"} size={9} tint={open ? "accent" : "dim"} />
                 </button>
             </div>
@@ -548,8 +564,6 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
             {placing
                 ? used.map((x) => {
                       const key = zoneKey(x.asset || KIND_ZONE[x.kind] || x.kind);
-                      const size = sizing[x.sl] ?? [x.w0, x.w1, x.d0, x.d1];
-                      const span = (p: number, q: number) => (p === q ? String(p) : p + "–" + q);
                       return (
                           <div key={x.sl} className={z.zone} data-testid={"zonemix-zone-" + x.sl}>
                               <div className={z.line} data-testid={"zonemix-line-" + x.sl}>
@@ -569,17 +583,9 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                                           if (b1 !== x.d1) set("depthMax" + x.sl, b1);
                                       }}
                                   />
-                                  <div className={z.lotText} title={t("Placemaker.UI.ZoneMix.GridTip", "")}>
-                                      <div className={z.lotSize}>
-                                          <span className={z.lotNum}>{span(Math.min(size[0], GRID_W), Math.min(size[1], GRID_W))}</span>
-                                          <span className={z.lotTimes}>×</span>
-                                          <span className={z.lotNum}>{span(Math.min(size[2], GRID_D), Math.min(size[3], GRID_D))}</span>
-                                      </div>
-                                      <div className={z.lotUnit}>{t("Placemaker.UI.ZoneMix.CellUnit", "cells of 8 m")}</div>
-                                  </div>
                                   <div className={z.side}>
                                       <div className={z.roadsCell} title={t("Placemaker.UI.ZoneMix.RoadTip", "The roads it goes on, by their width (a two-lane road is 16 m, four lanes 24 m, six lanes 32 m; the ticks): its lots are only placed along roads this wide.")}>
-                                          <Icon name="roads" size={11} tint="dim" />
+                                          <div className={z.roadsLabel}>{t("Placemaker.UI.ZoneMix.RoadWidth", "Road width")}</div>
                                           <div className={z.roadsTrack}>
                                               <RangeSlider
                                                   lo={x.r0}

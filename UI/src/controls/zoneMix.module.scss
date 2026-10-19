@@ -98,12 +98,22 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 
 .barText {
     @include row;
-    min-width: 0;
-    padding: 0 6rem;
+    flex: 0 0 auto;
+    padding: 1rem 7rem;
+    border-radius: 9rem;
     font-size: 12rem;
     color: #ffffff;
-    text-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.75);
-    @include ellipsis;
+    background-color: rgba(16, 21, 26, 0.62);
+    white-space: nowrap;
+}
+
+// a hidden copy of a label, to know how wide it is drawn
+.measure {
+    position: absolute;
+    top: 0;
+    left: 0;
+    visibility: hidden;
+    pointer-events: none;
 }
 
 .barName {
@@ -119,7 +129,7 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 
 .barEmpty .barText {
     color: $c-text-dim;
-    text-shadow: none;
+    background-color: transparent;
 }
 
 // a divider: a wide invisible grab area with a white grip
@@ -173,8 +183,11 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 
 .calloutText {
     @include row;
+    padding: 1rem 7rem;
+    border-radius: 9rem;
     font-size: 12rem;
     color: #ffffff;
+    background-color: rgba(16, 21, 26, 0.8);
     white-space: nowrap;
 }
 
@@ -182,11 +195,11 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 .zone {
     @include col;
     min-width: 0;
-    margin-bottom: 4rem;
-    padding-bottom: 4rem;
-    border-bottom-width: 1rem;
-    border-bottom-style: solid;
-    border-bottom-color: $c-line;
+    margin-bottom: 8rem;
+    padding: 7rem 8rem;
+    border-radius: 6rem;
+    background-color: rgba(255, 255, 255, 0.035);
+    @include border(1rem, $c-line);
 }
 
 .line {
@@ -513,11 +526,26 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     opacity: 1;
 }
 
-.gridRoad {
-    height: 2rem;
-    margin-top: 1rem;
+.legend {
+    @include row;
+    margin-top: 3rem;
+}
+
+.legendSwatch {
+    width: 6rem;
+    height: 6rem;
+    margin-right: 3rem;
     border-radius: 1rem;
-    background-color: rgba(200, 205, 210, 0.6);
+}
+
+.legendLight {
+    margin-left: 6rem;
+    opacity: 0.4;
+}
+
+.legendText {
+    font-size: 9rem;
+    color: $c-text-faint;
 }
 
 .lotText {
@@ -557,6 +585,12 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 .roadsCell {
     @include row;
     min-width: 0;
+}
+
+.roadsLabel {
+    flex: 0 0 auto;
+    font-size: 11rem;
+    color: $c-text-dim;
 }
 
 .roadsTrack {

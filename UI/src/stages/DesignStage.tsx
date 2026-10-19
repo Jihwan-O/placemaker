@@ -22,7 +22,9 @@ import { usePanelLayout } from "../lib/layout";
 import { Tip } from "../lib/tips";
 import { Btn, Icon, Section, Switch } from "../components/common";
 import { ControlList, controlsSummary } from "../controls/Controls";
-import { isZoneMix, knobSlotOf, ZoneMix } from "../controls/ZoneMix";
+import { isZoneMix, ZoneMix, ZoneOutgrow } from "../controls/ZoneMix";
+import { ValueSinkContext } from "../controls/Controls";
+import { SettingValue } from "../contract";
 import { ControlEx, valueOf } from "../lib/schema";
 import { useAssetName } from "../components/picker";
 import { BarMode, PresetBar, Tile, TypeBrowser } from "./PresetBrowser";
@@ -474,22 +476,49 @@ const MisfitChip = ({ step, catalog }: { step: StepView; catalog: Catalog }) => 
 // ───────────── step options ─────────────
 
 /**
- * A Zoning type: one section. Zone the empty land or only edit the buildings there (ZoneMix), the Outgrow switch, and a line
- * per zone with its own Outgrow settings (how its lots grow past their borders) folded under it: that zone's copy of the
- * look's settings in their groups (B's and C's ids end in _B, _C).
+ * A Zoning type: one section. Zone the empty land or only edit the buildings there (ZoneMix), and each zone type's own
+ * Outgrow: its switch and its settings (the type's Outgrow rows, shown with that zone type's changes over them and writing
+ * into them), kept in zoneOutgrow as {"<zone key>": {"on": bool, "v": {row: value}}}.
  */
+type OutgrowMap = Record<string, { on?: boolean; v?: Record<string, SettingValue> }>;
+
 const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: LayerType; state: ToolState; scope: string }) => {
     const { t } = useT();
     const zoningIds = (layer.controls as ControlEx[]).filter((c) => c.group === "zone" || c.id === "shapeLots").map((c) => c.id);
-    const outgrow = (slot: number) => {
-        const otherZones = (layer.controls as ControlEx[]).filter((c) => c.group !== "zone" && c.id !== "shapeLots" && knobSlotOf(c.id) !== slot).map((c) => c.id);
-        return <ControlList step={step} layer={layer} state={state} scope={scope + ":" + slot} exclude={new Set([...featureOptionIds(step), ...zoningIds, ...otherZones])} />;
+    const raw = step.values["zoneOutgrow"];
+    let map: OutgrowMap = {};
+    try {
+        map = typeof raw === "string" && raw ? (JSON.parse(raw) as OutgrowMap) : {};
+    } catch {
+        map = {};
+    }
+    const write = (next: OutgrowMap) => act.setValue(step.path, "zoneOutgrow", JSON.stringify(next));
+    const outgrow: ZoneOutgrow = {
+        isOn: (key) => map[key]?.on !== false,
+        setOn: (key, on) => write({ ...map, [key]: { ...(map[key] ?? {}), on } }),
+        body: (key) => {
+            // the type's rows, showing this zone type's changes over them; a row set writes into its changes
+            const own = map[key]?.v ?? {};
+            const view: StepView = { ...step, values: { ...step.values, ...own }, locked: [] };
+            const sink = { set: (id: string, v: SettingValue) => write({ ...map, [key]: { ...(map[key] ?? {}), v: { ...own, [id]: v } } }) };
+            return (
+                <ValueSinkContext.Provider value={sink}>
+                    <ControlList step={view} layer={layer} state={state} scope={scope + ":zone:" + key} exclude={new Set([...featureOptionIds(step), ...zoningIds])} />
+                </ValueSinkContext.Provider>
+            );
+        },
     };
     return (
         <div className={s.shape} data-testid="zoning">
             <Heading title={t("Placemaker.UI.Zoning", "Zoning")} sub={t("Placemaker.UI.Zoning.Sub2", "zones, and how their lots outgrow")} />
             <ErrorBoundary name="zoning">
-                <ZoneMix step={step} layer={layer} rows={(ids) => <ControlList step={step} layer={layer} state={state} only={ids} flat />} outgrow={outgrow} />
+                <ZoneMix
+                    step={step}
+                    layer={layer}
+                    rows={(ids) => <ControlList step={step} layer={layer} state={state} only={ids} flat />}
+                    found={state.painter?.areaZones ?? []}
+                    outgrow={outgrow}
+                />
             </ErrorBoundary>
         </div>
     );

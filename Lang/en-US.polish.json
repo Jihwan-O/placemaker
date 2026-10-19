@@ -321,5 +321,7 @@
   "Placemaker.Polish.roadMinC": "Roads from",
   "Placemaker.Polish.roadMinC.Tooltip": "The narrowest road this zone goes on (m; a two-lane road is 16 m).",
   "Placemaker.Polish.roadMaxC": "Roads to",
-  "Placemaker.Polish.roadMaxC.Tooltip": "The widest road this zone goes on (m; 48: any)."
+  "Placemaker.Polish.roadMaxC.Tooltip": "The widest road this zone goes on (m; 48: any).",
+  "Placemaker.Polish.zoneOutgrow": "Zone outgrow",
+  "Placemaker.Polish.zoneOutgrow.Tooltip": "Each zone type's own Outgrow switch and settings (set in the panel)."
 }

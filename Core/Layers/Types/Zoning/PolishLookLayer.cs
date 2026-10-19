@@ -7,9 +7,10 @@
 // Build (Game/Tool/PlacemakerToolSystem.Polish) polishes them with the look and the values the rows have, saved on each
 // building (NeighbourPolishSystem).
 // Two tools in one: Zoning (zoneArea: zone the empty land, or only edit the buildings there) and Outgrow (shapeLots: lots
-// grow past their borders). Up to three zones (A, B, C), each a zone type (or an exact zone prefab: any, mods' too) with
-// its share of the land (the rest stays empty), its lots' width and depth (cells) and the road widths it goes on, and its
-// own Outgrow settings (the look's knobs; B's and C's ids end in _B, _C). The neighbourhood types (ZoningTypes.cs: Suburb,
+// grow past their borders). Up to three zones (A, B, C) to zone, each a zone type (or an exact zone prefab: any, mods' too)
+// with its share of the land (the rest stays empty), its lots' width and depth (cells) and the road widths it goes on.
+// Outgrow: the look's settings (the type's default) and, per zone type, its own switch and changes (zoneOutgrow: JSON
+// {"<zone key>": {"on": bool, "v": {knob: value}}}, the key a zone's name without EU / NA, lower case), any number of them. The neighbourhood types (ZoningTypes.cs: Suburb,
 // Village, Main street…) give their own zones and styles; the looks as types (Garden, Natural…) are hidden on the shelf.
 // Zoning: the blocks in the area are zoned as lots that start at their road: along each block, lot after lot, each a zone
 // picked by the shares among the zones allowed on that block's road (empty by the land's empty share), its width and depth
@@ -61,7 +62,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
 
         private static string[] BuildZoningIds()
         {
-            var ids = new List<string> { "zoneArea", "zonePattern", "zoneGrain" };
+            var ids = new List<string> { "zoneArea", "zonePattern", "zoneGrain", "zoneOutgrow" };
             foreach (var sl in SlotNames)
                 foreach (var id in new[] { "zone", "zoneAsset", "share", "widthMin", "widthMax", "depthMin", "depthMax", "roadMin", "roadMax" }) ids.Add(id + sl);
             return ids.ToArray();
@@ -124,8 +125,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
         }
 
         /// <summary>Outgrow settings for every zone's copy (A, _B, _C).</summary>
-        protected static (string, object)[] AllZones(params (string, object)[] values) =>
-            values.SelectMany(v => Enumerable.Range(0, 3).Select(k => (KnobId(v.Item1, k), v.Item2))).ToArray();
+        protected static (string, object)[] AllZones(params (string, object)[] values) => values;
 
         /// <summary>Lots that keep to themselves (small reach, no open land, lawn everywhere).</summary>
         protected static readonly (string, object)[] CompactReach =
@@ -179,12 +179,14 @@ namespace Placemaker.Core.Layers.Types.Zoning
             }
             c.Choice("zonePattern", DefaultPattern, ControlTier.Essential, "zone", Patterns).Tip().When("zoneArea=true");
             c.Slider("zoneGrain", DefaultGrain, 1, 12, 1, "count", ControlTier.More, "zone").Tip().When("zonePattern=clumps");
-            foreach (var id in new[] { "zoneArea", "zonePattern", "zoneGrain" }) c.Fixed(id);
+            // each zone type's own Outgrow switch and changes (the panel writes it; JSON, see the file's header)
+            c.Asset("zoneOutgrow", "", ControlTier.More, "zone").Tip();
+            foreach (var id in new[] { "zoneArea", "zonePattern", "zoneGrain", "zoneOutgrow" }) c.Fixed(id);
             // Outgrow: the lots grow past their borders, each zone's lots by its own copy of the look's settings
             c.Toggle("shapeLots", true, ControlTier.Essential, "shape").Tip();
             c.Fixed("shapeLots");
             var look = (PolishLooks.BuiltIn.FirstOrDefault(l => l.Id == LookId) ?? PolishLooks.BuiltIn[0]).Values();
-            for (int slot = 0; slot < 3; slot++)
+            for (int slot = 0; slot < 1; slot++)
                 foreach (var k in PolishLooks.Knobs)
                 {
                     float def = look.TryGetValue(k.Id, out var v) ? v : 0f;

@@ -829,10 +829,10 @@ export const PlacemakerPanel = () => {
                     <Btn
                         icon="building"
                         iconSize={13}
-                        label={t("Placemaker.UI.Polish.CityButton", "City")}
+                        label={t("Placemaker.UI.Polish.GlobalButton", "Global outgrow")}
                         selected={cityOpen}
-                        title={t("Placemaker.UI.Polish.City", "Whole city")}
-                        description={t("Placemaker.UI.Polish.CityTip", "The polish on or off, new buildings, a look for each zone type, polish or unpolish every building.")}
+                        title={t("Placemaker.UI.Polish.Global", "Global outgrow")}
+                        description={t("Placemaker.UI.Polish.GlobalTip", "Outgrow for the whole city: new buildings on or off, a look for each zone type, outgrow or put back every building.")}
                         onClick={() => setCityOpen(!cityOpen)}
                         testId="polish-city-open"
                     />

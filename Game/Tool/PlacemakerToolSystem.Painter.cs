@@ -9,6 +9,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Placemaker.Core;
 using Placemaker.Core.Geometry;
 using Placemaker.Core.Neighbours;
@@ -189,6 +190,7 @@ namespace Placemaker.Game.Tool
         }
         private BrushRules _painterRules;
         private AreaShape _countShape;
+        private readonly List<(string Key, string Zone, string Icon, int Count)> _areaZones = new List<(string, string, string, int)>();
         private int _countFlags = -1;
         private int _countLots, _countYes;
 
@@ -346,13 +348,25 @@ namespace Placemaker.Game.Tool
                     _countShape = _shape;
                     _countFlags = NeighbourPolishSystem.FlagsVersion;
                     _countLots = _countYes = 0;
+                    _areaZones.Clear();
                     var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
                     if (polish != null)
+                    {
+                        var byKey = new Dictionary<string, (string Zone, int Count)>();
                         foreach (var e in PainterLots(polish))
                         {
                             _countLots++;
                             if (polish.IsYes(e)) _countYes++;
+                            string zone = polish.ZoneOfLot(e);
+                            string key = NeighbourPolishSystem.ZoneKey(zone);
+                            if (key == "") continue;
+                            byKey[key] = (byKey.TryGetValue(key, out var z) ? z.Zone : zone, (byKey.TryGetValue(key, out var z2) ? z2.Count : 0) + 1);
                         }
+                        var icons = new Dictionary<string, string>();
+                        foreach (var zz in polish.Zones()) icons[zz.Id] = zz.Icon;
+                        foreach (var kv in byKey.OrderByDescending(kv => kv.Value.Count))
+                            _areaZones.Add((kv.Key, kv.Value.Zone, icons.TryGetValue(kv.Value.Zone, out var ic) ? ic : "", kv.Value.Count));
+                    }
                 }
                 return (_countLots, _countYes);
             }
@@ -378,6 +392,7 @@ namespace Placemaker.Game.Tool
             v.LookValues = current != null ? current.Values() : new Dictionary<string, float>(PolishLooks.Defaults);
             v.LookSavedTheme = current?.Theme ?? "garden";
             foreach (var l in NeighbourPolishSystem.Looks) v.Looks.Add((l.Id, l.Name, l.Custom, l.Theme));
+            v.AreaZones.AddRange(_areaZones);
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
             if (polish != null)
                 foreach (var (zone, kind, icon) in polish.Zones())

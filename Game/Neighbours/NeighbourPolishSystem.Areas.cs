@@ -21,6 +21,9 @@ namespace Placemaker.Game.Neighbours
         private static readonly List<(float2[] Ring, string Look, IReadOnlyDictionary<string, float> Changes, string Zone, int Batch)> s_newAreas = new List<(float2[], string, IReadOnlyDictionary<string, float>, string, int)>();
         private static int s_batch;
 
+        /// <summary>A look area's look for a zone type whose Outgrow is off: its buildings are not polished.</summary>
+        public const string LookOff = "off";
+
         /// <summary>The start of one build's look areas (one per zone, and one for any other zone): they share an order.</summary>
         public static int NewLookBatch() => ++s_batch;
 

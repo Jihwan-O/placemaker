@@ -473,25 +473,18 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     background-color: $c-surface-hover;
 }
 
-// ── a zone's lots: the grid (10 along the road, 6 deep, the road below) and its road widths beside it ──
-.lots {
-    @include row;
-    align-items: flex-start;
-    min-width: 0;
-    margin: 4rem 0 2rem 0;
-}
-
+// ── a zone's line: button, a small grid of its lots (10 along the road, 6 deep, the road below), the size, its roads ──
 .lotGrid {
     @include col;
     flex: 0 0 auto;
-    align-items: flex-start;
+    margin-left: 10rem;
 }
 
 .grid {
     @include col;
-    padding: 2rem;
-    border-radius: 3rem;
-    background-color: rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    border-radius: 2rem;
+    background-color: rgba(0, 0, 0, 0.25);
     cursor: pointer;
 }
 
@@ -500,61 +493,73 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 }
 
 .cell {
-    width: 14rem;
-    height: 11rem;
-    margin: 1rem;
-    border-radius: 2rem;
-    background-color: rgba(255, 255, 255, 0.07);
+    width: 6rem;
+    height: 5rem;
+    margin: 0.5rem;
+    border-radius: 1rem;
+    background-color: rgba(255, 255, 255, 0.08);
     opacity: 1;
-    transition-property: background-color, opacity, transform;
-    transition-duration: 0.14s;
+    transition-property: background-color, opacity;
+    transition-duration: 0.12s;
 }
 
 .cellMax {
-    opacity: 0.38;
+    opacity: 0.4;
 }
 
 .cellMin {
     opacity: 1;
 }
 
-.cellCorner {
-    @include border(1rem, rgba(255, 255, 255, 0.95));
-}
-
-.cellHot {
-    transform: scale(1.18);
-}
-
 .gridRoad {
-    width: 100%;
-    height: 4rem;
+    height: 2rem;
     margin-top: 1rem;
-    border-radius: 2rem;
-    background-color: rgba(200, 205, 210, 0.55);
+    border-radius: 1rem;
+    background-color: rgba(200, 205, 210, 0.6);
 }
 
-.gridText {
-    margin-top: 3rem;
-    font-size: 11rem;
-    color: $c-text-dim;
+.lotText {
+    @include col;
+    flex: 0 0 auto;
+    width: 64rem;
+    margin-left: 8rem;
 }
 
-.gridNum {
+.lotSize {
+    @include row;
+    font-size: $fs-s;
     color: #ffffff;
+}
+
+.lotNum {
     font-weight: 600;
 }
 
-.lotsSide {
+.lotTimes {
+    margin: 0 3rem;
+    color: $c-text-dim;
+}
+
+.lotUnit {
+    font-size: 10rem;
+    color: $c-text-faint;
+}
+
+.roadsCell {
     @include col;
     flex: 1 1 auto;
     min-width: 0;
-    margin: 18rem 0 0 14rem;
+    margin: 0 10rem 0 6rem;
+}
+
+.roadsTop {
+    @include row;
+    min-width: 0;
 }
 
 .roadMarks {
     position: relative;
-    height: 18rem;
+    height: 12rem;
     margin: 0 52rem 0 40rem;
 }
 
@@ -578,4 +583,69 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     font-size: 10rem;
     color: $c-text-faint;
     white-space: nowrap;
+}
+
+// ── a zone type's Outgrow: its switch and Set ──
+.outgrowBox {
+    @include row;
+    flex: 0 0 auto;
+    margin-right: 6rem;
+}
+
+.outgrowLabel {
+    margin-right: 5rem;
+    font-size: 11rem;
+    color: $c-text-dim;
+}
+
+.setButton {
+    @include row;
+    height: 22rem;
+    margin-left: 6rem;
+    padding: 0 6rem 0 8rem;
+    border-radius: $radius;
+    @include border(1rem, $c-line);
+    color: $text;
+    font-size: $fs-s;
+    cursor: pointer;
+}
+
+.setButton:hover {
+    background-color: $c-surface-hover;
+}
+
+.setOn {
+    background-color: rgba(143, 209, 255, 0.12);
+    @include border(1rem, rgba(143, 209, 255, 0.6));
+}
+
+.setOff {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.setText {
+    margin-right: 5rem;
+}
+
+.foundName {
+    @include row;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 220rem;
+    color: $text;
+    font-size: $fs-s;
+}
+
+.foundCount {
+    flex: 0 0 auto;
+    margin-left: 10rem;
+    font-size: 11rem;
+    color: $c-text-dim;
+}
+
+.none {
+    padding: 10rem 4rem;
+    font-size: $fs-s;
+    color: $c-text-dim;
 }

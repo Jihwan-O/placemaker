@@ -499,7 +499,7 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                     <div className={pn.logo} style={{ marginLeft: "6rem" }}>
                         <Icon name="building" size={15} tint="accent" />
                     </div>
-                    <div className={pn.title}>{L("City", "Whole city")}</div>
+                    <div className={pn.title}>{L("Global", "Global outgrow")}</div>
                     <div className={pn.flex} />
                     <Btn icon="close" iconSize={14} title={t("Placemaker.UI.Close", "Close")} onClick={onClose} testId="polish-city-close" />
                 </div>

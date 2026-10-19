@@ -18,6 +18,7 @@ using Placemaker.Core.Layers.Types.Zoning;
 using Placemaker.Core.Neighbours;
 using Placemaker.Core.Tool;
 using Placemaker.Game.Neighbours;
+using Newtonsoft.Json.Linq;
 using Unity.Mathematics;
 
 namespace Placemaker.Game.Tool
@@ -64,13 +65,13 @@ namespace Placemaker.Game.Tool
             }
         }
 
-        /// <summary>The values a zone's Outgrow rows have (its look's for any row not set; slot 0 A, 1 B, 2 C).</summary>
-        private Dictionary<string, float> PolishValues(PolishLookLayer layer, int slot = 0)
+        /// <summary>The values the type's Outgrow rows have (its look's for any row not set).</summary>
+        private Dictionary<string, float> PolishValues(PolishLookLayer layer)
         {
             var values = (PolishLooks.BuiltIn.FirstOrDefault(l => l.Id == layer.LookId) ?? PolishLooks.BuiltIn[0]).Values();
             var bag = _recipe.Root.Settings;
             foreach (var k in PolishLooks.Knobs)
-                if (bag.Values.TryGetValue(PolishLookLayer.KnobId(k.Id, slot), out var v) && v != null) values[k.Id] = AsFloat(v);
+                if (bag.Values.TryGetValue(k.Id, out var v) && v != null) values[k.Id] = AsFloat(v);
             return values;
         }
 
@@ -86,69 +87,98 @@ namespace Placemaker.Game.Tool
                 string kind = PolishSetting(layer, "zone" + sl) as string ?? "";
                 list.Add((i, !string.IsNullOrEmpty(asset) ? asset : Placemaker.Core.Layers.Common.ZoneKinds.PrefabId(kind)));
             }
-            if (list.Count == 0) list.Add((0, ""));
             return list;
         }
 
-        /// <summary>Build for a Zoning type: the buildings in the area outgrow their lots, each by its zone's settings (a zone not
-        /// in the design: the first zone's). False when the design is not a Zoning type, or zones the area too (then the normal
-        /// build zones it).</summary>
+        /// <summary>Each zone type's own Outgrow (zoneOutgrow): its switch and its changes over the type's settings.</summary>
+        private Dictionary<string, (bool On, Dictionary<string, float> Values)> ZoneOutgrow(PolishLookLayer layer)
+        {
+            var map = new Dictionary<string, (bool, Dictionary<string, float>)>();
+            if (!(PolishSetting(layer, "zoneOutgrow") is string json) || string.IsNullOrWhiteSpace(json)) return map;
+            try
+            {
+                foreach (var p in JObject.Parse(json).Properties())
+                {
+                    if (!(p.Value is JObject o)) continue;
+                    bool on = o["on"] == null || (bool)o["on"];
+                    var v = new Dictionary<string, float>();
+                    if (o["v"] is JObject vo) foreach (var q in vo.Properties()) v[q.Name] = AsFloat(q.Value.Type == JTokenType.Boolean ? (object)(bool)q.Value : (q.Value.Type == JTokenType.String ? (object)(string)q.Value : (double)q.Value));
+                    map[p.Name] = (on, v);
+                }
+            }
+            catch (Exception e) { Mod.Log.Warn("Placemaker zoning: the zones' Outgrow settings could not be read: " + e.Message); }
+            return map;
+        }
+
+        /// <summary>Build for a Zoning type: the buildings in the area outgrow their lots, each zone type by its own switch and
+        /// settings (the type's when it has none). False when the design is not a Zoning type, or zones the area too (then the
+        /// normal build zones it).</summary>
         private bool BuildPolish()
         {
             var layer = _recipe == null ? null : PolishLookLayer.Of(_recipe.Root.Layer);
             if (layer == null) return false;
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
             if (polish == null || _shape == null) return true;
-            // Outgrow off: the buildings are left as they are (only the zoning is built)
-            bool shape = AsFloat(PolishSetting(layer, "shapeLots")) > 0.5f;
-            var lots = shape ? PainterLots(polish) : new List<global::Unity.Entities.Entity>();
-            bool zoning = _plan != null && _plan.Layers.Any(l => l.Zoning.Count > 0);
-            if (!shape && !zoning) { Flash(new LocText("Placemaker.Polish.Nothing")); return true; }
-            if (lots.Count == 0 && !zoning) { Flash(new LocText("Placemaker.Painter.NoLots")); return true; }
             var look = (PolishLooks.BuiltIn.FirstOrDefault(l => l.Id == layer.LookId) ?? PolishLooks.BuiltIn[0]).Values();
-            var zones = PolishZones(layer);
-            var changesOf = new Dictionary<int, Dictionary<string, float>>();
-            foreach (var (slot, _) in zones)
+            var baseValues = PolishValues(layer);
+            var outgrow = ZoneOutgrow(layer);
+            (bool On, Dictionary<string, float> Changes) Of(string zoneKey)
             {
-                var values = PolishValues(layer, slot);
-                changesOf[slot] = PolishLooks.Diff(values, look);
-                NeighbourPolishSystem.NoteReach(values);
+                var values = new Dictionary<string, float>(baseValues);
+                bool on = true;
+                if (zoneKey != "" && outgrow.TryGetValue(zoneKey, out var z))
+                {
+                    on = z.On;
+                    foreach (var kv in z.Values) values[kv.Key] = kv.Value;
+                }
+                if (on) NeighbourPolishSystem.NoteReach(values);
+                return (on, PolishLooks.Diff(values, look));
             }
-            // each building by its zone
-            var bySlot = new Dictionary<int, List<global::Unity.Entities.Entity>>();
+            bool zoning = _plan != null && _plan.Layers.Any(l => l.Zoning.Count > 0);
+            var lots = PainterLots(polish);
+            // each building by its zone type
+            var byKey = new Dictionary<string, List<global::Unity.Entities.Entity>>();
             foreach (var lot in lots)
             {
                 string key = NeighbourPolishSystem.ZoneKey(polish.ZoneOfLot(lot));
-                int slot = zones[0].Slot;
-                foreach (var (sl, zone) in zones) if (NeighbourPolishSystem.ZoneKey(zone) == key && key != "") { slot = sl; break; }
-                if (!bySlot.TryGetValue(slot, out var list)) bySlot[slot] = list = new List<global::Unity.Entities.Entity>();
+                if (!byKey.TryGetValue(key, out var list)) byKey[key] = list = new List<global::Unity.Entities.Entity>();
                 list.Add(lot);
             }
-            foreach (var kv in bySlot)
+            int stamped = 0;
+            var parts = new List<string>();
+            foreach (var kv in byKey)
             {
-                var ch = changesOf[kv.Key];
+                var (on, ch) = Of(kv.Key);
+                if (!on) { parts.Add($"{kv.Value.Count} {(kv.Key == "" ? "unzoned" : kv.Key)} left as they are"); continue; }
                 NeighbourPolishSystem.Stamp(kv.Value, true, layer.LookId, ch.Count > 0 ? ch : null);
+                stamped += kv.Value.Count;
+                parts.Add($"{kv.Value.Count} {(kv.Key == "" ? "unzoned" : kv.Key)}{(ch.Count > 0 ? $" ({ch.Count} changes)" : "")}");
             }
-            string perZone = string.Join(", ", bySlot.Select(kv => $"{kv.Value.Count} {PolishLookLayer.SlotNames[kv.Key]}"));
+            if (stamped == 0 && !zoning)
+            {
+                Flash(new LocText(lots.Count == 0 ? "Placemaker.Painter.NoLots" : "Placemaker.Polish.Nothing"));
+                return true;
+            }
+            string perZone = string.Join(", ", parts);
             if (zoning)
             {
-                if (shape)
+                // buildings that grow here later: their zone type's switch and settings (any other zone: the type's)
+                int batch = NeighbourPolishSystem.NewLookBatch();
+                var ring = _shape.Ring2D();
+                foreach (var (_, zone) in PolishZones(layer))
                 {
-                    // buildings that grow here later: their zone's settings (any other zone: the first zone's)
-                    int batch = NeighbourPolishSystem.NewLookBatch();
-                    var ring = _shape.Ring2D();
-                    foreach (var (slot, zone) in zones)
-                        if (!string.IsNullOrEmpty(zone)) NeighbourPolishSystem.AddLookArea(ring, layer.LookId, changesOf[slot].Count > 0 ? changesOf[slot] : null, zone, batch);
-                    var first = changesOf[zones[0].Slot];
-                    NeighbourPolishSystem.AddLookArea(ring, layer.LookId, first.Count > 0 ? first : null, "", batch);
+                    var (on, ch) = Of(NeighbourPolishSystem.ZoneKey(zone));
+                    NeighbourPolishSystem.AddLookArea(ring, on ? layer.LookId : NeighbourPolishSystem.LookOff, on && ch.Count > 0 ? ch : null, zone, batch);
                 }
+                var (_, baseCh) = Of("");
+                NeighbourPolishSystem.AddLookArea(ring, layer.LookId, baseCh.Count > 0 ? baseCh : null, "", batch);
                 int cells = _plan.Layers.Sum(l => l.Zoning.Count);
-                Mod.Log.Info($"Placemaker zoning: {cells} zone cells to zone with {layer.LookId}, {lots.Count} buildings outgrown now by zone ({perZone}; {AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
+                Mod.Log.Info($"Placemaker zoning: {cells} zone cells to zone with {layer.LookId}; buildings now: {(perZone == "" ? "none" : perZone)} ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
                 return false;
             }
-            LastStamp = (lots.Count, true);
-            Mod.Log.Info($"Placemaker zoning: {lots.Count} buildings outgrown with {layer.LookId} by zone ({perZone}; {AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
-            Flash(new LocText("Placemaker.Polish.Built", lots.Count), 5f);
+            LastStamp = (stamped, true);
+            Mod.Log.Info($"Placemaker zoning: {stamped} buildings outgrown with {layer.LookId} by zone type: {perZone} ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
+            Flash(new LocText("Placemaker.Polish.Built", stamped), 5f);
             SuiteNoteBuilt(0);
             _countShape = null;
             Touch();

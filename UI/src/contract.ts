@@ -173,6 +173,9 @@ export interface PainterState {
   looks?: { id: string; name: string; custom: boolean; theme: string }[];
   /** Every zone type of the game: its look ("off": not polished) and whether it has its own (else its kind's). */
   zones?: PolishZone[];
+  /** The zone types of the buildings in the selection: key (the zone's name without EU / NA, lower case), a zone prefab of
+   *  it, its icon, how many buildings (a Zoning type's Only edit existing). */
+  areaZones?: { key: string; zone: string; icon: string; count: number }[];
 }
 
 export interface PolishZone {

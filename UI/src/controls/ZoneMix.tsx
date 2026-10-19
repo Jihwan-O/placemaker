@@ -4,10 +4,10 @@
 //     above or below it on a line to their part. One line per zone: its colour and icon, its type from a short menu (or an
 //     exact zone of the game), its lots' width and depth and the road widths it goes on (two-handle sliders), remove.
 //     "Mix in another zone", then how the lots mix.
-//   * Only edit existing: the zone types alone, nothing about placing.
-// A zone's lots are picked on a grid of cells (10 along the road, 6 deep, the road at the bottom): the smallest lot solid,
-// the biggest lot lighter; a click or drag moves the nearer corner.
-// Every zone line has its own Outgrow settings (how its lots grow past their borders), folded under it.
+//   * Only edit existing: the zone types found among the buildings in the selection (none: said so), nothing about placing.
+// A zone's lots are picked on a small grid of cells (10 along the road, 6 deep, the road at the bottom; a cell is 8 m): the
+// smallest lot solid, the biggest lighter; a click or drag moves the nearer corner.
+// Every zone type has its own Outgrow switch and settings (Set: folded under its line), kept by zone type (zoneOutgrow).
 // It writes the same settings the rows would (zoneA/B/C, zoneAssetA/B/C, shareA/B/C, …), so styles, undo, locks and
 // Randomize keep working.
 import React, { ReactNode, useLayoutEffect, useRef, useState } from "react";
@@ -16,7 +16,7 @@ import { LayerType, SettingValue, StepView } from "../contract";
 import { act, playSound } from "../lib/bindings";
 import { humanize, TFunc, useT } from "../lib/l10n";
 import { ControlEx, valueOf } from "../lib/schema";
-import { Icon } from "../components/common";
+import { Icon, Switch } from "../components/common";
 import { useAssetList, usePicker } from "../components/picker";
 import z from "./zoneMix.module.scss";
 
@@ -68,8 +68,11 @@ export const isZoneMix = (layer: LayerType) => {
     return ids.has("zoneArea") && ids.has("shareA") && ids.has("zoneA");
 };
 
-/** A zone slot's id of an Outgrow setting (A: the plain id; B and C end in _B, _C). */
-export const knobSlotOf = (id: string): number => (id.endsWith("_B") ? 1 : id.endsWith("_C") ? 2 : 0);
+/** A zone's key: its name without EU / NA, lower case (NeighbourPolishSystem.ZoneKey): one Outgrow per zone type. */
+export const zoneKey = (zone: string) => (zone || "").replace(/^(EU|NA)\s+/, "").trim().toLowerCase();
+
+/** A zone type's Outgrow, as the Design page keeps it (zoneOutgrow): its switch, its settings to fold out. */
+export type ZoneOutgrow = { isOn: (key: string) => boolean; setOn: (key: string, on: boolean) => void; body: (key: string) => ReactNode };
 
 type Ctl = (id: string) => ControlEx | undefined;
 
@@ -103,18 +106,6 @@ const kindLabel = (t: TFunc, ctl: Ctl, kind: string) => {
     const o = (ctl("zoneA")?.options ?? []).find((x) => x.value === kind);
     return o ? t(o.label, humanize(o.value)) : humanize(kind);
 };
-
-/** The zones in use (for the Outgrow tabs): slot index, name, colour. */
-export function useZoneTabs(step: StepView, layer: LayerType): { index: number; name: string; colour: string }[] {
-    const { t } = useT();
-    const zones = useAssetList("zone");
-    const { ctl, used } = reader(step, layer);
-    return used.map((x) => ({
-        index: x.index,
-        name: x.asset ? zones?.find((a) => a.id === x.asset)?.name || humanize(x.asset) : kindLabel(t, ctl, x.kind),
-        colour: x.asset ? "#c9d3da" : ZONE_COLOR[x.kind] ?? "#c9d3da",
-    }));
-}
 
 /** A range of whole numbers on one track with two handles (the nearer handle follows the mouse). */
 const RangeSlider = ({ lo, hi, min, max, testId, text, onCommit }: { lo: number; hi: number; min: number; max: number; testId: string; text: (a: number, b: number) => string; onCommit: (lo: number, hi: number) => void }) => {
@@ -167,13 +158,12 @@ const RangeSlider = ({ lo, hi, min, max, testId, text, onCommit }: { lo: number;
 };
 
 /**
- * A zone's lots on a grid of cells, the road along the bottom: the smallest lot (solid) and the biggest (lighter), both
+ * A zone's lots on a small grid of cells, the road along the bottom: the smallest lot (solid) and the biggest (lighter), both
  * from the road's corner. A click or drag moves the corner nearer to it; cells fade in and out as it moves.
  */
-const LotGrid = ({ w0, w1, d0, d1, colour, testId, onCommit }: { w0: number; w1: number; d0: number; d1: number; colour: string; testId: string; onCommit: (w0: number, w1: number, d0: number, d1: number) => void }) => {
+const LotGrid = ({ w0, w1, d0, d1, colour, testId, onCommit, onDrag }: { w0: number; w1: number; d0: number; d1: number; colour: string; testId: string; onCommit: (w0: number, w1: number, d0: number, d1: number) => void; onDrag: (v: [number, number, number, number] | null) => void }) => {
     const { t } = useT();
     const [drag, setDrag] = useState<[number, number, number, number] | null>(null);
-    const [hover, setHover] = useState<[number, number] | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
     const [a0, a1, b0, b1] = drag ?? [Math.min(w0, GRID_W), Math.min(w1, GRID_W), Math.min(d0, GRID_D), Math.min(d1, GRID_D)];
     const cellAt = (clientX: number, clientY: number): [number, number] => {
@@ -195,17 +185,19 @@ const LotGrid = ({ w0, w1, d0, d1, colour, testId, onCommit }: { w0: number; w1:
         const apply = (px: number, py: number) => {
             cur = big ? [Math.min(cur[0], px), px, Math.min(cur[2], py), py] : [px, Math.max(cur[1], px), py, Math.max(cur[3], py)];
             setDrag(cur);
+            onDrag(cur);
         };
         apply(x, y);
         playSound("drag-slider");
         const move = (ev: MouseEvent) => {
             const [mx, my] = cellAt(ev.clientX, ev.clientY);
-            apply(mx, my);
+            if (mx !== cur[big ? 1 : 0] || my !== cur[big ? 3 : 2]) apply(mx, my);
         };
         const up = () => {
             window.removeEventListener("mousemove", move);
             window.removeEventListener("mouseup", up);
             setDrag(null);
+            onDrag(null);
             if (cur[0] !== w0 || cur[1] !== w1 || cur[2] !== d0 || cur[3] !== d1) onCommit(cur[0], cur[1], cur[2], cur[3]);
         };
         window.addEventListener("mousemove", move);
@@ -216,37 +208,22 @@ const LotGrid = ({ w0, w1, d0, d1, colour, testId, onCommit }: { w0: number; w1:
         const cells: ReactNode[] = [];
         for (let x = 1; x <= GRID_W; x++) {
             const inMin = x <= a0 && y <= b0, inMax = x <= a1 && y <= b1;
-            const corner = (x === a0 && y === b0) || (x === a1 && y === b1);
-            const hot = hover && hover[0] === x && hover[1] === y;
-            cells.push(
-                <div
-                    key={x}
-                    className={classNames(z.cell, { [z.cellMin]: inMin, [z.cellMax]: inMax && !inMin, [z.cellCorner]: corner, [z.cellHot]: hot })}
-                    style={inMax ? { backgroundColor: colour } : undefined}
-                />,
-            );
+            cells.push(<div key={x} className={classNames(z.cell, { [z.cellMin]: inMin, [z.cellMax]: inMax && !inMin })} style={inMax ? { backgroundColor: colour } : undefined} />);
         }
         rowsOut.push(<div key={y} className={z.gridRow}>{cells}</div>);
     }
-    const span = (p: number, q: number) => (p === q ? String(p) : p + "–" + q);
     return (
-        <div className={z.lotGrid} data-testid={testId} data-w={a0 + "-" + a1} data-d={b0 + "-" + b1} title={t("Placemaker.UI.ZoneMix.GridTip", "Its lots, in zone cells (8 m), the road at the bottom: the solid block is the smallest lot, the lighter one the biggest; each lot picks a size between. Click or drag near a corner to move it.")}>
-            <div
-                className={z.grid}
-                ref={gridRef}
-                onMouseDown={onDown}
-                onMouseMove={(e) => {
-                    const c = cellAt(e.clientX, e.clientY);
-                    if (!hover || hover[0] !== c[0] || hover[1] !== c[1]) setHover(c);
-                }}
-                onMouseLeave={() => setHover(null)}
-            >
+        <div
+            className={z.lotGrid}
+            data-testid={testId}
+            data-w={a0 + "-" + a1}
+            data-d={b0 + "-" + b1}
+            title={t("Placemaker.UI.ZoneMix.GridTip", "Its lots, in zone cells (one cell is 8 m), the road along the bottom: the solid block is the smallest lot, the lighter one the biggest; each lot picks a size between. Click or drag near a corner to move it.")}
+        >
+            <div className={z.grid} ref={gridRef} onMouseDown={onDown}>
                 {rowsOut}
             </div>
             <div className={z.gridRoad} />
-            <div className={z.gridText}>
-                <span className={z.gridNum}>{span(a0, a1)}</span> {t("Placemaker.UI.ZoneMix.Wide", "wide")} · <span className={z.gridNum}>{span(b0, b1)}</span> {t("Placemaker.UI.ZoneMix.Deep", "deep")}
-            </div>
         </div>
     );
 };
@@ -369,7 +346,7 @@ const ShareBar = ({ parts, onCommit, t }: { parts: Part[]; onCommit: (shares: Re
     );
 };
 
-export const ZoneMix = ({ step, layer, rows, outgrow }: { step: StepView; layer: LayerType; rows: (ids: string[]) => ReactNode; outgrow: (slot: number) => ReactNode }) => {
+export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView; layer: LayerType; rows: (ids: string[]) => ReactNode; found: { key: string; zone: string; icon: string; count: number }[]; outgrow: ZoneOutgrow }) => {
     const { t } = useT();
     const picker = usePicker();
     const zones = useAssetList("zone");
@@ -377,8 +354,8 @@ export const ZoneMix = ({ step, layer, rows, outgrow }: { step: StepView; layer:
     const { ctl, val, slots, used } = reader(step, layer);
     const set = (id: string, v: SettingValue) => act.setValue(step.path, id, v);
     const placing = val("zoneArea") === true;
-    const outgrowOn = val("shapeLots") !== false;
     const [opened, setOpened] = useState<Record<string, boolean>>({});
+    const [sizing, setSizing] = useState<Record<string, [number, number, number, number] | null>>({});
 
     /** The game's zone of a type (the city's EU or NA one when both exist). */
     const zoneOf = (kind: string, asset: string) => {
@@ -513,6 +490,35 @@ export const ZoneMix = ({ step, layer, rows, outgrow }: { step: StepView; layer:
         </div>
     );
 
+    /** A zone type's Outgrow: its switch, and Set (its settings folded out under the line). */
+    const OutgrowSwitch = ({ zkey, id }: { zkey: string; id: string }) => {
+        const on = outgrow.isOn(zkey);
+        const open = on && !!opened[zkey];
+        return (
+            <div className={z.outgrowBox} title={t("Placemaker.UI.ZoneMix.OutgrowTip", "Outgrow: its lots grow past their borders (reach, fences, lawns, ground, planting, paths). Off: its buildings stay as they are.")}>
+                <div className={z.outgrowLabel}>{t("Placemaker.UI.Outgrow", "Outgrow")}</div>
+                <Switch testId={"zonemix-outgrow-on-" + id} on={on} onChange={(v) => outgrow.setOn(zkey, v)} />
+                <button
+                    type="button"
+                    className={classNames(z.setButton, { [z.setOn]: open, [z.setOff]: !on })}
+                    data-testid={"zonemix-outgrow-" + id}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (on) setOpened({ ...opened, [zkey]: !open });
+                    }}
+                >
+                    <div className={z.setText}>{t("Placemaker.UI.ZoneMix.Set", "Set")}</div>
+                    <Icon name={open ? "chevronDown" : "chevronRight"} size={9} tint={open ? "accent" : "dim"} />
+                </button>
+            </div>
+        );
+    };
+
+    const foundName = (zone: string) => {
+        const local = t("Assets.NAME[" + zone + "]", "");
+        return local && local !== zone ? local.replace(/^(EU|NA)\s+/, "") : humanize(zone.replace(/^(EU|NA)\s+/, ""));
+    };
+
     const roadText = (a: number, b: number) =>
         a <= 0 && b >= MAX_ROAD ? t("Placemaker.UI.ZoneMix.AnyRoad", "any") : a <= 0 ? "≤ " + b + " m" : b >= MAX_ROAD ? "≥ " + a + " m" : a + "–" + b + " m";
 
@@ -539,104 +545,121 @@ export const ZoneMix = ({ step, layer, rows, outgrow }: { step: StepView; layer:
                     </button>
                 ))}
             </div>
-            {rows(["shapeLots"])}
             {placing ? <ShareBar parts={parts} onCommit={commitShares} t={t} /> : <div className={z.modeGap} />}
-            {used.map((x) => {
-                const open = outgrowOn && !!opened[x.sl];
-                return (
-                <div key={x.sl} className={z.zone} data-testid={"zonemix-zone-" + x.sl}>
-                    <div className={z.line} data-testid={"zonemix-line-" + x.sl}>
-                        <ZoneButton id={x.sl} kind={x.kind} asset={x.asset} />
-                        <div className={z.flex} />
-                        {outgrowOn ? (
-                            <button
-                                type="button"
-                                className={classNames(z.outgrowButton, { [z.outgrowOn]: open })}
-                                data-testid={"zonemix-outgrow-" + x.sl}
-                                title={t("Placemaker.UI.ZoneMix.OutgrowTip", "How this zone's lots grow past their borders: reach, fences, lawns, ground, planting, paths.")}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpened({ ...opened, [x.sl]: !open });
-                                }}
-                            >
-                                <Icon name={open ? "chevronDown" : "chevronRight"} size={9} tint={open ? "accent" : "dim"} />
-                                <div className={z.outgrowText}>{t("Placemaker.UI.Outgrow", "Outgrow")}</div>
-                            </button>
-                        ) : null}
-                        {used.length > 1 ? (
-                            <button
-                                type="button"
-                                className={z.remove}
-                                data-testid={"zonemix-remove-" + x.sl}
-                                title={t("Placemaker.UI.ZoneMix.Remove", "Remove this zone")}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeZone(x.sl);
-                                }}
-                            >
-                                <Icon name="close" size={10} tint="dim" />
-                            </button>
-                        ) : (
-                            <div className={z.endSpacer} />
-                        )}
-                    </div>
-                    {menu === x.sl ? <Menu id={x.sl} kind={x.kind} /> : null}
-                    {placing ? (
-                        <div className={z.lots}>
-                            <LotGrid
-                                w0={x.w0}
-                                w1={x.w1}
-                                d0={x.d0}
-                                d1={x.d1}
-                                colour={colourOf(x.kind, x.asset)}
-                                testId={"zonemix-grid-" + x.sl}
-                                onCommit={(a0, a1, b0, b1) => {
-                                    if (a0 !== x.w0) set("widthMin" + x.sl, a0);
-                                    if (a1 !== x.w1) set("widthMax" + x.sl, a1);
-                                    if (b0 !== x.d0) set("depthMin" + x.sl, b0);
-                                    if (b1 !== x.d1) set("depthMax" + x.sl, b1);
-                                }}
-                            />
-                            <div className={z.lotsSide}>
-                                <div className={z.range} title={t("Placemaker.UI.ZoneMix.RoadTip", "The roads it goes on, by their width (a two-lane road is 16 m, four lanes 24 m, six lanes 32 m): its lots are only placed along roads this wide.")}>
-                                    <div className={z.rangeLabel}>{t("Placemaker.UI.ZoneMix.Roads", "Roads")}</div>
-                                    <RangeSlider
-                                        lo={x.r0}
-                                        hi={x.r1}
-                                        min={0}
-                                        max={MAX_ROAD}
-                                        testId={"zonemix-roads-" + x.sl}
-                                        text={roadText}
-                                        onCommit={(a, b) => {
-                                            if (a !== x.r0) set("roadMin" + x.sl, a);
-                                            if (b !== x.r1) set("roadMax" + x.sl, b);
-                                        }}
-                                    />
+            {placing
+                ? used.map((x) => {
+                      const key = zoneKey(x.asset || KIND_ZONE[x.kind] || x.kind);
+                      const size = sizing[x.sl] ?? [x.w0, x.w1, x.d0, x.d1];
+                      const span = (p: number, q: number) => (p === q ? String(p) : p + "–" + q);
+                      return (
+                          <div key={x.sl} className={z.zone} data-testid={"zonemix-zone-" + x.sl}>
+                              <div className={z.line} data-testid={"zonemix-line-" + x.sl}>
+                                  <ZoneButton id={x.sl} kind={x.kind} asset={x.asset} />
+                                  <LotGrid
+                                      w0={x.w0}
+                                      w1={x.w1}
+                                      d0={x.d0}
+                                      d1={x.d1}
+                                      colour={colourOf(x.kind, x.asset)}
+                                      testId={"zonemix-grid-" + x.sl}
+                                      onDrag={(v) => setSizing({ ...sizing, [x.sl]: v })}
+                                      onCommit={(a0, a1, b0, b1) => {
+                                          if (a0 !== x.w0) set("widthMin" + x.sl, a0);
+                                          if (a1 !== x.w1) set("widthMax" + x.sl, a1);
+                                          if (b0 !== x.d0) set("depthMin" + x.sl, b0);
+                                          if (b1 !== x.d1) set("depthMax" + x.sl, b1);
+                                      }}
+                                  />
+                                  <div className={z.lotText} title={t("Placemaker.UI.ZoneMix.GridTip", "")}>
+                                      <div className={z.lotSize}>
+                                          <span className={z.lotNum}>{span(Math.min(size[0], GRID_W), Math.min(size[1], GRID_W))}</span>
+                                          <span className={z.lotTimes}>×</span>
+                                          <span className={z.lotNum}>{span(Math.min(size[2], GRID_D), Math.min(size[3], GRID_D))}</span>
+                                      </div>
+                                      <div className={z.lotUnit}>{t("Placemaker.UI.ZoneMix.CellUnit", "cells of 8 m")}</div>
+                                  </div>
+                                  <div className={z.roadsCell} title={t("Placemaker.UI.ZoneMix.RoadTip", "The roads it goes on, by their width (a two-lane road is 16 m, four lanes 24 m, six lanes 32 m): its lots are only placed along roads this wide.")}>
+                                      <div className={z.roadsTop}>
+                                          <div className={z.rangeLabel}>{t("Placemaker.UI.ZoneMix.Roads", "Roads")}</div>
+                                          <RangeSlider
+                                              lo={x.r0}
+                                              hi={x.r1}
+                                              min={0}
+                                              max={MAX_ROAD}
+                                              testId={"zonemix-roads-" + x.sl}
+                                              text={roadText}
+                                              onCommit={(a, b) => {
+                                                  if (a !== x.r0) set("roadMin" + x.sl, a);
+                                                  if (b !== x.r1) set("roadMax" + x.sl, b);
+                                              }}
+                                          />
+                                      </div>
+                                      <div className={z.roadMarks}>
+                                          {[
+                                              { at: 16, label: t("Placemaker.UI.ZoneMix.Lanes2", "2 lanes") },
+                                              { at: 24, label: t("Placemaker.UI.ZoneMix.Lanes4", "4") },
+                                              { at: 32, label: t("Placemaker.UI.ZoneMix.Lanes6", "6") },
+                                          ].map((m) => (
+                                              <div key={m.at} className={z.roadMark} style={{ left: (m.at / MAX_ROAD) * 100 + "%" }}>
+                                                  <div className={z.roadTick} />
+                                                  <div className={z.roadMarkText}>{m.label}</div>
+                                              </div>
+                                          ))}
+                                      </div>
+                                  </div>
+                                  <OutgrowSwitch zkey={key} id={x.sl} />
+                                  {used.length > 1 ? (
+                                      <button
+                                          type="button"
+                                          className={z.remove}
+                                          data-testid={"zonemix-remove-" + x.sl}
+                                          title={t("Placemaker.UI.ZoneMix.Remove", "Remove this zone")}
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              removeZone(x.sl);
+                                          }}
+                                      >
+                                          <Icon name="close" size={10} tint="dim" />
+                                      </button>
+                                  ) : (
+                                      <div className={z.endSpacer} />
+                                  )}
+                              </div>
+                              {menu === x.sl ? <Menu id={x.sl} kind={x.kind} /> : null}
+                              {opened[key] && outgrow.isOn(key) ? (
+                                  <div className={z.outgrow} data-testid={"zonemix-outgrow-body-" + x.sl}>
+                                      {outgrow.body(key)}
+                                  </div>
+                              ) : null}
+                          </div>
+                      );
+                  })
+                : found.length === 0
+                  ? (
+                        <div className={z.none} data-testid="zonemix-none">
+                            {t("Placemaker.UI.ZoneMix.NoZones", "No zoned buildings in the selection: pick an area with buildings.")}
+                        </div>
+                    )
+                  : found.map((f) => (
+                        <div key={f.key} className={z.zone} data-testid={"zonemix-found-" + f.key}>
+                            <div className={z.line}>
+                                <div className={z.foundName}>
+                                    {f.icon ? <Icon name={f.icon} size={14} fallback="zone" /> : <Icon name="zone" size={14} tint="dim" />}
+                                    <div className={z.zoneName}>{foundName(f.zone)}</div>
                                 </div>
-                                <div className={z.roadMarks}>
-                                    {[
-                                        { at: 16, label: t("Placemaker.UI.ZoneMix.Lanes2", "2 lanes") },
-                                        { at: 24, label: t("Placemaker.UI.ZoneMix.Lanes4", "4 lanes") },
-                                        { at: 32, label: t("Placemaker.UI.ZoneMix.Lanes6", "6 lanes") },
-                                    ].map((m) => (
-                                        <div key={m.at} className={z.roadMark} style={{ left: (m.at / MAX_ROAD) * 100 + "%" }}>
-                                            <div className={z.roadTick} />
-                                            <div className={z.roadMarkText}>{m.label}</div>
-                                        </div>
-                                    ))}
-                                </div>
+                                <div className={z.foundCount}>{t("Placemaker.UI.ZoneMix.Buildings", "{0} buildings", [f.count])}</div>
+                                <div className={z.flex} />
+                                <OutgrowSwitch zkey={f.key} id={f.key} />
+                                <div className={z.endSpacer} />
                             </div>
+                            {opened[f.key] && outgrow.isOn(f.key) ? (
+                                <div className={z.outgrow} data-testid={"zonemix-outgrow-body-" + f.key}>
+                                    {outgrow.body(f.key)}
+                                </div>
+                            ) : null}
                         </div>
-                    ) : null}
-                    {open ? (
-                        <div className={z.outgrow} data-testid={"zonemix-outgrow-body-" + x.sl}>
-                            {outgrow(x.index)}
-                        </div>
-                    ) : null}
-                </div>
-                );
-            })}
-            {used.length < SLOTS.length ? (
+                    ))}
+            {placing && used.length < SLOTS.length ? (
                 <button
                     type="button"
                     className={z.add}
@@ -647,7 +670,7 @@ export const ZoneMix = ({ step, layer, rows, outgrow }: { step: StepView; layer:
                     }}
                 >
                     <Icon name="plus" size={10} tint="accent" />
-                    <div className={z.chipText}>{placing ? t("Placemaker.UI.ZoneMix.Add", "Mix in another zone") : t("Placemaker.UI.ZoneMix.AddType", "Another zone type")}</div>
+                    <div className={z.chipText}>{t("Placemaker.UI.ZoneMix.Add", "Mix in another zone")}</div>
                 </button>
             ) : null}
             {placing ? rows(val("zonePattern") === "clumps" ? ["zonePattern", "zoneGrain"] : ["zonePattern"]) : null}

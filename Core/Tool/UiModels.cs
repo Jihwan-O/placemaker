@@ -99,6 +99,9 @@ namespace Placemaker.Core.Tool
         public List<(string Id, string Name, bool Custom, string Theme)> Looks = new List<(string, string, bool, string)>();
         /// <summary>Every zone type: prefab name, kind (home, shop, office, industry), its look ("off"), set for it (not its kind's).</summary>
         public List<(string Id, string Kind, string Look, bool Own, string Icon)> Zones = new List<(string, string, string, bool, string)>();
+        /// <summary>The zone types of the buildings in the selection (a Zoning type's Only edit existing): key (the zone's name
+        /// without EU / NA, lower case), a zone prefab of it, its icon, how many buildings.</summary>
+        public List<(string Key, string Zone, string Icon, int Count)> AreaZones = new List<(string, string, string, int)>();
     }
 
     public sealed class RecipeListEntry
@@ -240,7 +243,8 @@ namespace Placemaker.Core.Tool
                     .Set("lookTheme", p.LookTheme ?? "garden").Set("lookSavedTheme", p.LookSavedTheme ?? "garden").Set("modified", p.Modified).Set("tool", p.Tool).Set("live", p.Live)
                     .Set("values", Knobs(p.Values)).Set("lookValues", Knobs(p.LookValues))
                     .Set("looks", Arr(p.Looks.Select(l => JsonValue.Obj().Set("id", l.Id).Set("name", l.Name).Set("custom", l.Custom).Set("theme", l.Theme))))
-                    .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own).Set("icon", z.Icon ?? "")))));
+                    .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own).Set("icon", z.Icon ?? ""))))
+                    .Set("areaZones", Arr(p.AreaZones.Select(z => JsonValue.Obj().Set("key", z.Key).Set("zone", z.Zone).Set("icon", z.Icon ?? "").Set("count", z.Count)))));
             }
             return o;
         }

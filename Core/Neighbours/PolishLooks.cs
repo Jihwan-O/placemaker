@@ -39,15 +39,15 @@ namespace Placemaker.Core.Neighbours
         public static readonly IReadOnlyDictionary<string, float> Defaults = new Dictionary<string, float>
         {
             // reach and joining
-            ["sideReach"] = 40f, ["maxFrontGap"] = 48f, ["maxBackGap"] = 64f, ["maxRearGap"] = 24f, ["maxFacingGap"] = 20f,
-            ["maxDeepen"] = 24f, ["hug"] = 1f, ["hugReach"] = 24f, ["wrap"] = 1f, ["closeBacks"] = 1f,
+            ["sideReach"] = 60f, ["maxFrontGap"] = 70f, ["maxBackGap"] = 100f, ["maxRearGap"] = 40f, ["maxFacingGap"] = 35f,
+            ["maxDeepen"] = 40f, ["hug"] = 1f, ["hugReach"] = 45f, ["wrap"] = 1f, ["closeBacks"] = 1f,
             ["alleys"] = 1f, ["alleyChance"] = 45f,
             // lawns and ground paint
-            ["lawns"] = 1f, ["paintedGardens"] = 33f, ["paint"] = 1f, ["blendWidth"] = 12f, ["blendFar"] = 22f,
+            ["lawns"] = 1f, ["paintedGardens"] = 33f, ["paint"] = 1f, ["blendWidth"] = 16f, ["blendFar"] = 30f,
             ["blendStrength"] = 0.6f, ["gardenPaint"] = 0.85f,
             // planting and features
             ["plant"] = 1f, ["bedChance"] = 65f, ["bushesPerGarden"] = 14f, ["features"] = 1f, ["featureChance"] = 55f,
-            ["featureMinLand"] = 140f, ["rockChance"] = 12f,
+            ["featureMinLand"] = 100f, ["rockChance"] = 12f,
             // paths and shops
             ["pathChance"] = 45f, ["pavedFill"] = 1f,
         };

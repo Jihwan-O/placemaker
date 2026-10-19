@@ -153,7 +153,7 @@ namespace Placemaker.Game.Neighbours
         // a plot depends on houses up to ~2 lots away (and a ring's shared green on the whole ring): the pass plans with
         // everything within ClusterRadius but edits only houses within CoreRadius of a dirty one, so a house at the edge of
         // a pass (its neighbours not in it) is never planned half-blind and reset
-        private const float ClusterRadius = 90f;
+        private const float ClusterRadius = 120f;
         private const float CoreRadius = 40f;
         // a bulldozed house: the houses this near it are planned again (a neighbour's line on the shared side goes back)
         private const float GoneRadius = 70f;
@@ -517,7 +517,7 @@ namespace Placemaker.Game.Neighbours
             var hi = new float2(float.MinValue);
             foreach (var h in stitch)
             {
-                float r = math.length(h.HalfLot) + 40f;
+                float r = math.length(h.HalfLot) + 160f;
                 lo = math.min(lo, h.Position - r);
                 hi = math.max(hi, h.Position + r);
             }

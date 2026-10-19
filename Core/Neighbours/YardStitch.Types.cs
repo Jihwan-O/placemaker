@@ -68,9 +68,9 @@ namespace Placemaker.Core.Neighbours
     public sealed class StitchSettings
     {
         /// <summary>Largest gap between two neighbours' front corners that still makes them a pair (m); the inside of a curve opens to the street.</summary>
-        public float MaxFrontGap = 48f;
+        public float MaxFrontGap = 70f;
         /// <summary>Largest gap between their back corners (wedges on curves widen to the back) (m).</summary>
-        public float MaxBackGap = 64f;
+        public float MaxBackGap = 100f;
         /// <summary>How far two side neighbours' street edges may be apart along the street's normal (m).</summary>
         public float MaxFrontOffset = 10f;
         /// <summary>How far from a lot edge a line still counts as lying on it (m).</summary>

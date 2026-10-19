@@ -772,9 +772,9 @@ namespace Placemaker.Tests
         {
             var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
             a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 60f, ["maxRise"] = 0f };
-            // flat, then a 60 % cliff from 20 m to the house's right
+            // flat, then a cliff (150 %) from 20 m to the house's right; a 40 % slope on its left (gardens may climb that)
             var s = MiddleLine();
-            s.Ground = p => p.x > 20f ? (p.x - 20f) * 0.6f : 0f;
+            s.Ground = p => p.x > 20f ? (p.x - 20f) * 1.5f : p.x < -20f ? (-20f - p.x) * 0.4f : 0f;
             var plan = YardStitch.Plan(new[] { a }, s);
             Assert.True(plan.Plots.TryGetValue(1, out var pa), "the garden grows");
             Assert.True(pa.Max(p => p.x) <= 21.5f && pa.Max(p => p.x) >= 16f, $"stops at the foot of the cliff: {pa.Max(p => p.x):0.0}");

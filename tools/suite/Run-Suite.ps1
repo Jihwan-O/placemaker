@@ -48,6 +48,7 @@ param(
     [ValidateSet('human', 'settled', 'user')][string]$Pace = 'human',
     [switch]$RestoreOnly,
     [switch]$Playground,
+    [switch]$Menu,       # with -Playground: stop at the main menu (no new game, no grid)
     [switch]$DevMode,   # the game's developer mode (-developerMode: debug menus)
     [string]$ResultsRoot = 'C:\Users\jack\cs2-area-tool\.forensics\suite\runs',
     # The game queue (GameQueue.ps1): by default the run waits its turn in the machine-wide line and the queue's game runs
@@ -374,6 +375,7 @@ $cfg = [ordered]@{
     fixtureOnly = ($Set -eq 'bootstrap' -or [bool]$Playground); quit = (-not $Playground); playground = [bool]$Playground; shotWidth = [int]$w; shotHeight = [int]$h; noTerrain = [bool]$NoTerrain; queue = [bool]$Queue
     userModSettings = [bool]$UserModSettings; look = $Look; pace = $Pace; profile = $(if ($AllMods) { 'full' } else { 'clean' })
 }
+if ($Menu) { $cfg['menuOnly'] = $true }
 if ($Grid -match '^(\d+)x(\d+)$') { $cfg['nx'] = [int]$Matches[1]; $cfg['nz'] = [int]$Matches[2] }
 foreach ($kv in ($Opt -split ';' | Where-Object { $_ -match '=' })) {
     $k, $v = $kv -split '=', 2

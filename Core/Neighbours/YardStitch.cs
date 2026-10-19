@@ -2271,7 +2271,7 @@ namespace Placemaker.Core.Neighbours
         /// </summary>
         private static float2[] SlopeCut(StitchHouse h, float2[] plot, StitchSettings s)
         {
-            float maxSlope = K(h, s, "maxSlope", 35f) / 100f, maxRise = K(h, s, "maxRise", 4f);
+            float maxSlope = K(h, s, "maxSlope", 80f) / 100f, maxRise = K(h, s, "maxRise", 0f);
             if (maxSlope <= 0f && maxRise <= 0f) return null;
             var g = s.Ground;
             float home = g(h.Position);

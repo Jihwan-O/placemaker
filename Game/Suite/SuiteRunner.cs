@@ -390,6 +390,21 @@ namespace Placemaker.Game.Suite
             _summary["look"] = _look.Record;
             yield return _look.Window(Say);
 
+            if (_cfg.playground && _cfg.menuOnly)
+            {
+                // the user's playground at the main menu: nothing started, nothing run, never quit
+                _phase = "playground";
+                PlacemakerToolSystem.SuiteInputOnly = false;
+                _summary["playground"] = new JObject { ["menu"] = true };
+                Say("playground ready at the main menu: the controls are yours; the suite does nothing more");
+                WriteSummary();
+                while (true)
+                {
+                    Beat();
+                    yield return new WaitForSecondsRealtime(5f);
+                }
+            }
+
             _phase = "newgame";
             yield return NewGame();
             if (GameManager.instance.gameMode != GameMode.Game) throw new Exception("new game did not load (mode " + GameManager.instance.gameMode + ")");

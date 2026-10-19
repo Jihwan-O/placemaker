@@ -327,6 +327,14 @@ namespace Placemaker.Game.Neighbours
         private void TagNewPieces()
         {
             if (PendingTags.Count == 0) return;
+            var byOwner = new Dictionary<(Entity, Entity), List<int>>();
+            for (int k = 0; k < PendingTags.Count; k++)
+            {
+                var key = (PendingTags[k].Owner, PendingTags[k].Prefab);
+                if (!byOwner.TryGetValue(key, out var list)) byOwner[key] = list = new List<int>();
+                list.Add(k);
+            }
+            var used = new bool[PendingTags.Count];
             if (!_newPieces.IsEmptyIgnoreFilter)
                 using (var made = _newPieces.ToEntityArray(Allocator.Temp))
                     foreach (var e in made)
@@ -345,22 +353,25 @@ namespace Placemaker.Game.Neighbours
                         else if (EntityManager.HasComponent<global::Game.Objects.Transform>(e)) at = EntityManager.GetComponentData<global::Game.Objects.Transform>(e).m_Position.xz;
                         else continue;
                         // the nearest request of this owner and kind (an area's centre moves a little with its node count)
+                        if (!byOwner.TryGetValue((owner, prefab), out var mine)) continue;
                         int best = -1;
                         float bestD = 1.5f;
-                        for (int k = 0; k < PendingTags.Count; k++)
+                        foreach (int k in mine)
                         {
-                            var p = PendingTags[k];
-                            if (p.Owner != owner || p.Prefab != prefab) continue;
-                            float d = math.distance(p.At, at);
+                            if (used[k]) continue;
+                            float d = math.distance(PendingTags[k].At, at);
                             if (d < bestD) { bestD = d; best = k; }
                         }
                         if (best < 0) continue;
                         EntityManager.AddComponentData(e, new PolishPiece { Kind = PendingTags[best].Kind });
-                        PendingTags.RemoveAt(best);
+                        used[best] = true;
                         TotalTagged++;
                     }
             // a request the game did not make (a piece already stood there, the owner went): forgotten after a few frames
-            PendingTags.RemoveAll(p => LotFrame - p.Frame > 8);
+            var left = new List<PendingTag>(PendingTags.Count);
+            for (int k = 0; k < PendingTags.Count; k++) if (!used[k] && LotFrame - PendingTags[k].Frame <= 8) left.Add(PendingTags[k]);
+            PendingTags.Clear();
+            PendingTags.AddRange(left);
         }
 
         private void ApplyStamps()

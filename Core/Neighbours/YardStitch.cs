@@ -2008,7 +2008,7 @@ namespace Placemaker.Core.Neighbours
                         float pl = math.distance(p0, p1);
                         int count = Placemaker.Core.Layers.Common.Fences.SpacedPieceCount(pl, 4.1f);
                         float yaw = math.atan2(dir.x, dir.y);
-                        for (int c = 0; c < count && plan.FencePieces.Count - before < 600; c++)
+                        for (int c = 0; c < count && plan.FencePieces.Count - before < 300; c++)
                         {
                             var at = math.lerp(p0, p1, (c + 0.5f) / count);
                             // never through a house, shed, driveway, road or another building

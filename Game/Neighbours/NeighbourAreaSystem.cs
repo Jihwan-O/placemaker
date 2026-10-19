@@ -62,8 +62,11 @@ namespace Placemaker.Game.Neighbours
                 if (_byName == null) Index();
                 var heights = _terrain.GetHeightData(true);
                 _centres = null;
-                foreach (var r in Queue)
+                // a few dozen a frame (each is triangulated by the game)
+                int take = Math.Min(Queue.Count, MaxPerFrame);
+                for (int qi = 0; qi < take; qi++)
                 {
+                    var r = Queue[qi];
                     var ring = r.Ring;
                     var prefab = r.Prefab;
                     if (ring == null || ring.Length < 3 || (prefab == Entity.Null && (string.IsNullOrEmpty(r.Name) || !_byName.TryGetValue(r.Name, out prefab)))) continue;
@@ -88,11 +91,12 @@ namespace Placemaker.Game.Neighbours
                     TotalMade++;
                 }
             }
-            catch (Exception e) { Mod.Log.Warn("Placemaker neighbourhood surfaces failed: " + e.Message); }
-            Queue.Clear();
+            catch (Exception e) { Mod.Log.Warn("Placemaker neighbourhood surfaces failed: " + e.Message); Queue.Clear(); return; }
+            Queue.RemoveRange(0, Math.Min(Queue.Count, MaxPerFrame));
         }
 
         private Dictionary<Entity, List<float2>> _centres;
+        private const int MaxPerFrame = 40;
 
         /// <summary>A surface of this kind already centred here (after a load our in-memory list is empty).</summary>
         private bool Exists(Entity prefab, float2 centre)

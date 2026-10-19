@@ -301,7 +301,7 @@ namespace Placemaker.Game.Neighbours
                 }
                 CollectChanged();
                 ++_frame;
-                Busy = _dirty.Count > 0 || _inFlight.Count > 0 || _restoreQueue.Count > 0 || s_stamps.Count > 0;
+                Busy = _dirty.Count > 0 || _inFlight.Count > 0 || _restoreQueue.Count > 0 || s_stamps.Count > 0 || NeighbourObjectSystem.Queue.Count > 0 || NeighbourAreaSystem.Queue.Count > 0;
                 Waiting = _dirty.Count;
                 // one finished plan written per frame (writing is the part on the frame), one new patch started per frame
                 for (int k = 0; k < _inFlight.Count; k++)

@@ -34,6 +34,7 @@ namespace Placemaker.Game.Neighbours
 
         public static readonly List<Request> Queue = new List<Request>();
         public static int TotalMade;
+        private const int MaxPerFrame = 250;
 
         private PrefabSystem _prefabs;
         private TerrainSystem _terrain;
@@ -61,8 +62,11 @@ namespace Placemaker.Game.Neighbours
             {
                 if (_byName == null) Index();
                 var heights = _terrain.GetHeightData(true);
-                foreach (var r in Queue)
+                // a few hundred a frame: a whole city of closed gardens never lands in one frame
+                int take = Math.Min(Queue.Count, MaxPerFrame);
+                for (int qi = 0; qi < take; qi++)
                 {
+                    var r = Queue[qi];
                     if (r.Owner == Entity.Null || !EntityManager.Exists(r.Owner) || EntityManager.HasComponent<Deleted>(r.Owner)) continue;
                     if (string.IsNullOrEmpty(r.Name) || !_byName.TryGetValue(r.Name, out var prefab)) continue;
                     if (Owns(r.Owner, prefab, r.Position)) continue;
@@ -84,8 +88,8 @@ namespace Placemaker.Game.Neighbours
                     TotalMade++;
                 }
             }
-            catch (Exception e) { Mod.Log.Warn("Placemaker neighbourhood bushes failed: " + e.Message); }
-            Queue.Clear();
+            catch (Exception e) { Mod.Log.Warn("Placemaker neighbourhood bushes failed: " + e.Message); Queue.Clear(); return; }
+            Queue.RemoveRange(0, Math.Min(Queue.Count, MaxPerFrame));
         }
 
         /// <summary>The house already owns a piece of this kind here (after a load, our list of what we made is empty).</summary>

@@ -72,7 +72,7 @@ export const isZoneMix = (layer: LayerType) => {
 export const zoneKey = (zone: string) => (zone || "").replace(/^(EU|NA)\s+/, "").trim().toLowerCase();
 
 /** A zone type's Outgrow, as the Design page keeps it (zoneOutgrow): its switch, its settings to fold out. */
-export type ZoneOutgrow = { isOn: (key: string) => boolean; setOn: (key: string, on: boolean) => void; body: (key: string) => ReactNode };
+export type ZoneOutgrow = { isOn: (key: string) => boolean; setOn: (key: string, on: boolean) => void; body: (key: string) => ReactNode; summary: (key: string) => string };
 
 type Ctl = (id: string) => ControlEx | undefined;
 
@@ -578,6 +578,10 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                                           className={z.roadsCell}
                                           title={t("Placemaker.UI.ZoneMix.RoadTip2", "Allowed road width: the roads this zone may line, by their width (the ticks: two lanes 16 m, four lanes 24 m, six lanes 32 m). Its lots are only placed along roads in this range.")}
                                       >
+                                          <div className={z.roadsLabel}>
+                                              <div>{t("Placemaker.UI.ZoneMix.Allowed", "Allowed")}</div>
+                                              <div>{x.r0 > 0 || x.r1 < MAX_ROAD ? roadText(x.r0, x.r1) : t("Placemaker.UI.ZoneMix.RoadWidthShort", "road width")}</div>
+                                          </div>
                                           <div className={z.roadsTrack}>
                                               <RangeSlider
                                                   lo={x.r0}
@@ -597,9 +601,6 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                                                   ))}
                                               </div>
                                           </div>
-                                          <div className={z.roadsCaption}>
-                                              {t("Placemaker.UI.ZoneMix.AllowedRoads", "allowed road width") + (x.r0 > 0 || x.r1 < MAX_ROAD ? ": " + roadText(x.r0, x.r1) : "")}
-                                          </div>
                                       </div>
                                   </div>
                                   <LotGrid
@@ -617,8 +618,10 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                                           if (b1 !== x.d1) set("depthMax" + x.sl, b1);
                                       }}
                                   />
-                                  <div className={z.flex} />
-                                  <OutgrowSwitch zkey={key} id={x.sl} />
+                                  <div className={z.rightCol}>
+                                      <OutgrowSwitch zkey={key} id={x.sl} />
+                                      <div className={z.outgrowSummary}>{outgrow.isOn(key) ? outgrow.summary(key) : t("Placemaker.UI.ZoneMix.OutgrowOff", "its buildings stay as they are")}</div>
+                                  </div>
                                   {used.length > 1 ? (
                                       <button
                                           type="button"
@@ -630,11 +633,9 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                                               removeZone(x.sl);
                                           }}
                                       >
-                                          <Icon name="close" size={10} tint="dim" />
+                                          <Icon name="close" size={9} tint="dim" />
                                       </button>
-                                  ) : (
-                                      <div className={z.endSpacer} />
-                                  )}
+                                  ) : null}
                               </div>
                               {menu === x.sl ? <Menu id={x.sl} kind={x.kind} /> : null}
                               {opened[key] && outgrow.isOn(key) ? (
@@ -659,9 +660,10 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                                     <div className={z.zoneName}>{foundName(f.zone)}</div>
                                 </div>
                                 <div className={z.foundCount}>{t("Placemaker.UI.ZoneMix.Buildings", "{0} buildings", [f.count])}</div>
-                                <div className={z.flex} />
-                                <OutgrowSwitch zkey={f.key} id={f.key} />
-                                <div className={z.endSpacer} />
+                                <div className={z.rightCol}>
+                                    <OutgrowSwitch zkey={f.key} id={f.key} />
+                                    <div className={z.outgrowSummary}>{outgrow.isOn(f.key) ? outgrow.summary(f.key) : t("Placemaker.UI.ZoneMix.OutgrowOff", "its buildings stay as they are")}</div>
+                                </div>
                             </div>
                             {opened[f.key] && outgrow.isOn(f.key) ? (
                                 <div className={z.outgrow} data-testid={"zonemix-outgrow-body-" + f.key}>

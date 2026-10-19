@@ -496,6 +496,7 @@ const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: Lay
     const outgrow: ZoneOutgrow = {
         isOn: (key) => map[key]?.on !== false,
         setOn: (key, on) => write({ ...map, [key]: { ...(map[key] ?? {}), on } }),
+        summary: () => "",
         body: (key) => {
             // the type's rows, showing this zone type's changes over them; a row set writes into its changes
             const own = map[key]?.v ?? {};
@@ -507,6 +508,16 @@ const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: Lay
                 </ValueSinkContext.Provider>
             );
         },
+    };
+    outgrow.summary = (key) => {
+        const v = { ...step.values, ...(map[key]?.v ?? {}) };
+        const num = (id: string) => {
+            const c = (layer.controls as ControlEx[]).find((x) => x.id === id);
+            const val = id in v ? v[id] : c?.default;
+            return Math.round(Number(val) || 0);
+        };
+        const own = Object.keys(map[key]?.v ?? {}).length;
+        return t("Placemaker.UI.ZoneMix.OutgrowSummary", "reach {0} m · lawn {1} m", [num("sideReach"), num("lawnReach")]) + (own > 0 ? " · " + t("Placemaker.UI.ZoneMix.OwnChanges", "{0} own", [own]) : "");
     };
     return (
         <div className={s.shape} data-testid="zoning">

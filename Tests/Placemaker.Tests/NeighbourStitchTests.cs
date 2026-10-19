@@ -184,6 +184,53 @@ namespace Placemaker.Tests
         private static float2[] Ccw(float2[] r) => Poly.IsCcw(r) ? r : r.Reverse().ToArray();
 
         /// <summary>Gaps shared on the middle line (the stepped split and walkways have their own tests).</summary>
+        private static float2[] Strip(float x0, float z0, float x1, float z1) => new[] { new float2(x0, z0), new float2(x1, z0), new float2(x1, z1), new float2(x0, z1) };
+
+        [Fact]
+        public void Back_to_back_across_a_road_never_join_and_each_garden_stops_short_of_the_road()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            var b = House(2, new float2(0f, -60f), new float2(0f, -1f));
+            Assert.Contains(YardStitch.Plan(new[] { a, b }, MiddleLine()).Pairs, p => p.Rear);
+            var s = MiddleLine().WithBarriers(new List<float2[]> { Strip(-60f, -34f, 60f, -26f) });
+            var plan = YardStitch.Plan(new[] { a, b }, s);
+            Assert.DoesNotContain(plan.Pairs, p => p.Rear);
+            Assert.True(plan.Plots.TryGetValue(1, out var pa), "a reaches out to the road behind it");
+            Assert.True(pa.Min(p => p.y) > -26f + 0.5f && pa.Min(p => p.y) < -24.5f, $"a stops just short of the road: {pa.Min(p => p.y)}");
+            Assert.True(plan.Plots.TryGetValue(2, out var pb));
+            Assert.True(pb.Max(p => p.y) < -34f - 0.5f, $"b stops just short of the road: {pb.Max(p => p.y)}");
+        }
+
+        [Fact]
+        public void Side_neighbours_across_a_path_never_join()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            var b = House(2, new float2(30f, 0f), new float2(0f, 1f));
+            Assert.Single(YardStitch.Plan(new[] { a, b }, MiddleLine()).Pairs);
+            var plan = YardStitch.Plan(new[] { a, b }, MiddleLine().WithBarriers(new List<float2[]> { Strip(12f, -40f, 18f, 40f) }));
+            Assert.Empty(plan.Pairs);
+            Assert.True(plan.Plots.TryGetValue(1, out var pa) && pa.Max(p => p.x) < 12f - 0.5f, "a's garden stops short of the path");
+            Assert.True(plan.Plots.TryGetValue(2, out var pb) && pb.Min(p => p.x) > 18f + 0.5f, "b's garden stops short of the path");
+            // a's right fence follows the path
+            Assert.True(plan.MoveLines.TryGetValue(11L, out var fence) && math.abs(fence.A.x - 11.2f) < 0.3f && math.abs(fence.B.x - 11.2f) < 0.3f, "a's fence runs along the path");
+        }
+
+        [Fact]
+        public void A_garden_hugs_a_diagonal_road_near_it_and_never_crosses_it()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            // a road running away at 45 degrees from near a's front right corner
+            var road = new[] { new float2(12f, 24f), new float2(18f, 24f), new float2(58f, -16f), new float2(52f, -16f) };
+            var plan = YardStitch.Plan(new[] { a }, MiddleLine().WithBarriers(new List<float2[]> { road }));
+            Assert.True(plan.Plots.TryGetValue(1, out var pa), "a reaches out to the road");
+            Assert.True(pa.Max(p => p.x) > 14f, $"a fills the wedge towards the road: {pa.Max(p => p.x)}");
+            foreach (var p in pa) Assert.False(Poly.Contains(road, p), $"a plot corner {p} lies on the road");
+            Assert.False(Overlap(pa, road), "the garden overlaps the road");
+        }
+
+        private static bool Overlap(float2[] a, float2[] b) =>
+            Poly.Boolean(new[] { (IReadOnlyList<float2>)a }, new[] { (IReadOnlyList<float2>)b }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area) > 0.05f;
+
         private static StitchSettings MiddleLine()
         {
             var s = new StitchSettings();

@@ -511,7 +511,16 @@ namespace Placemaker.Game.Neighbours
                 stitch.Add(Copy(d.House, isCore, flag.Yes, ThemeFor(e, d.House.Zone), OptionsOf(flag)));
             }
             var planner = Planner;
-            var settings = Settings;
+            // the roads, paths, tracks and other buildings around the patch: never joined across, never reached onto, met
+            var lo = new float2(float.MaxValue);
+            var hi = new float2(float.MinValue);
+            foreach (var h in stitch)
+            {
+                float r = math.length(h.HalfLot) + 40f;
+                lo = math.min(lo, h.Position - r);
+                hi = math.max(hi, h.Position + r);
+            }
+            var settings = Settings.WithBarriers(stitch.Count > 0 ? BarriersIn(lo, hi) : null);
             _inFlight.Add(new Pending
             {
                 Stitch = stitch, LanesOf = lanesOf, LawnsOf = lawnsOf, OwnerOf = ownerOf, CoreIds = coreIds, HouseOf = new Dictionary<long, Entity>(_houseOf),

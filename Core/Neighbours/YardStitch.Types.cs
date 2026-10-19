@@ -82,6 +82,16 @@ namespace Placemaker.Core.Neighbours
         /// <summary>Knobs a hot-loaded YardStitch reads before they get a field of their own (lab op "polishSettings").</summary>
         public Dictionary<string, float> Extra = new Dictionary<string, float>();
         public float Knob(string name, float fallback) => Extra != null && Extra.TryGetValue(name, out var v) ? v : fallback;
+        /// <summary>What gardens never join across nor reach onto, and grow out to meet: the ground surfaces of roads, paths and
+        /// tracks and the lots of buildings that are not houses, as rings. Set per plan by the game (WithBarriers).</summary>
+        public List<float2[]> Barriers;
+        /// <summary>A copy of these settings for one plan, with the barriers around its houses.</summary>
+        public StitchSettings WithBarriers(List<float2[]> barriers)
+        {
+            var c = (StitchSettings)MemberwiseClone();
+            c.Barriers = barriers;
+            return c;
+        }
     }
 
     public sealed class StitchPair

@@ -13,8 +13,9 @@
 // {"<zone key>": {"on": bool, "v": {knob: value}}}, the key a zone's name without EU / NA, lower case), any number of them. The neighbourhood types (ZoningTypes.cs: Suburb,
 // Village, Main street…) give their own zones and styles; the looks as types (Garden, Natural…) are hidden on the shelf.
 // Zoning: the blocks in the area are zoned as lots that start at their road: along each block, lot after lot, each a zone
-// picked by the shares among the zones allowed on that block's road (empty by the land's empty share), its width and depth
-// in that zone's ranges (a single column left before a gap or the block's end joins the lot before it). A cell is only
+// picked by the shares among the zones allowed on that block's road whose smallest lot fits there (empty by the land's empty
+// share), its width and depth in that zone's ranges: a lot is a full rectangle, never smaller than its zone's smallest (a
+// leftover too narrow for any zone joins the lot before it, or that lot gives up enough for one; else it stays empty). A cell is only
 // zoned when every cell between it and the road is (a zone behind another zone can never grow anything). Lots are mixed at
 // random, in clumps (neighbouring lots alike) or spread evenly. The zoning is built as every build's (never over cells
 // already zoned); with Outgrow on, the buildings that grow there outgrow their lots with their zone's settings.
@@ -296,7 +297,9 @@ namespace Placemaker.Core.Layers.Types.Zoning
             {
                 int sx = g.Size.x, sy = g.Size.y;
                 if (sx <= 0 || sy <= 0) continue;
-                // how deep each column can be zoned: from the road back, while open and inside the area
+                // how deep each column can be zoned: from the road back, while open, inside the area and not taken by a block
+                // laid out before (corners where blocks overlap)
+                long KeyOf(float2 c) => ((long)math.round(c.x * 2f) << 32) ^ (uint)(int)math.round(c.y * 2f);
                 var reach = new int[sx];
                 bool any = false;
                 for (int x = 0; x < sx; x++)
@@ -305,7 +308,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     for (; y < sy; y++)
                     {
                         var c = ZoneGuard.CellCentre(g, x, y);
-                        if (c.x < rmin.x || c.y < rmin.y || c.x > rmax.x || c.y > rmax.y || !Poly.Contains(ring, c) || !open(g, x, y)) break;
+                        if (c.x < rmin.x || c.y < rmin.y || c.x > rmax.x || c.y > rmax.y || !Poly.Contains(ring, c) || !open(g, x, y) || done.Contains(KeyOf(c))) break;
                     }
                     reach[x] = y;
                     any |= y > 0;
@@ -321,39 +324,64 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     if (dist <= width * 0.5f + ZoneGuard.Cell && dist < best) { best = dist; roadWidth = width; }
                 }
                 var allowed = roadWidth < 0f ? zones : zones.Where(z => roadWidth >= z.R0 - 0.01f && roadWidth <= z.R1 + 0.01f).ToList();
-                float allowedSum = allowed.Sum(z => z.Share);
+                int MinReach(int from, int count)
+                {
+                    int m = int.MaxValue;
+                    for (int x = from; x < from + count && x < sx; x++) m = math.min(m, reach[x]);
+                    return m == int.MaxValue ? 0 : m;
+                }
                 int x0 = 0;
                 while (x0 < sx)
                 {
                     if (reach[x0] == 0) { x0++; continue; }
+                    // the run of columns that can be zoned from here (to a gap or the block's end): a lot never crosses it
+                    int run = 0;
+                    while (x0 + run < sx && reach[x0 + run] > 0) run++;
+                    // the zones whose smallest lot fits here (wide enough, and deep enough over its width)
+                    var fitting = allowed.Where(z => z.W0 <= run && MinReach(x0, z.W0) >= z.D0).ToList();
                     var front = ZoneGuard.CellCentre(g, x0, 0);
                     uint lotSeed = math.hash(new uint3((uint)(int)math.round(front.x * 4f), (uint)(int)math.round(front.y * 4f), seed));
-                    // one value picks both: below the zoned share a zone (among those its road allows), above it an empty lot
-                    // (so clumps and even spreads hold for the empty lots too)
+                    // one value picks both: below the zoned share a zone (among those that fit), above it an empty lot (so clumps
+                    // and even spreads hold for the empty lots too)
                     float u = PatternValue(pattern, front, lotIndex, clump, seed, lotSeed);
-                    bool empty = u >= fill || allowed.Count == 0;
-                    var sizeFrom = allowed.Count > 0 ? allowed : zones;
-                    float v = (empty ? (u >= fill ? (u - fill) / math.max(1e-4f, 1f - fill) : u / fill) : u / fill) * (allowed.Count > 0 ? allowedSum : sum);
-                    var z = sizeFrom[sizeFrom.Count - 1];
-                    foreach (var cand in sizeFrom) { if (v < cand.Share) { z = cand; break; } v -= cand.Share; }
-                    int w = z.W0 + (int)(((lotSeed >> 4) & 0xFFFF) % (uint)(z.W1 - z.W0 + 1));
-                    int d = z.D0 + (int)(((lotSeed >> 20) & 0xFFF) % (uint)(z.D1 - z.D0 + 1));
-                    // the lot runs to its width, the block's end or a column that cannot be zoned; a single column left
-                    // before the next gap or the end joins it
-                    int x1 = x0;
-                    while (x1 < sx && x1 - x0 < w && reach[x1] > 0) x1++;
-                    if (x1 < sx && reach[x1] > 0 && (x1 + 1 >= sx || reach[x1 + 1] == 0)) x1++;
-                    for (int x = x0; x < x1 && !empty; x++)
-                        for (int y = 0; y < math.min(d, reach[x]); y++)
-                        {
-                            var c = ZoneGuard.CellCentre(g, x, y);
-                            long key = ((long)math.round(c.x * 2f) << 32) ^ (uint)(int)math.round(c.y * 2f);
-                            if (!done.Add(key)) continue;   // overlapping blocks: one zone per spot
-                            var sq = ZoneGuard.CellSquare(g, x, y);
-                            ctx.Plan.Zoning.Add(new PlannedZoning { A = P(ctx, sq[0]), B = P(ctx, sq[1]), C = P(ctx, sq[2]), D = P(ctx, sq[3]), ZoneId = z.Id });
-                            count[z.Id] = (count.TryGetValue(z.Id, out var n) ? n.Cells + 1 : 1, z.Stat);
-                        }
-                    x0 = x1;
+                    bool empty = u >= fill || fitting.Count == 0;
+                    var sizeFrom = fitting.Count > 0 ? fitting : allowed.Count > 0 ? allowed : zones;
+                    float fromSum = sizeFrom.Sum(z => z.Share);
+                    float v = (u >= fill ? (u - fill) / math.max(1e-4f, 1f - fill) : u / fill) * fromSum;
+                    var zone = sizeFrom[sizeFrom.Count - 1];
+                    foreach (var cand in sizeFrom) { if (v < cand.Share) { zone = cand; break; } v -= cand.Share; }
+                    int w = math.min(run, zone.W0 + (int)(((lotSeed >> 4) & 0xFFFF) % (uint)(zone.W1 - zone.W0 + 1)));
+                    // a lot keeps its depth over its whole width: narrower where the land behind it ends sooner
+                    if (!empty)
+                    {
+                        while (w > zone.W0 && MinReach(x0, w) < zone.D0) w--;
+                        if (MinReach(x0, w) < zone.D0) empty = true;
+                    }
+                    // what it leaves before the next gap: too narrow for any zone's smallest lot, it joins this lot (or, past this
+                    // lot's widest, this lot gives up enough for one)
+                    int left = run - w;
+                    int minW = allowed.Count > 0 ? allowed.Min(z => z.W0) : 1;
+                    if (left > 0 && left < minW)
+                    {
+                        if (w + left <= zone.W1 && (empty || MinReach(x0, w + left) >= zone.D0)) w += left;
+                        else if (w - (minW - left) >= zone.W0) w -= minW - left;
+                    }
+                    w = math.max(1, w);
+                    if (!empty)
+                    {
+                        int d = zone.D0 + (int)(((lotSeed >> 20) & 0xFFF) % (uint)(zone.D1 - zone.D0 + 1));
+                        d = math.min(d, MinReach(x0, w));
+                        for (int x = x0; x < x0 + w; x++)
+                            for (int y = 0; y < d; y++)
+                            {
+                                var c = ZoneGuard.CellCentre(g, x, y);
+                                if (!done.Add(KeyOf(c))) continue;
+                                var sq = ZoneGuard.CellSquare(g, x, y);
+                                ctx.Plan.Zoning.Add(new PlannedZoning { A = P(ctx, sq[0]), B = P(ctx, sq[1]), C = P(ctx, sq[2]), D = P(ctx, sq[3]), ZoneId = zone.Id });
+                                count[zone.Id] = (count.TryGetValue(zone.Id, out var n) ? n.Cells + 1 : 1, zone.Stat);
+                            }
+                    }
+                    x0 += w;
                     lotIndex++;
                 }
             }

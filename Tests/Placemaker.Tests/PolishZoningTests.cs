@@ -152,6 +152,38 @@ namespace Placemaker.Tests
             }
         }
 
+        [Theory]
+        [InlineData("mixed")]
+        [InlineData("clumps")]
+        [InlineData("even")]
+        public void NoLotIsSmallerThanItsZonesSmallest(string pattern)
+        {
+            // shops at least 5 wide and 4 deep among homes: never a strip of shops narrower or shallower than that
+            var shop = ZoneKinds.PrefabId(ZoneKinds.CommercialLow);
+            var plan = Plan(out var site, ("zoneArea", true), ("zonePattern", pattern), ("shareA", 50.0), ("shareB", 50.0), ("zoneB", ZoneKinds.CommercialLow),
+                ("widthMinB", 5.0), ("widthMaxB", 6.0), ("depthMinB", 4.0), ("depthMaxB", 4.0));
+            int shops = 0;
+            foreach (var (g, zz) in ByBlock(plan, site))
+            {
+                int x = 0;
+                while (x < g.Size.x)
+                {
+                    if (zz[x, 0] != shop) { x++; continue; }
+                    int start = x;
+                    while (x < g.Size.x && zz[x, 0] == shop)
+                    {
+                        int depth = 0;
+                        while (depth < g.Size.y && zz[x, depth] == shop) depth++;
+                        Assert.True(depth >= 4, $"{pattern}: a shop column {depth} deep");
+                        x++;
+                    }
+                    Assert.True(x - start >= 5, $"{pattern}: a strip of shops {x - start} wide");
+                    shops++;
+                }
+            }
+            Assert.True(shops > 0, "some shops");
+        }
+
         [Fact]
         public void ShareOfTheLandLeavesTheRestEmpty()
         {

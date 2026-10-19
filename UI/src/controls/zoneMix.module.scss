@@ -1,0 +1,206 @@
+// The Zoning types' zone mix (ZoneMix.tsx): a bar of the mix, one line per zone, a short menu of zone types.
+@use "../styles/tokens" as *;
+
+$text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the text colour
+
+.mix {
+    @include col;
+    min-width: 0;
+}
+
+.bar {
+    @include row;
+    height: 6rem;
+    margin: 4rem 0 6rem 0;
+    border-radius: 3rem;
+    overflow: hidden;
+    background-color: $c-surface;
+}
+
+.barPart {
+    height: 100%;
+}
+
+.line {
+    @include row;
+    min-width: 0;
+    min-height: 26rem;
+    margin-bottom: 3rem;
+}
+
+.lineLabel {
+    flex: 0 0 auto;
+    width: 104rem;
+    font-size: $fs-s;
+    color: $c-text-dim;
+    @include ellipsis;
+}
+
+.zoneButton {
+    @include row;
+    flex: 0 1 auto;
+    width: 172rem;
+    min-width: 0;
+    height: 24rem;
+    padding: 0 7rem 0 5rem;
+    border-radius: $radius;
+    background-color: $c-surface;
+    @include border(1rem, $c-line);
+    color: $text;
+    font-size: $fs-s;
+    cursor: pointer;
+}
+
+.zoneButton:hover {
+    background-color: $c-surface-hover;
+}
+
+.zoneButtonOn {
+    @include border(1rem, rgba(143, 209, 255, 0.75));
+}
+
+.swatch {
+    flex: 0 0 auto;
+    width: 9rem;
+    height: 9rem;
+    margin-right: 5rem;
+    border-radius: 2rem;
+}
+
+.zoneName {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0 5rem;
+    text-align: left;
+    @include ellipsis;
+}
+
+.exactTag {
+    flex: 0 0 auto;
+    margin-right: 4rem;
+    padding: 0 3rem;
+    border-radius: 3rem;
+    font-size: 9rem;
+    font-weight: bold;
+    color: $c-text-dim;
+    background-color: $c-surface-strong;
+}
+
+.share {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 8rem;
+}
+
+.all {
+    flex: 1 1 auto;
+    margin-left: 8rem;
+    font-size: $fs-s;
+    color: $c-text-faint;
+}
+
+.remove {
+    @include row;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 18rem;
+    height: 18rem;
+    margin-left: 4rem;
+    border-radius: 9rem;
+    color: $text;
+    cursor: pointer;
+}
+
+.remove:hover {
+    background-color: $c-surface-hover;
+}
+
+.add {
+    @include row;
+    align-self: flex-start;
+    height: 22rem;
+    margin: 1rem 0 6rem 0;
+    padding: 0 8rem 0 6rem;
+    border-radius: $radius;
+    @include border(1rem, $c-line);
+    color: $text;
+    font-size: $fs-s;
+    cursor: pointer;
+}
+
+.add:hover {
+    background-color: $c-surface-hover;
+}
+
+.menu {
+    @include col;
+    min-width: 0;
+    margin: 0 0 6rem 0;
+    padding: 6rem 6rem 2rem 6rem;
+    border-radius: $radius;
+    background-color: rgba(143, 209, 255, 0.07);
+}
+
+.menuGroup {
+    @include row(flex-start);
+    min-width: 0;
+    margin-bottom: 3rem;
+}
+
+.menuTitle {
+    flex: 0 0 auto;
+    width: 58rem;
+    margin-top: 4rem;
+    font-size: 11rem;
+    color: $c-text-dim;
+}
+
+.menuChips {
+    @include row;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.chip {
+    @include row;
+    height: 20rem;
+    margin: 0 4rem 4rem 0;
+    padding: 0 7rem 0 5rem;
+    border-radius: $radius;
+    background-color: $c-surface;
+    @include border(1rem, $c-line);
+    color: $text;
+    font-size: 11rem;
+    cursor: pointer;
+}
+
+.chip:hover {
+    background-color: $c-surface-hover;
+}
+
+.chipOn {
+    background-color: rgba(143, 209, 255, 0.18);
+    @include border(1rem, rgba(143, 209, 255, 0.75));
+}
+
+.chipText {
+    margin-left: 4rem;
+    @include ellipsis;
+}
+
+.exactButton {
+    @include row;
+    align-self: flex-start;
+    height: 20rem;
+    margin: 2rem 0 4rem 58rem;
+    padding: 0 7rem 0 5rem;
+    border-radius: $radius;
+    color: $c-text-dim;
+    font-size: 11rem;
+    cursor: pointer;
+}
+
+.exactButton:hover {
+    background-color: $c-surface-hover;
+}

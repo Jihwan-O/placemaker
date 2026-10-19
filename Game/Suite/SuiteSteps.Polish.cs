@@ -72,8 +72,10 @@ namespace Placemaker.Game.Suite
         /// <summary>The painter card and its Style row, as a person uses them (each control clicked; its trigger if it is not on screen).</summary>
         private IEnumerator PolishCard(ScenarioState st, JObject step, JObject rec)
         {
-            if (!_tool.Painter || !_tool.IsActive) yield return OpenPolishTool(st, rec);
-            if (!_tool.Painter) { rec["error"] = "polish: the polish tool did not open"; yield break; }
+            // a Zoning type picked in Placemaker: its own panel (the City window, its groups) is clicked as it is
+            bool zoningType = _tool.PolishType && _tool.IsActive;
+            if (!zoningType && (!_tool.Painter || !_tool.IsActive)) yield return OpenPolishTool(st, rec);
+            if (!zoningType && !_tool.Painter) { rec["error"] = "polish: the polish tool did not open"; yield break; }
             var s = ToolRegistration.Settings;
             if (step["theme"] != null)
             {

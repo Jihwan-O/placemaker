@@ -17,6 +17,7 @@ import { Tip } from "../lib/tips";
 import { Btn, Icon, Segmented, Switch } from "../components/common";
 import { AutoMosaic, autoPool, Thumb, useAssetList, useAssetName, usePicker } from "../components/picker";
 import { Slider } from "./Slider";
+import { isZoneMix, ZoneMix, zoneMixSummary } from "./ZoneMix";
 import { setOpen as setSectionOpen, useSections } from "../lib/collapse";
 import { pairHalves, usePanelLayout } from "../lib/layout";
 import s from "./controls.module.scss";
@@ -663,6 +664,8 @@ export const ControlList = ({
         );
     }
     const groups = groupBy(visible);
+    // a Zoning type's zone group: one editor (ZoneMix) instead of a row per setting
+    const zoneMix = isZoneMix(layer);
     const key = scope ?? layer.id;
     // s42: every section starts folded (one line each); the player opens what they need, remembered per type.
     const defaultOpen = (_i: number, _list: ControlEx[]) => false;
@@ -686,7 +689,7 @@ export const ControlList = ({
                 <React.Fragment key={pair.map((x) => x.name).join("|")}>
                     <div className={s.secRow}>
                         {pair.map((x) => (
-                            <SectionHead key={x.name} id={x.id} name={x.name} title={x.title} open={x.open} summary={summarize(x.list, step, t, assetName)} width={100 / cols} />
+                            <SectionHead key={x.name} id={x.id} name={x.name} title={x.title} open={x.open} summary={x.name === "zone" && zoneMix ? zoneMixSummary(step, layer, t, assetName) : summarize(x.list, step, t, assetName)} width={100 / cols} />
                         ))}
                     </div>
                     {pair
@@ -694,7 +697,7 @@ export const ControlList = ({
                         .map((x) => (
                             <div key={x.name} className={s.secBody} data-testid={"group-" + x.name + "-body"}>
                                 {pair.length > 1 && pair.every((p) => p.open) ? <div className={s.secBodyTitle}>{x.title}</div> : null}
-                                {rows(x.list)}
+                                {x.name === "zone" && zoneMix ? <ZoneMix step={step} layer={layer} rows={(ids) => rows(x.list.filter((c) => ids.includes(c.id)))} /> : rows(x.list)}
                             </div>
                         ))}
                 </React.Fragment>

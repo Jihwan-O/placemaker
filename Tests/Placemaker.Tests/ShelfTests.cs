@@ -26,7 +26,7 @@ namespace Placemaker.Tests
             var shelf = Shipped();
             Assert.Empty(shelf.Warnings);
             var shown = shelf.Categories.Where(c => !c.Hidden).Select(c => c.Id).ToArray();
-            Assert.Equal(new[] { "roads", "parking", "parks", "beach", "shops", "nature", "farms", "sports", "zoning" }, shown);
+            Assert.Equal(new[] { "zoning", "roads", "parking", "parks", "beach", "shops", "nature", "farms", "sports" }, shown);
             Assert.True(shelf.Category("industry").Hidden);
             Assert.True(shelf.Category("transport").Hidden);
             foreach (var g in GeneratorRegistry.All)

@@ -323,7 +323,7 @@ const POLISH_STAGES: { id: Stage; key: string; en: string }[] = [
 
 const StageBar = ({ state }: { state: ToolState }) => {
     const { t } = useT();
-    const STAGES_SHOWN = state.painter ? POLISH_STAGES : STAGES;
+    const STAGES_SHOWN = state.painter?.tool ? POLISH_STAGES : STAGES;
     const currentIndex = STAGES_SHOWN.findIndex((x) => x.id === (state.stage === "building" ? "review" : state.stage));
     const locked = state.stage === "building";
     return (

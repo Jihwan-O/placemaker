@@ -33,7 +33,7 @@ namespace Placemaker.Tests
         [Fact]
         public void OffZonesNothing()
         {
-            Assert.Empty(Cells(Plan()));
+            Assert.Empty(Cells(Plan(("zoneArea", false))));
         }
 
         [Fact]

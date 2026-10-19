@@ -38,6 +38,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
         public override float MinArea => 20f;
 
         public const string StatCells = "Placemaker.Polish.Stat.Cells";
+        public const string StatZone = "Placemaker.Polish.Stat.Zone.", StatExact = "Placemaker.Polish.Stat.ZoneExact";
         public static readonly string[] Patterns = { "clumps", "speckled", "noise", "rows" };
 
         /// <summary>The zone a look zones by default (Yard: industry; every other look: low density homes).</summary>
@@ -49,7 +50,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
         protected override void DefineControls(ControlSet c)
         {
             // zone this area (first: the area's zoning, then how its buildings look): up to three zones with shares, a pattern, a road rule
-            c.Toggle("zoneArea", false, ControlTier.Essential, "zone").Tip();
+            c.Toggle("zoneArea", true, ControlTier.Essential, "zone").Tip();
             foreach (var (slot, def, share) in new[] { ("A", DefaultZone, 100.0), ("B", ZoneKinds.CommercialLow, 0.0), ("C", ZoneKinds.OfficeLow, 0.0) })
             {
                 var z = EdgeZoningAddOn.ZoneKindControl("zone" + slot, "zone", def);
@@ -127,6 +128,8 @@ namespace Placemaker.Core.Layers.Types.Zoning
             var site = ctx.Input.Site;
             var ring = ctx.LayerRegion.Ring;
             var zones = new List<(string Id, float Share)>();
+            // each zone's line in Review: its type's cells (an exact zone: "cells of an exact zone")
+            var statOf = new Dictionary<string, string>();
             foreach (var slot in new[] { "A", "B", "C" })
             {
                 float share = ctx.F("share" + slot);
@@ -134,6 +137,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                 string asset = ctx.S("zoneAsset" + slot);
                 string id = !string.IsNullOrEmpty(asset) ? asset : ZoneKinds.PrefabId(ctx.S("zone" + slot));
                 zones.Add((id, share));
+                statOf[id] = !string.IsNullOrEmpty(asset) ? StatExact : StatZone + ctx.S("zone" + slot);
             }
             if (zones.Count == 0) return;
             float total = zones.Sum(z => z.Share);
@@ -143,6 +147,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
             // roads wide enough for the road rule, as sampled centre lines
             bool roadRule = ctx.B("roadRule");
             string roadZone = ZoneKinds.PrefabId(ctx.S("roadZone"));
+            if (roadRule && !statOf.ContainsKey(roadZone)) statOf[roadZone] = StatZone + ctx.S("roadZone");
             float minWidth = ctx.F("roadMinWidth"), depth = math.max(1, ctx.I("roadDepth")) * ZoneGuard.Cell;
             var roads = new List<(float2[] Line, float Half)>();
             if (roadRule)
@@ -183,6 +188,9 @@ namespace Placemaker.Core.Layers.Types.Zoning
             }
             int cells = count.Values.Sum();
             ctx.Plan.Stats.Add(new PlanStat(StatCells, cells, "count"));
+            if (count.Count > 1)
+                foreach (var kv in count.OrderByDescending(kv => kv.Value))
+                    ctx.Plan.Stats.Add(new PlanStat(statOf.TryGetValue(kv.Key, out var key) ? key : StatExact, kv.Value, "count"));
             ctx.Plan.Facts["polishZoneCells"] = cells;
         }
 

@@ -200,6 +200,8 @@
   "Placemaker.Polish.levelEarth.Tooltip": "The deepest cut or highest fill a lot may need (m). Lots on steeper land are made shallower or left empty.",
   "Placemaker.Polish.levelBank": "Steepest bank",
   "Placemaker.Polish.levelBank.Tooltip": "No bank around the levelled lots is steeper than this (50 % = 1 in 2).",
+  "Placemaker.Polish.levelWalls": "Retaining walls",
+  "Placemaker.Polish.levelWalls.Tooltip": "Where a lot's back meets ground 2.6 m or more above it (the lot behind it, or the hill), a concrete wall stands there with a walk along its top, instead of a bank that takes the lots' ground. The lot behind gives up the row under the walk.",
   "Placemaker.Polish.Stat.Levelled": "Lots levelled",
   "Placemaker.Polish.roadRule": "Zone big roads",
   "Placemaker.Polish.roadRule.Tooltip": "The blocks along roads at least this wide get their own zone (shops along the big roads…).",

@@ -687,7 +687,7 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                 </button>
             ) : null}
             {placing ? rows(val("zonePattern") === "clumps" ? ["zonePattern", "zoneGrain"] : ["zonePattern"]) : null}
-            {placing ? rows(val("levelLots") === false ? ["levelLots"] : ["levelLots", "levelEarth", "levelBank"]) : null}
+            {placing ? rows(val("levelLots") === false ? ["levelLots"] : ["levelLots", "levelEarth", "levelBank", "levelWalls"]) : null}
         </div>
     );
 };

@@ -373,8 +373,9 @@ namespace Placemaker.Core.Layers.Roads.Terraces
                             if (i2 >= nx || j2 >= ny) continue;
                             int m = j2 * nx + i2;
                             if (!sc.Free[k] && !sc.Free[m]) continue;
-                            // A retaining wall's foot and top: the jump is the wall (BlockField).
-                            if (wall != null && wall[k] * wall[m] < 0) continue;
+                            // A retaining wall's nodes hold (BlockField): its jump is the wall, the land around its ends gives way
+                            // through the bank pass (no release spreading from a wall end).
+                            if (wall != null && (wall[k] != 0 || wall[m] != 0)) continue;
                             float dh = math.abs(T[k] - T[m]);
                             float allowed = math.max(step, math.abs(B[k] - B[m])) + 0.03f;
                             if (dh <= allowed) continue;
@@ -435,7 +436,7 @@ namespace Placemaker.Core.Layers.Roads.Terraces
                     }
                     byte lv = (byte)(l + 1);
                     for (int k = 0; k < count; k++)
-                        if (r[k] > 0f && protect[k] != 0 && protect[k] <= lv) protect[k] = 0;
+                        if (r[k] > 0f && protect[k] != 0 && protect[k] <= lv && (wall == null || wall[k] == 0)) protect[k] = 0;   // a wall holds: the land around it gives
                 }
                 cancel.ThrowIfCancellationRequested();
             }

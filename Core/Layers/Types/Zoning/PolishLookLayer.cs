@@ -185,7 +185,8 @@ namespace Placemaker.Core.Layers.Types.Zoning
             c.Toggle("levelLots", true, ControlTier.Essential, "zone").Tip().When("zoneArea=true");
             c.Slider("levelEarth", 4, 1, 8, 0.5, "m", ControlTier.More, "zone").Tip().When("levelLots=true");
             c.Slider("levelBank", 40, 20, 50, 5, "%", ControlTier.More, "zone").Tip().When("levelLots=true");
-            foreach (var id in new[] { "levelLots", "levelEarth", "levelBank" }) c.Fixed(id);
+            c.Toggle("levelWalls", true, ControlTier.More, "zone").Tip().When("levelLots=true");
+            foreach (var id in new[] { "levelLots", "levelEarth", "levelBank", "levelWalls" }) c.Fixed(id);
             c.Slider("zoneGrain", DefaultGrain, 1, 12, 1, "count", ControlTier.More, "zone").Tip().When("zonePattern=clumps");
             // each zone type's own Outgrow switch and changes (the panel writes it; JSON, see the file's header)
             c.Asset("zoneOutgrow", "", ControlTier.More, "zone").Tip();
@@ -397,7 +398,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                             {
                                 var lotFront = new float[w];
                                 Array.Copy(fronts, x0, lotFront, 0, w);
-                                lot = new LotLevel.Lot { G = g, X0 = x0, W = w, D = d, MinD = zone.D0, Front = lotFront, Level = needs, ZoneId = zone.Id, Stat = zone.Stat };
+                                lot = new LotLevel.Lot { G = g, X0 = x0, W = w, D = d, MinD = zone.D0, MinW = zone.W0, Front = lotFront, Level = needs, ZoneId = zone.Id, Stat = zone.Stat };
                                 lots.Add(lot);
                             }
                         }
@@ -408,7 +409,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                                 if (!done.Add(KeyOf(c))) continue;
                                 var sq = ZoneGuard.CellSquare(g, x, y);
                                 // levelled lots: zoned once the ground is laid (the rows a bank took off are not)
-                                if (lot != null) { lot.Cells.Add((y, sq)); continue; }
+                                if (lot != null) { lot.Cells.Add((x, y, sq)); continue; }
                                 ctx.Plan.Zoning.Add(new PlannedZoning { A = P(ctx, sq[0]), B = P(ctx, sq[1]), C = P(ctx, sq[2]), D = P(ctx, sq[3]), ZoneId = zone.Id });
                                 count[zone.Id] = (count.TryGetValue(zone.Id, out var n) ? n.Cells + 1 : 1, zone.Stat);
                             }
@@ -419,16 +420,16 @@ namespace Placemaker.Core.Layers.Types.Zoning
             }
             if (levelLots)
             {
-                var opt = new LotLevel.Options { MaxEarth = maxEarth, BankSlope = ctx.F("levelBank") / 100f, Seed = ctx.Input.Seed == 0 ? 1u : ctx.Input.Seed };
+                var opt = new LotLevel.Options { MaxEarth = maxEarth, BankSlope = ctx.F("levelBank") / 100f, Walls = ctx.B("levelWalls"), Seed = ctx.Input.Seed == 0 ? 1u : ctx.Input.Seed };
                 var after = LotLevel.Build(ctx, lots, roads3, opt, ctx.Cancel);
                 if (after != null) ctx.Plan.HeightAfter = after;
                 var h = after ?? site.HeightAt;
                 foreach (var lot in lots)
                 {
                     if (lot.D == 0) { tooSteep++; continue; }
-                    foreach (var (y, sq) in lot.Cells)
+                    foreach (var (x, y, sq) in lot.Cells)
                     {
-                        if (y >= lot.D) continue;
+                        if (y >= lot.D || x < lot.X0 || x >= lot.X0 + lot.W) continue;
                         ctx.Plan.Zoning.Add(new PlannedZoning { A = At(h, sq[0]), B = At(h, sq[1]), C = At(h, sq[2]), D = At(h, sq[3]), ZoneId = lot.ZoneId });
                         count[lot.ZoneId] = (count.TryGetValue(lot.ZoneId, out var n) ? n.Cells + 1 : 1, lot.Stat);
                     }

@@ -303,6 +303,7 @@ namespace Placemaker.Core.Layers.Roads
                 blockSurvey = Terraces.BlockField.Measure(boundary, heightAt, blockOpt.FlatSlope);
                 if (blockSurvey.Sloped)
                 {
+                    plan.Facts["blocks.walksDropped"] = Terraces.BlockField.DropClimbingWalks(net, blockSurvey);
                     var lctx = new Common.LayerContext { Input = input, Plan = plan, Settings = settings, Cancel = cancel, Seed = blockOpt.Seed };
                     terraceGround = Terraces.BlockField.Build(lctx, boundary, blockSurvey, net, blockOpt, hw, obstacles, connect ? existing : new List<ExistingRoad>(), cancel);
                     ground = terraceGround.HeightAfter ?? heightAt;
@@ -389,21 +390,7 @@ namespace Placemaker.Core.Layers.Roads
             }
             // Retaining walls (terraced blocks): a wide quay along the top of each deep cut, at the upper level; the game
             // raises its low side into the concrete quay wall (RESEARCH-NOTES-ADDENDUM 78).
-            if (terraceGround != null && terraceGround.Walls.Count > 0)
-            {
-                var quay = new AssetRef("", Types.Waterfront.WaterfrontArt.QuayWide);
-                foreach (var w in terraceGround.Walls)
-                    for (int i = 1; i < w.Line.Length; i++)
-                    {
-                        var p0 = new float3(w.Line[i - 1].x, w.Deck[i - 1], w.Line[i - 1].y);
-                        var p1 = new float3(w.Line[i].x, w.Deck[i], w.Line[i].y);
-                        plan.Nets.Add(new PlannedNet
-                        {
-                            A = p0, B = math.lerp(p0, p1, 1f / 3f), C = math.lerp(p0, p1, 2f / 3f), D = p1,
-                            Role = NetRole.PathwayWide, Asset = quay, FollowTerrain = false, Category = AssetCategories.NetQuay,
-                        });
-                    }
-            }
+            if (terraceGround != null) Terraces.BlockField.AddQuays(plan, terraceGround.Walls);
             if (roundabout.HasRoundabout && settings.B(RoadsIds.RoundaboutIsland, true) && MathEx.Finite(roundabout.Center)
                 && (obstacles == null || !obstacles.BlockedAt(roundabout.Center.xz)) && IsJunction(net, degree, roundabout.Center.xz))
             {
@@ -523,7 +510,7 @@ namespace Placemaker.Core.Layers.Roads
                     // the road whose ground is level across the block (≤ the cross-fall + 2.5 %, or the flat threshold) and
                     // no steeper along it than the steepest street.
                     float level = math.max(blockOpt.CrossFall + 0.025f, blockOpt.FlatSlope);
-                    float along = math.max(level, blockOpt.MaxGrade + 0.02f);
+                    float along = math.max(level, Terraces.BlockField.ClimbGrade + 0.02f);
                     rule = new RoadPreZone.DepthRule { MaxDepth = blockOpt.Cells, LevelAcross = RoadPreZone.LevelAcross(ground, level, along) };
                     plan.Facts[RoadPreZone.FactDepth] = blockOpt.Cells;
                     plan.Facts[RoadPreZone.FactLevel] = level;

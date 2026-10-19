@@ -25,6 +25,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Placemaker.Core.Build;
 using Placemaker.Core.Geometry;
@@ -59,6 +60,12 @@ namespace Placemaker.Core.Layers.Roads.Terraces
         private const float Eps = 0.3f;
         /// <summary>Half width of the wall's quay (the wide pedestrian quay, 8 m).</summary>
         public const float QuayHalf = 4f;
+        /// <summary>
+        /// A zoning street climbing steeper than this (over 30 m) holds no terrace of its own: it runs through the terraces of the
+        /// streets along the hill as a ramp (a corridor on its own profile, banks to the terraces), its frontage zoned only where
+        /// it lies level (on a hill, a grid's terraces follow its contour streets across whole blocks).
+        /// </summary>
+        public const float ClimbGrade = 0.06f;
         /// <summary>Lowest wall (m): a pathway's side is Raised from 2 m (its elevation limit), with a margin for the heightmap.</summary>
         public const float MinWall = 2.6f;
         /// <summary>Lowest wall face the build keeps after the limits (m).</summary>
@@ -87,7 +94,7 @@ namespace Placemaker.Core.Layers.Roads.Terraces
         /// </summary>
         private static float OwnWeight(float d, float grade)
         {
-            float e = d * (1f + 4f * grade) + 1f;
+            float e = d * (1f + 12f * grade) + 1f;
             return 1f / (e * e);
         }
 
@@ -138,6 +145,34 @@ namespace Placemaker.Core.Layers.Roads.Terraces
             return s;
         }
 
+        /// <summary>
+        /// Footpaths that climb the hill steeper than a walk may (vanilla has no stairs) cannot cross the terraces: each would
+        /// cut every terrace it crosses and break its walls. They are dropped (marked removed); returns how many.
+        /// </summary>
+        public static int DropClimbingWalks(RoadNetwork net, Survey survey)
+        {
+            int dropped = 0;
+            var pts = new List<float3>();
+            foreach (var e in net.Edges)
+            {
+                if (!e.Alive || !e.Walk) continue;
+                pts.Clear();
+                e.Curve.Flatten(pts, null, 6f, 4f);
+                float steepest = 0f;
+                for (int i = 0; i + 1 < pts.Count; i++)
+                {
+                    var a = pts[i].xz; var b = pts[i + 1].xz;
+                    var d = math.normalizesafe(b - a, new float2(1, 0));
+                    var c = (a + b) * 0.5f;
+                    steepest = math.max(steepest, math.abs(survey.GroundAt(c + d * 10f) - survey.GroundAt(c - d * 10f)) / 20f);
+                }
+                if (steepest <= TerraceOptions.WalkGrade + 0.01f) continue;
+                e.Removed = true;
+                dropped++;
+            }
+            return dropped;
+        }
+
         public static TerraceGround Build(LayerContext ctx, float2[] boundary, Survey survey, RoadNetwork net, TerraceOptions o, Func<NetRole, float> hw,
             RoadObstacles obstacles, List<ExistingRoad> existing, CancellationToken cancel)
         {
@@ -170,8 +205,11 @@ namespace Placemaker.Core.Layers.Roads.Terraces
                 {
                     var A = pts[k].xz; var B = pts[k + 1].xz;
                     var s = new Src { A = A, B = B, YA = survey.GroundAt(A), YB = survey.GroundAt(B), Source = ei, Half = roadHalf + (e.Walk ? 1f : 1.5f), Kind = e.Walk ? 1 : 2 };
-                    s.Grade = math.abs(s.YB - s.YA) / math.max(0.5f, math.distance(A, B));
-                    if (band)
+                    // its grade over 30 m (a street that climbs straight up the hill is a ramp through the terraces, not one)
+                    var dirAB = math.normalizesafe(B - A, new float2(1, 0));
+                    var cm = (A + B) * 0.5f;
+                    s.Grade = math.abs(survey.GroundAt(cm + dirAB * 15f) - survey.GroundAt(cm - dirAB * 15f)) / 30f;
+                    if (band && s.Grade <= ClimbGrade)
                     {
                         var d = math.normalizesafe(B - A, new float2(1, 0));
                         var n = new float2(-d.y, d.x);
@@ -486,11 +524,7 @@ namespace Placemaker.Core.Layers.Roads.Terraces
             var rises = new List<float>();
             void Flush()
             {
-                if (line.Count >= 2)
-                {
-                    var w = new TerraceWall { Line = line.ToArray(), Up = ups.ToArray(), Rise = rises.ToArray() };
-                    if (w.Length >= MinWallLength) runs.Add(w);
-                }
+                if (line.Count >= 2) runs.Add(new TerraceWall { Line = line.ToArray(), Up = ups.ToArray(), Rise = rises.ToArray() });
                 line.Clear(); ups.Clear(); rises.Clear();
             }
             bool Clear(float2 q, int src)
@@ -554,7 +588,51 @@ namespace Placemaker.Core.Layers.Roads.Terraces
                 }
             }
             Flush();
+            // a street is several edges (split at its nodes): its pieces of wall are one wall
+            Merge(runs);
+            runs.RemoveAll(w => w.Length < MinWallLength);
             return runs;
+        }
+
+        /// <summary>Joins wall pieces whose ends meet (within 4.5 m) running the same way, until none do.</summary>
+        internal static void Merge(List<TerraceWall> runs)
+        {
+            bool joined = true;
+            while (joined)
+            {
+                joined = false;
+                for (int i = 0; i < runs.Count && !joined; i++)
+                    for (int j = 0; j < runs.Count && !joined; j++)
+                    {
+                        if (i == j) continue;
+                        var a = runs[i]; var b = runs[j];
+                        // a's end to b's start, b turned around when it runs the other way
+                        for (int flip = 0; flip < 2 && !joined; flip++)
+                        {
+                            var bl = flip == 0 ? b : Reverse(b);
+                            float2 ae = a.Line[a.Line.Length - 1], bs = bl.Line[0];
+                            if (math.distance(ae, bs) > 4.5f) continue;
+                            var ta = math.normalizesafe(ae - a.Line[a.Line.Length - 2]);
+                            var tb = math.normalizesafe(bl.Line[1] - bs);
+                            if (math.dot(ta, tb) < 0.85f || math.dot(a.Up[a.Up.Length - 1], bl.Up[0]) < 0.85f) continue;
+                            int n = a.Line.Length + bl.Line.Length;
+                            var w = new TerraceWall { Line = new float2[n], Up = new float2[n], Rise = new float[n] };
+                            Array.Copy(a.Line, w.Line, a.Line.Length); Array.Copy(bl.Line, 0, w.Line, a.Line.Length, bl.Line.Length);
+                            Array.Copy(a.Up, w.Up, a.Up.Length); Array.Copy(bl.Up, 0, w.Up, a.Up.Length, bl.Up.Length);
+                            Array.Copy(a.Rise, w.Rise, a.Rise.Length); Array.Copy(bl.Rise, 0, w.Rise, a.Rise.Length, bl.Rise.Length);
+                            runs[i] = w;
+                            runs.RemoveAt(j);
+                            joined = true;
+                        }
+                    }
+            }
+        }
+
+        private static TerraceWall Reverse(TerraceWall w)
+        {
+            var r = new TerraceWall { Line = (float2[])w.Line.Clone(), Up = (float2[])w.Up.Clone(), Rise = (float[])w.Rise.Clone() };
+            Array.Reverse(r.Line); Array.Reverse(r.Up); Array.Reverse(r.Rise);
+            return r;
         }
 
         /// <summary>Marks the nodes on either side of each wall line (−1 the foot, +1 the top): the limits never smooth across it.</summary>
@@ -594,7 +672,7 @@ namespace Placemaker.Core.Layers.Roads.Terraces
         /// kept where the face at both its ends is at least <see cref="KeepWall"/> high, contiguous chords of at least
         /// <see cref="MinWallLength"/> kept as one wall.
         /// </summary>
-        private static List<TerraceWall> Verify(Sculpt sc, List<TerraceWall> runs, out bool changed)
+        internal static List<TerraceWall> Verify(Sculpt sc, List<TerraceWall> runs, out bool changed)
         {
             changed = false;
             var kept = new List<TerraceWall>();
@@ -607,8 +685,14 @@ namespace Placemaker.Core.Layers.Roads.Terraces
                 {
                     float foot = sc.Sample(sc.Target, pts[i] - ups[i] * 2.5f), top = sc.Sample(sc.Target, pts[i] + ups[i] * 3f);
                     rise[i] = top - foot;
-                    ok[i] = rise[i] >= KeepWall;
                 }
+                // a wall stands at its full height: where its face drops well under the run's typical height (its ends,
+                // where a climbing street's ramp comes in) a bank takes over, not a wall tapering to nothing
+                var sorted = (float[])rise.Clone();
+                Array.Sort(sorted);
+                float typical = sorted[sorted.Length / 2];
+                float need = math.max(KeepWall, math.min(typical * 0.75f, typical - 1.2f));
+                for (int i = 0; i < pts.Length; i++) ok[i] = rise[i] >= need;
                 foreach (bool b in ok) changed |= !b;
                 int start = -1;
                 for (int i = 0; i <= pts.Length; i++)
@@ -633,7 +717,7 @@ namespace Placemaker.Core.Layers.Roads.Terraces
         }
 
         /// <summary>The deck: the built ground at the quay's upper edge (its uphill side then sits on the ground, its low side is the wall).</summary>
-        private static void Decks(Sculpt sc, TerraceWall w)
+        internal static void Decks(Sculpt sc, TerraceWall w)
         {
             w.Deck = new float[w.Line.Length];
             for (int i = 0; i < w.Line.Length; i++)
@@ -641,6 +725,15 @@ namespace Placemaker.Core.Layers.Roads.Terraces
                 float d = sc.Sample(sc.Target, w.Line[i] + w.Up[i] * QuayHalf);
                 if (!math.isfinite(d)) d = sc.Sample(sc.Target, w.Line[i] + w.Up[i] * 2f);
                 w.Deck[i] = d;
+            }
+            // even along the wall (the grid's own steps would show in the deck): a running mean over five points
+            if (w.Deck.Length < 3) return;
+            var raw = (float[])w.Deck.Clone();
+            for (int i = 0; i < raw.Length; i++)
+            {
+                float sum = 0f; int n = 0;
+                for (int k = math.max(0, i - 2); k <= math.min(raw.Length - 1, i + 2); k++) { sum += raw[k]; n++; }
+                w.Deck[i] = sum / n;
             }
         }
 
@@ -663,6 +756,30 @@ namespace Placemaker.Core.Layers.Roads.Terraces
                 pts[i] = math.lerp(w.Line[seg], w.Line[seg + 1], t);
                 ups[i] = math.normalizesafe(math.lerp(w.Up[seg], w.Up[seg + 1], t), w.Up[seg]);
             }
+        }
+
+        /// <summary>
+        /// The walls' quays as nets: straight pieces between the wall's points at its deck heights, explicit heights; the game
+        /// raises a quay's low side into its concrete wall (RESEARCH-NOTES-ADDENDUM 78).
+        /// </summary>
+        internal static int AddQuays(AreaPlan plan, List<TerraceWall> walls)
+        {
+            int n = 0;
+            if (walls == null) return 0;
+            var quay = new AssetRef("", Types.Waterfront.WaterfrontArt.QuayWide);
+            foreach (var w in walls)
+                for (int i = 1; i < w.Line.Length; i++)
+                {
+                    var p0 = new float3(w.Line[i - 1].x, w.Deck[i - 1], w.Line[i - 1].y);
+                    var p1 = new float3(w.Line[i].x, w.Deck[i], w.Line[i].y);
+                    plan.Nets.Add(new PlannedNet
+                    {
+                        A = p0, B = math.lerp(p0, p1, 1f / 3f), C = math.lerp(p0, p1, 2f / 3f), D = p1,
+                        Role = NetRole.PathwayWide, Asset = quay, FollowTerrain = false, Category = AssetCategories.NetQuay,
+                    });
+                    n++;
+                }
+            return n;
         }
 
         /// <summary>Where the ray p + u·dir (u ≥ 0) crosses segment a–b: its distance u and the fraction f along a–b.</summary>

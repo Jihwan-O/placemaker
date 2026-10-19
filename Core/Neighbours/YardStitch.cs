@@ -522,6 +522,7 @@ namespace Placemaker.Core.Neighbours
                 }
                 if (clipped > 0) plan.Notes.Add($"{clipped} gardens cut back clear of roads, paths and buildings");
             }
+            FillGaps(houses, plots, touched, raw, kept, s, plan);
 
             // ── 3. fences on plot edges ──
             var moved = new Dictionary<long, (float2 A, float2 B)>();
@@ -1272,20 +1273,24 @@ namespace Placemaker.Core.Neighbours
                 foreach (var (fh, fat) in Feature) if (fh == h.Id) keepOff.Add(new Region(Ccw(Blob(fat, 7f, hash, 10))));
                 if (keepOff.Count > 0) land = Poly.Boolean(land, keepOff, BoolOp.Difference);
                 // the roomiest spot: the grid point farthest from the land's edge
+                // a roomy spot, nearer the house the better (a garden reaching far keeps its features where people are); the grid
+                // coarser in big land, so a huge garden is searched as quickly as a small one
                 float2 best = default;
-                float room = 0f;
+                float room = 0f, bestScore = float.MinValue;
                 foreach (var r in land)
                 {
                     var lo = r.Outer.Aggregate(new float2(float.MaxValue), math.min);
                     var hi = r.Outer.Aggregate(new float2(float.MinValue), math.max);
-                    for (float x = lo.x + 0.5f; x < hi.x; x += 1f)
-                        for (float y = lo.y + 0.5f; y < hi.y; y += 1f)
+                    float cell = math.max(1f, math.sqrt(math.max(1f, (hi.x - lo.x) * (hi.y - lo.y))) / 50f);
+                    for (float x = lo.x + cell * 0.5f; x < hi.x; x += cell)
+                        for (float y = lo.y + cell * 0.5f; y < hi.y; y += cell)
                         {
                             var p = new float2(x, y);
                             if (!Poly.Contains(r.Outer, p) || r.Holes.Any(hl => Poly.Contains(hl, p))) continue;
                             float c = DistanceToRing(r.Outer, p);
                             foreach (var hl in r.Holes) c = math.min(c, DistanceToRing(hl, p));
-                            if (c > room) { room = c; best = p; }
+                            float score = math.min(c, 6f) - math.distance(p, h.Position) * 0.02f;
+                            if (c >= 2.2f && score > bestScore) { bestScore = score; room = c; best = p; }
                         }
                 }
                 if (room < 2.2f) continue;
@@ -1973,10 +1978,38 @@ namespace Placemaker.Core.Neighbours
         private static void CloseGardens(IReadOnlyList<StitchHouse> houses, float2[][] plots, bool[] touched, StitchPlan plan, Dictionary<long, (float2 A, float2 B)> moved, StitchSettings s)
         {
             int n = houses.Count;
-            // moved lines standing away from their garden's edge
+            // moved lines: only the stretch that lies on a garden's edge stays (a line carried past where its garden now ends, or
+            // into a strip a garden took, would stand in the middle of a garden); none of it on an edge: it goes
             for (int i = 0; i < n; i++)
             {
                 if (!touched[i] || plots[i] == null) continue;
+                foreach (var l in houses[i].Lines)
+                {
+                    if (plan.HideLines.Contains(l.Id) || !moved.TryGetValue(l.Id, out var m)) continue;
+                    float len = math.distance(m.A, m.B);
+                    if (len < 0.5f) continue;
+                    int steps = math.max(2, (int)(len / 0.5f));
+                    int run0 = -1, best0 = 0, best1 = -1;
+                    for (int k = 0; k <= steps; k++)
+                    {
+                        var p = math.lerp(m.A, m.B, (float)k / steps);
+                        bool onEdge = false;
+                        for (int j = 0; j < n && !onEdge; j++) if (plots[j] != null && DistanceToRing(plots[j], p) < 1.0f) onEdge = true;
+                        if (onEdge && run0 < 0) run0 = k;
+                        if ((!onEdge || k == steps) && run0 >= 0)
+                        {
+                            int end = onEdge ? k : k - 1;
+                            if (end - run0 > best1 - best0) { best0 = run0; best1 = end; }
+                            run0 = -1;
+                        }
+                    }
+                    float kept0 = (float)best0 / steps, kept1 = (float)best1 / steps;
+                    if (best1 < 0 || (kept1 - kept0) * len < s.Knob("minLine", 2f)) { plan.HideLines.Add(l.Id); plan.Notes.Add($"{houses[i].Id}: a line inside its garden goes"); continue; }
+                    if (kept0 > 0.001f || kept1 < 0.999f) moved[l.Id] = (math.lerp(m.A, m.B, kept0), math.lerp(m.A, m.B, kept1));
+                }
+            }
+            for (int i = 0; i < 0; i++)
+            {
                 foreach (var l in houses[i].Lines)
                 {
                     if (plan.HideLines.Contains(l.Id) || !moved.TryGetValue(l.Id, out var m)) continue;
@@ -2056,6 +2089,68 @@ namespace Placemaker.Core.Neighbours
                 if (plan.FencePieces.Count > before) { gardens++; pieces += plan.FencePieces.Count - before; }
             }
             if (pieces > 0) plan.Notes.Add($"{gardens} gardens closed with {pieces} fence and hedge pieces");
+        }
+
+        /// <summary>
+        /// Land some gardens reached but none got (the strips the cuts between gardens that are not neighbours leave, "alleys"):
+        /// each piece goes to the garden it borders most, so neighbouring gardens meet. Never onto a lot, a road or a building.
+        /// </summary>
+        private static void FillGaps(IReadOnlyList<StitchHouse> houses, float2[][] plots, bool[] touched, List<float2>[] raw, float2[][] kept, StitchSettings s, StitchPlan plan)
+        {
+            int n = houses.Count;
+            var want = Enumerable.Range(0, n).Where(i => touched[i] && houses[i].Edit && houses[i].Polished && raw[i] != null && raw[i].Count >= 3 && plots[i] != null).ToList();
+            if (want.Count < 2) return;
+            var reached = Poly.UnionAll(want.Select(i => (IReadOnlyList<float2>)Ccw(raw[i].ToArray())));
+            var taken = new List<IReadOnlyList<float2>>();
+            for (int i = 0; i < n; i++)
+            {
+                if (plots[i] != null) taken.Add(Ccw(plots[i]));
+                if (kept[i] != null) taken.Add(Ccw(kept[i]));
+            }
+            float margin = s.Knob("barrierMargin", 0.8f);
+            if (s_barriers != null) foreach (var (_, _, ring) in s_barriers) foreach (var g in Poly.Offset(ring, -margin)) taken.Add(Ccw(g));
+            var gaps = Poly.Boolean(RingsOf(reached), taken, BoolOp.Difference, FillRule.NonZero);
+            int filled = 0;
+            float area = 0f;
+            foreach (var gap in gaps.OrderByDescending(g => g.Area))
+            {
+                if (gap.Area < 2f) continue;
+                // the garden it borders most (its outline sampled every metre, near which garden's edge)
+                var ring = gap.Outer;
+                var score = new Dictionary<int, int>();
+                for (int k = 0; k < ring.Length; k++)
+                {
+                    var a = ring[k];
+                    var b = ring[(k + 1) % ring.Length];
+                    int steps = math.max(1, (int)(math.distance(a, b)));
+                    for (int t = 0; t < steps; t++)
+                    {
+                        var p = math.lerp(a, b, (t + 0.5f) / steps);
+                        foreach (int i in want)
+                            if (DistanceToRing(plots[i], p) < 0.6f) { score[i] = (score.TryGetValue(i, out var c) ? c : 0) + 1; break; }
+                    }
+                }
+                if (score.Count == 0) continue;
+                int best = score.OrderByDescending(kv => kv.Value).First().Key;
+                var merged = Poly.Boolean(new List<Region> { new Region(Ccw(plots[best])) }, new List<Region> { gap }, BoolOp.Union);
+                var keep = merged.OrderByDescending(r => Poly.Contains(r.Outer, houses[best].Position) ? 1 : 0).ThenByDescending(r => r.Area).FirstOrDefault();
+                if (keep == null) continue;
+                var outer = keep.HasHoles ? Poly.CutHoles(keep, 0f).OrderByDescending(r => Poly.Area(r)).First() : keep.Outer;
+                if (outer == null || outer.Length < 3) continue;
+                plots[best] = Poly.Simplify(outer, 0.05f);
+                filled++;
+                area += gap.Area;
+            }
+            if (filled > 0) plan.Notes.Add($"{filled} strips between gardens ({area:F0} m²) given to the garden beside them");
+        }
+
+        private static IEnumerable<IReadOnlyList<float2>> RingsOf(IEnumerable<Region> regions)
+        {
+            foreach (var r in regions)
+            {
+                yield return r.Outer;
+                foreach (var h in r.Holes) yield return h;
+            }
         }
 
         /// <summary>The piece object of a house's fence kind ("FenceResidentialHigh01" → "FenceResidentialPieceHigh01"), or the

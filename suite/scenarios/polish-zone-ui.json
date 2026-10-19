@@ -48,8 +48,8 @@
         },
         {
           "do": "type",
-          "layer": "polishGarden",
-          "preset": "standard"
+          "layer": "zoningSuburb",
+          "preset": "suburbCornerShops"
         },
         {
           "do": "shot",
@@ -68,14 +68,6 @@
           "do": "shot",
           "name": "zone-two-ui",
           "shotMode": "ui"
-        },
-        {
-          "do": "polish",
-          "click": "zonemix-pick-B"
-        },
-        {
-          "do": "polish",
-          "click": "zonemix-B-commercialLow"
         },
         {
           "do": "polish",

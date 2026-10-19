@@ -253,6 +253,7 @@ namespace Placemaker.Game.Neighbours
             });
             CreateLotQueries();
             CreateAreaQueries();
+            CreateNearbyQuery();
         }
 
         [Preserve]
@@ -320,6 +321,8 @@ namespace Placemaker.Game.Neighbours
         /// <summary>Fence lanes the game created or reset (not the ones we wrote): their houses need stitching.</summary>
         private void CollectChanged()
         {
+            try { CollectNewNearby(); }
+            catch (Exception e) { if (_errors++ < 5) Mod.Log.Error(e, "Placemaker neighbourhood polish (new things nearby) failed"); }
             if (!_goneHouses.IsEmptyIgnoreFilter)
                 using (var gone = _goneHouses.ToEntityArray(Allocator.Temp))
                 {

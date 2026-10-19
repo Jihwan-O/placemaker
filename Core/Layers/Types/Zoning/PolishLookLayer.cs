@@ -6,7 +6,9 @@
 // Compact, Standard and Sprawling (and the player's own, as for every type). Planning counts the buildings in the area;
 // Build (Game/Tool/PlacemakerToolSystem.Polish) polishes them with the look and the values the rows have, saved on each
 // building (NeighbourPolishSystem).
-// Two tools in one, each with its switch: Zoning (zoneArea) and Shape (shapeLots, how the lots grow: the look's settings).
+// Two tools in one, each with its switch: Zoning (zoneArea) and Outgrow (shapeLots: lots grow past their borders, by the
+// look's settings). The neighbourhood types (ZoningTypes.cs: Suburb, Village, Main street…) give their own zones, lots,
+// fill, mix and road rule and their own styles; the looks as types (Garden, Natural…) are hidden on the shelf.
 // Zoning: the blocks in the area are zoned as lots that start at their road: along each block, lot after lot, each a zone
 // picked by the shares (a zone type, or an exact zone prefab: any, mods' too), its width and depth picked in that zone's
 // ranges (cells; a single column left before a gap or the block's end joins the lot before it). A cell is only zoned
@@ -51,7 +53,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
         {
             "zoneArea", "zoneA", "zoneB", "zoneC", "zoneAssetA", "zoneAssetB", "zoneAssetC", "shareA", "shareB", "shareC",
             "widthMinA", "widthMaxA", "depthMinA", "depthMaxA", "widthMinB", "widthMaxB", "depthMinB", "depthMaxB",
-            "widthMinC", "widthMaxC", "depthMinC", "depthMaxC", "zonePattern", "zoneGrain", "roadRule", "roadZone", "roadMinWidth", "roadDepth",
+            "widthMinC", "widthMaxC", "depthMinC", "depthMaxC", "zoneFill", "zonePattern", "zoneGrain", "roadRule", "roadZone", "roadMinWidth", "roadDepth",
         };
 
         /// <summary>A lot's usual size by zone type (cells): width along the road, depth from it.</summary>
@@ -70,6 +72,70 @@ namespace Placemaker.Core.Layers.Types.Zoning
         /// <summary>The zone a look zones by default (Yard: industry; every other look: low density homes).</summary>
         protected virtual string DefaultZone => LookId == "yard" ? ZoneKinds.Industrial : ZoneKinds.ResidentialLow;
 
+        /// <summary>One of the three zones of a type: its zone type, its share, its lots (cells).</summary>
+        public readonly struct ZoneSlot
+        {
+            public readonly string Kind;
+            public readonly double Share;
+            public readonly int W0, W1, D0, D1;
+            public ZoneSlot(string kind, double share, int w0, int w1, int d0, int d1) { Kind = kind; Share = share; W0 = w0; W1 = w1; D0 = d0; D1 = d1; }
+            public ZoneSlot(string kind, double share) : this(kind, share, LotSize(kind).W0, LotSize(kind).W1, LotSize(kind).D0, LotSize(kind).D1) { }
+        }
+
+        /// <summary>The type's three zones (B and C with share 0: not mixed in).</summary>
+        protected virtual ZoneSlot[] Slots => new[] { new ZoneSlot(DefaultZone, 100), new ZoneSlot(ZoneKinds.CommercialLow, 0), new ZoneSlot(ZoneKinds.OfficeLow, 0) };
+        protected virtual double DefaultFill => 100;
+        protected virtual string DefaultPattern => "mixed";
+        protected virtual double DefaultGrain => 3;
+        /// <summary>The road rule: on, its zone, the roads' width, its depth.</summary>
+        protected virtual (bool On, string Kind, double MinWidth, double Depth) Road => (false, ZoneKinds.CommercialLow, 20, 2);
+
+        /// <summary>A style's zones: every setting of the three slots (a slot not given: share 0).</summary>
+        protected static (string, object)[] Mix(params ZoneSlot[] zones)
+        {
+            var list = new List<(string, object)>();
+            string[] names = { "A", "B", "C" };
+            for (int i = 0; i < 3; i++)
+            {
+                if (i >= zones.Length) { list.Add(("share" + names[i], 0.0)); continue; }
+                var z = zones[i];
+                list.Add(("zone" + names[i], z.Kind));
+                list.Add(("zoneAsset" + names[i], ""));
+                list.Add(("share" + names[i], z.Share));
+                list.Add(("widthMin" + names[i], (double)z.W0));
+                list.Add(("widthMax" + names[i], (double)z.W1));
+                list.Add(("depthMin" + names[i], (double)z.D0));
+                list.Add(("depthMax" + names[i], (double)z.D1));
+            }
+            return list.ToArray();
+        }
+
+        protected static (string, object)[] RoadRule(string kind, double minWidth, double depth) =>
+            new (string, object)[] { ("roadRule", true), ("roadZone", kind), ("roadMinWidth", minWidth), ("roadDepth", depth) };
+
+        /// <summary>Lots that keep to themselves (small reach, no open land, lawn everywhere).</summary>
+        protected static readonly (string, object)[] CompactReach =
+        {
+            ("sideReach", 30.0), ("maxFrontGap", 40.0), ("maxBackGap", 60.0), ("maxRearGap", 20.0), ("maxFacingGap", 16.0),
+            ("maxDeepen", 16.0), ("hugReach", 16.0), ("openReach", 0.0), ("lawnReach", 1000.0),
+        };
+
+        /// <summary>Roomy lots: they reach well out, but stop short of filling whole fields.</summary>
+        protected static readonly (string, object)[] WideReach =
+        {
+            ("sideReach", 150.0), ("maxFrontGap", 120.0), ("maxBackGap", 180.0), ("maxRearGap", 80.0), ("maxFacingGap", 60.0),
+            ("maxDeepen", 60.0), ("hugReach", 100.0), ("openReach", 40.0),
+        };
+
+        /// <summary>Lots that take every bit of land around them.</summary>
+        protected static readonly (string, object)[] SprawlReach =
+        {
+            ("sideReach", 250.0), ("maxFrontGap", 200.0), ("maxBackGap", 300.0), ("maxRearGap", 150.0), ("maxFacingGap", 120.0),
+            ("maxDeepen", 150.0), ("hugReach", 150.0), ("openReach", 80.0),
+        };
+
+        protected static (string, object)[] With(params (string, object)[][] parts) => parts.SelectMany(p => p).ToArray();
+
         /// <summary>The type of a layer id, or null.</summary>
         public static PolishLookLayer Of(string layerId) => GeneratorRegistry.Get(layerId) as PolishLookLayer;
 
@@ -77,8 +143,14 @@ namespace Placemaker.Core.Layers.Types.Zoning
         {
             // zone this area (first: the area's zoning, then how its buildings look): up to three zones with shares, a pattern, a road rule
             c.Toggle("zoneArea", true, ControlTier.Essential, "zone").Tip();
-            foreach (var (slot, def, share) in new[] { ("A", DefaultZone, 100.0), ("B", ZoneKinds.CommercialLow, 0.0), ("C", ZoneKinds.OfficeLow, 0.0) })
+            var slots = Slots;
+            string[] names = { "A", "B", "C" };
+            for (int i = 0; i < 3; i++)
             {
+                string slot = names[i];
+                var zs = i < slots.Length ? slots[i] : new ZoneSlot(ZoneKinds.CommercialLow, 0);
+                string def = zs.Kind;
+                double share = zs.Share;
                 var z = EdgeZoningAddOn.ZoneKindControl("zone" + slot, "zone", def);
                 z.LabelKey = c.Key("zone" + slot);
                 z.TooltipKey = z.LabelKey + ".Tooltip";
@@ -87,26 +159,29 @@ namespace Placemaker.Core.Layers.Types.Zoning
                 c.List.Add(z);
                 c.Asset("zoneAsset" + slot, AssetCategories.Zone, ControlTier.More, "zone").Tip().When("zoneArea=true");
                 c.Slider("share" + slot, share, 0, 100, 5, "%", slot == "A" ? ControlTier.Essential : ControlTier.More, "zone").Tip().When("zoneArea=true");
-                var (w0, w1, d0, d1) = LotSize(def);
+                int w0 = zs.W0, w1 = zs.W1, d0 = zs.D0, d1 = zs.D1;
                 c.Slider("widthMin" + slot, w0, 1, MaxWidth, 1, "count", ControlTier.More, "zone").Tip().When("zoneArea=true");
                 c.Slider("widthMax" + slot, w1, 1, MaxWidth, 1, "count", ControlTier.More, "zone").Tip().When("zoneArea=true");
                 c.Slider("depthMin" + slot, d0, 1, MaxDepth, 1, "count", ControlTier.More, "zone").Tip().When("zoneArea=true");
                 c.Slider("depthMax" + slot, d1, 1, MaxDepth, 1, "count", ControlTier.More, "zone").Tip().When("zoneArea=true");
                 foreach (var id in new[] { "zone", "zoneAsset", "share", "widthMin", "widthMax", "depthMin", "depthMax" }) c.Fixed(id + slot);
             }
-            c.Choice("zonePattern", "mixed", ControlTier.Essential, "zone", Patterns).Tip().When("zoneArea=true");
-            c.Slider("zoneGrain", 3, 1, 12, 1, "count", ControlTier.More, "zone").Tip().When("zonePattern=clumps");
-            c.Toggle("roadRule", false, ControlTier.More, "zone").Tip().When("zoneArea=true");
-            var rz = EdgeZoningAddOn.ZoneKindControl("roadZone", "zone", ZoneKinds.CommercialLow);
+            c.Slider("zoneFill", DefaultFill, 5, 100, 5, "%", ControlTier.Essential, "zone").Tip().When("zoneArea=true");
+            c.Fixed("zoneFill");
+            c.Choice("zonePattern", DefaultPattern, ControlTier.Essential, "zone", Patterns).Tip().When("zoneArea=true");
+            c.Slider("zoneGrain", DefaultGrain, 1, 12, 1, "count", ControlTier.More, "zone").Tip().When("zonePattern=clumps");
+            var road = Road;
+            c.Toggle("roadRule", road.On, ControlTier.More, "zone").Tip().When("zoneArea=true");
+            var rz = EdgeZoningAddOn.ZoneKindControl("roadZone", "zone", road.Kind);
             rz.LabelKey = c.Key("roadZone");
             rz.TooltipKey = rz.LabelKey + ".Tooltip";
             rz.Tier = ControlTier.More;
             rz.VisibleWhen = "roadRule=true";
             c.List.Add(rz);
-            c.Slider("roadMinWidth", 20, 6, 60, 1, "m", ControlTier.More, "zone").Tip().When("roadRule=true");
-            c.Slider("roadDepth", 2, 1, 6, 1, "count", ControlTier.More, "zone").Tip().When("roadRule=true");
+            c.Slider("roadMinWidth", road.MinWidth, 6, 60, 1, "m", ControlTier.More, "zone").Tip().When("roadRule=true");
+            c.Slider("roadDepth", road.Depth, 1, 6, 1, "count", ControlTier.More, "zone").Tip().When("roadRule=true");
             foreach (var id in new[] { "zoneArea", "zonePattern", "zoneGrain", "roadRule", "roadZone", "roadMinWidth", "roadDepth" }) c.Fixed(id);
-            // Shape: the lots grow by the look (its settings below); off: the area is only zoned
+            // Outgrow: the lots grow past their borders by the look (its settings below); off: the area is only zoned
             c.Toggle("shapeLots", true, ControlTier.Essential, "shape").Tip();
             c.Fixed("shapeLots");
             var look = (PolishLooks.BuiltIn.FirstOrDefault(l => l.Id == LookId) ?? PolishLooks.BuiltIn[0]).Values();
@@ -128,12 +203,8 @@ namespace Placemaker.Core.Layers.Types.Zoning
         protected override void DefinePresets()
         {
             Preset("standard");
-            // gardens that keep to themselves: small reach, no open land, lawn everywhere
-            Preset("compact", ("sideReach", 30.0), ("maxFrontGap", 40.0), ("maxBackGap", 60.0), ("maxRearGap", 20.0), ("maxFacingGap", 16.0),
-                ("maxDeepen", 16.0), ("hugReach", 16.0), ("openReach", 0.0), ("lawnReach", 1000.0));
-            // gardens that take every bit of land around them
-            Preset("sprawling", ("sideReach", 250.0), ("maxFrontGap", 200.0), ("maxBackGap", 300.0), ("maxRearGap", 150.0), ("maxFacingGap", 120.0),
-                ("maxDeepen", 150.0), ("hugReach", 150.0), ("openReach", 80.0));
+            Preset("compact", CompactReach);
+            Preset("sprawling", SprawlReach);
         }
 
         protected override void PlanCore(LayerContext ctx)
@@ -188,6 +259,8 @@ namespace Placemaker.Core.Layers.Types.Zoning
             }
             if (zones.Count == 0) return;
             float total = zones.Sum(z => z.Share);
+            // Fill: the share of the lots that get a zone; the rest are left empty (as wide as a lot of the zone they skip)
+            float fill = math.clamp(ctx.F("zoneFill") / 100f, 0.05f, 1f);
             string pattern = ctx.S("zonePattern");
             float clump = math.max(1, ctx.I("zoneGrain")) * 3f * ZoneGuard.Cell;   // about this many lots of 3 cells alike
             uint seed = ctx.Input.Seed * 2654435761u + 0x2D0Eu;
@@ -247,10 +320,15 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     var front = ZoneGuard.CellCentre(g, x0, 0);
                     uint lotSeed = math.hash(new uint3((uint)(int)math.round(front.x * 4f), (uint)(int)math.round(front.y * 4f), seed));
                     LotZone z;
+                    bool empty = false;
                     if (wide) z = roadZone;
                     else
                     {
-                        float v = PatternValue(pattern, front, lotIndex, clump, seed, lotSeed) * total;
+                        // one value picks both: below Fill a zone by the shares, above it an empty lot (so clumps and even spreads
+                        // hold for the empty lots too)
+                        float u = PatternValue(pattern, front, lotIndex, clump, seed, lotSeed);
+                        empty = u >= fill;
+                        float v = (empty ? (u - fill) / math.max(1e-4f, 1f - fill) : u / fill) * total;
                         z = zones[zones.Count - 1];
                         foreach (var cand in zones) { if (v < cand.Share) { z = cand; break; } v -= cand.Share; }
                     }
@@ -261,7 +339,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     int x1 = x0;
                     while (x1 < sx && x1 - x0 < w && reach[x1] > 0) x1++;
                     if (x1 < sx && reach[x1] > 0 && (x1 + 1 >= sx || reach[x1 + 1] == 0)) x1++;
-                    for (int x = x0; x < x1; x++)
+                    for (int x = x0; x < x1 && !empty; x++)
                         for (int y = 0; y < math.min(d, reach[x]); y++)
                         {
                             var c = ZoneGuard.CellCentre(g, x, y);

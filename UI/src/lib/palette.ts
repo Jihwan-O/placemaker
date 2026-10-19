@@ -56,7 +56,17 @@ export const categoryIcon = (group: string) => CATEGORY_ICON[group] ?? "layers";
 
 /** Type glyphs by type (recipe / fill layer) id. Unknown types: the bundled glyph of their id, else the category's. */
 const TYPE_ICON: Record<string, string> = {
-    // the Zoning category's looks
+    // the Zoning category's neighbourhoods
+    zoningSuburb: "flower",
+    zoningVillage: "tree",
+    zoningTownhouses: "bench",
+    zoningMainStreet: "shop",
+    zoningTownCentre: "parkPlaza",
+    zoningDowntown: "building",
+    zoningBusinessPark: "sparkle",
+    zoningIndustrial: "factory",
+    zoningSeaside: "waves",
+    // the Zoning category's looks (hidden)
     polishGarden: "flower",
     polishNatural: "rocks",
     polishTidy: "topiary",

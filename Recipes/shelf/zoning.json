@@ -1,5 +1,5 @@
 {
-  "_about": "Make-row category 'Zoning' (Core/Tool/Shelf.cs): the looks of an area's buildings (Core/Layers/Types/Zoning/PolishLookLayer). Each type is a look (its option rows are every setting of the neighbourhood polish, its styles Compact / Standard / Sprawling and the player's own); Build polishes the buildings in the area. The City window (header button) sets each zone type's look for new buildings and polishes or unpolishes the whole city.",
+  "_about": "Make-row category 'Zoning' (Core/Tool/Shelf.cs): the neighbourhood types (Core/Layers/Types/Zoning/ZoningTypes.cs: Suburb, Village, Townhouses, Main street, Town centre, Downtown, Business park, Industrial estate, Seaside). Each zones the empty land as lots from the road (its zones, lot sizes, fill, mix, road rule) and lets the lots outgrow their borders with its look; its styles are variations of that neighbourhood. The looks as types (polishGarden…) are hidden. The City window (header button) sets each zone type's look for new buildings and polishes or unpolishes the whole city.",
   "id": "zoning",
   "name": "Zoning",
   "order": 0,
@@ -8,6 +8,15 @@
     "zoning"
   ],
   "types": [],
-  "hiddenTypes": [],
+  "hiddenTypes": [
+    "polishGarden",
+    "polishNatural",
+    "polishTidy",
+    "polishYard",
+    "polishMeadow",
+    "polishRustic",
+    "polishCoastal",
+    "polishManicured"
+  ],
   "hiddenStyles": {}
 }

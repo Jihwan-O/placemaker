@@ -474,8 +474,8 @@ const MisfitChip = ({ step, catalog }: { step: StepView; catalog: Catalog }) => 
 // ───────────── step options ─────────────
 
 /**
- * A Zoning type: two tools in one, each with its switch. Zoning (zones for the empty land: ZoneMix) on top, Shape (how
- * the lots grow: the look's settings in their groups) under it.
+ * A Zoning type: two tools in one, each with its switch. Zoning (zones for the empty land: ZoneMix) on top, Outgrow (lots
+ * grow past their borders: the look's settings in their groups) under it.
  */
 const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: LayerType; state: ToolState; scope: string }) => {
     const { t } = useT();
@@ -491,7 +491,7 @@ const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: Lay
                 </ErrorBoundary>
             </div>
             <div className={s.shape} data-testid="shape">
-                <Heading title={t("Placemaker.UI.Shape", "Shape")} sub={t("Placemaker.UI.ShapeLots.Sub", "how the lots grow")} />
+                <Heading title={t("Placemaker.UI.Outgrow", "Outgrow")} sub={t("Placemaker.UI.Outgrow.Sub", "lots grow past their borders")} />
                 <ErrorBoundary name="controls">
                     <ControlList step={step} layer={layer} state={state} only={["shapeLots"]} flat />
                     {shapeOn ? <ControlList step={step} layer={layer} state={state} scope={scope} exclude={new Set([...featureOptionIds(step), ...zoningIds])} /> : null}

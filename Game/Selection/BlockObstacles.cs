@@ -124,6 +124,21 @@ namespace Placemaker.Game.Selection
             catch (Exception e) { Mod.Log.Warn("Placemaker: could not read other builds: " + e.Message); }
         }
 
+        /// <summary>
+        /// Lot areas (parks, extractor lots…) and every Placemaker build's outline touching the box, as the brush's "Lots" and
+        /// "My builds" rules see them (neighbourhood polish: gardens never grow into them). No log line, no cache.
+        /// </summary>
+        public List<BrushObstacle> LotsAndBuildsIn(float2 min, float2 max)
+        {
+            var list = new List<BrushObstacle>();
+            var bounds = new Bounds2(min, max);
+            try { Lots(bounds, 0, list); }
+            catch (Exception e) { Mod.Log.Warn("Placemaker: could not read areas: " + e.Message); }
+            try { BuildReceipts(bounds, 0, list); }
+            catch (Exception e) { Mod.Log.Warn("Placemaker: could not read other builds: " + e.Message); }
+            return list;
+        }
+
         /// <summary>(s15) Building lots / footprints touching the box only (plain Paint, the selection overlay).</summary>
         public List<float2[]> BuildingsIn(float2 min, float2 max, int ignoreGroup)
         {

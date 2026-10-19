@@ -3,10 +3,10 @@
 // exact zone of the game, its share) with its lots' width and depth ranges, "Mix in another zone", then the mix pattern and
 // the road rule. It writes the same settings the rows would
 // (zoneA/B/C, zoneAssetA/B/C, shareA/B/C, …), so styles, undo, locks and Randomize keep working.
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useRef, useState } from "react";
 import classNames from "classnames";
 import { LayerType, SettingValue, StepView } from "../contract";
-import { act } from "../lib/bindings";
+import { act, playSound } from "../lib/bindings";
 import { humanize, TFunc, useT } from "../lib/l10n";
 import { ControlEx, valueOf } from "../lib/schema";
 import { Icon } from "../components/common";
@@ -95,46 +95,59 @@ export function zoneMixSummary(step: StepView, layer: LayerType, t: TFunc, asset
     const { ctl, val, used } = reader(step, layer);
     if (val("zoneArea") !== true) return t("Placemaker.UI.Off", "Off");
     const total = used.reduce((n, x) => n + x.share, 0) || 1;
-    return used.map((x) => (x.asset ? assetName("zone", x.asset) : kindLabel(t, ctl, x.kind)) + " " + Math.round((x.share / total) * 100) + "%").join(" · ");
+    const fill = Math.min(100, Math.max(5, Number(val("zoneFill")) || 100));
+    return used.map((x) => (x.asset ? assetName("zone", x.asset) : kindLabel(t, ctl, x.kind)) + " " + Math.round((x.share / total) * fill) + "%").join(" · ");
 }
 
-/** A range of whole cells: two small steppers. */
-const Range = ({ label, tip, lo, hi, max, onLo, onHi, testId }: { label: string; tip: string; lo: number; hi: number; max: number; onLo: (v: number) => void; onHi: (v: number) => void; testId: string }) => (
-    <div className={z.range} data-testid={testId} title={tip}>
-        <div className={z.rangeLabel}>{label}</div>
-        <Stepper value={lo} max={max} on={onLo} testId={testId + "-min"} />
-        <div className={z.rangeDash}>{"\u2013"}</div>
-        <Stepper value={hi} max={max} on={onHi} testId={testId + "-max"} />
-    </div>
-);
-
-const Stepper = ({ value, max, on, testId }: { value: number; max: number; on: (v: number) => void; testId: string }) => (
-    <div className={z.stepper}>
-        <button
-            type="button"
-            className={classNames(z.stepButton, { [z.stepOff]: value <= 1 })}
-            data-testid={testId + "-down"}
-            onClick={(e) => {
-                e.stopPropagation();
-                if (value > 1) on(value - 1);
-            }}
-        >
-            {"\u2212"}
-        </button>
-        <div className={z.stepValue}>{value}</div>
-        <button
-            type="button"
-            className={classNames(z.stepButton, { [z.stepOff]: value >= max })}
-            data-testid={testId + "-up"}
-            onClick={(e) => {
-                e.stopPropagation();
-                if (value < max) on(value + 1);
-            }}
-        >
-            +
-        </button>
-    </div>
-);
+/** A range of whole numbers on one track with two handles (the nearer handle follows the mouse); the value beside it. */
+const RangeSlider = ({ lo, hi, min, max, testId, onCommit }: { lo: number; hi: number; min: number; max: number; testId: string; onCommit: (lo: number, hi: number) => void }) => {
+    const [drag, setDrag] = useState<[number, number] | null>(null);
+    const trackRef = useRef<HTMLDivElement>(null);
+    const [a, b] = drag ?? [lo, hi];
+    const pct = (v: number) => ((v - min) / (max - min || 1)) * 100;
+    const fromX = (x: number) => {
+        const r = trackRef.current?.getBoundingClientRect();
+        if (!r || r.width <= 0) return a;
+        const ratio = Math.min(1, Math.max(0, (x - r.left) / r.width));
+        return Math.round(min + ratio * (max - min));
+    };
+    const onDown = (e: React.MouseEvent) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const v0 = fromX(e.clientX);
+        const da = Math.abs(v0 - a), db = Math.abs(v0 - b);
+        const which = da < db ? 0 : da > db ? 1 : v0 > b ? 1 : 0;
+        let cur: [number, number] = [a, b];
+        const apply = (v: number) => {
+            cur = which === 0 ? [Math.min(v, cur[1]), cur[1]] : [cur[0], Math.max(v, cur[0])];
+            setDrag(cur);
+        };
+        apply(v0);
+        playSound("drag-slider");
+        const move = (ev: MouseEvent) => apply(fromX(ev.clientX));
+        const up = () => {
+            window.removeEventListener("mousemove", move);
+            window.removeEventListener("mouseup", up);
+            setDrag(null);
+            if (cur[0] !== lo || cur[1] !== hi) onCommit(cur[0], cur[1]);
+        };
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", up);
+    };
+    return (
+        <div className={z.rangeWrap} data-testid={testId} data-lo={a} data-hi={b}>
+            <div className={z.rangeTrack} ref={trackRef} onMouseDown={onDown}>
+                <div className={z.rangeRail}>
+                    <div className={z.rangeFill} style={{ left: pct(a) + "%", width: Math.max(0, pct(b) - pct(a)) + "%" }} />
+                </div>
+                <div className={z.rangeThumb} style={{ left: pct(a) + "%" }} />
+                <div className={z.rangeThumb} style={{ left: pct(b) + "%" }} />
+            </div>
+            <div className={z.value}>{a === b ? String(a) : a + "\u2013" + b}</div>
+        </div>
+    );
+};
 
 export const ZoneMix = ({ step, layer, rows }: { step: StepView; layer: LayerType; rows: (ids: string[]) => ReactNode }) => {
     const { t } = useT();
@@ -288,75 +301,109 @@ export const ZoneMix = ({ step, layer, rows }: { step: StepView; layer: LayerTyp
         </div>
     );
 
+    const fill = Math.min(100, Math.max(5, Number(val("zoneFill")) || 100));
+    /** A line's second and third rows: a label under the zone button, a control lined up with the share slider. */
+    const Sub = ({ label, tip, children }: { label: string; tip: string; children: ReactNode }) => (
+        <div className={z.sub} title={tip}>
+            <div className={z.subLabel}>{label}</div>
+            <div className={z.cell}>{children}</div>
+            <div className={z.endSpacer} />
+        </div>
+    );
+
     return (
         <div className={z.mix} data-testid="zonemix">
             {rows(["zoneArea"])}
             {on ? (
                 <>
+                    {/* the mix as one bar: each zone's part of the land, labelled, and the land left empty */}
                     <div className={z.bar} data-testid="zonemix-bar">
-                        {used.map((x) => (
-                            <div key={x.sl} className={z.barPart} style={{ width: (x.share / total) * 100 + "%", backgroundColor: colourOf(x.kind, x.asset) }} />
-                        ))}
+                        {used.map((x) => {
+                            const p = Math.round((x.share / total) * fill);
+                            return (
+                                <div key={x.sl} className={z.barPart} style={{ width: (x.share / total) * fill + "%", backgroundColor: colourOf(x.kind, x.asset) }}>
+                                    <div className={z.barText}>{nameOf(x.kind, x.asset) + " " + p + "%"}</div>
+                                </div>
+                            );
+                        })}
+                        {fill < 100 ? (
+                            <div className={classNames(z.barPart, z.barEmpty)} style={{ width: 100 - fill + "%" }}>
+                                <div className={z.barText}>{t("Placemaker.UI.ZoneMix.Empty", "Empty") + " " + (100 - fill) + "%"}</div>
+                            </div>
+                        ) : null}
+                    </div>
+                    <div className={z.line} data-testid="zonemix-line-fill" title={t("Placemaker.Polish.zoneFill.Tooltip", "")}>
+                        <div className={z.lineLabel}>{t("Placemaker.Polish.zoneFill", "Fill")}</div>
+                        <div className={z.cell}>
+                            <Slider testId="zonemix-fill" value={fill} min={5} max={100} step={5} unit="%" onPreview={() => undefined} onCommit={(v) => set("zoneFill", v)} />
+                        </div>
+                        <div className={z.endSpacer} />
                     </div>
                     {used.map((x) => (
-                        <React.Fragment key={x.sl}>
+                        <div key={x.sl} className={z.zone} data-testid={"zonemix-zone-" + x.sl}>
                             <div className={z.line} data-testid={"zonemix-line-" + x.sl}>
                                 <ZoneButton id={x.sl} kind={x.kind} asset={x.asset} />
+                                <div className={z.cell}>
+                                    {used.length > 1 ? (
+                                        <Slider
+                                            testId={"zonemix-share-" + x.sl}
+                                            value={x.share}
+                                            min={5}
+                                            max={100 - 5 * (used.length - 1)}
+                                            step={5}
+                                            unit="%"
+                                            onPreview={() => undefined}
+                                            onCommit={(v) => reshare(x.sl, v, used.map((u) => u.sl))}
+                                        />
+                                    ) : (
+                                        <div className={z.all}>{t("Placemaker.UI.ZoneMix.All", "all the zoned land")}</div>
+                                    )}
+                                </div>
                                 {used.length > 1 ? (
-                                    <>
-                                        <div className={z.share}>
-                                            <Slider
-                                                testId={"zonemix-share-" + x.sl}
-                                                value={x.share}
-                                                min={5}
-                                                max={100 - 5 * (used.length - 1)}
-                                                step={5}
-                                                unit="%"
-                                                onPreview={() => undefined}
-                                                onCommit={(v) => reshare(x.sl, v, used.map((u) => u.sl))}
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            className={z.remove}
-                                            data-testid={"zonemix-remove-" + x.sl}
-                                            title={t("Placemaker.UI.ZoneMix.Remove", "Remove this zone")}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                removeZone(x.sl);
-                                            }}
-                                        >
-                                            <Icon name="close" size={10} tint="dim" />
-                                        </button>
-                                    </>
+                                    <button
+                                        type="button"
+                                        className={z.remove}
+                                        data-testid={"zonemix-remove-" + x.sl}
+                                        title={t("Placemaker.UI.ZoneMix.Remove", "Remove this zone")}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            removeZone(x.sl);
+                                        }}
+                                    >
+                                        <Icon name="close" size={10} tint="dim" />
+                                    </button>
                                 ) : (
-                                    <div className={z.all}>{t("Placemaker.UI.ZoneMix.All", "the whole area")}</div>
+                                    <div className={z.endSpacer} />
                                 )}
                             </div>
-                            <div className={z.lots} data-testid={"zonemix-lots-" + x.sl}>
-                                <Range
-                                    label={t("Placemaker.UI.ZoneMix.Width", "Width")}
-                                    tip={t("Placemaker.UI.ZoneMix.WidthTip", "How wide its lots are along the road, in zone cells (8 m): each lot picks a width in this range.")}
+                            {menu === x.sl ? <Menu id={x.sl} kind={x.kind} /> : null}
+                            <Sub label={t("Placemaker.UI.ZoneMix.Width", "Lot width")} tip={t("Placemaker.UI.ZoneMix.WidthTip", "How wide its lots are along the road, in zone cells (8 m): each lot picks a width in this range.")}>
+                                <RangeSlider
                                     lo={x.w0}
                                     hi={x.w1}
+                                    min={1}
                                     max={12}
                                     testId={"zonemix-width-" + x.sl}
-                                    onLo={(v) => { set("widthMin" + x.sl, v); if (v > x.w1) set("widthMax" + x.sl, v); }}
-                                    onHi={(v) => { set("widthMax" + x.sl, v); if (v < x.w0) set("widthMin" + x.sl, v); }}
+                                    onCommit={(a, b) => {
+                                        if (a !== x.w0) set("widthMin" + x.sl, a);
+                                        if (b !== x.w1) set("widthMax" + x.sl, b);
+                                    }}
                                 />
-                                <Range
-                                    label={t("Placemaker.UI.ZoneMix.Depth", "Depth")}
-                                    tip={t("Placemaker.UI.ZoneMix.DepthTip", "How deep its lots go back from the road, in zone cells: each lot picks a depth in this range (6 at most).")}
+                            </Sub>
+                            <Sub label={t("Placemaker.UI.ZoneMix.Depth", "Lot depth")} tip={t("Placemaker.UI.ZoneMix.DepthTip", "How deep its lots go back from the road, in zone cells: each lot picks a depth in this range (6 at most).")}>
+                                <RangeSlider
                                     lo={x.d0}
                                     hi={x.d1}
+                                    min={1}
                                     max={6}
                                     testId={"zonemix-depth-" + x.sl}
-                                    onLo={(v) => { set("depthMin" + x.sl, v); if (v > x.d1) set("depthMax" + x.sl, v); }}
-                                    onHi={(v) => { set("depthMax" + x.sl, v); if (v < x.d0) set("depthMin" + x.sl, v); }}
+                                    onCommit={(a, b) => {
+                                        if (a !== x.d0) set("depthMin" + x.sl, a);
+                                        if (b !== x.d1) set("depthMax" + x.sl, b);
+                                    }}
                                 />
-                            </div>
-                            {menu === x.sl ? <Menu id={x.sl} kind={x.kind} /> : null}
-                        </React.Fragment>
+                            </Sub>
+                        </div>
                     ))}
                     {used.length < SLOTS.length ? (
                         <button

@@ -2,7 +2,8 @@
 //
 // For each pass the planner gets the barriers around its patch of town (StitchSettings.Barriers): the ground surfaces of
 // roads, paths and tracks (each edge's curve as a strip of its full width, sidewalks included; elevated and tunnelled
-// pieces left out), the lots of buildings that are not houses (service buildings, Placemaker builds' buildings…), lot
+// pieces left out), the lots of buildings that are not houses (service buildings, Placemaker builds' buildings, houses still
+// being built: a building site is no house to plan yet), lot
 // areas and every Placemaker build's outline (as the area brush's "Lots" and "My builds": a park in the middle of a block
 // stays the park's), and water (sampled every 4 m, merged). Two houses never join across one, no garden reaches onto one,
 // and a garden side nobody else has reaches out to one near it (YardStitch.Hug). Read from the game's own search trees, so
@@ -92,7 +93,9 @@ namespace Placemaker.Game.Neighbours
                     {
                         var e = results[i];
                         if (!seen.Add(e) || !BuildingFootprints.IsBuilding(EntityManager, e)) continue;
-                        if (EntityManager.HasComponent<Temp>(e) || EntityManager.HasComponent<Deleted>(e) || IsGrowable(e)) continue;   // houses are the plan's own
+                        if (EntityManager.HasComponent<Temp>(e) || EntityManager.HasComponent<Deleted>(e)) continue;
+                        // houses are the plan's own; a house still being built is not (it is no house to plan yet): its lot is kept clear
+                        if (IsGrowable(e) && !EntityManager.HasComponent<global::Game.Objects.UnderConstruction>(e)) continue;
                         BuildingFootprints.Of(EntityManager, e, out var lot, out _);
                         if (lot != null && lot.Length >= 3) { list.Add(lot); kinds?.Add(1); }
                     }
@@ -177,7 +180,9 @@ namespace Placemaker.Game.Neighbours
                     if (boxes.Count > 2000) break;
                     if (EntityManager.HasComponent<global::Game.Buildings.Building>(e))
                     {
-                        if (IsGrowable(e) || !EntityManager.HasComponent<global::Game.Objects.Transform>(e)) continue;   // new houses: their own pass
+                        if (!EntityManager.HasComponent<global::Game.Objects.Transform>(e)) continue;
+                        // new houses: their own pass; a house just started (a building site) moves the gardens off its lot now
+                        if (IsGrowable(e) && !EntityManager.HasComponent<global::Game.Objects.UnderConstruction>(e)) continue;
                         var p = EntityManager.GetComponentData<global::Game.Objects.Transform>(e).m_Position.xz;
                         boxes.Add((p - 40f, p + 40f));
                         continue;

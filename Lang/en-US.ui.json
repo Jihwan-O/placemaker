@@ -378,5 +378,10 @@
   "Placemaker.UI.Why.WhenNot": "Not when {0} is {1}",
   "Placemaker.UI.Why.WhenOff": "Only when {0} is off",
   "Placemaker.UI.Why.WhenOn": "Only when {0} is on",
-  "Placemaker.UI.X": "English"
+  "Placemaker.UI.X": "English",
+  "Placemaker.UI.ZoneMix.Add": "Mix in another zone",
+  "Placemaker.UI.ZoneMix.All": "the whole area",
+  "Placemaker.UI.ZoneMix.Exact": "exact",
+  "Placemaker.UI.ZoneMix.ExactPick": "Pick an exact zone (mods' too)…",
+  "Placemaker.UI.ZoneMix.Remove": "Remove this zone"
 }

@@ -209,6 +209,7 @@ namespace Placemaker.Game.Tool
         {
             var after = _afterBuild;
             _afterBuild = AfterBuild.Fresh;
+            RememberDesign();   // picking the type again brings these choices back
             _markersEdited.Clear();
             _permanentAck = null;
             _worker.Cancel();

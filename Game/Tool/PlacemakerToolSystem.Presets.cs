@@ -78,7 +78,16 @@ namespace Placemaker.Game.Tool
             if (presetId.Length > 0)
             {
                 var working = _recipe.Clone();
-                if (_presets.Apply(working.Root, presetId, NewSeed)) { _recipe = working; changed = true; }
+                // a road style keeps the zone the player picked, unless the style has a zone of its own
+                string zone = working.Root.Layer == Placemaker.Core.Layers.Roads.RoadsLayer.LayerId
+                    ? working.Root.Settings.S(Placemaker.Core.Layers.Roads.RoadsIds.PreZone, null) : null;
+                if (_presets.Apply(working.Root, presetId, NewSeed))
+                {
+                    if (zone != null && working.Root.Settings.S(Placemaker.Core.Layers.Roads.RoadsIds.PreZone, Placemaker.Core.Layers.Roads.RoadPreZone.Default) == Placemaker.Core.Layers.Roads.RoadPreZone.Default)
+                        working.Root.Settings.Values[Placemaker.Core.Layers.Roads.RoadsIds.PreZone] = zone;
+                    _recipe = working;
+                    changed = true;
+                }
             }
             bool activeChanged = _presetLayer != layerId || _presetId != presetId;
             if (!changed && !activeChanged) return;

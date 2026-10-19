@@ -397,8 +397,14 @@ namespace Placemaker.Tests
             int blocks = plan.Nets.Where(n => ZoneBlockPredictor.Zones(n.Role)).Sum(n => ZoneBlockPredictor.Blocks(n.A, n.B, n.C, n.D, ZoneGuard.NetWidth(n, site)).Count);
             Assert.Equal(blocks, plan.Zoning.Count);
             Assert.All(plan.Zoning, z => Assert.Equal("EU Residential Medium Row", z.ZoneId));
-            // Default: no zoning at all.
-            var none = Run(SiteInput(Pattern("grid"), "flat", out _));
+            // Default: Residential Low (new roads come zoned); "No zoning": nothing.
+            var def = Run(SiteInput(Pattern("grid"), "flat", out _));
+            Assert.Equal(1.0, def.Facts[RoadPreZone.Fact]);
+            Assert.NotEmpty(def.Zoning);
+            Assert.All(def.Zoning, z => Assert.Equal("EU Residential Low", z.ZoneId));
+            var off = Pattern("grid");
+            off.Values[RoadsIds.PreZone] = RoadPreZone.None;
+            var none = Run(SiteInput(off, "flat", out _));
             Assert.Empty(none.Zoning);
             Assert.False(none.Facts.ContainsKey(RoadPreZone.Fact));
         }

@@ -51,6 +51,8 @@ namespace Placemaker.Core.Layers.Roads
         {
             if (step == null || step.Layer != LayerId) return 0;
             int n = 0;
+            // the retaining walls (quays) are gone: a design saved with them gets banks
+            if (step.Settings.S(RoadsIds.TerraceBank, "") == "retaining") { step.Settings.Values[RoadsIds.TerraceBank] = "bank"; n++; }
             for (int i = step.Children.Count - 1; i >= 0; i--)
             {
                 var c = step.Children[i];

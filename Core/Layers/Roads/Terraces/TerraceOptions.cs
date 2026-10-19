@@ -68,8 +68,9 @@ namespace Placemaker.Core.Layers.Roads.Terraces
             {
                 Cells = (int)math.clamp(math.round(N(RoadsIds.TerraceCells)), 1f, 6f),
                 CrossFall = N(RoadsIds.TerraceFall) / 100f,
-                Wall = s.S(RoadsIds.TerraceBank, "retaining") == "wall",
-                Retaining = s.S(RoadsIds.TerraceBank, "retaining") == "retaining",
+                Wall = s.S(RoadsIds.TerraceBank, "bank") == "wall",
+                // the retaining walls (the game's quays) are gone: a saved "retaining" is a bank
+                Retaining = false,
                 BankSlope = N(RoadsIds.TerraceBankSlope) / 100f,
                 LinkSpacing = N(RoadsIds.TerraceLinkSpacing),
                 AvenueLinks = s.B(RoadsIds.TerraceAvenues, false),

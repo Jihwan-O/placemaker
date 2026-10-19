@@ -286,7 +286,7 @@ namespace Placemaker.Core.Layers.Roads
             c.Add(Choice(RoadsIds.TerrainFit, ControlTier.Essential, "terrain", "auto", new[] { "auto", "follow", "ignore" }));
             c.Add(Choice(RoadsIds.LandShape, ControlTier.Essential, "terrain", "terrace", new[] { "terrace", "natural" }));
             c.Add(Slider(RoadsIds.MaxGrade, ControlTier.More, "terrain", 4, 16, 1, "%", 10));
-            var preZone = Choice(RoadsIds.PreZone, ControlTier.Essential, "zoning", RoadPreZone.None, RoadPreZone.Values());
+            var preZone = Choice(RoadsIds.PreZone, ControlTier.Essential, "zoning", RoadPreZone.Default, RoadPreZone.Values());
             // The zone types read like everywhere else (Placemaker.Zone.<kind>).
             foreach (var o in preZone.Options)
                 if (o.Value != RoadPreZone.None) { o.LabelKey = "Placemaker.Zone." + o.Value; o.TooltipKey = "Placemaker.Zone." + o.Value + ".Tooltip"; }
@@ -295,7 +295,8 @@ namespace Placemaker.Core.Layers.Roads
             // ── s52: hillside terraces (more) ────────────────────────────
             c.Add(Toggle(RoadsIds.TerraceAvenues, ControlTier.More, "layout", false, "pattern=terraces"));
             c.Add(Slider(RoadsIds.TerraceFall, ControlTier.More, "terraces", 0, 4, 0.5, "%", 1, "landShape=terrace"));
-            c.Add(Choice(RoadsIds.TerraceBank, ControlTier.More, "terraces", "retaining", new[] { "retaining", "bank", "wall" }, "landShape=terrace"));
+            // no "retaining" (the walls were the game's quays: the user, "they never work"); a saved "retaining" is a bank
+            c.Add(Choice(RoadsIds.TerraceBank, ControlTier.More, "terraces", "bank", new[] { "bank", "wall" }, "landShape=terrace"));
             c.Add(Slider(RoadsIds.TerraceBankSlope, ControlTier.More, "terraces", 20, 50, 5, "%", 40, "landShape=terrace"));
             c.Add(Slider(RoadsIds.TerraceFlat, ControlTier.More, "terraces", 2, 12, 1, "%", 5, "landShape=terrace"));
             c.Add(Slider(RoadsIds.TerraceEarthwork, ControlTier.More, "terraces", 2, 20, 1, "m", 8, "landShape=terrace"));

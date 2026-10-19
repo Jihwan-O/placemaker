@@ -196,9 +196,23 @@ namespace Placemaker.Tests
             Assert.Empty(strict.Plan.Terraform);
         }
 
-        // ───────────────────────── retaining walls ─────────────────────────
+        // ───────────────────────── no retaining walls ─────────────────────────
 
         [Fact]
+        public void NoQuaysEvenOnSteepHills()
+        {
+            // The retaining walls (the game's quays) are gone (the user: "they never work"): a 15 % plane is all banks, also
+            // for a design saved with "retaining".
+            var r = Plane(Roads("grid", (RoadsIds.GridSpacing, 90.0), (RoadsIds.TerraceBank, "retaining")), 0.15f);
+            Assert.NotNull(r.Ground);
+            Assert.Empty(r.Ground.Walls);
+            Assert.DoesNotContain(r.Plan.Nets, n => n.Category == AssetCategories.NetQuay);
+            Assert.NotEmpty(r.Plan.Terraform);
+            Assert.NotEmpty(r.Plan.Zoning);
+        }
+
+        // The old wall checks, kept for the wall code (no road plan builds walls now): skipped.
+        [Fact(Skip = "the retaining walls (quays) are gone from road plans")]
         public void WallsStandWhereTheCutIsDeep()
         {
             // A 15 % plane, streets 90 m apart: the back of every block is cut several metres into the hill.

@@ -135,7 +135,8 @@ namespace Placemaker.Tests
         [Fact]
         public void WallsStandBehindLotsCutIntoTheHill()
         {
-            var plan = RingSlope(out var site);
+            // walls are off by default now (the user dislikes the quays): switched on here
+            var plan = RingSlope(out var site, ("levelWalls", true));
             var quays = plan.Layers.SelectMany(l => l.Nets).Where(n => n.Category == AssetCategories.NetQuay).ToList();
             _out.WriteLine($"cells {Cells(plan).Length}, walls {Fact(plan, "polishLevelWalls")} ({Fact(plan, "polishLevelWallLength"):0} m), quays {quays.Count}, lots {Fact(plan, "polishLevelLotsAll")} lost {Fact(plan, "polishLevelLotsLost")}");
             Assert.True(Fact(plan, "polishLevelWalls") >= 1);

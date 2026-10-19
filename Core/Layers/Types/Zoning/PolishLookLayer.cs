@@ -185,7 +185,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
             c.Toggle("levelLots", true, ControlTier.Essential, "zone").Tip().When("zoneArea=true");
             c.Slider("levelEarth", 4, 1, 8, 0.5, "m", ControlTier.More, "zone").Tip().When("levelLots=true");
             c.Slider("levelBank", 40, 20, 50, 5, "%", ControlTier.More, "zone").Tip().When("levelLots=true");
-            c.Toggle("levelWalls", true, ControlTier.More, "zone").Tip().When("levelLots=true");
+            c.Toggle("levelWalls", false, ControlTier.More, "zone").Tip().When("levelLots=true");
             foreach (var id in new[] { "levelLots", "levelEarth", "levelBank", "levelWalls" }) c.Fixed(id);
             c.Slider("zoneGrain", DefaultGrain, 1, 12, 1, "count", ControlTier.More, "zone").Tip().When("zonePattern=clumps");
             // each zone type's own Outgrow switch and changes (the panel writes it; JSON, see the file's header)

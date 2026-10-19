@@ -19,6 +19,9 @@ namespace Placemaker.Core.Layers.Roads
     public static class RoadPreZone
     {
         public const string None = "none";
+        /// <summary>A new road is zoned unless the player says otherwise (the user: "I make a grid ... and then there's no
+        /// zoning on it"): Residential Low.</summary>
+        public const string Default = Common.ZoneKinds.ResidentialLow;
         /// <summary>AreaPlan fact: the plan's zoning quads are "zone the new roads whole" (the game re-snaps them to the live blocks).</summary>
         public const string Fact = "roads.preZone";
 

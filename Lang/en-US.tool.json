@@ -257,6 +257,8 @@
   "Placemaker.Settings.LayoutSize.Desc": "Scales the layout of every area type: path loops, spacing between benches and trees, plaza and feature sizes, margins. Trees, props and path widths keep their real size; parking stalls, roads, sports fields and golf greens keep real dimensions. 50% is the default; 100% is the original, roomier layout.",
   "Placemaker.Settings.EdgeMargin": "Edge margin",
   "Placemaker.Settings.EdgeMargin.Desc": "The one gap (in metres at 100% layout size) kept between the outline and paths or layout. Objects still keep their own footprint clear of the edge.",
+  "Placemaker.Settings.ZoneGridOpacity": "Empty zone grid",
+  "Placemaker.Settings.ZoneGridOpacity.Desc": "How strongly the grid of empty zone cells shows while zoning or building roads. 100% is the game's own look; lower makes it fainter, 0% hides it. Zoned cells keep their colour.",
   "Placemaker.Settings.ToggleToolBinding": "Open / close Placemaker",
   "Placemaker.Settings.ToggleToolBinding.Desc": "Opens or closes the Placemaker tool.",
   "Placemaker.Settings.PrimaryBinding": "Next step / build",

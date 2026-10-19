@@ -19,7 +19,10 @@
 // zoned when every cell between it and the road is (a zone behind another zone can never grow anything). Lots are mixed at
 // random, in clumps (neighbouring lots alike) or spread evenly. The zoning is built as every build's (never over cells
 // already zoned); with Outgrow on, the buildings that grow there outgrow their lots with their zone's settings.
+// Level the lots (levelLots, LotLevel.cs): on sloped land each lot becomes a level pad at the height it meets its road, banks
+// blending into the land around; a lot needing more earth than levelEarth is made shallower or left empty.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Placemaker.Core.Build;
@@ -179,6 +182,10 @@ namespace Placemaker.Core.Layers.Types.Zoning
                 foreach (var id in new[] { "zone", "zoneAsset", "share", "widthMin", "widthMax", "depthMin", "depthMax", "roadMin", "roadMax" }) c.Fixed(id + slot);
             }
             c.Choice("zonePattern", DefaultPattern, ControlTier.Essential, "zone", Patterns).Tip().When("zoneArea=true");
+            c.Toggle("levelLots", true, ControlTier.Essential, "zone").Tip().When("zoneArea=true");
+            c.Slider("levelEarth", 4, 1, 8, 0.5, "m", ControlTier.More, "zone").Tip().When("levelLots=true");
+            c.Slider("levelBank", 40, 20, 50, 5, "%", ControlTier.More, "zone").Tip().When("levelLots=true");
+            foreach (var id in new[] { "levelLots", "levelEarth", "levelBank" }) c.Fixed(id);
             c.Slider("zoneGrain", DefaultGrain, 1, 12, 1, "count", ControlTier.More, "zone").Tip().When("zonePattern=clumps");
             // each zone type's own Outgrow switch and changes (the panel writes it; JSON, see the file's header)
             c.Asset("zoneOutgrow", "", ControlTier.More, "zone").Tip();
@@ -281,13 +288,21 @@ namespace Placemaker.Core.Layers.Types.Zoning
             uint seed = ctx.Input.Seed * 2654435761u + 0x2D0Eu;
             // the roads near the area as sampled centre lines, for each block's road width
             var roads = new List<(float2[] Line, float Width)>();
+            var roads3 = new List<(float3[] Line, float Width)>();
             foreach (var net in site.NearbyNets)
             {
                 if (net.Category != NetCategory.Road) continue;
                 var line = new float2[17];
-                for (int k = 0; k <= 16; k++) line[k] = Bezier(net, k / 16f);
+                var line3 = new float3[17];
+                for (int k = 0; k <= 16; k++) { line3[k] = Bezier3(net, k / 16f); line[k] = line3[k].xz; }
                 roads.Add((line, net.Width));
+                roads3.Add((line3, net.Width));
             }
+            // Level the lots: each lot a level pad at its road's height (a lot needing too much earth: shallower or empty)
+            bool levelLots = ctx.B("levelLots") && site.HeightAt != null;
+            float maxEarth = math.clamp(ctx.F("levelEarth"), 0.5f, 12f);
+            var lots = new List<LotLevel.Lot>();
+            int tooSteep = 0;
             Poly.Bounds(ring, out var rmin, out var rmax);
             var open = ZoneGuard.CellOpener(site.NearbyNets, rmin - 40f, rmax + 40f);
             var count = new Dictionary<string, (int Cells, string Stat)>();
@@ -314,6 +329,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     any |= y > 0;
                 }
                 if (!any) continue;
+                var fronts = levelLots ? LotLevel.Fronts(g, site.HeightAt) : null;
                 // the block's road (the nearest to its front middle) and the zones allowed on it (unknown road: all)
                 float roadWidth = -1f;
                 var mid = ZoneGuard.CellCentre(g, sx / 2, 0);
@@ -371,12 +387,28 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     {
                         int d = zone.D0 + (int)(((lotSeed >> 20) & 0xFFF) % (uint)(zone.D1 - zone.D0 + 1));
                         d = math.min(d, MinReach(x0, w));
+                        LotLevel.Lot lot = null;
+                        if (levelLots)
+                        {
+                            // as deep as it can be levelled within the earthwork limit (never under its zone's smallest: then empty)
+                            d = LotLevel.Depth(g, fronts, x0, w, d, zone.D0, site.HeightAt, maxEarth, out bool needs);
+                            if (d == 0) tooSteep++;
+                            else
+                            {
+                                var lotFront = new float[w];
+                                Array.Copy(fronts, x0, lotFront, 0, w);
+                                lot = new LotLevel.Lot { G = g, X0 = x0, W = w, D = d, MinD = zone.D0, Front = lotFront, Level = needs, ZoneId = zone.Id, Stat = zone.Stat };
+                                lots.Add(lot);
+                            }
+                        }
                         for (int x = x0; x < x0 + w; x++)
                             for (int y = 0; y < d; y++)
                             {
                                 var c = ZoneGuard.CellCentre(g, x, y);
                                 if (!done.Add(KeyOf(c))) continue;
                                 var sq = ZoneGuard.CellSquare(g, x, y);
+                                // levelled lots: zoned once the ground is laid (the rows a bank took off are not)
+                                if (lot != null) { lot.Cells.Add((y, sq)); continue; }
                                 ctx.Plan.Zoning.Add(new PlannedZoning { A = P(ctx, sq[0]), B = P(ctx, sq[1]), C = P(ctx, sq[2]), D = P(ctx, sq[3]), ZoneId = zone.Id });
                                 count[zone.Id] = (count.TryGetValue(zone.Id, out var n) ? n.Cells + 1 : 1, zone.Stat);
                             }
@@ -384,6 +416,24 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     x0 += w;
                     lotIndex++;
                 }
+            }
+            if (levelLots)
+            {
+                var opt = new LotLevel.Options { MaxEarth = maxEarth, BankSlope = ctx.F("levelBank") / 100f, Seed = ctx.Input.Seed == 0 ? 1u : ctx.Input.Seed };
+                var after = LotLevel.Build(ctx, lots, roads3, opt, ctx.Cancel);
+                if (after != null) ctx.Plan.HeightAfter = after;
+                var h = after ?? site.HeightAt;
+                foreach (var lot in lots)
+                {
+                    if (lot.D == 0) { tooSteep++; continue; }
+                    foreach (var (y, sq) in lot.Cells)
+                    {
+                        if (y >= lot.D) continue;
+                        ctx.Plan.Zoning.Add(new PlannedZoning { A = At(h, sq[0]), B = At(h, sq[1]), C = At(h, sq[2]), D = At(h, sq[3]), ZoneId = lot.ZoneId });
+                        count[lot.ZoneId] = (count.TryGetValue(lot.ZoneId, out var n) ? n.Cells + 1 : 1, lot.Stat);
+                    }
+                }
+                ctx.Plan.Facts["polishLevelTooSteep"] = tooSteep;
             }
             int cells = count.Values.Sum(vv => vv.Cells);
             ctx.Plan.Stats.Add(new PlanStat(StatCells, cells, "count"));
@@ -393,7 +443,15 @@ namespace Placemaker.Core.Layers.Types.Zoning
             ctx.Plan.Facts["polishZoneCells"] = cells;
         }
 
+        private static float3 At(System.Func<float2, float> h, float2 p) => new float3(p.x, h(p), p.y);
+
         private static float3 P(LayerContext ctx, float2 p) => new float3(p.x, ctx.Input.Site.HeightAt != null ? ctx.Input.Site.HeightAt(p) : 0f, p.y);
+
+        private static float3 Bezier3(NearbyNet n, float t)
+        {
+            float u = 1f - t;
+            return u * u * u * n.A + 3f * u * u * t * n.B + 3f * u * t * t * n.C + t * t * t * n.D;
+        }
 
         private static float2 Bezier(NearbyNet n, float t)
         {

@@ -472,9 +472,10 @@ namespace Placemaker.Tests
             Assert.Equal("wall", Preset("vineyard-terraces").S(RoadsIds.TerraceBank, ""));
             Assert.Equal(RoadPreZone.None, new RoadsLayer().Defaults().S(RoadsIds.PreZone, ""));
             Assert.NotEqual(RoadPreZone.None, Preset("terraced-hillside").S(RoadsIds.PreZone, RoadPreZone.None));
-            // The terrace controls show for the terraces pattern only.
+            // The links show for the terraces pattern only; the ground controls for every pattern on terraced land.
+            var linkIds = new[] { RoadsIds.TerraceLinks, RoadsIds.TerraceLinkSpacing, RoadsIds.TerraceAvenues };
             foreach (var c in layer.Controls.Where(c => c.Id.StartsWith("terrace")))
-                Assert.Equal("pattern=terraces", c.VisibleWhen);
+                Assert.Equal(linkIds.Contains(c.Id) ? "pattern=terraces" : "landShape=terrace", c.VisibleWhen);
         }
 
         [Fact]

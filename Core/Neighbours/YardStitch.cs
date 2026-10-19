@@ -491,6 +491,20 @@ namespace Placemaker.Core.Neighbours
                 narrowed++;
             }
             if (narrowed > 0) plan.Notes.Add($"{narrowed} gardens end where they get narrow (no spikes)");
+            // nor up a cliff: each side grown past the lot ends (a straight line across it) where the land gets steeper than
+            // maxSlope or further than maxRise above or below the house
+            int sloped = 0;
+            if (s.Ground != null)
+                for (int i = 0; i < n; i++)
+                {
+                    if (!touched[i] || plots[i] == null) continue;
+                    var cut = SlopeCut(houses[i], plots[i], s);
+                    if (cut == null) continue;
+                    plots[i] = cut;
+                    if (raw[i] != null) raw[i] = ClipToPlot(raw[i], houses[i], cut);
+                    sloped++;
+                }
+            if (sloped > 0) plan.Notes.Add($"{sloped} gardens end where the land gets too steep or too high");
             var stepSplits = new List<(int I, int J, bool AFront, float2 Pa, float2 Pb, float2 S, float2 Inward, uint Hash)>();
             foreach (var (si, sj, aFront, deep, ph) in steps)
             {
@@ -2250,6 +2264,84 @@ namespace Placemaker.Core.Neighbours
 
         /// <summary>The piece object of a house's fence kind ("FenceResidentialHigh01" → "FenceResidentialPieceHigh01"), or the
         /// look's: 1 low hedge, 2 tall hedge, 3 low wood fence, 4 tall wood fence.</summary>
+        /// <summary>
+        /// The plot cut back where it grows past its lot onto land steeper than the house's maxSlope (%) or further than its
+        /// maxRise (m) above or below the house: on each side (left, right, back), stepping out from the lot edge, the first
+        /// line across the plot where the ground fails ends it there (null: nothing to cut).
+        /// </summary>
+        private static float2[] SlopeCut(StitchHouse h, float2[] plot, StitchSettings s)
+        {
+            float maxSlope = K(h, s, "maxSlope", 35f) / 100f, maxRise = K(h, s, "maxRise", 4f);
+            if (maxSlope <= 0f && maxRise <= 0f) return null;
+            var g = s.Ground;
+            float home = g(h.Position);
+            // the plot's extent in the house's frame
+            float xMin = 0f, xMax = 0f, zMin = 0f;
+            foreach (var p in plot)
+            {
+                var l = Local(h, p);
+                xMin = math.min(xMin, l.x); xMax = math.max(xMax, l.x); zMin = math.min(zMin, l.y);
+            }
+            float hx = h.HalfLot.x, hz = h.HalfLot.y;
+            const float Step = 2f, E = 1.5f;
+            bool Fails(float2 local)
+            {
+                var p = h.ToWorld(local);
+                if (maxRise > 0f && math.abs(g(p) - home) > maxRise) return true;
+                if (maxSlope <= 0f) return false;
+                float gx = (g(p + new float2(E, 0f)) - g(p - new float2(E, 0f))) / (2f * E);
+                float gz = (g(p + new float2(0f, E)) - g(p - new float2(0f, E))) / (2f * E);
+                return math.sqrt(gx * gx + gz * gz) > maxSlope;
+            }
+            var poly = plot.ToList();
+            bool cutAny = false;
+            // the back first, across the lot's width; then each side, along the lot's depth (the corners past both follow)
+            {
+                float edge = hz, far = -zMin;
+                for (float t = edge + Step; t < far + 0.01f; t += Step)
+                {
+                    bool fail = false;
+                    for (int k = 0; k <= 4 && !fail; k++) fail = Fails(new float2(math.lerp(-hx, hx, k / 4f), -t));
+                    if (!fail) continue;
+                    float at = math.max(edge, t - Step * 0.5f);
+                    poly = ClipHalfPlane(poly, h.ToWorld(new float2(0f, -at)), h.Right, h.Position);
+                    cutAny = true;
+                    break;
+                }
+            }
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float edge = hx, far = side < 0 ? -xMin : xMax;
+                for (float t = edge + Step; t < far + 0.01f; t += Step)
+                {
+                    bool fail = false;
+                    for (int k = 0; k <= 4 && !fail; k++) fail = Fails(new float2(side * t, math.lerp(-hz, hz, k / 4f)));
+                    if (!fail) continue;
+                    float at = math.max(edge, t - Step * 0.5f);
+                    poly = ClipHalfPlane(poly, h.ToWorld(new float2(side * at, 0f)), h.Forward, h.Position);
+                    cutAny = true;
+                    break;
+                }
+            }
+            if (!cutAny || poly.Count < 3 || Poly.Area(poly) < 1f) return null;
+            return poly.ToArray();
+        }
+
+        private static float2 Local(StitchHouse h, float2 p) => new float2(math.dot(p - h.Position, h.Right), math.dot(p - h.Position, h.Forward));
+
+        /// <summary>A polygon clipped to a convex plot (each of the plot's edges a half-plane keeping the house's side).</summary>
+        private static List<float2> ClipToPlot(List<float2> poly, StitchHouse h, float2[] plot)
+        {
+            var r = poly;
+            for (int i = 0; i < plot.Length && r.Count >= 3; i++)
+            {
+                var a = plot[i]; var b = plot[(i + 1) % plot.Length];
+                if (math.distancesq(a, b) < 1e-6f) continue;
+                r = ClipHalfPlane(r, a, math.normalize(b - a), h.Position);
+            }
+            return r;
+        }
+
         public static string PieceFor(StitchHouse h, int kind)
         {
             switch (kind)

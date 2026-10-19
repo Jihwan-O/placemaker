@@ -290,7 +290,27 @@ namespace Placemaker.Core.Layers.Roads
             Terraces.TerraceGround terraceGround = null;
             Func<float2, float> ground = heightAt;
             int bankWalks = 0;
-            if (terraceLayout != null)
+            bool landTerrace = settings.S(RoadsIds.LandShape, "terrace") == "terrace";
+            // Terraced blocks (every other pattern): each zoning street's frontage level across, banks between the levels.
+            Terraces.TerraceOptions blockOpt = null;
+            Terraces.BlockField.Survey blockSurvey = null;
+            // (blocks another step fills — a park on every block — grade their own ground: no terraces under them)
+            bool childBlocks = input.ChildTargets != null && Array.Exists(input.ChildTargets, t => t != null && t.StartsWith("block", StringComparison.Ordinal));
+            if (terraceLayout == null && landTerrace && follow && !childBlocks)
+            {
+                blockOpt = Terraces.TerraceOptions.Read(settings, controls, hw);
+                blockOpt.Seed = input.Seed == 0 ? 1u : input.Seed;
+                blockSurvey = Terraces.BlockField.Measure(boundary, heightAt, blockOpt.FlatSlope);
+                if (blockSurvey.Sloped)
+                {
+                    var lctx = new Common.LayerContext { Input = input, Plan = plan, Settings = settings, Cancel = cancel, Seed = blockOpt.Seed };
+                    terraceGround = Terraces.BlockField.Build(lctx, boundary, blockSurvey, net, blockOpt, hw, obstacles, connect ? existing : new List<ExistingRoad>(), cancel);
+                    ground = terraceGround.HeightAfter ?? heightAt;
+                    if (terraceGround.Cells > 0) plan.HeightAfter = ground;
+                }
+                cancel.ThrowIfCancellationRequested();
+            }
+            if (terraceLayout != null && landTerrace)
             {
                 bankWalks = Terraces.TerraceNetwork.AddWalks(net, terraceLayout, hw, terraceOpt.BankSlope);
                 var lctx = new Common.LayerContext { Input = input, Plan = plan, Settings = settings, Cancel = cancel, Seed = terraceOpt.Seed };
@@ -367,6 +387,23 @@ namespace Placemaker.Core.Layers.Roads
                     caps.Add((tip.xz, CapRadius(width)));
                 }
             }
+            // Retaining walls (terraced blocks): a wide quay along the top of each deep cut, at the upper level; the game
+            // raises its low side into the concrete quay wall (RESEARCH-NOTES-ADDENDUM 78).
+            if (terraceGround != null && terraceGround.Walls.Count > 0)
+            {
+                var quay = new AssetRef("", Types.Waterfront.WaterfrontArt.QuayWide);
+                foreach (var w in terraceGround.Walls)
+                    for (int i = 1; i < w.Line.Length; i++)
+                    {
+                        var p0 = new float3(w.Line[i - 1].x, w.Deck[i - 1], w.Line[i - 1].y);
+                        var p1 = new float3(w.Line[i].x, w.Deck[i], w.Line[i].y);
+                        plan.Nets.Add(new PlannedNet
+                        {
+                            A = p0, B = math.lerp(p0, p1, 1f / 3f), C = math.lerp(p0, p1, 2f / 3f), D = p1,
+                            Role = NetRole.PathwayWide, Asset = quay, FollowTerrain = false, Category = AssetCategories.NetQuay,
+                        });
+                    }
+            }
             if (roundabout.HasRoundabout && settings.B(RoadsIds.RoundaboutIsland, true) && MathEx.Finite(roundabout.Center)
                 && (obstacles == null || !obstacles.BlockedAt(roundabout.Center.xz)) && IsJunction(net, degree, roundabout.Center.xz))
             {
@@ -441,7 +478,7 @@ namespace Placemaker.Core.Layers.Roads
                 if (cutsShown++ >= MaxCutIssues) break;
                 plan.Issues.Add(new PlanIssue { Severity = IssueSeverity.Info, Key = IssueJunctionCut, At = at, Cause = RoadsIds.JunctionSpacing, CauseValue = spacingValue });
             }
-            if (terraceLayout != null && follow)
+            if ((terraceLayout != null || (terraceGround != null && terraceGround.Cells > 0)) && follow)
             {
                 // (s52) Grades on the ground the build leaves (the terraces and the link ramps), not the hillside before.
                 design.Steep.Clear();
@@ -480,7 +517,19 @@ namespace Placemaker.Core.Layers.Roads
             {
                 // (s52) Terraces zone only the level rows of each block (the terrace's cells, never the bank).
                 RoadPreZone.DepthRule rule = null;
-                if (terraceLayout != null)
+                if (blockOpt != null && terraceGround != null && terraceGround.Cells > 0)
+                {
+                    // Terraced blocks: a street may climb (its own grade), but its lots lie level across it: the cells from
+                    // the road whose ground is level across the block (≤ the cross-fall + 2.5 %, or the flat threshold) and
+                    // no steeper along it than the steepest street.
+                    float level = math.max(blockOpt.CrossFall + 0.025f, blockOpt.FlatSlope);
+                    float along = math.max(level, blockOpt.MaxGrade + 0.02f);
+                    rule = new RoadPreZone.DepthRule { MaxDepth = blockOpt.Cells, LevelAcross = RoadPreZone.LevelAcross(ground, level, along) };
+                    plan.Facts[RoadPreZone.FactDepth] = blockOpt.Cells;
+                    plan.Facts[RoadPreZone.FactLevel] = level;
+                    plan.Facts[RoadPreZone.FactAlong] = along;
+                }
+                else if (terraceLayout != null)
                 {
                     float level = math.max(terraceOpt.CrossFall + 0.025f, terraceOpt.FlatSlope);
                     rule = new RoadPreZone.DepthRule { MaxDepth = terraceOpt.Cells, Level = RoadPreZone.LevelCell(ground, level) };
@@ -550,6 +599,7 @@ namespace Placemaker.Core.Layers.Roads
             plan.Facts[FactConnections] = attachedCount;
             plan.Facts[FactRemoved] = removedByObstacles;
             if (terraceLayout != null) TerraceReport(plan, terraceLayout, terraceOpt, terraceGround, net, hw, obstacles, boundary, bankWalks);
+            else if (blockOpt != null) BlockReport(plan, blockSurvey, blockOpt, terraceGround, net, hw, obstacles, boundary);
             return plan;
         }
 
@@ -563,6 +613,46 @@ namespace Placemaker.Core.Layers.Roads
         public const string IssueTerraceSteep = "Placemaker.Roads.Issue.TerraceSteep";
         public const string IssueTerraceEarthwork = "Placemaker.Roads.Issue.TerraceEarthwork";
         public const string IssueTerraceFlat = "Placemaker.Roads.Issue.TerraceFlat";
+
+        /// <summary>Terraced blocks: the earthwork readout, the bank paint and trees (as the terraces').</summary>
+        private static void BlockReport(AreaPlan plan, Terraces.BlockField.Survey survey, Terraces.TerraceOptions o, Terraces.TerraceGround g,
+            RoadNetwork net, Func<NetRole, float> hw, RoadObstacles obstacles, float2[] boundary)
+        {
+            plan.Facts["blocks.sloped"] = survey != null && survey.Sloped ? 1 : 0;
+            plan.Facts["blocks.slopedShare"] = survey?.SlopedShare ?? 0f;
+            plan.Facts["blocks.relief"] = survey?.Relief ?? 0f;
+            if (g == null || g.Grid == null || g.Cells == 0) return;
+            var earth = g.Earth;
+            plan.Facts["blocks.cut"] = earth.CutVolume;
+            plan.Facts["blocks.fill"] = earth.FillVolume;
+            plan.Facts["blocks.maxCut"] = earth.MaxCut;
+            plan.Facts["blocks.maxFill"] = earth.MaxFill;
+            plan.Facts["blocks.area"] = g.TerracedArea;
+            plan.Facts["blocks.cells"] = g.Cells;
+            plan.Facts["blocks.lostTerrace"] = g.LostTerrace;
+            plan.Facts["blocks.clashes"] = g.Clashes.Count;
+            float wallLen = 0f, wallMax = 0f;
+            foreach (var w in g.Walls) { wallLen += w.Length; foreach (var r in w.Rise) wallMax = math.max(wallMax, r); }
+            plan.Facts["blocks.walls"] = g.Walls.Count;
+            plan.Facts["blocks.wallLength"] = wallLen;
+            plan.Facts["blocks.wallHighest"] = wallMax;
+            plan.Stats.Add(new PlanStat(StatTerracedArea, Math.Round(g.TerracedArea), "m2"));
+            plan.Stats.Add(new PlanStat(StatCut, Math.Round(earth.CutVolume / 10.0) * 10.0, "m³"));
+            plan.Stats.Add(new PlanStat(StatFill, Math.Round(earth.FillVolume / 10.0) * 10.0, "m³"));
+            plan.Stats.Add(new PlanStat(StatDeepest, Math.Round(earth.MaxCut, 1), "m"));
+            plan.Stats.Add(new PlanStat(StatHighest, Math.Round(earth.MaxFill, 1), "m"));
+            if (g.Limited) plan.Issues.Add(new PlanIssue { Severity = IssueSeverity.Info, Key = IssueTerraceEarthwork, Args = new object[] { Math.Round(o.Earthwork) } });
+            int paints = o.Paint ? Terraces.TerraceDressing.Paint(plan, g, boundary, o) : 0;
+            int trees = o.Trees ? Terraces.TerraceDressing.Trees(plan, g, boundary, o, net, hw, obstacles) : 0;
+            plan.Facts["blocks.paints"] = paints;
+            plan.Facts["blocks.trees"] = trees;
+            if (paints > 0)
+            {
+                bool warned = false;
+                foreach (var i in plan.Issues) warned |= i.Key == Layers.Common.TerrainPaint.PermanentKey;
+                if (!warned) plan.Issues.Add(new PlanIssue { Severity = IssueSeverity.Warning, Key = Layers.Common.TerrainPaint.PermanentKey });
+            }
+        }
 
         /// <summary>(s52) Terraces: the earthwork readout, what the plan had to give up, the bank paint and trees.</summary>
         private static void TerraceReport(AreaPlan plan, Terraces.TerraceLayout lay, Terraces.TerraceOptions o, Terraces.TerraceGround g,

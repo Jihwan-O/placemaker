@@ -546,6 +546,13 @@ namespace Placemaker.Game.Neighbours
             }
             var kinds = new List<int>();
             var settings = Settings.WithBarriers(stitch.Count > 0 ? BarriersIn(lo, hi, kinds) : null, kinds);
+            if (stitch.Count > 0)
+            {
+                // the ground (gardens stop where it gets too steep or too high): a 4 m raster, read by the worker
+                var th = _terrain.GetHeightData(true);
+                var raster = new HeightRaster(lo, hi, math.max(4f, math.cmax(hi - lo) / 200f), p => TerrainUtils.SampleHeight(ref th, new float3(p.x, 0f, p.y)));
+                settings.Ground = raster.Sample;
+            }
             _inFlight.Add(new Pending
             {
                 Stitch = stitch, LanesOf = lanesOf, LawnsOf = lawnsOf, OwnerOf = ownerOf, CoreIds = coreIds, HouseOf = new Dictionary<long, Entity>(_houseOf),

@@ -42,6 +42,8 @@ namespace Placemaker.Core.Neighbours
             ["sideReach"] = 100f, ["maxFrontGap"] = 100f, ["maxBackGap"] = 150f, ["maxRearGap"] = 60f, ["maxFacingGap"] = 50f,
             ["maxDeepen"] = 60f, ["hug"] = 1f, ["hugReach"] = 80f, ["openReach"] = 20f, ["wrap"] = 1f, ["closeBacks"] = 1f,
             ["alleys"] = 1f, ["alleyChance"] = 45f,
+            // the land a garden grows onto: no steeper than this (%), no further above or below the house (m); 0: no limit
+            ["maxSlope"] = 35f, ["maxRise"] = 4f,
             // lawns and ground paint
             ["lawns"] = 1f, ["paintedGardens"] = 33f, ["paint"] = 1f, ["blendWidth"] = 20f, ["blendFar"] = 40f,
             ["blendStrength"] = 0.6f, ["gardenPaint"] = 0.85f,
@@ -95,6 +97,8 @@ namespace Placemaker.Core.Neighbours
             new Knob("hug", "reach", KnobKind.Toggle, ControlTier.Essential),
             new Knob("hugReach", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
             new Knob("openReach", "reach", KnobKind.Slider, ControlTier.Essential, 0, 500, 1, "m"),
+            new Knob("maxSlope", "reach", KnobKind.Slider, ControlTier.Essential, 0, 100, 5, "%"),
+            new Knob("maxRise", "reach", KnobKind.Slider, ControlTier.More, 0, 20, 0.5, "m"),
             new Knob("wrap", "reach", KnobKind.Toggle, ControlTier.More),
             new Knob("closeBacks", "reach", KnobKind.Toggle, ControlTier.More),
             new Knob("closeGardens", "fences", KnobKind.Toggle, ControlTier.Essential),

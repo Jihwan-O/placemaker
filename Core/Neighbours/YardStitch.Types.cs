@@ -1,6 +1,7 @@
 // Placemaker neighbourhood polish — the data YardStitch plans with (kept apart from the algorithm so the game runner can
 // load a newer YardStitch into a running game: tools/hot, lab op "hotload").
 
+using System;
 using System.Collections.Generic;
 using Unity.Mathematics;
 
@@ -90,6 +91,8 @@ namespace Placemaker.Core.Neighbours
         public List<float2[]> Barriers;
         /// <summary>What each barrier is: 0 a road, path or track, 1 a building's lot (null: all roads).</summary>
         public List<int> BarrierKinds;
+        /// <summary>The ground height (set per plan by the game; null: gardens grow regardless of the slope).</summary>
+        public Func<float2, float> Ground;
         /// <summary>A copy of these settings for one plan, with the barriers around its houses.</summary>
         public StitchSettings WithBarriers(List<float2[]> barriers, List<int> kinds = null)
         {
@@ -97,6 +100,39 @@ namespace Placemaker.Core.Neighbours
             c.Barriers = barriers;
             c.BarrierKinds = kinds;
             return c;
+        }
+    }
+
+    /// <summary>Ground heights over a rectangle on a regular grid (sampled once on the main thread), bilinear between them.</summary>
+    public sealed class HeightRaster
+    {
+        public readonly float2 Min;
+        public readonly float Cell;
+        public readonly int Nx, Ny;
+        public readonly float[] H;
+
+        public HeightRaster(float2 min, float2 max, float cell, Func<float2, float> sample)
+        {
+            Cell = math.max(0.5f, cell);
+            Min = min;
+            Nx = math.max(2, (int)math.ceil((max.x - min.x) / Cell) + 1);
+            Ny = math.max(2, (int)math.ceil((max.y - min.y) / Cell) + 1);
+            H = new float[Nx * Ny];
+            for (int j = 0; j < Ny; j++)
+                for (int i = 0; i < Nx; i++)
+                {
+                    float v = sample(Min + new float2(i, j) * Cell);
+                    H[j * Nx + i] = float.IsNaN(v) || float.IsInfinity(v) ? 0f : v;
+                }
+        }
+
+        public float Sample(float2 p)
+        {
+            float fx = math.clamp((p.x - Min.x) / Cell, 0f, Nx - 1.001f), fy = math.clamp((p.y - Min.y) / Cell, 0f, Ny - 1.001f);
+            int i = (int)fx, j = (int)fy;
+            float tx = fx - i, ty = fy - j;
+            int k = j * Nx + i;
+            return math.lerp(math.lerp(H[k], H[k + 1], tx), math.lerp(H[k + Nx], H[k + Nx + 1], tx), ty);
         }
     }
 

@@ -766,5 +766,38 @@ namespace Placemaker.Tests
         }
 
         private static float Side(float2 a, float2 b, float2 p) => (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+
+        [Fact]
+        public void A_garden_never_grows_up_a_cliff()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 60f, ["maxRise"] = 0f };
+            // flat, then a 60 % cliff from 20 m to the house's right
+            var s = MiddleLine();
+            s.Ground = p => p.x > 20f ? (p.x - 20f) * 0.6f : 0f;
+            var plan = YardStitch.Plan(new[] { a }, s);
+            Assert.True(plan.Plots.TryGetValue(1, out var pa), "the garden grows");
+            Assert.True(pa.Max(p => p.x) <= 21.5f && pa.Max(p => p.x) >= 16f, $"stops at the foot of the cliff: {pa.Max(p => p.x):0.0}");
+            Assert.True(pa.Min(p => p.x) < -8f - 55f, "the flat side still grows its full reach");
+            // no limit: up the cliff as before
+            a.Options["maxSlope"] = 0f;
+            var free = YardStitch.Plan(new[] { a }, s);
+            Assert.True(free.Plots[1].Max(p => p.x) > 8f + 55f);
+        }
+
+        [Fact]
+        public void A_garden_stops_where_the_land_climbs_too_far_above_its_house()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 60f, ["maxSlope"] = 0f, ["maxRise"] = 4f };
+            // a 10 % rise behind the house: 4 m above it 40 m back
+            var s = MiddleLine();
+            s.Ground = p => math.max(0f, -p.y) * 0.1f;
+            var plan = YardStitch.Plan(new[] { a }, s);
+            Assert.True(plan.Plots.TryGetValue(1, out var pa));
+            float back = pa.Min(p => p.y);
+            Assert.True(back >= -43f && back <= -36f, $"the back stops about 40 m behind the house: {back:0.0}");
+            Assert.True(pa.Min(p => p.x) < -8f - 55f && pa.Max(p => p.x) > 8f + 55f, "the level sides grow their full reach");
+        }
     }
 }

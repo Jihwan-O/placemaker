@@ -145,84 +145,146 @@
     color: $c-warning;
 }
 
-// a zone's or a kind's look: its button and the short list under it
-.choice {
-    @include col;
-    min-width: 0;
-    flex: 1 1 auto;
-    align-items: flex-end;
-}
-
-.choiceButton {
-    @include row;
-    max-width: 100%;
-    padding: 2rem 6rem;
-    border-radius: 4rem;
-    background-color: rgba(255, 255, 255, 0.06);
-    @include border(1rem, rgba(255, 255, 255, 0.16));
-    color: inherit;
-    font-size: $fs-s;
-    cursor: pointer;
-}
-
-.choiceInherited {
-    opacity: 0.6;
-}
-
-.choiceText {
-    margin: 0 5rem;
-    @include ellipsis;
-}
-
+// the looks to pick (a zone's or a kind's): a short list of chips
 .choiceList {
     @include row;
     flex-wrap: wrap;
-    justify-content: flex-end;
-    margin-top: 3rem;
+    min-width: 0;
 }
 
 .choiceItem {
-    margin: 0 0 3rem 3rem;
-    padding: 2rem 7rem;
+    @include row;
+    margin: 0 4rem 4rem 0;
+    padding: 2rem 7rem 2rem 5rem;
     border-radius: 4rem;
     background-color: rgba(255, 255, 255, 0.05);
-    @include border(1rem, rgba(255, 255, 255, 0.14));
+    @include border(1rem, rgba(255, 255, 255, 0.12));
     color: inherit;
     font-size: $fs-s;
     cursor: pointer;
 }
 
 .choiceItemOn {
-    background-color: rgba(90, 170, 90, 0.35);
-    @include border(1rem, rgba(120, 200, 120, 0.9));
+    background-color: rgba(143, 209, 255, 0.18);
+    @include border(1rem, rgba(143, 209, 255, 0.75));
 }
 
-// the City window beside the panel
-.cityCard {
-    @include col;
-    min-height: 0;
+.choiceText {
+    margin-left: 4rem;
+    @include ellipsis;
+}
+
+// the City window beside the panel: Placemaker's panel frame, only as tall as it needs
+.cityPanel {
+    height: auto;
     max-height: 100%;
-    pointer-events: auto;
-    border-radius: $radius;
-    background-color: rgba(12, 18, 23, 0.9);
-    @include border(1rem, rgba(255, 255, 255, 0.13));
-    box-shadow: 0 10rem 34rem rgba(0, 0, 0, 0.45);
-}
-
-.cityHead {
-    @include row;
-    flex-shrink: 0;
-    height: 32rem;
-    padding: 0 4rem 0 9rem;
-    font-size: $fs;
-    font-weight: bold;
-    background-color: rgba(0, 0, 0, 0.22);
 }
 
 .cityBody {
+    padding-top: 6rem;
+}
+
+.cityFoot {
+    @include row;
+    flex-shrink: 0;
+    padding: 6rem 8rem;
+    border-top-width: 1rem;
+    border-top-style: solid;
+    border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.kindLook {
+    @include row;
+    max-width: 130rem;
+    padding: 1rem 6rem;
+    border-radius: 4rem;
+    background-color: rgba(255, 255, 255, 0.06);
+    @include border(1rem, rgba(255, 255, 255, 0.14));
+    color: inherit;
+    font-size: $fs-s;
+    cursor: pointer;
+}
+
+.kindLookOn {
+    @include border(1rem, rgba(143, 209, 255, 0.75));
+}
+
+.pickBox {
     @include col;
-    min-height: 0;
-    flex: 1 1 auto;
-    overflow-y: auto;
-    padding: 8rem 10rem 10rem 10rem;
+    min-width: 0;
+    margin: 2rem 0 6rem 0;
+    padding: 6rem 6rem 2rem 6rem;
+    border-radius: 4rem;
+    background-color: rgba(143, 209, 255, 0.07);
+}
+
+.pickTitle {
+    margin-bottom: 5rem;
+    font-size: $fs-s;
+    color: $c-text-dim;
+}
+
+// zone types as the zoning toolbar shows them
+.zoneGrid {
+    @include row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    min-width: 0;
+    margin: 2rem 0 4rem 0;
+}
+
+.zoneTile {
+    @include col;
+    width: 31%;
+    margin: 0 2% 5rem 0;
+    padding: 5rem 5rem 4rem 5rem;
+    border-radius: 5rem;
+    background-color: rgba(255, 255, 255, 0.04);
+    @include border(1rem, rgba(255, 255, 255, 0.08));
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.zoneTileOn {
+    background-color: rgba(143, 209, 255, 0.12);
+    @include border(1rem, rgba(143, 209, 255, 0.75));
+}
+
+.zoneTop {
+    @include row;
+    justify-content: space-between;
+}
+
+.regionTag {
+    padding: 0 4rem;
+    border-radius: 3rem;
+    font-size: 10rem;
+    font-weight: bold;
+    color: $c-text-dim;
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.zoneName {
+    min-width: 0;
+    margin-top: 4rem;
+    font-size: 11rem;
+    line-height: 1.2;
+}
+
+.zoneLook {
+    @include row;
+    min-width: 0;
+    margin-top: 4rem;
+    font-size: 10rem;
+    color: $c-text-dim;
+}
+
+.zoneLookOwn {
+    color: #ffffff;
+}
+
+.zoneLookText {
+    margin-left: 3rem;
+    @include ellipsis;
 }

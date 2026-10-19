@@ -334,6 +334,8 @@ export const act = {
     polishLook: (what: string, arg = "") => fire(Triggers.polishLook, what, arg),
     /** A zone type's look ("off"; "" = as its kind). */
     polishZone: (zone: string, look: string) => fire(Triggers.polishZone, zone, look),
+    /** The Live switch beside Polish. */
+    polishLive: (on: boolean) => fire(Triggers.polishLive, on),
     undo: () => fire(Triggers.undo),
     redo: () => fire(Triggers.redo),
     setAreaMode: (mode: AreaMode) => fire(Triggers.setAreaMode, mode),

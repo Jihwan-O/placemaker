@@ -294,6 +294,7 @@ namespace Placemaker.Game.Tool
         {
             CheckKeepOffSetting();
             RebuildShapeIfDirty(false);
+            UpdateLivePolish();
             UpdatePlanning();
             TickPlanningProgress();
             var facts = Facts();

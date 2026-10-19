@@ -19,6 +19,7 @@ import b from "../stages/browser.module.scss";
 import d from "../stages/design.module.scss";
 import c from "../controls/controls.module.scss";
 import s from "./painter.module.scss";
+import pn from "./panel.module.scss";
 
 export const THEME_ICON: Record<string, string> = { zone: "zone", garden: "flower", natural: "rocks", tidy: "topiary", yard: "crate" };
 const THEMES = ["garden", "natural", "tidy", "yard"];
@@ -37,14 +38,14 @@ const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Kno
     {
         id: "reach", en: "Reach and joining", icon: "ruler", open: true,
         knobs: [
-            { id: "sideReach", en: "Reach to a side neighbour", tip: "How far a garden reaches sideways to meet the neighbour beside it.", kind: "slider", min: 0, max: 80, step: 1, unit: "m" },
-            { id: "maxFrontGap", en: "Join at the street, up to", tip: "Two neighbours this far apart at the street still join (one shared fence or hedge).", kind: "slider", min: 0, max: 100, step: 1, unit: "m" },
-            { id: "maxBackGap", en: "Join at the back, up to", tip: "How far apart their back corners may be (wedges on the outside of a curve).", kind: "slider", min: 0, max: 150, step: 1, unit: "m" },
-            { id: "maxRearGap", en: "Join back to back, up to", tip: "Two gardens back to back this far apart meet in the middle.", kind: "slider", min: 0, max: 80, step: 1, unit: "m" },
-            { id: "maxFacingGap", en: "Join at block corners, up to", tip: "A side facing another house's side or back this far away meets it halfway.", kind: "slider", min: 0, max: 60, step: 1, unit: "m" },
-            { id: "maxDeepen", en: "Line up back fences, up to", tip: "A shallow garden reaches back to its row's deepest by up to this much.", kind: "slider", min: 0, max: 60, step: 1, unit: "m" },
+            { id: "sideReach", en: "Side reach", tip: "How far a garden reaches sideways to meet the neighbour beside it.", kind: "slider", min: 0, max: 80, step: 1, unit: "m" },
+            { id: "maxFrontGap", en: "Street gap", tip: "Two neighbours this far apart at the street still join (one shared fence or hedge).", kind: "slider", min: 0, max: 100, step: 1, unit: "m" },
+            { id: "maxBackGap", en: "Back gap", tip: "How far apart their back corners may be (wedges on the outside of a curve).", kind: "slider", min: 0, max: 150, step: 1, unit: "m" },
+            { id: "maxRearGap", en: "Back to back", tip: "Two gardens back to back this far apart meet in the middle.", kind: "slider", min: 0, max: 80, step: 1, unit: "m" },
+            { id: "maxFacingGap", en: "Block corners", tip: "A side facing another house's side or back this far away meets it halfway.", kind: "slider", min: 0, max: 60, step: 1, unit: "m" },
+            { id: "maxDeepen", en: "Line up backs", tip: "A shallow garden reaches back to its row's deepest by up to this much.", kind: "slider", min: 0, max: 60, step: 1, unit: "m" },
             { id: "hug", en: "Reach out to roads and buildings", tip: "A side or back nobody else has grows out to a road, path or building near it and hugs it.", kind: "toggle" },
-            { id: "hugReach", en: "Reach out up to", tip: "How far a garden reaches out to a road, path or building.", kind: "slider", min: 0, max: 60, step: 1, unit: "m" },
+            { id: "hugReach", en: "Reach out", tip: "How far a garden reaches out to a road, path or building.", kind: "slider", min: 0, max: 60, step: 1, unit: "m" },
             { id: "wrap", en: "Meet behind a shallow lot", tip: "Two deep gardens meet behind a shallow one between them.", kind: "toggle" },
             { id: "closeBacks", en: "Close open backs", tip: "A garden open at the back closes with a fence or hedge the joining freed.", kind: "toggle" },
         ],
@@ -54,10 +55,10 @@ const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Kno
         knobs: [
             { id: "lawns", en: "Lawns up to the fences", tip: "A garden's lawn grows to its new fences, around driveways and paving.", kind: "toggle" },
             { id: "paintedGardens", en: "Painted gardens", tip: "How many gardens are painted (lush ground, soft edges) instead of keeping their lawns. Natural and Yard more often, Tidy seldom.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
-            { id: "gardenPaint", en: "Painted garden strength", tip: "How strong the paint of a painted garden is.", kind: "slider", min: 0, max: 1, step: 0.05 },
+            { id: "gardenPaint", en: "Garden paint", tip: "How strong the paint of a painted garden is.", kind: "slider", min: 0, max: 1, step: 0.05 },
             { id: "paint", en: "Ground paint", tip: "Soft lush ground past the gardens and worn ground along fences facing open land.", kind: "toggle" },
-            { id: "blendWidth", en: "Paint past the gardens", tip: "How far the lush ground reaches past the gardens.", kind: "slider", min: 0, max: 40, step: 1, unit: "m" },
-            { id: "blendFar", en: "Faint paint reaches", tip: "How far the fainter, wider band reaches.", kind: "slider", min: 0, max: 60, step: 1, unit: "m" },
+            { id: "blendWidth", en: "Paint reach", tip: "How far the lush ground reaches past the gardens.", kind: "slider", min: 0, max: 40, step: 1, unit: "m" },
+            { id: "blendFar", en: "Faint reach", tip: "How far the fainter, wider band reaches.", kind: "slider", min: 0, max: 60, step: 1, unit: "m" },
             { id: "blendStrength", en: "Paint strength", tip: "How strong the paint past the gardens is.", kind: "slider", min: 0, max: 1, step: 0.05 },
         ],
     },
@@ -65,12 +66,12 @@ const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Kno
         id: "planting", en: "Planting and features", icon: "shrub",
         knobs: [
             { id: "plant", en: "Beds and bushes", tip: "Planted beds with bushes along new fences. Off: no planting, features, paths or rocks.", kind: "toggle" },
-            { id: "bedChance", en: "Beds along fences", tip: "How often a new fence gets a bed with bushes.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
-            { id: "bushesPerGarden", en: "Bushes per garden, up to", tip: "The most bushes the beds of one garden get.", kind: "slider", min: 0, max: 40, step: 1, unit: "count" },
+            { id: "bedChance", en: "Beds", tip: "How often a new fence gets a bed with bushes.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
+            { id: "bushesPerGarden", en: "Bushes", tip: "The most bushes the beds of one garden get.", kind: "slider", min: 0, max: 40, step: 1, unit: "count" },
             { id: "features", en: "Garden features", tip: "Big new garden land gets something by its theme: a rock garden, a sand pit, a log pile, a bench nook, a flower garden, a storage yard.", kind: "toggle" },
-            { id: "featureChance", en: "Gardens with a feature", tip: "How many big gardens get a feature.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
-            { id: "featureMinLand", en: "A feature needs at least", tip: "New garden land a feature needs.", kind: "slider", min: 20, max: 400, step: 10, unit: "m2" },
-            { id: "rockChance", en: "Rocks where gardens meet", tip: "How often a rock sits where two gardens meet at the street (never against a hedge).", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
+            { id: "featureChance", en: "Feature chance", tip: "How many big gardens get a feature.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
+            { id: "featureMinLand", en: "Feature land", tip: "New garden land a feature needs.", kind: "slider", min: 20, max: 400, step: 10, unit: "m2" },
+            { id: "rockChance", en: "Rocks", tip: "How often a rock sits where two gardens meet at the street (never against a hedge).", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
         ],
     },
     {
@@ -78,11 +79,13 @@ const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Kno
         knobs: [
             { id: "pathChance", en: "Garden paths", tip: "How many big gardens get a paved path from the house to the back.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
             { id: "alleys", en: "Walkways between houses", tip: "A narrow even gap between two houses becomes a paved walkway.", kind: "toggle" },
-            { id: "alleyChance", en: "Walkway chance", tip: "How often a narrow gap becomes a walkway.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
+            { id: "alleyChance", en: "Walkways", tip: "How often a narrow gap becomes a walkway.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
             { id: "pavedFill", en: "Shops keep their paving", tip: "Shops, offices and works fill the land between them with the surface most of their ground already is, not lawn.", kind: "toggle" },
         ],
     },
 ];
+
+const changedIn = (knobs: Knob[], p: PainterState) => knobs.filter((k) => Math.abs((p.values?.[k.id] ?? 0) - (p.lookValues?.[k.id] ?? 0)) > 1e-4).length;
 
 /** One options row, as Controls.tsx draws a type's: label (tooltip) left, editor right, reset when changed. */
 const Row = ({ id, label, tip, toggle, changed, onReset, children }: { id: string; label: string; tip?: string; toggle?: boolean; changed?: boolean; onReset?: () => void; children: ReactNode }) => {
@@ -302,7 +305,7 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
                             icon={g.icon}
                             defaultOpen={!!g.open}
                             testId={"polish-group-" + g.id}
-                            summary={t("Placemaker.UI.Polish.GroupChanged", "{0} changed", [g.knobs.filter((k) => Math.abs((p.values?.[k.id] ?? 0) - (p.lookValues?.[k.id] ?? 0)) > 1e-4).length])}
+                            summary={changedIn(g.knobs, p) > 0 ? t("Placemaker.UI.Polish.GroupChanged", "{0} changed", [changedIn(g.knobs, p)]) : undefined}
                         >
                             {g.knobs.map((k) => (
                                 <KnobRow key={k.id} k={k} p={p} />
@@ -315,63 +318,40 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
     );
 };
 
-/** A look picked from a short list under its button (a zone's or a kind's). */
-const LookChoice = ({ p, value, own, testId, onPick, allowInherit }: { p: PainterState; value: string; own: boolean; testId: string; onPick: (v: string) => void; allowInherit?: boolean }) => {
+/** The looks to pick from (a short list of chips): Off, every look, and "as its kind" for a zone with its own. */
+const LookChips = ({ p, value, testId, onPick, inherit }: { p: PainterState; value: string; testId: string; onPick: (v: string) => void; inherit?: boolean }) => {
     const { t } = useT();
-    const [open, setOpen] = useState(false);
-    const options = ["off", ...(p.looks ?? []).map((l) => l.id)];
-    const pick = (v: string) => {
-        onPick(v);
-        setOpen(false);
-    };
+    const options = [...(p.looks ?? []).map((l) => l.id), "off"];
     return (
-        <div className={s.choice}>
-            <button
-                type="button"
-                className={classNames(s.choiceButton, { [s.choiceInherited]: !own })}
-                data-testid={testId}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    setOpen(!open);
-                }}
-            >
-                <Icon name={value === "off" ? "eyeOff" : THEME_ICON[(p.looks ?? []).find((l) => l.id === value)?.theme ?? ""] ?? "star"} size={11} tint="dim" />
-                <div className={s.choiceText}>{lookName(t, p, value)}</div>
-                <Icon name={open ? "chevronUp" : "chevronDown"} size={9} tint="dim" />
-            </button>
-            {open ? (
-                <div className={s.choiceList}>
-                    {allowInherit && own ? (
-                        <button
-                            type="button"
-                            className={s.choiceItem}
-                            data-testid={testId + "-inherit"}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                pick("");
-                            }}
-                        >
-                            {t("Placemaker.UI.Polish.AsKind", "As its kind")}
-                        </button>
-                    ) : null}
-                    {options.map((o) => (
-                        <button
-                            key={o}
-                            type="button"
-                            className={classNames(s.choiceItem, { [s.choiceItemOn]: o === value })}
-                            data-testid={testId + "-" + o}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                pick(o);
-                            }}
-                        >
-                            {lookName(t, p, o)}
-                        </button>
-                    ))}
-                </div>
+        <div className={s.choiceList} data-testid={testId}>
+            {inherit ? (
+                <button type="button" className={s.choiceItem} data-testid={testId + "-inherit"} onClick={(e) => { e.stopPropagation(); onPick(""); }}>
+                    <Icon name="undo" size={10} tint="dim" />
+                    <div className={s.choiceText}>{t("Placemaker.UI.Polish.AsKind", "As its kind")}</div>
+                </button>
             ) : null}
+            {options.map((o) => (
+                <button
+                    key={o}
+                    type="button"
+                    className={classNames(s.choiceItem, { [s.choiceItemOn]: o === value })}
+                    data-testid={testId + "-" + o}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onPick(o);
+                    }}
+                >
+                    <Icon name={o === "off" ? "eyeOff" : lookIcon(p, o)} size={10} tint={o === value ? "light" : "dim"} />
+                    <div className={s.choiceText}>{lookName(t, p, o)}</div>
+                </button>
+            ))}
         </div>
     );
+};
+
+const lookIcon = (p: PainterState, id: string) => {
+    const l = (p.looks ?? []).find((x) => x.id === id);
+    return !l ? "eyeOff" : l.custom ? "star" : THEME_ICON[l.theme] ?? "flower";
 };
 
 const KINDS: { id: "home" | "shop" | "office" | "industry"; city: "homes" | "shops" | "offices" | "industry"; en: string; icon: string }[] = [
@@ -381,74 +361,139 @@ const KINDS: { id: "home" | "shop" | "office" | "industry"; city: "homes" | "sho
     { id: "industry", city: "industry", en: "Industry", icon: "factory" },
 ];
 
+/** A zone's region (the prefab name's EU / NA) and its name without it. */
+function zoneLabel(t: TFunc, id: string): { region: string; name: string } {
+    const m = /^(EU|NA)\s+(.*)$/.exec(id);
+    const region = m ? m[1] : "";
+    const local = t("Assets.NAME[" + id + "]", "");
+    const name = local && local !== id ? local.replace(/^(EU|NA)\s+/, "") : humanize(m ? m[2] : id);
+    return { region, name };
+}
+
+/** One zone type as the zoning toolbar shows it: its icon, its name, its look underneath (dim: its kind's). */
+const ZoneTile = ({ p, z, on, onClick }: { p: PainterState; z: PolishZone; on: boolean; onClick: () => void }) => {
+    const { t } = useT();
+    const { region, name } = zoneLabel(t, z.id);
+    return (
+        <Tip title={name} description={(region ? region + " · " : "") + t("Placemaker.UI.Polish.ZoneTip", "Click to pick its look")}>
+            <button
+                type="button"
+                className={classNames(s.zoneTile, { [s.zoneTileOn]: on })}
+                data-testid={"polish-zone-" + z.id}
+                data-look={z.look}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onClick();
+                }}
+            >
+                <div className={s.zoneTop}>
+                    <Icon name={z.icon || "zone"} size={22} fallback="zone" />
+                    {region ? <div className={s.regionTag}>{region}</div> : null}
+                </div>
+                <div className={s.zoneName}>{name}</div>
+                <div className={classNames(s.zoneLook, { [s.zoneLookOwn]: z.own })}>
+                    <Icon name={z.look === "off" ? "eyeOff" : lookIcon(p, z.look)} size={9} tint={z.own ? "light" : "dim"} />
+                    <div className={s.zoneLookText}>{lookName(t, p, z.look)}</div>
+                </div>
+            </button>
+        </Tip>
+    );
+};
+
 type Ask = "polishAll" | "unpolishAll" | null;
 
-/** The City window beside the panel: the polish on or off, new buildings, a look per zone type, the whole city. */
+/** The City window beside the panel (Placemaker's frame): new buildings, a look per zone type, the whole city. */
 export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: () => void }) => {
     const { t } = useT();
     const [ask, setAsk] = useState<Ask>(null);
+    const [picking, setPicking] = useState<string | null>(null);   // a zone id, or "kind:<kind>"
     const p = state.painter;
     if (!p || !p.city) return null;
     const city = p.city;
     const L = (id: string, en: string) => t("Placemaker.UI.Polish." + id, en);
     const status =
         t("Placemaker.UI.Polish.Count", "{0} of {1} buildings polished", [city.polished, city.total]) +
-        (city.restoring > 0
-            ? " · " + t("Placemaker.UI.Polish.Restoring", "putting {0} back", [city.restoring])
-            : city.waiting > 0 && p.featureOn
-              ? " · " + t("Placemaker.UI.Polish.Working", "working through {0}", [city.waiting])
-              : "");
+        (city.restoring > 0 ? " · " + t("Placemaker.UI.Polish.Restoring", "putting {0} back", [city.restoring]) : city.waiting > 0 ? " · " + t("Placemaker.UI.Polish.Working", "working through {0}", [city.waiting]) : "");
     const zones: PolishZone[] = p.zones ?? [];
     return (
-        <div className={s.cityCard} data-testid="polish-city" onMouseDown={(e) => e.stopPropagation()}>
-            <div className={s.cityHead}>
-                <Icon name="building" size={13} tint="light" />
-                <div className={s.titleText}>{L("City", "Whole city")}</div>
-                <div className={s.flex} />
-                <Btn icon="close" iconSize={12} title={t("Placemaker.UI.Close", "Close")} onClick={onClose} testId="polish-city-close" />
-            </div>
-            <div className={s.cityBody}>
-                <div className={s.status} data-testid="polish-status" data-polished={city.polished} data-total={city.total} data-waiting={city.waiting}>
-                    <div className={s.swatch} />
-                    <div className={s.statusText}>{status}</div>
+        <div className={classNames(pn.panel, s.cityPanel)} data-testid="polish-city" onMouseDown={(e) => e.stopPropagation()}>
+            <div className={pn.panelTint}>
+                <div className={pn.header}>
+                    <div className={pn.logo} style={{ marginLeft: "6rem" }}>
+                        <Icon name="building" size={15} tint="accent" />
+                    </div>
+                    <div className={pn.title}>{L("City", "Whole city")}</div>
+                    <div className={pn.flex} />
+                    <Btn icon="close" iconSize={14} title={t("Placemaker.UI.Close", "Close")} onClick={onClose} testId="polish-city-close" />
                 </div>
-                <Row id="on" label={L("On", "Neighbourhood polish")} tip={L("On.Tip", "On: polished gardens keep fitting as the city grows and changes. Off: nothing changes; polished gardens stay as they are. Polish switches it on.")} toggle>
-                    <div className={c.toggleCell}>
-                        <Switch testId="polish-on" on={p.featureOn} onChange={(v) => act.polishCity("on", v ? "true" : "false")} />
+                <div className={pn.bodyWrap}>
+                    <div className={classNames(pn.body, s.cityBody)}>
+                        <Row id="newHouses" label={L("NewHouses", "Polish new buildings")} tip={L("NewHouses.Tip2", "Buildings that grow from now on get their zone's look. Buildings already standing stay as they are until you polish them.")} toggle>
+                            <div className={c.toggleCell}>
+                                <Switch testId="polish-newHouses" on={p.newHouses} onChange={(v) => act.polishCity("newHouses", v ? "true" : "false")} />
+                            </div>
+                        </Row>
+                        <div className={s.status} data-testid="polish-status" data-polished={city.polished} data-total={city.total} data-waiting={city.waiting}>
+                            <div className={s.swatch} />
+                            <div className={s.statusText}>{status}</div>
+                        </div>
+                        {KINDS.map((k) => {
+                            const list = zones.filter((z) => z.kind === k.id);
+                            if (!list.length) return null;
+                            const kindLook = String(city[k.city]);
+                            const kindKey = "kind:" + k.id;
+                            const picked = list.find((z) => z.id === picking);
+                            return (
+                                <Collapsible
+                                    key={k.id}
+                                    id={"polish:zones:" + k.id}
+                                    title={t("Placemaker.UI.Polish.Kind." + k.city, k.en)}
+                                    icon={k.icon}
+                                    defaultOpen={k.id === "home"}
+                                    testId={"polish-zones-" + k.id}
+                                    summary={lookName(t, p, kindLook)}
+                                    right={
+                                        <button
+                                            type="button"
+                                            className={classNames(s.kindLook, { [s.kindLookOn]: picking === kindKey })}
+                                            data-testid={"polish-kind-" + k.city}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPicking(picking === kindKey ? null : kindKey);
+                                            }}
+                                        >
+                                            <Icon name={kindLook === "off" ? "eyeOff" : lookIcon(p, kindLook)} size={10} tint="light" />
+                                            <div className={s.choiceText}>{lookName(t, p, kindLook)}</div>
+                                            <Icon name="chevronDown" size={9} tint="dim" />
+                                        </button>
+                                    }
+                                >
+                                    {picking === kindKey ? (
+                                        <div className={s.pickBox}>
+                                            <div className={s.pickTitle}>{t("Placemaker.UI.Polish.KindPick", "Every {0} zone without its own look", [t("Placemaker.UI.Polish.Kind." + k.city, k.en).toLowerCase()])}</div>
+                                            <LookChips p={p} value={kindLook} testId={"polish-kind-" + k.city + "-pick"} onPick={(v) => { if (v) act.polishCity(k.city, v); setPicking(null); }} />
+                                        </div>
+                                    ) : null}
+                                    <div className={s.zoneGrid}>
+                                        {list.map((z) => (
+                                            <ZoneTile key={z.id} p={p} z={z} on={picking === z.id} onClick={() => setPicking(picking === z.id ? null : z.id)} />
+                                        ))}
+                                    </div>
+                                    {picked ? (
+                                        <div className={s.pickBox}>
+                                            <div className={s.pickTitle}>{zoneLabel(t, picked.id).name + (zoneLabel(t, picked.id).region ? " · " + zoneLabel(t, picked.id).region : "")}</div>
+                                            <LookChips p={p} value={picked.look} inherit={picked.own} testId={"polish-zone-" + picked.id + "-pick"} onPick={(v) => { act.polishZone(picked.id, v); setPicking(null); }} />
+                                        </div>
+                                    ) : null}
+                                </Collapsible>
+                            );
+                        })}
                     </div>
-                </Row>
-                <Row id="newHouses" label={L("NewHouses", "Polish new buildings")} tip={L("NewHouses.Tip", "Buildings that grow from now on are polished with their zone's look below.")} toggle>
-                    <div className={c.toggleCell}>
-                        <Switch testId="polish-newHouses" on={p.newHouses} onChange={(v) => act.polishCity("newHouses", v ? "true" : "false")} />
-                    </div>
-                </Row>
-                {KINDS.map((k) => {
-                    const list = zones.filter((z) => z.kind === k.id);
-                    const kindName = t("Placemaker.UI.Polish.Kind." + k.city, k.en);
-                    return (
-                        <Collapsible
-                            key={k.id}
-                            id={"polish:zones:" + k.id}
-                            title={kindName}
-                            icon={k.icon}
-                            defaultOpen={k.id === "home"}
-                            testId={"polish-zones-" + k.id}
-                            summary={lookName(t, p, String(city[k.city]))}
-                        >
-                            <Row id={"kind-" + k.id} label={t("Placemaker.UI.Polish.KindDefault", "Every zone of this kind")} tip={L("Kind.Tip", "The look of every zone of this kind that has none of its own.")}>
-                                <LookChoice p={p} value={String(city[k.city])} own testId={"polish-kind-" + k.city} onPick={(v) => v && act.polishCity(k.city, v)} />
-                            </Row>
-                            {list.map((z) => (
-                                <Row key={z.id} id={"zone-" + z.id} label={t("Assets.NAME[" + z.id + "]", humanize(z.id))} tip={z.id}>
-                                    <LookChoice p={p} value={z.look} own={z.own} allowInherit testId={"polish-zone-" + z.id} onPick={(v) => act.polishZone(z.id, v)} />
-                                </Row>
-                            ))}
-                        </Collapsible>
-                    );
-                })}
-                <div className={s.buttons}>
-                    <Btn variant="solid" icon="sparkle" iconSize={12} label={L("PolishAll", "Polish the whole city")} testId="polish-all" onClick={() => setAsk("polishAll")} />
-                    <Btn variant="solid" icon="reset" iconSize={12} label={L("UnpolishAll", "Unpolish the whole city")} testId="polish-none" disabled={city.polished === 0} onClick={() => setAsk("unpolishAll")} />
+                </div>
+                <div className={s.cityFoot}>
+                    <Btn variant="solid" icon="sparkle" iconSize={12} label={L("PolishAllShort", "Polish all")} title={L("PolishAll", "Polish the whole city")} testId="polish-all" onClick={() => setAsk("polishAll")} />
+                    <div className={s.flex} />
+                    <Btn variant="ghost" icon="reset" iconSize={12} label={L("UnpolishAllShort", "Unpolish all")} title={L("UnpolishAll", "Unpolish the whole city")} testId="polish-none" disabled={city.polished === 0} onClick={() => setAsk("unpolishAll")} />
                 </div>
             </div>
             {ask ? (

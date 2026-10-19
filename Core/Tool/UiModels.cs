@@ -90,11 +90,13 @@ namespace Placemaker.Core.Tool
         /// every knob's value in the rows and in the saved look.</summary>
         public string LookTheme = "garden", LookSavedTheme = "garden";
         public bool Modified;
+        /// <summary>Live polish: the selection polished again after every change.</summary>
+        public bool Live;
         public Dictionary<string, float> Values = new Dictionary<string, float>(), LookValues = new Dictionary<string, float>();
         /// <summary>Every look: id, name (a key for the built-in ones), the player's own, base theme.</summary>
         public List<(string Id, string Name, bool Custom, string Theme)> Looks = new List<(string, string, bool, string)>();
         /// <summary>Every zone type: prefab name, kind (home, shop, office, industry), its look ("off"), set for it (not its kind's).</summary>
-        public List<(string Id, string Kind, string Look, bool Own)> Zones = new List<(string, string, string, bool)>();
+        public List<(string Id, string Kind, string Look, bool Own, string Icon)> Zones = new List<(string, string, string, bool, string)>();
     }
 
     public sealed class RecipeListEntry
@@ -233,10 +235,10 @@ namespace Placemaker.Core.Tool
                         .Set("paths", p.Paths).Set("rocks", p.Rocks).Set("groundPaint", p.GroundPaint).Set("shopPaving", p.ShopPaving))
                     .Set("city", JsonValue.Obj().Set("homes", p.Homes ?? "garden").Set("shops", p.Shops ?? "tidy").Set("offices", p.Offices ?? "tidy").Set("industry", p.Industry ?? "yard")
                         .Set("polished", p.CityPolished).Set("total", p.CityTotal).Set("waiting", p.Waiting).Set("restoring", p.Restoring))
-                    .Set("lookTheme", p.LookTheme ?? "garden").Set("lookSavedTheme", p.LookSavedTheme ?? "garden").Set("modified", p.Modified)
+                    .Set("lookTheme", p.LookTheme ?? "garden").Set("lookSavedTheme", p.LookSavedTheme ?? "garden").Set("modified", p.Modified).Set("live", p.Live)
                     .Set("values", Knobs(p.Values)).Set("lookValues", Knobs(p.LookValues))
                     .Set("looks", Arr(p.Looks.Select(l => JsonValue.Obj().Set("id", l.Id).Set("name", l.Name).Set("custom", l.Custom).Set("theme", l.Theme))))
-                    .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own)))));
+                    .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own).Set("icon", z.Icon ?? "")))));
             }
             return o;
         }

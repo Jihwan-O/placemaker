@@ -60,6 +60,7 @@ namespace Placemaker.Game.UI
             Trigger<string, double>("polishKnob", (id, v) => _tool.SetPolishKnob(id, v));   // a look row of the polish tool
             Trigger<string, string>("polishLook", (what, arg) => _tool.PolishLookAction(what, arg));   // save / saveAs / rename / delete / revert
             Trigger<string, string>("polishZone", (zone, look) => _tool.SetPolishZoneLook(zone, look));   // the City window's zone looks
+            Trigger<bool>("polishLive", on => _tool.SetPolishLive(on));   // the Live switch beside Polish
             Trigger<string, string>("polishCity", (what, value) => _tool.PolishCity(what, value));   // the painter card's Whole city rows
             Trigger("undo", () => _tool.Undo());
             Trigger("redo", () => _tool.Redo());

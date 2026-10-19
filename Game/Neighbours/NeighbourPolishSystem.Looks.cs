@@ -205,17 +205,17 @@ namespace Placemaker.Game.Neighbours
         private string LookOfZone(Entity buildingPrefab) => ZoneLook(ZoneName(buildingPrefab), ZoneKind(buildingPrefab));
 
         private EntityQuery _zonePrefabs;
-        private List<(string Id, string Kind)> _zones;
+        private List<(string Id, string Kind, string Icon)> _zones;
         private int _zonesCount = -1;
 
         /// <summary>Every zone type in the game (mods' zones too): its prefab name and kind, homes first.</summary>
-        public List<(string Id, string Kind)> Zones()
+        public List<(string Id, string Kind, string Icon)> Zones()
         {
             if (_zonePrefabs == default) _zonePrefabs = GetEntityQuery(ComponentType.ReadOnly<ZoneData>(), ComponentType.ReadOnly<PrefabData>());
             int count = _zonePrefabs.CalculateEntityCount();
             if (_zones != null && count == _zonesCount) return _zones;
             _zonesCount = count;
-            var list = new List<(string, string)>();
+            var list = new List<(string, string, string)>();
             using (var all = _zonePrefabs.ToEntityArray(Allocator.Temp))
                 foreach (var z in all)
                 {
@@ -223,7 +223,10 @@ namespace Placemaker.Game.Neighbours
                     if (zd.m_AreaType == global::Game.Zones.AreaType.None) continue;
                     string kind = zd.m_AreaType == global::Game.Zones.AreaType.Residential ? "home" : zd.m_AreaType == global::Game.Zones.AreaType.Commercial ? "shop" : zd.IsOffice() ? "office" : "industry";
                     var name = NameOf(z);
-                    if (!string.IsNullOrEmpty(name) && !list.Any(x => x.Item1 == name)) list.Add((name, kind));
+                    if (string.IsNullOrEmpty(name) || list.Any(x => x.Item1 == name)) continue;
+                    string icon = "";
+                    try { icon = _prefabs.GetPrefab<PrefabBase>(z)?.GetComponent<UIObject>()?.m_Icon ?? ""; } catch (Exception) { }
+                    list.Add((name, kind, icon));
                 }
             string[] order = { "home", "shop", "office", "industry" };
             _zones = list.OrderBy(x => Array.IndexOf(order, x.Item2)).ThenBy(x => x.Item1, StringComparer.OrdinalIgnoreCase).ToList();

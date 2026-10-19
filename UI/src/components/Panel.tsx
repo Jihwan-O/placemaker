@@ -25,7 +25,7 @@ import { AreaStage, modeAvailability, modeOptions, toolOf } from "../stages/Area
 import { DesignStage, markerLabel } from "../stages/DesignStage";
 import { BuildingStage, ReviewStage } from "../stages/ReviewStage";
 import { ManageStage } from "../stages/ManageStage";
-import { Btn, Check, Icon, Keys, Segmented } from "./common";
+import { Btn, Check, Icon, Keys, Segmented, Switch } from "./common";
 import { layoutFor, MAX_SHARE, MIN_REM, NARROW_REM, PanelLayoutContext, WIDE_DEFAULT_REM, WIDE_SCREEN_PX } from "../lib/layout";
 import { AssetPickerCard, PickerContext, PickerRequest } from "./picker";
 import { PolishCityCard, PolishDesign } from "./PainterCard";
@@ -572,6 +572,18 @@ const Footer = ({
                     <Tip title={t("Placemaker.UI.Review.AckTip", "Some changes stay after you remove the build (the amber tags). Tick to allow them.")}>
                         <div className={s.ackChip}>
                             <Check testId="ack-permanent" checked={ack.on} onChange={ack.set} label={t("Placemaker.UI.Review.AckShort", "OK, permanent")} />
+                        </div>
+                    </Tip>
+                ) : null}
+                {p.action === "polish" && state.painter ? (
+                    // Live polish: the selection polished again a moment after every change of the look or the selection
+                    <Tip
+                        title={t("Placemaker.UI.Polish.Live", "Live")}
+                        description={t("Placemaker.UI.Polish.LiveTip", "On: the buildings in the selection are polished again a moment after every change you make, and the selection stays. Unpolish puts them back.")}
+                    >
+                        <div className={s.liveChip} data-testid="polish-live-wrap" data-on={state.painter.live ? "true" : "false"}>
+                            <Switch testId="polish-live" on={!!state.painter.live} onChange={(v) => act.polishLive(v)} />
+                            <div className={s.liveLabel}>{t("Placemaker.UI.Polish.Live", "Live")}</div>
                         </div>
                     </Tip>
                 ) : null}

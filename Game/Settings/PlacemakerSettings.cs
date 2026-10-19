@@ -432,7 +432,9 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Economy.ParkingCompanionSystem.CompanionEnabled = ExperimentalParkingCompanion;
                 global::Placemaker.Game.Economy.ParkingCompanionUpkeepSystem.UpkeepFactor = CompanionUpkeepFactor;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PolishNew = PolishNewHouses;
-                global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = NeighbourhoodPolish;
+                // always on: what is polished keeps fitting as the city changes; only new buildings (Polish new buildings) and
+                // what the player polishes are ever polished, buildings standing before are left as they are
+                global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = true;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetZoneThemes(PolishThemeHomes, PolishThemeShops, PolishThemeOffices, PolishThemeIndustry);
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetZoneLooks(PolishZoneLooks);
                 {
@@ -499,7 +501,7 @@ namespace Placemaker.Game.Settings
             OverlayPavedSurfaces = true;
             DecalsNeverCollide = true;
             SeeThroughDecals = true;
-            NeighbourhoodPolish = false;   // experimental: on once it has been seen in the game
+            NeighbourhoodPolish = true;
             PolishNewHouses = true;
             PolishThemeHomes = "garden";
             PolishThemeShops = "tidy";

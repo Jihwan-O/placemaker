@@ -162,6 +162,8 @@ export interface PainterState {
   lookSavedTheme: string;
   /** The rows changed the look (not saved). */
   modified: boolean;
+  /** Live polish: the selection polished again a moment after every change (the switch beside Polish). */
+  live?: boolean;
   /** Every setting of the look as the rows have it, and as the look has it (reset). */
   values?: Record<string, number>;
   lookValues?: Record<string, number>;
@@ -176,6 +178,8 @@ export interface PolishZone {
   kind: "home" | "shop" | "office" | "industry";
   look: string;
   own: boolean;
+  /** The game's own zone icon (UIObject.m_Icon, "Media/…"), or "". */
+  icon: string;
 }
 
 export interface PolishLook {
@@ -595,6 +599,7 @@ export const Triggers = {
   polishCity: "polishCity",                 // (what: string, value: string) — on / newHouses / homes|shops|offices|industry / polishAll / unpolishAll
   polishKnob: "polishKnob",                 // (id: string, value: number) — a setting of the look picked ("theme": base theme index)
   polishLook: "polishLook",                 // (what: string, arg: string) — save / saveAs / rename / delete / revert the look picked
+  polishLive: "polishLive",                 // (on: boolean) — the Live switch beside Polish
   polishZone: "polishZone",                 // (zone: string, look: string) — a zone type's look ("off"; "" = its kind's)
   polishStamp: "polishStamp",               // (yes: boolean) — (PROTOCOL 25) the painter: Polish (true, = primary) / Unpolish (false) the lots in the area
   undo: "undo",                             // ()

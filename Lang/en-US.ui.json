@@ -380,6 +380,7 @@
   "Placemaker.UI.Why.WhenOn": "Only when {0} is on",
   "Placemaker.UI.X": "English",
   "Placemaker.UI.ZoneMix.Add": "Mix in another zone",
+  "Placemaker.UI.ZoneMix.AllowedRoads": "allowed road width",
   "Placemaker.UI.ZoneMix.AnyRoad": "any",
   "Placemaker.UI.ZoneMix.Buildings": "{0} buildings",
   "Placemaker.UI.ZoneMix.DragTip": "Drag to share the land",
@@ -397,8 +398,7 @@
   "Placemaker.UI.ZoneMix.OutgrowSettings": "Outgrow settings",
   "Placemaker.UI.ZoneMix.OutgrowTip": "Outgrow: its lots grow past their borders (reach, fences, lawns, ground, planting, paths). Click to set them; the switch turns it off (its buildings stay as they are).",
   "Placemaker.UI.ZoneMix.Remove": "Remove this zone",
-  "Placemaker.UI.ZoneMix.RoadTip": "The roads it goes on, by their width (a two-lane road is 16 m, four lanes 24 m, six lanes 32 m; the ticks): its lots are only placed along roads this wide.",
-  "Placemaker.UI.ZoneMix.RoadWidth": "Road width",
+  "Placemaker.UI.ZoneMix.RoadTip2": "Allowed road width: the roads this zone may line, by their width (the ticks: two lanes 16 m, four lanes 24 m, six lanes 32 m). Its lots are only placed along roads in this range.",
   "Placemaker.UI.Zoning": "Zoning",
   "Placemaker.UI.Zoning.Sub2": "zones, and how their lots outgrow"
 }

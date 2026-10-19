@@ -152,7 +152,7 @@ const RangeSlider = ({ lo, hi, min, max, testId, text, onCommit }: { lo: number;
                 <div className={z.rangeThumb} style={{ left: pct(a) + "%" }} />
                 <div className={z.rangeThumb} style={{ left: pct(b) + "%" }} />
             </div>
-            <div className={z.rangeValue}>{text(a, b)}</div>
+            {text(a, b) ? <div className={z.rangeValue}>{text(a, b)}</div> : null}
         </div>
     );
 };
@@ -350,13 +350,18 @@ const ShareBar = ({ parts, onCommit, t }: { parts: Part[]; onCommit: (shares: Re
             {labels
                 .filter((l) => l.place !== "in")
                 .map((l) => (
-                    <div key={"lbl" + l.key} className={classNames(z.callout, l.place === "above" ? z.calloutAbove : z.calloutBelow)} style={{ left: l.centre + "%" }}>
-                        <div className={z.calloutLine} />
-                        <div className={z.calloutText}>
-                            <span className={z.barName}>{l.name}</span>
-                            <span className={z.barPct}>{l.pct}</span>
+                    <React.Fragment key={"lbl" + l.key}>
+                        <div className={classNames(z.calloutLine, l.place === "above" ? z.calloutLineAbove : z.calloutLineBelow)} style={{ left: l.centre + "%" }} />
+                        <div
+                            className={classNames(z.callout, l.place === "above" ? z.calloutAbove : z.calloutBelow)}
+                            style={l.centre > 75 ? { right: "0%" } : l.centre < 25 ? { left: "0%" } : { left: l.centre + "%", marginLeft: "-80rem", width: "160rem" }}
+                        >
+                            <div className={z.calloutText}>
+                                <span className={z.barName}>{l.name}</span>
+                                <span className={z.barPct}>{l.pct}</span>
+                            </div>
                         </div>
-                    </div>
+                    </React.Fragment>
                 ))}
         </div>
     );
@@ -567,7 +572,36 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                       return (
                           <div key={x.sl} className={z.zone} data-testid={"zonemix-zone-" + x.sl}>
                               <div className={z.line} data-testid={"zonemix-line-" + x.sl}>
-                                  <ZoneButton id={x.sl} kind={x.kind} asset={x.asset} />
+                                  <div className={z.leftCol}>
+                                      <ZoneButton id={x.sl} kind={x.kind} asset={x.asset} />
+                                      <div
+                                          className={z.roadsCell}
+                                          title={t("Placemaker.UI.ZoneMix.RoadTip2", "Allowed road width: the roads this zone may line, by their width (the ticks: two lanes 16 m, four lanes 24 m, six lanes 32 m). Its lots are only placed along roads in this range.")}
+                                      >
+                                          <div className={z.roadsTrack}>
+                                              <RangeSlider
+                                                  lo={x.r0}
+                                                  hi={x.r1}
+                                                  min={0}
+                                                  max={MAX_ROAD}
+                                                  testId={"zonemix-roads-" + x.sl}
+                                                  text={() => ""}
+                                                  onCommit={(a, b) => {
+                                                      if (a !== x.r0) set("roadMin" + x.sl, a);
+                                                      if (b !== x.r1) set("roadMax" + x.sl, b);
+                                                  }}
+                                              />
+                                              <div className={z.roadMarks}>
+                                                  {[16, 24, 32].map((at) => (
+                                                      <div key={at} className={z.roadTick} style={{ left: (at / MAX_ROAD) * 100 + "%" }} />
+                                                  ))}
+                                              </div>
+                                          </div>
+                                          <div className={z.roadsCaption}>
+                                              {t("Placemaker.UI.ZoneMix.AllowedRoads", "allowed road width") + (x.r0 > 0 || x.r1 < MAX_ROAD ? ": " + roadText(x.r0, x.r1) : "")}
+                                          </div>
+                                      </div>
+                                  </div>
                                   <LotGrid
                                       w0={x.w0}
                                       w1={x.w1}
@@ -583,31 +617,8 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                                           if (b1 !== x.d1) set("depthMax" + x.sl, b1);
                                       }}
                                   />
-                                  <div className={z.side}>
-                                      <div className={z.roadsCell} title={t("Placemaker.UI.ZoneMix.RoadTip", "The roads it goes on, by their width (a two-lane road is 16 m, four lanes 24 m, six lanes 32 m; the ticks): its lots are only placed along roads this wide.")}>
-                                          <div className={z.roadsLabel}>{t("Placemaker.UI.ZoneMix.RoadWidth", "Road width")}</div>
-                                          <div className={z.roadsTrack}>
-                                              <RangeSlider
-                                                  lo={x.r0}
-                                                  hi={x.r1}
-                                                  min={0}
-                                                  max={MAX_ROAD}
-                                                  testId={"zonemix-roads-" + x.sl}
-                                                  text={roadText}
-                                                  onCommit={(a, b) => {
-                                                      if (a !== x.r0) set("roadMin" + x.sl, a);
-                                                      if (b !== x.r1) set("roadMax" + x.sl, b);
-                                                  }}
-                                              />
-                                              <div className={z.roadMarks}>
-                                                  {[16, 24, 32].map((at) => (
-                                                      <div key={at} className={z.roadTick} style={{ left: (at / MAX_ROAD) * 100 + "%" }} />
-                                                  ))}
-                                              </div>
-                                          </div>
-                                      </div>
-                                      <OutgrowSwitch zkey={key} id={x.sl} />
-                                  </div>
+                                  <div className={z.flex} />
+                                  <OutgrowSwitch zkey={key} id={x.sl} />
                                   {used.length > 1 ? (
                                       <button
                                           type="button"

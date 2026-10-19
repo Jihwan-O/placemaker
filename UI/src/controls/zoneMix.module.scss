@@ -159,16 +159,13 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 // a label that does not fit its part: above or below the bar, on a line to it
 .callout {
     position: absolute;
-    @include col;
-    align-items: center;
-    width: 160rem;
-    margin-left: -80rem;
+    @include row;
+    justify-content: center;
     pointer-events: none;
 }
 
 .calloutAbove {
     top: 0;
-    flex-direction: column-reverse;
 }
 
 .calloutBelow {
@@ -176,9 +173,19 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 }
 
 .calloutLine {
+    position: absolute;
     width: 1rem;
-    height: 8rem;
+    height: 6rem;
     background-color: rgba(255, 255, 255, 0.8);
+    pointer-events: none;
+}
+
+.calloutLineAbove {
+    top: 16rem;
+}
+
+.calloutLineBelow {
+    bottom: 16rem;
 }
 
 .calloutText {
@@ -213,11 +220,18 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     flex: 1 1 auto;
 }
 
+.leftCol {
+    @include col;
+    flex: 1 1 140rem;
+    min-width: 120rem;
+    max-width: 230rem;
+}
+
 .zoneButton {
     @include row;
-    flex: 0 1 auto;
-    width: 128rem;
-    min-width: 84rem;
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
     height: 24rem;
     padding: 0 7rem 0 5rem;
     border-radius: $radius;
@@ -492,7 +506,7 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 .lotGrid {
     @include col;
     flex: 0 0 auto;
-    margin-left: 10rem;
+    margin-left: 14rem;
 }
 
 .grid {
@@ -583,8 +597,16 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 }
 
 .roadsCell {
-    @include row;
+    @include col;
     min-width: 0;
+    margin-top: 4rem;
+}
+
+.roadsCaption {
+    margin-top: 3rem;
+    font-size: 9rem;
+    color: $c-text-faint;
+    @include ellipsis;
 }
 
 .roadsLabel {
@@ -596,16 +618,15 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 .roadsTrack {
     position: relative;
     @include col;
-    flex: 1 1 auto;
     min-width: 0;
-    margin-left: 5rem;
+    padding: 0 7rem;
 }
 
 .roadMarks {
     position: absolute;
     top: 16rem;
-    left: 0;
-    right: 52rem;
+    left: 7rem;
+    right: 7rem;
     height: 4rem;
     pointer-events: none;
 }
@@ -626,7 +647,7 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     align-self: flex-start;
     flex: 0 0 auto;
     height: 22rem;
-    margin-top: 3rem;
+    margin: 1rem 6rem 0 10rem;
     padding: 0 2rem 0 5rem;
     border-radius: 11rem;
     background-color: $c-surface;

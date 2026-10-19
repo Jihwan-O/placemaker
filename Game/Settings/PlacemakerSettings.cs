@@ -88,7 +88,7 @@ namespace Placemaker.Game.Settings
         [SettingsUISection(SectionMain, GroupGeneral)]
         public float EdgeMargin { get; set; }
 
-        /// <summary>Opacity (%) of the game's empty zone grid, in every tool that shows it (ZoneGridOpacitySystem); 100 = vanilla.</summary>
+        /// <summary>Opacity (%) of the game's zone grid, empty and zoned cells, in every tool that shows it (ZoneGridOpacitySystem); 100 = vanilla.</summary>
         [SettingsUISlider(min = 0, max = 100, step = 5, scalarMultiplier = 1, unit = global::Game.UI.Unit.kPercentage)]
         [SettingsUISection(SectionMain, GroupGeneral)]
         public int ZoneGridOpacity { get; set; }

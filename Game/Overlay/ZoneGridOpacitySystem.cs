@@ -1,13 +1,14 @@
-// Placemaker — the empty zone grid drawn faint (setting "Empty zone grid", Options → Placemaker). GPL-3.0.
+// Placemaker — the zone grid drawn faint (setting "Zone grid", Options → Placemaker). GPL-3.0.
 //
-// User (in game, zoning): "The grids are way too prominent. Can we make them nearly 100% transparent or a slider".
-// The game draws zone cells from two global colour arrays (colossal_ZoneFillColors / colossal_ZoneEdgeColors) that
-// Game.Prefabs.ZoneSystem fills from each ZonePrefab's m_Color / m_Edge, with occupied / selected / highlight shades
-// derived from their alpha. Its own opacities (UserState.zoneFillAlphas, the zoning infoview) cover Residential,
-// Commercial, Industrial and Office only: the empty cells come from the unzoned prefab (AreaType.None, zone type 0),
-// which nothing in the game fades. So we scale that prefab's colour alphas in memory (originals kept, the setting is
-// absolute) and raise ZoneSystem's private m_UpdateColors so it rebuilds the arrays itself, as after a load. Saves
-// reference prefabs by name: nothing of this reaches a save.
+// User (in game, zoning): "The grids are way too prominent. Can we make them nearly 100% transparent or a slider", then
+// "the transparency should work for filled grid as well. Not just empty grid." The game draws zone cells from two
+// global colour arrays (colossal_ZoneFillColors / colossal_ZoneEdgeColors) that Game.Prefabs.ZoneSystem fills from each
+// ZonePrefab's m_Color / m_Edge, with occupied / selected / highlight shades derived from their alpha. Its own
+// opacities (UserState.zoneFillAlphas) cover Residential, Commercial, Industrial and Office only, never the empty cells
+// (the unzoned prefab, AreaType.None, zone type 0). So we scale every zone prefab's colour alphas in memory (originals
+// kept, the setting is absolute; the game's own opacities still multiply on top) and raise ZoneSystem's private
+// m_UpdateColors so it rebuilds the arrays itself, as after a load. Saves reference prefabs by name: nothing of this
+// reaches a save.
 
 using System;
 using System.Collections.Generic;
@@ -71,13 +72,12 @@ namespace Placemaker.Game.Overlay
         {
             float k = pct / 100f;
             int faded = 0;
-            string alphas = "";
+            string empty = "";
             using (var entities = _query.ToEntityArray(Allocator.Temp))
             {
                 foreach (var e in entities)
                 {
                     if (!_prefabs.TryGetPrefab(EntityManager.GetComponentData<PrefabData>(e), out ZonePrefab prefab)) continue;
-                    if (prefab.m_AreaType != AreaType.None) continue;
                     if (!_original.TryGetValue(prefab, out var o))
                         _original[prefab] = o = (prefab.m_Color, prefab.m_Edge);
                     var fill = o.fill; fill.a *= k;
@@ -85,12 +85,13 @@ namespace Placemaker.Game.Overlay
                     prefab.m_Color = fill;
                     prefab.m_Edge = edge;
                     faded++;
-                    alphas += $" {prefab.name} fill {o.fill.a:0.###}→{fill.a:0.###}, lines {o.edge.a:0.###}→{edge.a:0.###};";
+                    if (prefab.m_AreaType == AreaType.None)
+                        empty += $" {prefab.name} fill {o.fill.a:0.###}→{fill.a:0.###}, lines {o.edge.a:0.###}→{edge.a:0.###};";
                 }
             }
             if (faded == 0) return;   // zone prefabs not loaded yet (main menu): applied when they are
             _updateColors?.SetValue(_zones, true);
-            Mod.Log.Info($"Placemaker zone grid: empty cells at {pct}%:{alphas}");
+            Mod.Log.Info($"Placemaker zone grid: {faded} zone type(s) at {pct}%; empty cells:{empty}");
         }
     }
 }

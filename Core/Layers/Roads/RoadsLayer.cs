@@ -57,12 +57,13 @@ namespace Placemaker.Core.Layers.Roads
             {
                 var c = step.Children[i];
                 if (c == null || c.Layer != AddOns.EdgeZoningAddOn.LayerId || (c.Target ?? "") != RegionTags.Edge) continue;
-                string current = step.Settings.S(RoadsIds.PreZone, RoadPreZone.None);
-                if (c.Enabled && current == RoadPreZone.None)
+                // the old feature predates the control: it decides (on: its zone; off: no zoning, not the new default)
+                if (c.Enabled)
                 {
                     string kind = c.Settings?.S(AddOns.EdgeZoningAddOn.KindControl, Common.ZoneKinds.Default) ?? Common.ZoneKinds.Default;
                     step.Settings.Values[RoadsIds.PreZone] = Array.IndexOf(Common.ZoneKinds.All, kind) >= 0 ? kind : Common.ZoneKinds.Default;
                 }
+                else step.Settings.Values[RoadsIds.PreZone] = RoadPreZone.None;
                 step.Children.RemoveAt(i);
                 n++;
             }

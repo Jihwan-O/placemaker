@@ -470,7 +470,7 @@ namespace Placemaker.Tests
             Assert.Equal("spiral", Preset("hill-town").S(RoadsIds.TerraceLinks, ""));
             Assert.True(Preset("hill-town").B(RoadsIds.TerraceAvenues, false));
             Assert.Equal("wall", Preset("vineyard-terraces").S(RoadsIds.TerraceBank, ""));
-            Assert.Equal(RoadPreZone.None, new RoadsLayer().Defaults().S(RoadsIds.PreZone, ""));
+            Assert.Equal(RoadPreZone.Default, new RoadsLayer().Defaults().S(RoadsIds.PreZone, ""));
             Assert.NotEqual(RoadPreZone.None, Preset("terraced-hillside").S(RoadsIds.PreZone, RoadPreZone.None));
             // The links show for the terraces pattern only; the ground controls for every pattern on terraced land.
             var linkIds = new[] { RoadsIds.TerraceLinks, RoadsIds.TerraceLinkSpacing, RoadsIds.TerraceAvenues };

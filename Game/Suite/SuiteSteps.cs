@@ -361,7 +361,9 @@ namespace Placemaker.Game.Suite
         private IEnumerator WaitGhost(JObject rec, float timeout = 45f)
         {
             float t0 = Time.realtimeSinceStartup;
-            yield return Until(() => _tool.PreviewModeEffective == PreviewMode.Ghost && !_tool.GhostPending, timeout, "ghost");
+            // (shops4) a refused plan (an error: Build waits) shows no ghost: nothing to wait for
+            yield return Until(() => (_tool.PreviewModeEffective == PreviewMode.Ghost && !_tool.GhostPending) || (_tool.PlanRefused && !_tool.Planning), timeout, "ghost");
+            if (_tool.PlanRefused) { rec["ghost"] = "none: the plan is refused"; yield break; }
             bool timedOut = _timedOut;
             int last = -1, still = 0;
             float until = Time.realtimeSinceStartup + 30f;

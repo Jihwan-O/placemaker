@@ -90,6 +90,11 @@ namespace Placemaker.Game.Settings
         [SettingsUISection(SectionMain, GroupGeneral)]
         public float EdgeMargin { get; set; }
 
+        /// <summary>Opacity (%) of the game's zone grid, empty and zoned cells, in every tool that shows it (ZoneGridOpacitySystem); 100 = vanilla.</summary>
+        [SettingsUISlider(min = 0, max = 100, step = 5, scalarMultiplier = 1, unit = global::Game.UI.Unit.kPercentage)]
+        [SettingsUISection(SectionMain, GroupGeneral)]
+        public int ZoneGridOpacity { get; set; }
+
         // ───────────── Brush rules (Block paint; plain Paint ignores them) ─────────────
         // Mirrored in the panel's Block paint "Rules" row (Core/Geometry/BrushRules). Ids are save format.
 
@@ -461,6 +466,7 @@ namespace Placemaker.Game.Settings
                     ["rockChance"] = PolishRocks ? 12f : 0f,
                     ["paint"] = PolishGroundPaint ? 1f : 0f,
                 });
+                global::Placemaker.Game.Overlay.ZoneGridOpacitySystem.OpacityPercent = ZoneGridOpacity;
             }
             catch (Exception e) { Mod.Log.Warn("Placemaker: build options not applied: " + e.Message); }
         }
@@ -488,6 +494,7 @@ namespace Placemaker.Game.Settings
             AreaRulesVersion = 0;   // a file without it is older than the overhaul (MigrateAreaRules); new files get the defaults anyway
             LayoutSize = (int)System.Math.Round(global::Placemaker.Core.SiteContext.DefaultLayoutScale * 100f);
             EdgeMargin = global::Placemaker.Core.SiteContext.DefaultEdgeMargin;
+            ZoneGridOpacity = 20;
             BrushSize = 150f;
             BrushSquare = false;
             LastAreaMode = 0;

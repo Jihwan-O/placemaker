@@ -25,8 +25,12 @@ namespace Placemaker.Game.Tool
 
         /// <summary>contract state.previewMode: the player's choice for the current stage.</summary>
         public PreviewMode PreviewModeSelected => _previewModes.Selected(_stage);
+        /// <summary>(shops4) The current plan is refused (an error): no ghost is shown for it.</summary>
+        public bool PlanRefused => _plan != null && _plan.HasErrors;
         /// <summary>contract state.ghostPending.</summary>
         public bool GhostPending => _preview.GhostPending;
+        /// <summary>The ghost's state in one line (the runner's idle timeout says why the preview never settled).</summary>
+        public string GhostDebug { get { var st = _ghost.Status; return $"stage {_stage}, selected {_preview.Selected}, effective {_preview.Effective}, phase {st.Phase}, shown {st.ShownRevision}, requested {st.RequestedRevision}, ghost revision {_ghostRevision}, plan {_planRevision}/{_inputRevision}, plan errors {(_plan != null && _plan.HasErrors)}, available {_ghost.Available}, active {IsActive}, building {_building}"; } }
         /// <summary>What is on the map this frame (sketch during drags even when ghost is selected).</summary>
         public PreviewMode PreviewModeEffective => _preview.Effective;
         /// <summary>How the overlay draws the plan's nets/objects/surfaces (outline, markers, handles always drawn).</summary>
@@ -91,6 +95,7 @@ namespace Placemaker.Game.Tool
                     PlanAvailable = _plan != null,
                     PlanRevision = rev,
                     PlanStale = PlanStale,
+                    PlanRefused = PlanRefused,
                     GhostAvailable = _ghost.Available && rev != _ghostGaveUpRevision,
                     GhostShownRevision = status.ShownRevision,
                     GhostBusy = status.Phase == GhostPhase.Pending,

@@ -47,6 +47,10 @@ namespace Placemaker.Core.Neighbours
         public string MainSurface;
         /// <summary>What the building is: "home", "shop", "office" or "industry" (null: unknown, treated as a home).</summary>
         public string Zone;
+        /// <summary>How its garden is dressed: "garden" (lawns, beds, a sand pit or a bench), "natural" (painted ground, rock
+        /// outcrops, logs, no lawn), "tidy" (lawns, hedges, flower beds, no rocks) or "yard" (worn ground, rubble, pallets).
+        /// Null: by what it is (industry a yard, everything else a garden).</summary>
+        public string Theme;
 
         public float2 Right => new float2(Forward.y, -Forward.x);
         public float2 ToLocal(float2 w) { var d = w - Position; return new float2(math.dot(d, Right), math.dot(d, Forward)); }

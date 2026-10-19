@@ -28,8 +28,10 @@ namespace Placemaker.Game.Suite
     {
         private IEnumerator StepPolish(ScenarioState st, JObject step, JObject rec)
         {
-            bool yes = !string.Equals((string)step["stamp"] ?? "yes", "no", StringComparison.OrdinalIgnoreCase);
-            if (!_tool.SuiteHasSelection || _tool.Shape == null) { rec["error"] = "polish: pick the lots with an area step first"; yield break; }
+            string stamp = ((string)step["stamp"] ?? "yes").ToLowerInvariant();
+            bool yes = stamp != "no";
+            bool pickOnly = stamp == "pick";   // {"stamp":"pick"}: the painter picked first, the area painted after (as a player does)
+            if (!pickOnly && (!_tool.SuiteHasSelection || _tool.Shape == null)) { rec["error"] = "polish: pick the lots with an area step first"; yield break; }
             // the painter is picked in the Make row, which the panel shows in Design
             if (!_tool.Painter)
             {
@@ -39,6 +41,7 @@ namespace Placemaker.Game.Suite
                 if (!_tool.Painter) { rec["error"] = "polish: the painter was not picked"; yield break; }
                 yield return Frames(4);
             }
+            if (pickOnly) { rec["painter"] = true; yield break; }
             var (lots, polished) = _tool.PainterCount;
             rec["areaLots"] = lots;
             rec["areaPolishedBefore"] = polished;

@@ -38,6 +38,22 @@ namespace Placemaker.Core.Neighbours
         };
         private const int FirstRock = 5, FirstStone = 8, FirstRubble = 13, FirstStock = 17, FirstLog = 23, FirstBench = 26, Flowerbed = 28;
 
+        public static readonly string[] Themes = { "garden", "natural", "tidy", "yard" };
+
+        public static string ThemeOf(StitchHouse h) =>
+            !string.IsNullOrEmpty(h.Theme) && Array.IndexOf(Themes, h.Theme) >= 0 ? h.Theme : h.Zone == "industry" ? "yard" : "garden";
+
+        /// <summary>A painted garden (no drawn lawn): natural and yard always, tidy never, a garden now and then.</summary>
+        private static bool PaintedGarden(StitchHouse h, StitchSettings s)
+        {
+            switch (ThemeOf(h))
+            {
+                case "natural": case "yard": return true;
+                case "tidy": return false;
+                default: return Hash((ulong)h.Id ^ 0x9A1D7UL) % 100 < (uint)s.Knob("paintedGardens", 33f);
+            }
+        }
+
         public static int Score(string name)
         {
             var n = (name ?? "").ToLowerInvariant();
@@ -665,11 +681,27 @@ namespace Placemaker.Core.Neighbours
                 }
             for (int i = 0; i < n; i++)
             {
-                if (!touched[i] || !houses[i].Edit) continue;
+                if (!houses[i].Edit || !houses[i].Polished || plots[i] == null) continue;
                 var h = houses[i];
                 var plot = Ccw(plots[i]);
-                plan.Plots[h.Id] = plot;
+                if (touched[i]) plan.Plots[h.Id] = plot;
                 if (s.Knob("lawns", 1f) < 0.5f) continue;   // the player keeps lawns as the houses come
+                // a painted garden (by its theme), joined to its neighbours or not: the house's own grass surfaces are tucked
+                // away under the house and the whole garden (minus the paving) is painted, lush (a yard: worn ground)
+                if (string.IsNullOrEmpty(h.MainSurface) && PaintedGarden(h, s) && h.Lawns.Any(l => l.Ring != null && l.Ring.Length >= 3) | touched[i])
+                {
+                    var keepOff = houses.SelectMany(o => o.Hard).Where(r => r != null && r.Length >= 3 && Overlaps(plot, r)).Select(r => new Region(Ccw(r))).Concat(beds[i]).Concat(reserved[i]).ToList();
+                    var garden = keepOff.Count > 0 ? Poly.Boolean(lawnLand[i], keepOff, BoolOp.Difference) : lawnLand[i];
+                    bool yard = ThemeOf(h) == "yard";
+                    foreach (var r in garden.Where(r => r.Area >= 6f))
+                        Paint(plan, r.Outer, yard ? 3 : (int)s.Knob("lushLayer", 2f), yard ? s.Knob("yardPaint", 0.7f) : s.Knob("gardenPaint", 0.85f), 1.6f, 1.4f, 5f, (uint)(h.Id * 2246822519L) ^ (uint)Poly.Area(r.Outer));
+                    var under = UnderHouse(h);
+                    if (under != null && s.Knob("hideOwnLawn", 1f) > 0.5f)
+                        foreach (var l in h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3)) plan.Lawns[l.Id] = under;
+                    plan.Notes.Add($"{h.Id}: a painted garden ({ThemeOf(h)})");
+                    continue;
+                }
+                if (!touched[i]) continue;
                 // once the plot reaches past the lot, the lawn fills all of it but driveways and paving (lawn and fence meet)
                 var ext = Poly.Boolean(new[] { (IReadOnlyList<float2>)plot }, new[] { (IReadOnlyList<float2>)Ccw(Lot(h)) }, BoolOp.Difference, FillRule.NonZero);
                 if (ext.Sum(r => r.Area) < 1f) continue;
@@ -688,19 +720,6 @@ namespace Placemaker.Core.Neighbours
                         if (ring != null) { plan.Paths.Add((h.Id, ring, h.MainSurface)); made++; } else failed++;
                     }
                     plan.Notes.Add($"{h.Id}: its extra land in {h.MainSurface} ({made} pieces{(failed > 0 ? $", {failed} the game would not take" : "")}; land {spare.Sum(r => r.Area):F0} m² in {spare.Count}, {spare0:F0} m² before paving, plot {Poly.Area(plot):F0}, ext {ext.Sum(r => r.Area):F0}, landAll {lawnLand[i].Sum(r => r.Area):F0})");
-                    continue;
-                }
-                // variety, as streets are: some gardens (about a third) are painted, not drawn: the house's own grass surfaces
-                // are tucked away under the house and the whole garden (minus the paving) is painted lush with soft edges
-                if (Hash((ulong)h.Id ^ 0x9A1D7UL) % 100 < (uint)s.Knob("paintedGardens", 33f))
-                {
-                    var garden = hard0.Count > 0 ? Poly.Boolean(lawnLand[i], hard0, BoolOp.Difference) : lawnLand[i];
-                    foreach (var r in garden.Where(r => r.Area >= 6f))
-                        Paint(plan, r.Outer, (int)s.Knob("lushLayer", 2f), s.Knob("gardenPaint", 0.85f), 1.6f, 1.4f, 5f, (uint)(h.Id * 2246822519L) ^ (uint)Poly.Area(r.Outer));
-                    var under = UnderHouse(h);
-                    if (under != null && s.Knob("hideOwnLawn", 1f) > 0.5f)
-                        foreach (var l in h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3)) plan.Lawns[l.Id] = under;
-                    plan.Notes.Add($"{h.Id}: a painted garden");
                     continue;
                 }
                 var lawns = h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3).OrderByDescending(l => Poly.Area(l.Ring)).ToList();
@@ -964,6 +983,8 @@ namespace Placemaker.Core.Neighbours
             for (int i = 0; i < houses.Count; i++)
             {
                 if (!touched[i] || !houses[i].Edit || !string.IsNullOrEmpty(houses[i].MainSurface)) continue;
+                string theme = ThemeOf(houses[i]);
+                if (theme == "natural" || theme == "yard") continue;   // no tidy beds in a wild garden or a works yard
                 var h = houses[i];
                 var plot = Ccw(plots[i]);
                 // only gardens the stitching made bigger: a lot left as it was keeps the game's own planting
@@ -976,7 +997,7 @@ namespace Placemaker.Core.Neighbours
                     float len = math.distance(a, b);
                     if (len < 6f || DistanceToRing(plot, a) > 0.8f || DistanceToRing(plot, b) > 0.8f || DistanceToRing(plot, (a + b) * 0.5f) > 0.8f) continue;
                     uint hash = Hash((ulong)id ^ ((ulong)h.Id * 0x9E3779B97F4A7C15UL));
-                    if (hash % 100 >= (uint)s.Knob("bedChance", 65f)) continue;
+                    if (hash % 100 >= (uint)(theme == "tidy" ? s.Knob("tidyBedChance", 90f) : s.Knob("bedChance", 65f))) continue;
                     var d = (b - a) / len;
                     var nrm = new float2(-d.y, d.x);
                     if (math.dot(centre - (a + b) * 0.5f, nrm) < 0f) nrm = -nrm;
@@ -1013,7 +1034,9 @@ namespace Placemaker.Core.Neighbours
                         float tt = math.saturate((t + ((hb & 255) / 255f - 0.5f) * 0.5f) / blen);
                         var p = math.lerp(e0, e1, tt) + nrm * (Width(tt) * (0.5f + ((hb >> 8 & 255) / 255f - 0.5f) * 0.3f));
                         if (!Poly.Contains(ring, p)) continue;
-                        plan.Bushes.Add((h.Id, p, (hb >> 16 & 1023) / 1023f * 2f * math.PI, count % 2 == 0 ? k0 : k1));
+                        // a tidy garden: flower beds between the bushes
+                        int kind = theme == "tidy" && count % 3 == 1 ? Flowerbed : count % 2 == 0 ? k0 : k1;
+                        plan.Bushes.Add((h.Id, p, (hb >> 16 & 1023) / 1023f * 2f * math.PI, kind));
                         bushes++;
                         count++;
                     }
@@ -1064,10 +1087,11 @@ namespace Placemaker.Core.Neighbours
             {
                 var h = houses[i];
                 if (!touched[i] || !h.Edit || plots[i] == null) continue;
-                bool industry = h.Zone == "industry";
+                string theme = ThemeOf(h);
+                bool industry = theme == "yard";
                 if (!industry && !string.IsNullOrEmpty(h.MainSurface)) continue;   // shops and offices: paving only
                 uint hash = Hash((ulong)h.Id * 0x7F4A7C15UL ^ 0xFEA7UL);
-                if (hash % 100 >= (uint)s.Knob("featureChance", 55f)) continue;
+                if (hash % 100 >= (uint)(theme == "natural" ? s.Knob("naturalFeatureChance", 75f) : s.Knob("featureChance", 55f))) continue;
                 var plot = Ccw(plots[i]);
                 var land = Poly.Boolean(new[] { new Region(plot) }, new[] { new Region(Ccw(Lot(h))) }, BoolOp.Difference);
                 if (land.Sum(r => r.Area) < s.Knob("featureMinLand", 140f)) continue;
@@ -1095,6 +1119,42 @@ namespace Placemaker.Core.Neighbours
                 float Turn(uint k) => (Hash(hash + k) & 1023) / 1023f * 2f * math.PI;
                 float2 Around(uint k, float maxR) { float a = Turn(k), d = maxR * math.sqrt(((Hash(hash ^ (k * 2654435761u)) >> 4) & 1023) / 1023f); return best + new float2(math.cos(a), math.sin(a)) * d; }
                 void Put(int kind, float2 at, uint k) { plan.Bushes.Add((h.Id, at, Turn(k + 97u), kind)); Feature.Add((h.Id, at)); }
+                if (theme == "natural")
+                {
+                    if ((hash >> 12 & 1) == 0)
+                    {
+                        // a rocky outcrop: boulders and stones on bare dry ground, a big bush in its lee
+                        int boulders = 2 + (int)(hash >> 14 & 1);
+                        for (int k = 0; k < boulders; k++) Put(FirstRock + (int)(Hash(hash + (uint)k * 13u) % 3), Around((uint)k + 31u, rad * 0.6f), (uint)k + 31u);
+                        for (int k = 0; k < 4; k++) Put(FirstStone + (int)(Hash(hash + (uint)k * 7u) % 5), Around((uint)k + 41u, rad), (uint)k + 41u);
+                        Put(4, Around(51u, rad), 51u);
+                        Paint(plan, Blob(best, rad + 1.2f, hash, 12), 1, s.Knob("outcropDry", 0.75f), 1.8f, 1.2f, 4f, hash);
+                        Paint(plan, Blob(best, rad * 0.7f, hash ^ 0x55u, 10), 3, s.Knob("outcropDirt", 0.5f), 1.2f, 0.8f, 3f, hash ^ 0x55u);
+                        plan.Notes.Add($"{h.Id}: a rocky outcrop");
+                    }
+                    else
+                    {
+                        // a log pile and big bushes on lush ground
+                        LogPile(h.Id, best, Turn(61u), 3, hash, plan);
+                        for (int k = 0; k < 4; k++) Put(4, Around((uint)k + 71u, rad), (uint)k + 71u);
+                        Paint(plan, Blob(best, rad + 1.5f, hash, 10), (int)s.Knob("lushLayer", 2f), 0.85f, 2f, 1.5f, 4f, hash);
+                        plan.Notes.Add($"{h.Id}: a wild corner");
+                    }
+                    continue;
+                }
+                if (theme == "tidy")
+                {
+                    // a flower garden: three flower beds in a row and a bench facing the house
+                    var toHouseT = math.normalizesafe(h.Position - best);
+                    var acrossT = new float2(-toHouseT.y, toHouseT.x);
+                    float yawT = math.atan2(toHouseT.x, toHouseT.y);
+                    for (int k = -1; k <= 1; k++) { var at = best + acrossT * (k * 2.2f); plan.Bushes.Add((h.Id, at, yawT, Flowerbed)); Feature.Add((h.Id, at)); }
+                    var benchAt = best - toHouseT * 1.8f;
+                    plan.Bushes.Add((h.Id, benchAt, yawT, FirstBench + (int)(hash >> 16) % 2));
+                    Feature.Add((h.Id, benchAt));
+                    plan.Notes.Add($"{h.Id}: a flower garden");
+                    continue;
+                }
                 if (industry)
                 {
                     // a storage yard: a few piles and stock, on worn ground
@@ -1130,7 +1190,7 @@ namespace Placemaker.Core.Neighbours
                         break;
                     }
                     case 2:   // a wild corner: logs and big bushes on lush ground
-                        for (int k = 0; k < 2; k++) Put(FirstLog + (int)(Hash(hash + (uint)k) % 3), Around((uint)k + 11u, rad * 0.8f), (uint)k + 11u);
+                        LogPile(h.Id, Around(11u, rad * 0.5f), Turn(11u), 2, hash, plan);
                         for (int k = 0; k < 3; k++) Put(4, Around((uint)k + 21u, rad), (uint)k + 21u);
                         Paint(plan, Blob(best, rad + 1.5f, hash, 10), (int)s.Knob("lushLayer", 2f), 0.8f, 2f, 1.5f, 4f, hash);
                         plan.Notes.Add($"{h.Id}: a wild corner");
@@ -1148,6 +1208,18 @@ namespace Placemaker.Core.Neighbours
                         break;
                     }
                 }
+            }
+        }
+
+        /// <summary>Logs lying side by side, all one way (a pile, not sticks dropped anyhow).</summary>
+        private static void LogPile(long house, float2 at, float yaw, int count, uint hash, StitchPlan plan)
+        {
+            var across = new float2(math.cos(yaw), -math.sin(yaw));
+            for (int k = 0; k < count; k++)
+            {
+                var p = at + across * ((k - (count - 1) * 0.5f) * 0.75f);
+                plan.Bushes.Add((house, p, yaw + ((Hash(hash + (uint)k * 3u) & 15) / 15f - 0.5f) * 0.08f, FirstLog + (int)(Hash(hash + (uint)k) % 3)));
+                Feature.Add((house, p));
             }
         }
 
@@ -1205,6 +1277,7 @@ namespace Placemaker.Core.Neighbours
             {
                 var hk = houses[k];
                 if (!touched[k] || !string.IsNullOrEmpty(hk.MainSurface) || hk.Footprint == null || hk.Footprint.Length < 3) return false;
+                if (ThemeOf(hk) == "natural" || ThemeOf(hk) == "yard") return false;
                 if (Hash((ulong)hk.Id * 0x2545F4914F6CDD1DUL) % 100 >= (uint)s.Knob("pathChance", 45f)) return false;
                 return Poly.Area(plots[k]) - 4f * hk.HalfLot.x * hk.HalfLot.y >= s.Knob("pathMinExtra", 120f);
             }
@@ -1279,9 +1352,11 @@ namespace Placemaker.Core.Neighbours
             {
                 if (pair.Rear || math.lengthsq(pair.Back - pair.Front) < 1f) continue;
                 uint hash = Hash(((ulong)pair.Left << 20) ^ (ulong)pair.Right ^ 0xB0D1UL);
-                if (hash % 100 >= (uint)s.Knob("rockChance", 12f)) continue;
                 long owner = (hash >> 7 & 1) == 0 ? pair.Left : pair.Right;
                 if (!byId.TryGetValue(owner, out int oi)) continue;
+                string ownerTheme = ThemeOf(houses[oi]);
+                float chance = ownerTheme == "natural" ? s.Knob("naturalRockChance", 35f) : ownerTheme == "garden" ? s.Knob("rockChance", 12f) : 0f;
+                if (hash % 100 >= (uint)chance) continue;
                 if (!houses[oi].Polished)
                 {
                     // never on an unpolished lot: the polished side of the pair

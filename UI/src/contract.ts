@@ -153,6 +153,8 @@ export interface PainterState {
   featureOn: boolean;
   /** "Polish new houses". */
   newHouses: boolean;
+  /** The theme Polish gives: "zone" (each house by its zone's setting), "garden", "natural", "tidy", "yard". */
+  theme: string;
 }
 
 /** One control, mirrors Core.ControlSchema. */
@@ -541,6 +543,7 @@ export const Triggers = {
 
   goToStage: "goToStage",                   // (stage: Stage) — only if in state.reachable
   primary: "primary",                       // () — same as Enter
+  polishTheme: "polishTheme",               // (theme: string) — the theme the painter's Polish gives
   polishStamp: "polishStamp",               // (yes: boolean) — (PROTOCOL 25) the painter: Polish (true, = primary) / Unpolish (false) the lots in the area
   undo: "undo",                             // ()
   redo: "redo",                             // ()

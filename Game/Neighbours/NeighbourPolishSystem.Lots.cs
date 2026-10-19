@@ -29,7 +29,7 @@ namespace Placemaker.Game.Neighbours
     {
         // ───────────── the painter and the settings (main thread) ─────────────
 
-        private static readonly List<(Entity Lot, bool Yes)> s_stamps = new List<(Entity, bool)>();
+        private static readonly List<(Entity Lot, bool Yes, byte Theme)> s_stamps = new List<(Entity, bool, byte)>();
         private static bool s_removeAll;
 
         /// <summary>Bumped whenever a lot's flag changes (the painter's overlay redraws).</summary>
@@ -38,9 +38,9 @@ namespace Placemaker.Game.Neighbours
         public static int TotalStampedYes, TotalStampedNo, TotalRestored, TotalCarried, TotalFlaggedNew, TotalTagged;
 
         /// <summary>The painter: these lots become polished (yes) or are put back (no). Applied on the next frame.</summary>
-        public static void Stamp(IEnumerable<Entity> lots, bool yes)
+        public static void Stamp(IEnumerable<Entity> lots, bool yes, byte theme = 0)
         {
-            foreach (var e in lots) s_stamps.Add((e, yes));
+            foreach (var e in lots) s_stamps.Add((e, yes, theme));
         }
 
         /// <summary>Setting "Remove all polish": every lot to no, everything put back (spread over a few frames).</summary>
@@ -111,14 +111,18 @@ namespace Placemaker.Game.Neighbours
         /// <summary>The lot's flag: yes (polished) or no (as the game made it; also a lot without a flag yet).</summary>
         public bool IsYes(Entity lot) => EntityManager.HasComponent<PolishedLot>(lot) && EntityManager.GetComponentData<PolishedLot>(lot).Yes;
 
-        private void SetFlag(Entity lot, bool yes)
+        /// <summary>The lot's theme (0: by its zone).</summary>
+        public byte ThemeOfLot(Entity lot) => EntityManager.HasComponent<PolishedLot>(lot) ? EntityManager.GetComponentData<PolishedLot>(lot).Theme : (byte)0;
+
+        private void SetFlag(Entity lot, bool yes, byte theme = 0)
         {
             if (EntityManager.HasComponent<PolishedLot>(lot))
             {
-                if (EntityManager.GetComponentData<PolishedLot>(lot).Yes == yes) return;
-                EntityManager.SetComponentData(lot, new PolishedLot { Yes = yes });
+                var was = EntityManager.GetComponentData<PolishedLot>(lot);
+                if (was.Yes == yes && (!yes || was.Theme == theme)) return;
+                EntityManager.SetComponentData(lot, new PolishedLot { Yes = yes, Theme = yes ? theme : was.Theme });
             }
-            else EntityManager.AddComponentData(lot, new PolishedLot { Yes = yes });
+            else EntityManager.AddComponentData(lot, new PolishedLot { Yes = yes, Theme = theme });
             FlagsVersion++;
         }
 
@@ -148,7 +152,8 @@ namespace Placemaker.Game.Neighbours
                     var half = (float2)EntityManager.GetComponentData<BuildingData>(prefab).m_LotSize * 4f + 2f;
                     var fwd = math.normalizesafe(math.mul(t.m_Rotation, new float3(0f, 0f, 1f)).xz, new float2(0f, 1f));
                     var right = new float2(fwd.y, -fwd.x);
-                    bool yes = PolishNew;
+                    // a new lot: polished when new houses are, unless its zone's theme is Off in the settings
+                    bool yes = PolishNew && ZoneTheme(ZoneKind(prefab)) != "off";
                     for (int k = _goneFlags.Count - 1; k >= 0; k--)
                     {
                         var d = _goneFlags[k].At - t.m_Position.xz;
@@ -207,13 +212,13 @@ namespace Placemaker.Game.Neighbours
         private void ApplyStamps()
         {
             if (s_stamps.Count == 0) return;
-            var stamps = new List<(Entity Lot, bool Yes)>(s_stamps);
+            var stamps = new List<(Entity Lot, bool Yes, byte Theme)>(s_stamps);
             s_stamps.Clear();
             int yes = 0, no = 0, restored = 0;
-            foreach (var (lot, y) in stamps)
+            foreach (var (lot, y, theme) in stamps)
             {
                 if (!EntityManager.Exists(lot) || EntityManager.HasComponent<Deleted>(lot) || !IsGrowable(lot)) continue;
-                SetFlag(lot, y);
+                SetFlag(lot, y, theme);
                 _described.Remove(lot);
                 if (y)
                 {

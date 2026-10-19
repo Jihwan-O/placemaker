@@ -17,19 +17,24 @@ namespace Placemaker.Game.Neighbours
 {
     public struct PolishedLot : IComponentData, IQueryTypeParameter, ISerializable
     {
-        public const int CurrentVersion = 1;
+        public const int CurrentVersion = 2;
         public bool Yes;
+        /// <summary>(v2) How the garden is dressed: 0 by the zone (the settings), 1 garden, 2 natural, 3 tidy, 4 yard
+        /// (NeighbourPolishSystem.ThemeNames). Never renumber.</summary>
+        public byte Theme;
 
         public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
         {
             writer.Write(CurrentVersion);
             writer.Write(Yes);
+            writer.Write(Theme);
         }
 
         public void Deserialize<TReader>(TReader reader) where TReader : IReader
         {
             reader.Read(out int version);
             reader.Read(out Yes);
+            if (version >= 2) reader.Read(out Theme); else Theme = 0;
         }
     }
 

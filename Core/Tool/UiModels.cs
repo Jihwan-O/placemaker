@@ -75,6 +75,8 @@ namespace Placemaker.Core.Tool
         public bool FeatureOn;
         /// <summary>"Polish new houses".</summary>
         public bool NewHouses;
+        /// <summary>The theme Polish stamps: "zone" (each house by its zone's setting), "garden", "natural", "tidy", "yard".</summary>
+        public string Theme = "zone";
     }
 
     public sealed class RecipeListEntry

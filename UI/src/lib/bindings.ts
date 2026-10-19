@@ -321,6 +321,8 @@ export const act = {
     primary: () => fire(Triggers.primary),
     /** (PROTOCOL 25) The painter: Polish (true) or Unpolish (false) the lots in the area. */
     polishStamp: (yes: boolean) => fire(Triggers.polishStamp, yes),
+    /** The theme the painter's Polish gives. */
+    polishTheme: (theme: string) => fire(Triggers.polishTheme, theme),
     undo: () => fire(Triggers.undo),
     redo: () => fire(Triggers.redo),
     setAreaMode: (mode: AreaMode) => fire(Triggers.setAreaMode, mode),

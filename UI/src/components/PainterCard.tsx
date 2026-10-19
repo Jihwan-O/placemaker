@@ -5,6 +5,7 @@ import React from "react";
 import { ToolState } from "../contract";
 import { useT } from "../lib/l10n";
 import { Icon } from "./common";
+import { act } from "../lib/bindings";
 import s from "./painter.module.scss";
 
 export const PainterCard = ({ state }: { state: ToolState }) => {
@@ -20,6 +21,19 @@ export const PainterCard = ({ state }: { state: ToolState }) => {
             </div>
             <div className={s.line}>
                 {t("Placemaker.UI.Painter.How", "Pick houses with Points, Paint bucket or Paint area, then press Polish or Unpolish. Only polished gardens are joined up; Unpolish puts a house back as the game made it.")}
+            </div>
+            <div className={s.themes} data-testid="painter-themes">
+                {["zone", "garden", "natural", "tidy", "yard"].map((id) => (
+                    <button
+                        key={id}
+                        className={p.theme === id ? s.themeOn : s.theme}
+                        data-testid={"painter-theme-" + id}
+                        onClick={() => act.polishTheme(id)}
+                        title={t("Placemaker.UI.Painter.ThemeTip." + id, "")}
+                    >
+                        {t("Placemaker.UI.Painter.Theme." + id, id)}
+                    </button>
+                ))}
             </div>
             {hasArea ? (
                 <div className={s.count} data-testid="painter-count" data-lots={p.lots} data-polished={p.polished}>

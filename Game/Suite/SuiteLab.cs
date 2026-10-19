@@ -152,7 +152,8 @@ namespace Placemaker.Game.Suite
                             if (side == "west" && p.x > midX || side == "east" && p.x < midX) continue;
                             lots.Add(e);
                         }
-                    Placemaker.Game.Neighbours.NeighbourPolishSystem.Stamp(lots, yes);
+                    string themeName = ((string)step["theme"] ?? "zone").ToLowerInvariant();
+                    Placemaker.Game.Neighbours.NeighbourPolishSystem.Stamp(lots, yes, (byte)Math.Max(0, Array.IndexOf(Placemaker.Game.Neighbours.NeighbourPolishSystem.ThemeNames, themeName)));
                     rec["stamped"] = lots.Count;
                     Mod.Log.Info($"Placemaker lab: {lots.Count} lots stamped {(yes ? "polished" : "back as the game made them")} ({side})");
                     yield return Frames(10);

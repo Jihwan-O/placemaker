@@ -57,3 +57,26 @@
     min-width: 0;
     margin-left: 4rem;
 }
+
+.themes {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 6rem 0 2rem;
+}
+
+.theme,
+.themeOn {
+    padding: 3rem 8rem;
+    border-radius: 4rem;
+    border: 1rem solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+    color: inherit;
+    font-size: 12rem;
+    cursor: pointer;
+    margin: 0 4rem 4rem 0;
+}
+
+.themeOn {
+    border-color: rgba(120, 200, 120, 0.9);
+    background: rgba(90, 170, 90, 0.35);
+}

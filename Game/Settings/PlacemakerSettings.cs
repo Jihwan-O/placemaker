@@ -10,6 +10,7 @@ using Colossal.IO.AssetDatabase;
 using Game.Input;
 using Game.Modding;
 using Game.Settings;
+using Game.UI.Widgets;
 using FillWall = global::Placemaker.Core.Geometry.FillWall;
 
 namespace Placemaker.Game.Settings
@@ -375,6 +376,37 @@ namespace Placemaker.Game.Settings
         [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
         public bool PolishNewHouses { get; set; }
 
+        /// <summary>How homes' gardens are dressed: garden, natural, tidy, yard, or off (new homes not polished).</summary>
+        [SettingsUIDropdown(typeof(PlacemakerSettings), nameof(GetPolishThemes))]
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public string PolishThemeHomes { get; set; }
+
+        /// <summary>Shops (their gaps are paved with their own paving whatever the theme).</summary>
+        [SettingsUIDropdown(typeof(PlacemakerSettings), nameof(GetPolishThemes))]
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public string PolishThemeShops { get; set; }
+
+        [SettingsUIDropdown(typeof(PlacemakerSettings), nameof(GetPolishThemes))]
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public string PolishThemeOffices { get; set; }
+
+        [SettingsUIDropdown(typeof(PlacemakerSettings), nameof(GetPolishThemes))]
+        [SettingsUISection(SectionMain, GroupNeighbourhood)]
+        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
+        public string PolishThemeIndustry { get; set; }
+
+        public static DropdownItem<string>[] GetPolishThemes() => new[]
+        {
+            new DropdownItem<string> { value = "garden", displayName = "Placemaker.Settings.PolishTheme.garden" },
+            new DropdownItem<string> { value = "natural", displayName = "Placemaker.Settings.PolishTheme.natural" },
+            new DropdownItem<string> { value = "tidy", displayName = "Placemaker.Settings.PolishTheme.tidy" },
+            new DropdownItem<string> { value = "yard", displayName = "Placemaker.Settings.PolishTheme.yard" },
+            new DropdownItem<string> { value = "off", displayName = "Placemaker.Settings.PolishTheme.off" },
+        };
+
         /// <summary>Lawns grow to the shared fences (off: only the fences and hedges are joined).</summary>
         [SettingsUISection(SectionMain, GroupNeighbourhood)]
         [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
@@ -469,6 +501,7 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Economy.ParkingCompanionUpkeepSystem.UpkeepFactor = CompanionUpkeepFactor;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PolishNew = PolishNewHouses;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = NeighbourhoodPolish;
+                global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetZoneThemes(PolishThemeHomes, PolishThemeShops, PolishThemeOffices, PolishThemeIndustry);
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetOptions(new System.Collections.Generic.Dictionary<string, float>
                 {
                     ["lawns"] = PolishLawns ? 1f : 0f,
@@ -523,6 +556,10 @@ namespace Placemaker.Game.Settings
             SeeThroughDecals = true;
             NeighbourhoodPolish = false;   // experimental: on once it has been seen in the game
             PolishNewHouses = true;
+            PolishThemeHomes = "garden";
+            PolishThemeShops = "tidy";
+            PolishThemeOffices = "tidy";
+            PolishThemeIndustry = "yard";
             PolishLawns = true;
             PolishPaintedGardens = 33;
             PolishPlanting = true;

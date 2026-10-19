@@ -7,6 +7,7 @@
 // nothing is a lasting zone. While the painter is the pick, every polished lot is tinted green (PlacemakerOverlaySystem).
 // Nothing is planned or built: no plan, no ghost, no Review.
 
+using System;
 using System.Collections.Generic;
 using Placemaker.Core;
 using Placemaker.Core.Geometry;
@@ -23,6 +24,15 @@ namespace Placemaker.Game.Tool
         public const string PainterId = "polishGardens";
 
         private bool _painter;
+        private string _painterTheme = "zone";
+
+        /// <summary>The theme the painter's Polish gives: "zone" (by each house's zone) or a theme name.</summary>
+        public void SetPainterTheme(string theme)
+        {
+            if (string.IsNullOrEmpty(theme) || Array.IndexOf(NeighbourPolishSystem.ThemeNames, theme) < 0 || theme == _painterTheme) return;
+            _painterTheme = theme;
+            Touch();
+        }
         private BrushRules _painterRules;
         private AreaShape _countShape;
         private int _countFlags = -1;
@@ -51,6 +61,8 @@ namespace Placemaker.Game.Tool
             _hoverFaceAt = new float2(float.MaxValue);
             if (_mode == SelectionMode.Block) RepickBlocks();
             else if (_mode == SelectionMode.Draw && _draw.Closed) ShapeChanged();
+            // a painted area keeps the outline it was painted with (the other stops): it goes, and is painted again
+            else if ((_mode == SelectionMode.Paint || _mode == SelectionMode.BlockPaint) && _shape != null) ClearArea();
             if (on && _stage == ToolStage.Review) SetStage(ToolStage.Design);
             _countShape = null;
             DesignChanged();
@@ -80,7 +92,7 @@ namespace Placemaker.Game.Tool
             if (_shape == null) { Flash(new LocText("Placemaker.Reason.NoArea")); return; }
             var lots = polish.LotsInside(_shape.Ring2D());
             if (lots.Count == 0) { Flash(new LocText("Placemaker.Painter.NoLots")); return; }
-            NeighbourPolishSystem.Stamp(lots, yes);
+            NeighbourPolishSystem.Stamp(lots, yes, (byte)Math.Max(0, Array.IndexOf(NeighbourPolishSystem.ThemeNames, _painterTheme)));
             LastStamp = (lots.Count, yes);
             Mod.Log.Info($"Placemaker painter: {(yes ? "polish" : "unpolish")} {lots.Count} lots ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
             ClearArea();
@@ -116,7 +128,7 @@ namespace Placemaker.Game.Tool
             var (lots, yes) = PainterCount;
             return new PainterView
             {
-                Lots = lots, Polished = yes, FeatureOn = NeighbourPolishSystem.FeatureEnabled, NewHouses = NeighbourPolishSystem.PolishNew,
+                Lots = lots, Polished = yes, FeatureOn = NeighbourPolishSystem.FeatureEnabled, NewHouses = NeighbourPolishSystem.PolishNew, Theme = _painterTheme,
             };
         }
     }

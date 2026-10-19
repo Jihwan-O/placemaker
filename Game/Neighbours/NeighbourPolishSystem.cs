@@ -43,6 +43,48 @@ namespace Placemaker.Game.Neighbours
         /// <summary>Setting "Polish new houses": a lot that spawns gets the flag yes (off: no; the painter decides). Only yes
         /// lots are ever edited (PolishedLot, NeighbourPolishSystem.Lots).</summary>
         public static bool PolishNew = true;
+
+        /// <summary>The lot's theme byte as a name (PolishedLot.Theme; 0 = by the zone).</summary>
+        public static readonly string[] ThemeNames = { "zone", "garden", "natural", "tidy", "yard" };
+
+        /// <summary>Settings: the theme each kind of building gets ("off": new ones of that kind are not polished).</summary>
+        private static readonly Dictionary<string, string> s_zoneTheme = new Dictionary<string, string>
+        {
+            ["home"] = "garden", ["shop"] = "tidy", ["office"] = "tidy", ["industry"] = "yard",
+        };
+
+        public static string ZoneTheme(string zone) => s_zoneTheme.TryGetValue(zone ?? "home", out var t) ? t : "garden";
+
+        /// <summary>Settings changed the zone themes: polished lots that follow their zone are planned again.</summary>
+        public static void SetZoneThemes(string homes, string shops, string offices, string industry)
+        {
+            bool changed = false;
+            foreach (var (k, v) in new[] { ("home", homes), ("shop", shops), ("office", offices), ("industry", industry) })
+            {
+                var t = string.IsNullOrEmpty(v) ? ZoneTheme(k) : v;
+                if (ZoneTheme(k) != t) { s_zoneTheme[k] = t; changed = true; }
+            }
+            if (changed && FeatureEnabled) Redo();
+        }
+
+        /// <summary>What a building prefab is: home, shop, office or industry.</summary>
+        private string ZoneKind(Entity prefab)
+        {
+            if (!EntityManager.HasComponent<SpawnableBuildingData>(prefab)) return "home";
+            var zone = EntityManager.GetComponentData<SpawnableBuildingData>(prefab).m_ZonePrefab;
+            if (zone == Entity.Null || !EntityManager.HasComponent<ZoneData>(zone)) return "home";
+            var zd = EntityManager.GetComponentData<ZoneData>(zone);
+            return zd.m_AreaType == global::Game.Zones.AreaType.Residential ? "home" : zd.m_AreaType == global::Game.Zones.AreaType.Commercial ? "shop" : zd.IsOffice() ? "office" : "industry";
+        }
+
+        /// <summary>The theme the planner uses for a lot: its own, else its zone's.</summary>
+        private string ThemeFor(Entity lot, string zone)
+        {
+            byte t = ThemeOfLot(lot);
+            if (t > 0 && t < ThemeNames.Length) return ThemeNames[t];
+            var z = ZoneTheme(zone);
+            return z == "off" ? null : z;
+        }
         /// <summary>Game runner: which parts are edited (both by default).</summary>
         public static bool EditLines = true, EditLawns = true;
         /// <summary>The stitching rules (the game runner can change them live and ask for a redo).</summary>
@@ -417,7 +459,7 @@ namespace Placemaker.Game.Neighbours
                     foreach (var (id, lawn) in d.Lawns) { lawnsOf[id] = lawn; ownerOf[id] = d.House.Id; }
                     coreIds.Add(d.House.Id);
                 }
-                stitch.Add(Copy(d.House, isCore, IsYes(e)));
+                stitch.Add(Copy(d.House, isCore, IsYes(e), ThemeFor(e, d.House.Zone)));
             }
             var planner = Planner;
             var settings = Settings;
@@ -723,10 +765,10 @@ namespace Placemaker.Game.Neighbours
         private readonly Dictionary<Entity, Bounds3?> _modelBounds = new Dictionary<Entity, Bounds3?>();
         private readonly Dictionary<long, Entity> _houseOf = new Dictionary<long, Entity>();
         /// <summary>The cached description with this pass's Edit flag and the lot's flag (the lists are shared: the planner only reads them).</summary>
-        private static StitchHouse Copy(StitchHouse h, bool edit, bool polished) => new StitchHouse
+        private static StitchHouse Copy(StitchHouse h, bool edit, bool polished, string theme) => new StitchHouse
         {
             Id = h.Id, Position = h.Position, Forward = h.Forward, HalfLot = h.HalfLot, Lines = h.Lines, Lawns = h.Lawns, Hard = h.Hard,
-            Footprint = h.Footprint, Props = h.Props, Edit = edit, MainSurface = h.MainSurface, Polished = polished, Zone = h.Zone,
+            Footprint = h.Footprint, Props = h.Props, Edit = edit, MainSurface = h.MainSurface, Polished = polished, Zone = h.Zone, Theme = theme,
         };
 
         /// <summary>

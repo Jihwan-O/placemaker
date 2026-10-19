@@ -54,6 +54,7 @@ namespace Placemaker.Game.UI
             Trigger<string>("goToStage", s => { if (StageMachine.TryParse(s, out var st)) _tool.GoToStage(st); });
             Trigger("primary", () => _tool.Primary());
             Trigger<bool>("polishStamp", yes => _tool.PolishStamp(yes));   // PROTOCOL 25: the painter's Polish / Unpolish
+            Trigger<string>("polishTheme", theme => _tool.SetPainterTheme(theme));   // the theme the painter's Polish gives
             Trigger("undo", () => _tool.Undo());
             Trigger("redo", () => _tool.Redo());
             // Area overhaul: Road nodes is part of Points (corners snap to road nodes); an older panel asking for it gets Points.

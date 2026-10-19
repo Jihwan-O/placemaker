@@ -191,6 +191,7 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 
 .line {
     @include row;
+    flex-wrap: wrap;
     min-width: 0;
     min-height: 28rem;
 }
@@ -201,8 +202,9 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 
 .zoneButton {
     @include row;
-    flex: 0 0 auto;
-    width: 160rem;
+    flex: 0 1 auto;
+    width: 128rem;
+    min-width: 84rem;
     height: 24rem;
     padding: 0 7rem 0 5rem;
     border-radius: $radius;
@@ -545,86 +547,83 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     color: $c-text-faint;
 }
 
+.side {
+    @include col;
+    flex: 1 1 150rem;
+    min-width: 150rem;
+    margin: 0 6rem 0 8rem;
+}
+
 .roadsCell {
+    @include row;
+    min-width: 0;
+}
+
+.roadsTrack {
+    position: relative;
     @include col;
     flex: 1 1 auto;
     min-width: 0;
-    margin: 0 10rem 0 6rem;
-}
-
-.roadsTop {
-    @include row;
-    min-width: 0;
+    margin-left: 5rem;
 }
 
 .roadMarks {
-    position: relative;
-    height: 12rem;
-    margin: 0 52rem 0 40rem;
+    position: absolute;
+    top: 16rem;
+    left: 0;
+    right: 52rem;
+    height: 4rem;
+    pointer-events: none;
 }
 
-// a road width on the roads slider: a tick and its name
-.roadMark {
-    position: absolute;
-    top: 0;
-    @include col;
-    align-items: center;
-    width: 50rem;
-    margin-left: -25rem;
-}
 
 .roadTick {
+    position: absolute;
+    top: 0;
     width: 1rem;
     height: 4rem;
-    background-color: rgba(255, 255, 255, 0.35);
+    background-color: rgba(255, 255, 255, 0.45);
 }
 
-.roadMarkText {
-    font-size: 10rem;
-    color: $c-text-faint;
-    white-space: nowrap;
-}
 
-// ── a zone type's Outgrow: its switch and Set ──
-.outgrowBox {
+// ── a zone type's Outgrow: one chip, its switch and the button that folds its settings out ──
+.outgrowChip {
     @include row;
+    align-self: flex-start;
     flex: 0 0 auto;
-    margin-right: 6rem;
-}
-
-.outgrowLabel {
-    margin-right: 5rem;
-    font-size: 11rem;
-    color: $c-text-dim;
-}
-
-.setButton {
-    @include row;
     height: 22rem;
-    margin-left: 6rem;
-    padding: 0 6rem 0 8rem;
-    border-radius: $radius;
+    margin-top: 3rem;
+    padding: 0 2rem 0 5rem;
+    border-radius: 11rem;
+    background-color: $c-surface;
     @include border(1rem, $c-line);
+}
+
+.outgrowChipOpen {
+    background-color: rgba(143, 209, 255, 0.12);
+    @include border(1rem, rgba(143, 209, 255, 0.6));
+}
+
+.outgrowChipOff .outgrowOpen {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.outgrowOpen {
+    @include row;
+    height: 100%;
+    margin-left: 4rem;
+    padding: 0 6rem 0 2rem;
     color: $text;
     font-size: $fs-s;
     cursor: pointer;
 }
 
-.setButton:hover {
-    background-color: $c-surface-hover;
+.outgrowOpen:hover .outgrowName {
+    color: #ffffff;
 }
 
-.setOn {
-    background-color: rgba(143, 209, 255, 0.12);
-    @include border(1rem, rgba(143, 209, 255, 0.6));
-}
-
-.setOff {
-    opacity: 0.4;
-    cursor: default;
-}
-
-.setText {
+.outgrowName {
     margin-right: 5rem;
 }
 

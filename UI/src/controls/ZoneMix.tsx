@@ -490,24 +490,23 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
         </div>
     );
 
-    /** A zone type's Outgrow: its switch, and Set (its settings folded out under the line). */
+    /** A zone type's Outgrow: its switch, and the chip itself folds its settings out under the line. */
     const OutgrowSwitch = ({ zkey, id }: { zkey: string; id: string }) => {
         const on = outgrow.isOn(zkey);
         const open = on && !!opened[zkey];
         return (
-            <div className={z.outgrowBox} title={t("Placemaker.UI.ZoneMix.OutgrowTip", "Outgrow: its lots grow past their borders (reach, fences, lawns, ground, planting, paths). Off: its buildings stay as they are.")}>
-                <div className={z.outgrowLabel}>{t("Placemaker.UI.Outgrow", "Outgrow")}</div>
+            <div className={classNames(z.outgrowChip, { [z.outgrowChipOpen]: open, [z.outgrowChipOff]: !on })} title={t("Placemaker.UI.ZoneMix.OutgrowTip", "Outgrow: its lots grow past their borders (reach, fences, lawns, ground, planting, paths). Click to set them; the switch turns it off (its buildings stay as they are).")}>
                 <Switch testId={"zonemix-outgrow-on-" + id} on={on} onChange={(v) => outgrow.setOn(zkey, v)} />
                 <button
                     type="button"
-                    className={classNames(z.setButton, { [z.setOn]: open, [z.setOff]: !on })}
+                    className={z.outgrowOpen}
                     data-testid={"zonemix-outgrow-" + id}
                     onClick={(e) => {
                         e.stopPropagation();
                         if (on) setOpened({ ...opened, [zkey]: !open });
                     }}
                 >
-                    <div className={z.setText}>{t("Placemaker.UI.ZoneMix.Set", "Set")}</div>
+                    <div className={z.outgrowName}>{t("Placemaker.UI.Outgrow", "Outgrow")}</div>
                     <Icon name={open ? "chevronDown" : "chevronRight"} size={9} tint={open ? "accent" : "dim"} />
                 </button>
             </div>
@@ -578,36 +577,31 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                                       </div>
                                       <div className={z.lotUnit}>{t("Placemaker.UI.ZoneMix.CellUnit", "cells of 8 m")}</div>
                                   </div>
-                                  <div className={z.roadsCell} title={t("Placemaker.UI.ZoneMix.RoadTip", "The roads it goes on, by their width (a two-lane road is 16 m, four lanes 24 m, six lanes 32 m): its lots are only placed along roads this wide.")}>
-                                      <div className={z.roadsTop}>
-                                          <div className={z.rangeLabel}>{t("Placemaker.UI.ZoneMix.Roads", "Roads")}</div>
-                                          <RangeSlider
-                                              lo={x.r0}
-                                              hi={x.r1}
-                                              min={0}
-                                              max={MAX_ROAD}
-                                              testId={"zonemix-roads-" + x.sl}
-                                              text={roadText}
-                                              onCommit={(a, b) => {
-                                                  if (a !== x.r0) set("roadMin" + x.sl, a);
-                                                  if (b !== x.r1) set("roadMax" + x.sl, b);
-                                              }}
-                                          />
-                                      </div>
-                                      <div className={z.roadMarks}>
-                                          {[
-                                              { at: 16, label: t("Placemaker.UI.ZoneMix.Lanes2", "2 lanes") },
-                                              { at: 24, label: t("Placemaker.UI.ZoneMix.Lanes4", "4") },
-                                              { at: 32, label: t("Placemaker.UI.ZoneMix.Lanes6", "6") },
-                                          ].map((m) => (
-                                              <div key={m.at} className={z.roadMark} style={{ left: (m.at / MAX_ROAD) * 100 + "%" }}>
-                                                  <div className={z.roadTick} />
-                                                  <div className={z.roadMarkText}>{m.label}</div>
+                                  <div className={z.side}>
+                                      <div className={z.roadsCell} title={t("Placemaker.UI.ZoneMix.RoadTip", "The roads it goes on, by their width (a two-lane road is 16 m, four lanes 24 m, six lanes 32 m; the ticks): its lots are only placed along roads this wide.")}>
+                                          <Icon name="roads" size={11} tint="dim" />
+                                          <div className={z.roadsTrack}>
+                                              <RangeSlider
+                                                  lo={x.r0}
+                                                  hi={x.r1}
+                                                  min={0}
+                                                  max={MAX_ROAD}
+                                                  testId={"zonemix-roads-" + x.sl}
+                                                  text={roadText}
+                                                  onCommit={(a, b) => {
+                                                      if (a !== x.r0) set("roadMin" + x.sl, a);
+                                                      if (b !== x.r1) set("roadMax" + x.sl, b);
+                                                  }}
+                                              />
+                                              <div className={z.roadMarks}>
+                                                  {[16, 24, 32].map((at) => (
+                                                      <div key={at} className={z.roadTick} style={{ left: (at / MAX_ROAD) * 100 + "%" }} />
+                                                  ))}
                                               </div>
-                                          ))}
+                                          </div>
                                       </div>
+                                      <OutgrowSwitch zkey={key} id={x.sl} />
                                   </div>
-                                  <OutgrowSwitch zkey={key} id={x.sl} />
                                   {used.length > 1 ? (
                                       <button
                                           type="button"

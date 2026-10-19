@@ -125,7 +125,7 @@ namespace Placemaker.Game.Tool
             base.OnDestroy();
         }
 
-        /// <summary>First open: load recipes (generators register by then) and pick the last used recipe.</summary>
+        /// <summary>First open: load recipes (generators register by then). No type is chosen until the player picks one.</summary>
         private void EnsureInitialized()
         {
             if (_initialized) return;
@@ -137,25 +137,8 @@ namespace Placemaker.Game.Tool
                 _recipes.Reload();
             }
             catch (Exception e) { Mod.Log.Error(e, "Placemaker: loading recipes failed"); }
-            var last = _settings?.LastRecipe;
-            var pick = !string.IsNullOrEmpty(last) && _recipes.Find(last) != null ? last
-                     : _recipes.Entries.Count > 0 ? _recipes.Entries[0].Recipe.Id : null;
-            // (core) The last type used is shelved now (e.g. Quarry before industry was hidden): start on the first type shown.
-            // Only at this restore: a hidden type picked on purpose (the game runner by id, editing an old build) stays.
-            if (pick != null && _recipes.IsShelved(pick))
-            {
-                var shown = _recipes.FirstShown();
-                if (shown != null)
-                {
-                    Mod.Log.Info($"Placemaker: the last type used, '{pick}', is shelved; starting on '{shown}'.");
-                    pick = shown;
-                }
-            }
-            if (pick != null)
-            {
-                _recipe = _recipes.Instantiate(pick, NewSeed());
-                _recipeId = pick;
-            }
+            // The last type used is not picked again (the user: "nothing should be selected if I didn't specifically select
+            // something"): it planned itself on the next area, often a big one meant for something else, and lagged.
             _history.Reset(Capture());
         }
 
@@ -180,6 +163,7 @@ namespace Placemaker.Game.Tool
             {
                 if (_painter) SetPainter(false);
                 _closeAfterGhost = 0;
+                _closeAfterBuild = false;   // opened by the player: a Build & close the build never handed back is void
                 m_ToolSystem.activeTool = this;
             }
         }
@@ -261,6 +245,8 @@ namespace Placemaker.Game.Tool
                 _roads.BeginFrame();
                 PumpPreview();
                 UpdateBuild();
+                // Build & close: the build service hands the tool back when it is done, then it closes
+                if (_closeAfterBuild && !_building) { _closeAfterBuild = false; Close(); }
                 ReadInput();
 
                 if (HandleKeys()) { /* key handled: no tool input this frame */ }
@@ -351,8 +337,8 @@ namespace Placemaker.Game.Tool
             {
                 case PrimaryKind.ToDesign: SetStage(ToolStage.Design); break;
                 case PrimaryKind.ToReview: SetStage(ToolStage.Review); break;
-                case PrimaryKind.Build:
-                case PrimaryKind.FinishEdit: StartBuild(); break;
+                case PrimaryKind.Build: StartBuild(AfterBuild.KeepArea); break;
+                case PrimaryKind.FinishEdit: StartBuild(AfterBuild.Fresh); break;
                 case PrimaryKind.PlaceMarkers:
                     if (_markerKind != null) ExitMarkerMode();
                     else StartMarkers(p.StepPath, p.MarkerKind);

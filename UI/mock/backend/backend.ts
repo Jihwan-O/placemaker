@@ -162,6 +162,8 @@ export class MockBackend {
     // ── build / manage ──
     buildProgress = 0;
     private buildTimer: number | null = null;
+    /** What the build under way leaves (the game's AfterBuild): keep the area, close the tool, or a fresh Area step. */
+    private afterBuild: "keep" | "close" | "fresh" = "fresh";
     groups: BuiltGroup[] = [];
     managedId: number | null = null;
     editingGroup: number | null = null;
@@ -600,6 +602,14 @@ export class MockBackend {
             case "primary":
                 this.primaryAction();
                 return;
+            case "buildAndClose": {
+                const p = this.primary();
+                if (!p.enabled || p.action !== "build" || (this.plan && needsAck(this.plan.permanent) && !this.ackPermanent)) return;
+                this.afterBuild = "close";
+                this.startBuild();
+                this.publishAll();
+                return;
+            }
             case "undo":
                 this.undo();
                 return;
@@ -1236,6 +1246,7 @@ export class MockBackend {
             case "build":
             case "finishEdit":
                 if (this.plan && needsAck(this.plan.permanent) && !this.ackPermanent) return;
+                this.afterBuild = p.action === "build" ? "keep" : "fresh";
                 this.startBuild();
                 break;
             case "cancelBuild":
@@ -1281,12 +1292,20 @@ export class MockBackend {
         this.groups = this.groups.filter((x) => x.id !== g.id).concat([g]);
         this.money -= plan.cost;
         this.editingGroup = null;
-        this.ring = [];
-        this.closed = false;
-        this.cells.clear();
-        this.picked = [];
-        for (const s of this.allSteps()) s.markers = [];
-        this.stage = "area";
+        const keep = this.afterBuild === "keep";
+        if (!keep) {
+            this.ring = [];
+            this.closed = false;
+            this.cells.clear();
+            this.picked = [];
+        }
+        // no type stays chosen (the game: a kept one planned itself on the next area)
+        this.root = null;
+        this.recipeId = "";
+        this.focus = "0";
+        this.stage = keep ? "design" : "area";
+        if (this.afterBuild === "close") this.open = false;
+        this.afterBuild = "fresh";
         this.undoStack = [];
         this.redoStack = [];
         this.ackPermanent = false;

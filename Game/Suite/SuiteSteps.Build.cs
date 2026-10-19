@@ -70,6 +70,11 @@ namespace Placemaker.Game.Suite
             }
             int doneBefore = _tool.SuiteBuildsDone;
             float t0 = Time.realtimeSinceStartup;
+            // what the build leaves: "fresh" (default, the area cleared as every scenario expects), "keep" (the area kept,
+            // back to Design: the player's Build & keep area) or "close" (Build & close)
+            string after = ((string)step["after"] ?? "fresh").ToLowerInvariant();
+            _tool.SuiteNextAfterBuild = after == "keep" ? PlacemakerToolSystem.AfterBuild.KeepArea
+                : after == "close" ? PlacemakerToolSystem.AfterBuild.Close : PlacemakerToolSystem.AfterBuild.Fresh;
             string via = ((string)step["via"] ?? "panel").ToLowerInvariant();
             if (via == "enter") { yield return KeyPress("enter"); rec["ui"] = new JArray(new JObject { ["action"] = "Build", ["path"] = "key Enter" }); }
             else yield return UiPrimary(st, rec, "Build");

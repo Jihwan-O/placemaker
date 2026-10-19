@@ -20,6 +20,17 @@ namespace Placemaker.Game.Tool
         private readonly List<Entity> _members = new List<Entity>();
         private int _membersGroup = -1;
 
+        /// <summary>
+        /// What a finished build leaves. KeepArea (Build & keep area, Enter): the area stays and the tool goes back to Design
+        /// with no type chosen. Close (Build & close): Placemaker closes. Fresh (an edit applied, the game runner): the area
+        /// is cleared and the tool stays open. No type stays chosen after any of them.
+        /// </summary>
+        public enum AfterBuild { Fresh, KeepArea, Close }
+        private AfterBuild _afterBuild;
+        private bool _closeAfterBuild;
+        /// <summary>The game runner: what its next build leaves (its scenarios expect a fresh tool after a build).</summary>
+        public AfterBuild? SuiteNextAfterBuild;
+
         public bool Building => _building;
         public float BuildProgress => _building ? math.saturate(_buildStatus.Progress) : 0f;
         public PlanIssue BuildFailure => _feedback.Failure;
@@ -42,7 +53,15 @@ namespace Placemaker.Game.Tool
         public int HoverGroup => _hoverGroup;
         public int ManagedGroup => _managedGroup;
 
-        private void StartBuild()
+        /// <summary>UI: the "Build & close" button.</summary>
+        public void BuildAndClose()
+        {
+            var p = StageMachine.Primary(_stage, Facts());
+            if (!p.Enabled) { Flash(p.Reason); return; }
+            if (p.Kind == PrimaryKind.Build || p.Kind == PrimaryKind.FinishEdit) StartBuild(AfterBuild.Close);
+        }
+
+        private void StartBuild(AfterBuild after)
         {
             // a Zoning type (a look): its buildings polished, nothing built
             if (BuildPolish()) return;
@@ -79,6 +98,8 @@ namespace Placemaker.Game.Tool
                 return;
             }
             SuiteLastBuildPath = instant ? "instant" : "start";
+            _afterBuild = SuiteNextAfterBuild ?? after;
+            SuiteNextAfterBuild = null;
             _building = true;
             _buildStatus = default;
             CancelGesture();
@@ -180,23 +201,33 @@ namespace Placemaker.Game.Tool
             try { svc.Acknowledge(); } catch (Exception e) { Mod.Log.Warn("Placemaker: acknowledge failed: " + e.Message); }
         }
 
-        /// <summary>Built: the tool stays open with a fresh selection; design and recipe stay for the next one.</summary>
+        /// <summary>
+        /// Built: the area kept (back to Design) or cleared (the Area step), or the tool closes (_afterBuild). No type stays
+        /// chosen: a kept one planned itself on the next area, often a big one meant for something else, and lagged.
+        /// </summary>
         private void OnBuilt(int groupId, List<PlanIssue> warnings, Placemaker.Core.Build.BuildAudit audit = null)
         {
+            var after = _afterBuild;
+            _afterBuild = AfterBuild.Fresh;
             _markersEdited.Clear();
             _permanentAck = null;
             _worker.Cancel();
-            ClearSelectionState();
+            if (after == AfterBuild.KeepArea) ShapeChanged(alreadyBuilt: true);   // the area stays; what was built is in its site now
+            else ClearSelectionState();
             _roads.InvalidateGraph();   // the new roads must be pickable right away
             InvalidateFills();          // and stop the area tools at once
-            if (_recipe != null) foreach (var kv in RecipePaths.Walk(_recipe)) kv.Value.Markers.Clear();
+            _recipe = null;
+            _recipeId = "";
+            _presetLayer = ""; _presetId = "";
+            _focus = RecipePaths.Root;
             _editingGroup = 0;
             _plan = null;
             _planRevision = -1;
             _requestedRevision = -1;
             DesignChanged();
             _history.Reset(Capture());
-            SetStage(ToolStage.Area);
+            SetStage(after == AfterBuild.KeepArea && _shape != null ? ToolStage.Design : ToolStage.Area);
+            if (after == AfterBuild.Close) _closeAfterBuild = true;
             // After the stage change and the cleared selection (both clear feedback): what the build service
             // repaired, skipped or cleared stays in the summary until the next change, and the toast says it.
             _feedback.Succeeded(warnings, audit);

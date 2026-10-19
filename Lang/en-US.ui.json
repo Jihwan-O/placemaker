@@ -31,6 +31,8 @@
   "Placemaker.UI.Bucket.Roads": "Roads",
   "Placemaker.UI.Bucket.Shops": "Shops",
   "Placemaker.UI.Bucket.Water": "Water",
+  "Placemaker.UI.Build.Close": "Build & close",
+  "Placemaker.UI.Build.CloseTip": "Builds it, then closes Placemaker.",
   "Placemaker.UI.Building.Hint": "You can keep playing",
   "Placemaker.UI.Building.Title": "Building…",
   "Placemaker.UI.Cancel": "Cancel",

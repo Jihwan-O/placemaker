@@ -32,7 +32,8 @@ namespace Placemaker.Core.Geometry
     public sealed class FillOptions
     {
         public const float DefaultGap = 10f, MaxGap = 40f;
-        public const float DefaultReach = 500f, MinReach = 20f, MaxReach = 1500f;
+        // 300 m (was 500 m): the Paint bucket fills under the cursor on every hover, and a 500 m disc made hovering lag
+        public const float DefaultReach = 300f, MinReach = 20f, MaxReach = 1500f;
 
         /// <summary>Openings narrower than this (m) count as closed; places narrower than it are left out. 0 = off.</summary>
         public float Gap = DefaultGap;

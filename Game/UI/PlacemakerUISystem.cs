@@ -54,6 +54,7 @@ namespace Placemaker.Game.UI
             Trigger<bool>("setPanelCollapsed", c => _tool.SetPanelCollapsed(c));
             Trigger<string>("goToStage", s => { if (StageMachine.TryParse(s, out var st)) _tool.GoToStage(st); });
             Trigger("primary", () => _tool.Primary());
+            Trigger("buildAndClose", () => _tool.BuildAndClose());   // Review's second button (the primary keeps the area)
             Trigger<bool>("polishStamp", yes => _tool.PolishStamp(yes));   // PROTOCOL 25: the painter's Polish / Unpolish
             Trigger<string>("polishTheme", theme => _tool.SetPainterTheme(theme));   // the theme the painter's Polish gives
             Trigger<string, double>("polishOption", (id, v) => _tool.SetPolishOption(id, v));   // the painter card's look rows

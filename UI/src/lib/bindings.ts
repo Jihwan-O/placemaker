@@ -320,6 +320,8 @@ export const act = {
     setPanelCollapsed: (collapsed: boolean) => fire(Triggers.setPanelCollapsed, collapsed),
     goToStage: (stage: Stage) => fire(Triggers.goToStage, stage),
     primary: () => fire(Triggers.primary),
+    /** Review's second button: build, then close Placemaker (the primary builds and keeps the area). */
+    buildAndClose: () => fire(Triggers.buildAndClose),
     /** (PROTOCOL 25) The painter: Polish (true) or Unpolish (false) the lots in the area. */
     polishStamp: (yes: boolean) => fire(Triggers.polishStamp, yes),
     /** The theme the painter's Polish gives. */

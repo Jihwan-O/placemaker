@@ -161,7 +161,7 @@ namespace Placemaker.Game.Settings
 
         /// <summary>(Area overhaul) Settings files older than the overhaul get its stops once (zoned land on).</summary>
         [SettingsUIHidden] public int AreaRulesVersion { get; set; }
-        public const int CurrentAreaRulesVersion = 2;
+        public const int CurrentAreaRulesVersion = 3;
 
         // (s43) Paint bucket walls (Core/Geometry/FillWalls). Area overhaul: replaced by the shared stops; ids kept.
         [SettingsUIHidden] public bool BucketWallRoads { get; set; }
@@ -205,15 +205,20 @@ namespace Placemaker.Game.Settings
 
         /// <summary>
         /// (Area overhaul) Once per settings file older than the overhaul: the new stops on (paths, bike paths, tracks, and
-        /// zoned land whether built on or not), the fill's gap and reach at their defaults. True when something changed.
+        /// zoned land whether built on or not), the fill's gap and reach at their defaults. Version 3: a reach still at the
+        /// old default (500 m) becomes the new one (300 m); a reach the player chose stays. True when something changed.
         /// </summary>
         public bool MigrateAreaRules()
         {
             if (AreaRulesVersion >= CurrentAreaRulesVersion) return false;
             var r = GetBrushRules();
             var d = global::Placemaker.Core.Geometry.BrushRules.Defaults();
-            r.Paths = d.Paths; r.Bikes = d.Bikes; r.Tracks = d.Tracks; r.AllZoned = d.AllZoned; r.Gap = d.Gap; r.Reach = d.Reach;
-            if (r.Zoned == false && r.AllZoned) r.Zoned = true;
+            if (AreaRulesVersion < 2)
+            {
+                r.Paths = d.Paths; r.Bikes = d.Bikes; r.Tracks = d.Tracks; r.AllZoned = d.AllZoned; r.Gap = d.Gap; r.Reach = d.Reach;
+                if (r.Zoned == false && r.AllZoned) r.Zoned = true;
+            }
+            if (Math.Abs(r.Reach - 500f) < 0.5f) r.Reach = d.Reach;
             SetBrushRules(r);
             AreaRulesVersion = CurrentAreaRulesVersion;
             return true;

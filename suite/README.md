@@ -311,7 +311,7 @@ after a failed `area`, `type`, `preview` or `build` the scenario's remaining ste
 | `preview` | – | Next to Review; waits for the plan and the ghost; records what the Review panel lists |
 | `previewMode` | `mode`: `sketch`/`ghost` | the preview switch |
 | `edit` | `build` (false) | back to Design; with `build: true`: clicks the build (Manage) and Edit |
-| `build` | `when` (`settled`; `planReady`; `ghostPending`), `via` (`panel`; `enter`) | (Next if needed,) OK for permanent changes, Build; waits until it is done and the game has no temporaries left; records the build path (`instant` from the ghost or `start`) |
+| `build` | `when` (`settled`; `planReady`; `ghostPending`), `via` (`panel`; `enter`), `after` (`fresh`: the area cleared, the Area step; `keep`: the player's Build & keep area, the area kept and back to Design; `close`: Build & close) | (Next if needed,) OK for permanent changes, Build; waits until it is done and the game has no temporaries left; records the build path (`instant` from the ghost or `start`). No type stays chosen after a build |
 | `select` | – | the Manage stage, the game's raycast click on the build |
 | `delete` | – | select, Remove, OK; waits until the build is gone |
 | `bulldoze` | `target`: `owner` (the owner lot), `part` | the bulldozer's delete definition on that member (applied through the runner's fixture tool, not the bulldozer UI), then the group's own cascade |

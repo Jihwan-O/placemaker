@@ -598,7 +598,8 @@ export const Triggers = {
   setPanelCollapsed: "setPanelCollapsed",   // (collapsed: boolean)
 
   goToStage: "goToStage",                   // (stage: Stage) — only if in state.reachable
-  primary: "primary",                       // () — same as Enter
+  primary: "primary",                       // () — same as Enter (Review: Build & keep area)
+  buildAndClose: "buildAndClose",           // () — Review's second button: build, then close Placemaker
   polishTheme: "polishTheme",               // (theme: string) — the theme the painter's Polish gives
   polishOption: "polishOption",             // (id: string, value: number) — the painter card's look rows (toggles 1/0, painted 0–100)
   polishCity: "polishCity",                 // (what: string, value: string) — on / newHouses / homes|shops|offices|industry / polishAll / unpolishAll

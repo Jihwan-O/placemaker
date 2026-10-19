@@ -602,6 +602,23 @@ const Footer = ({
                         <div className={s.primaryLabel}>{t("Placemaker.UI.Painter.Unpolish", "Unpolish")}</div>
                     </button>
                 ) : null}
+                {p.action === "build" ? (
+                    // Build & close beside the primary (Build & keep area, Enter): builds, then closes Placemaker
+                    <Tip title={t("Placemaker.UI.Build.Close", "Build & close")} description={t("Placemaker.UI.Build.CloseTip", "Builds it, then closes Placemaker.")}>
+                        <button
+                            type="button"
+                            data-testid="build-close"
+                            aria-disabled={enabled ? "false" : "true"}
+                            className={classNames(s.primary, s.primarySecond, { [s.primaryOff]: !enabled })}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (enabled) act.buildAndClose();
+                            }}
+                        >
+                            <div className={s.primaryLabel}>{t("Placemaker.UI.Build.Close", "Build & close")}</div>
+                        </button>
+                    </Tip>
+                ) : null}
                 {!enabled && reason ? (
                     <Tip title={label} description={reason}>
                         {button}

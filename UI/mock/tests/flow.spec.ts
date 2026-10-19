@@ -42,13 +42,17 @@ test("full flow: draw → design → review → build, then manage the result", 
     await panelShot(page, "panel-review");
 
     await expect(primary).toContainText("Build");
-    await primary.click();
+    // Build & close: built, then Placemaker closes (the primary, Build & keep area, has its own test)
+    await page.getByTestId("build-close").click();
     await expect(page.getByTestId("stage-building")).toBeVisible();
     await panelShot(page, "panel-building");
-    await expect(page.getByTestId("stage-area")).toBeVisible({ timeout: 10000 });
-    // built: area cleared, design kept, group on the map
+    await expect(page.getByTestId("launcher")).toHaveAttribute("data-open", "false", { timeout: 10000 });
+    // built: area cleared, no type kept, group on the map
     expect(await page.evaluate(() => (window as any).pm.backend.groups.length)).toBe(1);
     expect(await page.evaluate(() => (window as any).pm.backend.ring.length)).toBe(0);
+    expect(await page.evaluate(() => (window as any).pm.backend.root)).toBeNull();
+    await page.getByTestId("launcher").locator("button").click();
+    await expect(page.getByTestId("stage-area")).toBeVisible();
     await shot(page, "06-built");
 
     // manage: click the built group
@@ -65,6 +69,27 @@ test("full flow: draw → design → review → build, then manage the result", 
     await page.getByTestId("confirm-ok").click();
     expect(await page.evaluate(() => (window as any).pm.backend.groups.length)).toBe(0);
 
+    expect(errors).toEqual([]);
+});
+
+test("Build & keep area: the area stays, back to Design with no type chosen", async ({ page }) => {
+    const errors = await open(page);
+    await drawPolygon(page, FIELD);
+    await page.getByTestId("primary").click();
+    expect(await stage(page)).toBe("design");
+    await waitPlanned(page);
+    await page.keyboard.press("Enter");
+    expect(await stage(page)).toBe("review");
+    await waitPlanned(page);
+    await expect(page.getByTestId("primary")).toContainText("Build & keep area");
+    await page.getByTestId("primary").click();
+    await expect(page.getByTestId("stage-building")).toBeVisible();
+    await expect(page.getByTestId("stage-design")).toBeVisible({ timeout: 10000 });
+    expect(await page.evaluate(() => (window as any).pm.backend.groups.length)).toBe(1);
+    expect(await page.evaluate(() => (window as any).pm.backend.ring.length)).toBe(4);
+    expect(await page.evaluate(() => (window as any).pm.backend.root)).toBeNull();
+    await expect(page.getByTestId("primary")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("launcher")).toHaveAttribute("data-open", "true");
     expect(errors).toEqual([]);
 });
 

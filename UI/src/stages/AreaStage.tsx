@@ -105,10 +105,34 @@ const Stops = ({ rules, off, offWhy }: { rules: BrushRules; off?: boolean; offWh
         { key: "builds", icon: "otherBuilds", label: t("Placemaker.UI.Rules.MyBuilds", "My builds"), tip: t("Placemaker.UI.Rules.BuildsTip", "Keep off what you built with Placemaker.") },
     ];
     const zoning = zoningOf(rules);
+    const allOn = stops.every((x) => stopOn(rules, x.key));
+    const setAll = (on: boolean) => {
+        const change: Partial<Record<StopKey, boolean>> = {};
+        for (const x of stops) change[x.key] = on;
+        act.setBrushRules(change);
+    };
     return (
         <>
             <Row label={t("Placemaker.UI.Rules.Stops", "Stops at")} off={off} testId="area-stops" tip={t("Placemaker.UI.Rules.StopsTip", "What the area never covers, for every tool. Red on the map.")}>
                 <div className={s.chips} data-testid="area-stops-chips">
+                    <Tip
+                        title={t("Placemaker.UI.Rules.AllStops", "All of them")}
+                        description={off ? offWhy : t("Placemaker.UI.Rules.AllStopsTip", "Lit when it stops at everything here. Click to turn them all on, or all off when they are all on.")}
+                    >
+                        <button
+                            type="button"
+                            data-testid="stop-all"
+                            aria-pressed={allOn && !off ? "true" : "false"}
+                            aria-disabled={off ? "true" : "false"}
+                            className={classNames(s.chip, s.chipStar, { [s.chipOn]: allOn && !off, [s.chipOff]: off })}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (!off) setAll(!allOn);
+                            }}
+                        >
+                            <Icon name="star" size={12} tint={allOn && !off ? "light" : "dim"} />
+                        </button>
+                    </Tip>
                     {stops.map((x) => (
                         <ToggleChip
                             key={x.key}
@@ -170,12 +194,11 @@ const BucketSettings = ({ rules }: { rules: BrushRules }) => {
     );
 };
 
-/** Points: the stops (the outline is cut by them). */
-const PointsSettings = ({ rules }: { rules: BrushRules }) => {
+/** Points: just the points (no stops: the outline is exactly what was drawn). */
+const PointsSettings = () => {
     const { t } = useT();
     return (
         <div className={s.settings} data-testid="points-settings">
-            <Stops rules={rules} />
             <div className={s.note} data-testid="points-note">
                 <Icon name="info" size={11} tint="dim" />
                 <div className={s.noteText}>{t("Placemaker.UI.Area.PointsNodes", "Over a junction a corner snaps to the road node; two in a row follow the road. Alt: no snapping.")}</div>
@@ -326,7 +349,7 @@ export const AreaStage = ({ state }: { state: ToolState }) => {
                 </div>
             ) : null}
             {tool === "block" && rules ? <BucketSettings rules={rules} /> : null}
-            {tool === "draw" && rules ? <PointsSettings rules={rules} /> : null}
+            {tool === "draw" ? <PointsSettings /> : null}
             <div className={s.summary} data-testid="area-summary">
                 {a.closed && a.areaM2 > 0 ? (
                     <>

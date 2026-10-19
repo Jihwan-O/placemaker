@@ -180,6 +180,13 @@ $accent: #8fd1ff;
     cursor: default;
 }
 
+// the master chip of the stops: the star alone
+.chipStar {
+    justify-content: center;
+    width: 22rem;
+    padding: 0;
+}
+
 .chipText {
     margin-left: 4rem;
     font-size: $fs-s;

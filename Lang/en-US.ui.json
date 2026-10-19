@@ -295,6 +295,8 @@
   "Placemaker.UI.Review.Planning": "Planning…",
   "Placemaker.UI.Review.PlusN": "+{0} more",
   "Placemaker.UI.Review.Upkeep": "Upkeep",
+  "Placemaker.UI.Rules.AllStops": "All of them",
+  "Placemaker.UI.Rules.AllStopsTip": "Lit when it stops at everything here. Click to turn them all on, or all off when they are all on.",
   "Placemaker.UI.Rules.BikesTip": "Stop at bike paths.",
   "Placemaker.UI.Rules.Block": "One block",
   "Placemaker.UI.Rules.BlockTip2": "A stroke stays in what the Paint bucket would fill where it started.",

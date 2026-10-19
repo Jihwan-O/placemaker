@@ -3,9 +3,8 @@
 // "and then all that avoid stuff, points should have all that avoid stuff as well. Stops at, keep off, whatever".
 //   * A corner placed over a junction or a dead end snaps to its road node (Snap, SnapKind.RoadNode; Alt places
 //     freely). Two such corners in a row follow the road between them (shortest route, if it is not a long detour).
-//   * The outline is then cut by the shared stops (Game/Selection/AreaWalls): with Roads on, an outline along road
-//     centre lines lands exactly on the curbs, as Road nodes did; buildings, lots, zoning, my builds, paths, tracks
-//     and water are kept off the same way. The biggest piece is kept; what was left out is shaded grey.
+//   * (2026-10-19, "for points, we don't need stop set or even zoning. Points is just points") The outline is exactly
+//     what was drawn: no stops cut it (it was cut by the shared stops, the biggest piece kept, the rest shaded grey).
 
 using System;
 using System.Collections.Generic;
@@ -163,7 +162,8 @@ namespace Placemaker.Game.Tool
             {
                 if (s?.Ring == null || s.Ring.Length < 3) return s;
                 if (_mode != SelectionMode.Draw && _mode != SelectionMode.Perimeter) return s;
-                if (_painter) return s;   // the painter picks lots by their middle: the outline is exactly what was drawn, across streets too
+                // Points is just points: the outline as drawn
+                if (_mode == SelectionMode.Draw || _painter) return s;   // the painter picks lots by their middle: the outline is exactly what was drawn, across streets too
                 var rules = BrushRules.ForOutline();
                 var ring = s.Ring2D();
                 Poly.Bounds(ring, out var mn, out var mx);

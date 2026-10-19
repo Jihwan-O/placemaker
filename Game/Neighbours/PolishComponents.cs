@@ -17,17 +17,29 @@ namespace Placemaker.Game.Neighbours
 {
     public struct PolishedLot : IComponentData, IQueryTypeParameter, ISerializable
     {
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 4;
         public bool Yes;
         /// <summary>(v2) How the garden is dressed: 0 by the zone (the settings), 1 garden, 2 natural, 3 tidy, 4 yard
         /// (NeighbourPolishSystem.ThemeNames). Never renumber.</summary>
         public byte Theme;
+        /// <summary>(v3) The theme was picked with the painter: "Redo polished buildings" keeps it. Else it came from the
+        /// setting for the building's kind when the lot was polished.</summary>
+        public bool Picked;
+        /// <summary>(v4) The look the lot was polished with (the painter's options; new buildings: the options then):
+        /// Parts (NeighbourPolishSystem.Part* bits) and the painted-garden share 0–100. Own false (older lots): the
+        /// settings.</summary>
+        public bool Own;
+        public byte Parts, Painted;
 
         public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
         {
             writer.Write(CurrentVersion);
             writer.Write(Yes);
             writer.Write(Theme);
+            writer.Write(Picked);
+            writer.Write(Own);
+            writer.Write(Parts);
+            writer.Write(Painted);
         }
 
         public void Deserialize<TReader>(TReader reader) where TReader : IReader
@@ -35,6 +47,9 @@ namespace Placemaker.Game.Neighbours
             reader.Read(out int version);
             reader.Read(out Yes);
             if (version >= 2) reader.Read(out Theme); else Theme = 0;
+            if (version >= 3) reader.Read(out Picked); else Picked = Theme != 0;   // v2: only the painter gave a theme
+            if (version >= 4) { reader.Read(out Own); reader.Read(out Parts); reader.Read(out Painted); }
+            else { Own = false; Parts = 0; Painted = 0; }
         }
     }
 

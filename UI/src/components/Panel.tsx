@@ -28,6 +28,7 @@ import { ManageStage } from "../stages/ManageStage";
 import { Btn, Check, Icon, Keys, Segmented } from "./common";
 import { layoutFor, MAX_SHARE, MIN_REM, NARROW_REM, PanelLayoutContext, WIDE_DEFAULT_REM, WIDE_SCREEN_PX } from "../lib/layout";
 import { AssetPickerCard, PickerContext, PickerRequest } from "./picker";
+import { PolishDesign, PolishReview } from "./PainterCard";
 import s from "./panel.module.scss";
 
 const STAGES: { id: Stage; key: string; en: string }[] = [
@@ -736,18 +737,20 @@ export const PlacemakerPanel = () => {
         blockedReason = t("Placemaker.UI.Review.AckFirst", "Tick OK to build");
     }
 
-    const leftOut = (state.stage === "area" || state.stage === "review") ? <LeftOut audit={summary.audit} /> : null;
+    // the neighbourhood-polish tool (its own button, state.painter): Placemaker's panel and steps, its own Design and Review
+    const polish = !!state.painter;
+    const leftOut = !polish && (state.stage === "area" || state.stage === "review") ? <LeftOut audit={summary.audit} /> : null;
     let body: React.ReactNode = null;
     switch (state.stage) {
         case "area":
             body = <>{leftOut}<AreaStage state={state} /></>;
             break;
         case "design":
-            body = <DesignStage catalog={catalog} design={design} state={state} />;
+            body = polish ? <PolishDesign state={state} /> : <DesignStage catalog={catalog} design={design} state={state} />;
             break;
         case "review":
             body = (
-<ReviewStage catalog={catalog} state={state} summary={summary} />
+polish ? <PolishReview state={state} /> : <ReviewStage catalog={catalog} state={state} summary={summary} />
             );
             break;
         case "building":
@@ -759,7 +762,7 @@ export const PlacemakerPanel = () => {
     }
 
     const collapsed = state.panelCollapsed;
-    const showPreviewToggle = state.stage === "design" || state.stage === "review";
+    const showPreviewToggle = !polish && (state.stage === "design" || state.stage === "review");
     // Header tips open UPWARDS (over the game's top bar), so they never sit on the stage bar below.
     const header = (
         <TipDirectionContext.Provider value="up">
@@ -779,9 +782,9 @@ export const PlacemakerPanel = () => {
                         <Icon name="grip" size={12} tint="dim" />
                     </div>
                 </Tip>
-                <Tip title={t("Placemaker.Name", "Placemaker")}>
+                <Tip title={polish ? t("Placemaker.UI.Polish.Name", "Neighbourhood polish") : t("Placemaker.Name", "Placemaker")}>
                     <div className={s.logo}>
-                        <Icon name="logo" size={16} tint="accent" />
+                        <Icon name={polish ? "shrub" : "logo"} size={16} tint="accent" />
                     </div>
                 </Tip>
                 {/* Design / Review show the preview toggle in the title's place (the logo names the tool). */}
@@ -789,7 +792,7 @@ export const PlacemakerPanel = () => {
                     <PreviewToggle state={state} />
                 ) : (
                     <div className={s.title}>
-                        {state.stage === "manage" ? t("Placemaker.UI.Manage.Title", "Built with Placemaker") : t("Placemaker.Name", "Placemaker")}
+                        {polish ? t("Placemaker.UI.Polish.Name", "Neighbourhood polish") : state.stage === "manage" ? t("Placemaker.UI.Manage.Title", "Built with Placemaker") : t("Placemaker.Name", "Placemaker")}
                     </div>
                 )}
                 {state.editingGroup != null ? <div className={s.editingPill}>{t("Placemaker.UI.Editing", "Editing")}</div> : null}

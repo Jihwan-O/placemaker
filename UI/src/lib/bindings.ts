@@ -315,6 +315,7 @@ const json = (v: SettingValue) => JSON.stringify(v);
 /** Every UI → C# call, typed after contract.ts Triggers. */
 export const act = {
     toggleTool: () => fire(Triggers.toggleTool),
+    togglePolish: () => fire(Triggers.togglePolish),
     close: () => fire(Triggers.close),
     setPanelCollapsed: (collapsed: boolean) => fire(Triggers.setPanelCollapsed, collapsed),
     goToStage: (stage: Stage) => fire(Triggers.goToStage, stage),
@@ -323,6 +324,10 @@ export const act = {
     polishStamp: (yes: boolean) => fire(Triggers.polishStamp, yes),
     /** The theme the painter's Polish gives. */
     polishTheme: (theme: string) => fire(Triggers.polishTheme, theme),
+    /** A look row of the painter card (toggles 1 / 0, painted 0–100). */
+    polishOption: (id: string, value: number) => fire(Triggers.polishOption, id, value),
+    /** A Whole city row of the painter card. */
+    polishCity: (what: string, value = "") => fire(Triggers.polishCity, what, value),
     undo: () => fire(Triggers.undo),
     redo: () => fire(Triggers.redo),
     setAreaMode: (mode: AreaMode) => fire(Triggers.setAreaMode, mode),

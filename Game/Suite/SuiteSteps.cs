@@ -311,6 +311,7 @@ namespace Placemaker.Game.Suite
                 case "key": yield return StepKey(st, step, rec); break;
                 case "anarchy": yield return StepAnarchy(st, step, rec); break;
                 case "setting": yield return StepSetting(st, step, rec); break;
+                case "options": yield return StepOptions(st, step, rec); break;
                 case "preset": yield return StepPreset(st, step, rec); break;
                 case "lab": yield return StepLab(st, step, rec); break;
                 case "polish": yield return StepPolish(st, step, rec); break;

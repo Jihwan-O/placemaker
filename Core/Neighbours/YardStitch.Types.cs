@@ -51,6 +51,10 @@ namespace Placemaker.Core.Neighbours
         /// outcrops, logs, no lawn), "tidy" (lawns, hedges, flower beds, no rocks) or "yard" (worn ground, rubble, pallets).
         /// Null: by what it is (industry a yard, everything else a garden).</summary>
         public string Theme;
+        /// <summary>What this house was polished with (the painter's options, saved on its lot): planner knobs by name
+        /// ("paintedGardens", "lawns", "plant", "features", "pathChance", "alleyChance", "rockChance", "paint", "pavedFill")
+        /// before the settings. Null: the settings.</summary>
+        public Dictionary<string, float> Options;
 
         public float2 Right => new float2(Forward.y, -Forward.x);
         public float2 ToLocal(float2 w) { var d = w - Position; return new float2(math.dot(d, Right), math.dot(d, Forward)); }

@@ -166,7 +166,7 @@ type ChipProps = {
     onClick: () => void;
 };
 
-const Chip = ({ testId, nav, icon, color, name, count, on, title, description, dashed, badge, extra, onClick }: ChipProps) => (
+export const Chip = ({ testId, nav, icon, color, name, count, on, title, description, dashed, badge, extra, onClick }: ChipProps) => (
     <Tip title={title ?? name} description={description}>
         <button
             type="button"
@@ -190,7 +190,7 @@ const Chip = ({ testId, nav, icon, color, name, count, on, title, description, d
     </Tip>
 );
 
-const RowLabel = ({ n, label }: { n: number; label: string }) => (
+export const RowLabel = ({ n, label }: { n: number; label: string }) => (
     <div className={s.rowLabel}>
         <div className={s.rowNum}>{n}</div>
         <div className={s.rowLabelText}>{label}</div>

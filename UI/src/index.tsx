@@ -4,7 +4,7 @@
 import { ModRegistrar } from "cs2/modding";
 import { initializeVanilla } from "./lib/vanilla";
 import { PlacemakerRoot } from "./components/Panel";
-import { Launcher } from "./components/Launcher";
+import { Launcher, PolishLauncher } from "./components/Launcher";
 import { INFO_SECTION_TYPE, PlacemakerInfoSection } from "./components/InfoSection";
 
 const SELECTED_INFO_SECTIONS = "game-ui/game/components/selected-info-panel/selected-info-sections/selected-info-sections.tsx";
@@ -27,6 +27,7 @@ const register: ModRegistrar = (moduleRegistry) => {
 
     try {
         moduleRegistry.append("GameTopLeft", Launcher);
+        moduleRegistry.append("GameTopLeft", PolishLauncher);
     } catch (e) {
         console.error("[Placemaker] could not add the toolbar button.", e);
     }

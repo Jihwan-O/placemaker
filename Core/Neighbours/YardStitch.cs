@@ -43,15 +43,24 @@ namespace Placemaker.Core.Neighbours
         public static string ThemeOf(StitchHouse h) =>
             !string.IsNullOrEmpty(h.Theme) && Array.IndexOf(Themes, h.Theme) >= 0 ? h.Theme : h.Zone == "industry" ? "yard" : "garden";
 
-        /// <summary>A painted garden (no drawn lawn): natural and yard always, tidy never, a garden now and then.</summary>
+        /// <summary>A knob for one house: what its lot was polished with (StitchHouse.Options), else the settings.</summary>
+        private static float K(StitchHouse h, StitchSettings s, string name, float fallback) =>
+            h?.Options != null && h.Options.TryGetValue(name, out var v) ? v : s.Knob(name, fallback);
+
+        /// <summary>
+        /// A painted garden (no drawn lawn) or the house's own lawns: a mix along every street. The setting "Painted gardens"
+        /// (share p) is a Garden house's chance; a Natural or Yard house is painted more often (1 - (1 - p)², 33% → 55%), a
+        /// Tidy one seldom (p², 33% → 11%); 0 never, 100 always.
+        /// </summary>
         private static bool PaintedGarden(StitchHouse h, StitchSettings s)
         {
+            float p = math.saturate(K(h, s, "paintedGardens", 33f) / 100f);
             switch (ThemeOf(h))
             {
-                case "natural": case "yard": return true;
-                case "tidy": return false;
-                default: return Hash((ulong)h.Id ^ 0x9A1D7UL) % 100 < (uint)s.Knob("paintedGardens", 33f);
+                case "natural": case "yard": p = 1f - (1f - p) * (1f - p); break;
+                case "tidy": p *= p; break;
             }
+            return Hash((ulong)h.Id ^ 0x9A1D7UL) % 100 < (uint)math.round(p * 100f);
         }
 
         public static int Score(string name)
@@ -288,7 +297,7 @@ namespace Placemaker.Core.Neighbours
                     uint ph = Hash(((ulong)a.Id * 0x9E3779B97F4A7C15UL) ^ (ulong)b.Id);
                     bool step = s.Knob("steps", 1f) > 0.5f && ringCut[i] == null && ringCut[right[i]] == null && bg > fg + 6f && ph % 100 < (uint)s.Knob("stepChance", 0f)
                         && SideLines(a, +1, s).Any() && SideLines(b, -1, s).Any();
-                    bool alley = !step && s.Knob("alleys", 1f) > 0.5f && fg >= 3f && fg <= 9f && math.abs(bg - fg) < 2f && (ph >> 8) % 100 < (uint)s.Knob("alleyChance", 45f);
+                    bool alley = !step && s.Knob("alleys", 1f) > 0.5f && fg >= 3f && fg <= 9f && math.abs(bg - fg) < 2f && (ph >> 8) % 100 < (uint)math.min(K(a, s, "alleyChance", 45f), K(b, s, "alleyChance", 45f));
                     if (step || alley)
                     {
                         // each keeps to the other's lot line (a step: both reach it, the parts are taken away below), or to
@@ -648,12 +657,13 @@ namespace Placemaker.Core.Neighbours
             for (int i = 0; i < n; i++) beds[i] = new List<Region>();
             var reserved = new List<Region>[n];   // features' ground (a sand pit): never under a lawn, kept through bed fitting
             for (int i = 0; i < n; i++) reserved[i] = new List<Region>();
-            if (s.Knob("plant", 1f) > 0.5f)
+            // planting, features, paths and rocks: each house as it was polished (its own options), else the settings
+            if (houses.Any(h => h.Edit && K(h, s, "plant", 1f) > 0.5f))
             {
                 var built = new Obstacle(houses);
-                foreach (var (hi, a, b, inward) in stepBeds) if (houses[hi].Edit) StepRow(houses[hi], plots[hi], a, b, inward, plan, beds[hi], built, s);
+                foreach (var (hi, a, b, inward) in stepBeds) if (houses[hi].Edit && K(houses[hi], s, "plant", 1f) > 0.5f) StepRow(houses[hi], plots[hi], a, b, inward, plan, beds[hi], built, s);
                 Plant(houses, plots, touched, plan, moved, beds, built, s);
-                if (s.Knob("features", 1f) > 0.5f) Features(houses, plots, touched, plan, beds, reserved, built, s);
+                Features(houses, plots, touched, plan, beds, reserved, built, s);
                 Paths(houses, plots, touched, left, right, plan, beds, built, s);
                 Rocks(houses, plots, plan, moved, built, s);
             }
@@ -685,7 +695,7 @@ namespace Placemaker.Core.Neighbours
                 var h = houses[i];
                 var plot = Ccw(plots[i]);
                 if (touched[i]) plan.Plots[h.Id] = plot;
-                if (s.Knob("lawns", 1f) < 0.5f) continue;   // the player keeps lawns as the houses come
+                if (K(h, s, "lawns", 1f) < 0.5f) continue;   // the player keeps lawns as the houses come
                 // a painted garden (by its theme), joined to its neighbours or not: the house's own grass surfaces are tucked
                 // away under the house and the whole garden (minus the paving) is painted, lush (a yard: worn ground)
                 if (string.IsNullOrEmpty(h.MainSurface) && PaintedGarden(h, s) && h.Lawns.Any(l => l.Ring != null && l.Ring.Length >= 3) | touched[i])
@@ -707,7 +717,7 @@ namespace Placemaker.Core.Neighbours
                 if (ext.Sum(r => r.Area) < 1f) continue;
                 var hard0 = houses.SelectMany(o => o.Hard).Where(r => r != null && r.Length >= 3 && Overlaps(plot, r)).Select(r => new Region(Ccw(r))).Concat(beds[i]).Concat(reserved[i]).ToList();
                 // a shop, office or works: its extra land in the surface most of its ground already is (its car park), not lawn
-                if (!string.IsNullOrEmpty(h.MainSurface) && s.Knob("pavedFill", 1f) > 0.5f)
+                if (!string.IsNullOrEmpty(h.MainSurface) && K(h, s, "pavedFill", 1f) > 0.5f)
                 {
                     var spare = Poly.Boolean(lawnLand[i], new[] { new Region(Ccw(Lot(h))) }, BoolOp.Difference);
                     float spare0 = spare.Sum(r => r.Area);
@@ -785,9 +795,9 @@ namespace Placemaker.Core.Neighbours
 
             // ground paint round every polished house, joined or not: the gardens of a pass as one shape, grown outward with
             // rounded corners into a near band and a wider, fainter one, minus the gardens themselves (lush, soft, uneven)
-            if (s.Knob("paint", 1f) > 0.5f && s.Knob("blendWidth", 12f) > 0.5f)
+            if (s.Knob("blendWidth", 12f) > 0.5f)
             {
-                var gardens = Enumerable.Range(0, n).Where(i => houses[i].Edit && houses[i].Polished && plots[i] != null).Select(i => (IReadOnlyList<float2>)Ccw(plots[i])).ToList();
+                var gardens = Enumerable.Range(0, n).Where(i => houses[i].Edit && houses[i].Polished && plots[i] != null && K(houses[i], s, "paint", 1f) > 0.5f).Select(i => (IReadOnlyList<float2>)Ccw(plots[i])).ToList();
                 var allPlots = Enumerable.Range(0, n).Where(i => plots[i] != null).Select(i => new Region(Ccw(plots[i]))).ToList();
                 var joined = gardens.Count > 0 ? Poly.UnionAll(gardens) : new List<Region>();
                 float near = s.Knob("blendWidth", 12f), far = s.Knob("blendFar", 22f);
@@ -807,10 +817,9 @@ namespace Placemaker.Core.Neighbours
             Commons(houses, plots, ringOf, plan, s);
 
             // ground paint along the outside of back fences that face open land (a worn edge where the field meets the gardens)
-            if (s.Knob("paint", 1f) > 0.5f)
-                for (int i = 0; i < n; i++)
+            for (int i = 0; i < n; i++)
                 {
-                    if (!touched[i] || !BackEdge(houses[i], plots[i], out var e0, out var e1) || math.distance(e0, e1) < 4f) continue;
+                    if (!touched[i] || K(houses[i], s, "paint", 1f) < 0.5f || !BackEdge(houses[i], plots[i], out var e0, out var e1) || math.distance(e0, e1) < 4f) continue;
                     var mid = (e0 + e1) * 0.5f;
                     var outward = math.normalizesafe(mid - houses[i].Position);
                     var d = math.normalize(e1 - e0);
@@ -825,7 +834,7 @@ namespace Placemaker.Core.Neighbours
             foreach (var kv in moved) if (!plan.HideLines.Contains(kv.Key)) plan.MoveLines[kv.Key] = kv.Value;
             KeepUnpolished(houses, plan);
             plan.Notes.Add($"{touched.Count(t => t)} plots: {borders.Count} shared sides, {rearPairs.Count} back to back, {plan.MoveLines.Count} lines moved, {plan.HideLines.Count} hidden, {plan.Lawns.Count} lawns fitted, {plan.NewLawns.Count} new lawns, {plan.Beds.Count} beds, {plan.Bushes.Count} bushes and rocks, {plan.Paths.Count} paths");
-            if (s.Knob("paint", 1f) > 0.5f) PlanPaint(plan, s, houses.Where(h => !h.Polished).Select(h => new Region(Ccw(Lot(h)))).ToList());
+            if (plan.Paints.Count > 0 || s.Knob("paint", 1f) > 0.5f) PlanPaint(plan, s, houses.Where(h => !h.Polished).Select(h => new Region(Ccw(Lot(h)))).ToList());
             Stage("rest");
             plan.Notes.Add("time (ms): " + string.Join(", ", stages));
             return plan;
@@ -982,7 +991,7 @@ namespace Placemaker.Core.Neighbours
             int maxBushes = (int)s.Knob("bushesPerGarden", 14f);
             for (int i = 0; i < houses.Count; i++)
             {
-                if (!touched[i] || !houses[i].Edit || !string.IsNullOrEmpty(houses[i].MainSurface)) continue;
+                if (!touched[i] || !houses[i].Edit || !string.IsNullOrEmpty(houses[i].MainSurface) || K(houses[i], s, "plant", 1f) < 0.5f) continue;
                 string theme = ThemeOf(houses[i]);
                 if (theme == "natural" || theme == "yard") continue;   // no tidy beds in a wild garden or a works yard
                 var h = houses[i];
@@ -1086,7 +1095,7 @@ namespace Placemaker.Core.Neighbours
             for (int i = 0; i < houses.Count; i++)
             {
                 var h = houses[i];
-                if (!touched[i] || !h.Edit || plots[i] == null) continue;
+                if (!touched[i] || !h.Edit || plots[i] == null || K(h, s, "plant", 1f) < 0.5f || K(h, s, "features", 1f) < 0.5f) continue;
                 string theme = ThemeOf(h);
                 bool industry = theme == "yard";
                 if (!industry && !string.IsNullOrEmpty(h.MainSurface)) continue;   // shops and offices: paving only
@@ -1278,7 +1287,7 @@ namespace Placemaker.Core.Neighbours
                 var hk = houses[k];
                 if (!touched[k] || !string.IsNullOrEmpty(hk.MainSurface) || hk.Footprint == null || hk.Footprint.Length < 3) return false;
                 if (ThemeOf(hk) == "natural" || ThemeOf(hk) == "yard") return false;
-                if (Hash((ulong)hk.Id * 0x2545F4914F6CDD1DUL) % 100 >= (uint)s.Knob("pathChance", 45f)) return false;
+                if (K(hk, s, "plant", 1f) < 0.5f || Hash((ulong)hk.Id * 0x2545F4914F6CDD1DUL) % 100 >= (uint)K(hk, s, "pathChance", 45f)) return false;
                 return Poly.Area(plots[k]) - 4f * hk.HalfLot.x * hk.HalfLot.y >= s.Knob("pathMinExtra", 120f);
             }
             for (int i = 0; i < houses.Count; i++)
@@ -1355,7 +1364,8 @@ namespace Placemaker.Core.Neighbours
                 long owner = (hash >> 7 & 1) == 0 ? pair.Left : pair.Right;
                 if (!byId.TryGetValue(owner, out int oi)) continue;
                 string ownerTheme = ThemeOf(houses[oi]);
-                float chance = ownerTheme == "natural" ? s.Knob("naturalRockChance", 35f) : ownerTheme == "garden" ? s.Knob("rockChance", 12f) : 0f;
+                float chance = K(houses[oi], s, "plant", 1f) < 0.5f || K(houses[oi], s, "rockChance", 12f) <= 0f ? 0f
+                    : ownerTheme == "natural" ? s.Knob("naturalRockChance", 35f) : ownerTheme == "garden" ? K(houses[oi], s, "rockChance", 12f) : 0f;
                 if (hash % 100 >= (uint)chance) continue;
                 if (!houses[oi].Polished)
                 {

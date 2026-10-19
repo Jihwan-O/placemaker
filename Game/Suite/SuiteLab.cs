@@ -199,13 +199,18 @@ namespace Placemaker.Game.Suite
                     var clock = System.Diagnostics.Stopwatch.StartNew();
                     int passes0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPasses;
                     int frames = 0;
+                    var ms = new System.Collections.Generic.List<float>();
                     yield return Frames(4);
-                    while (Placemaker.Game.Neighbours.NeighbourPolishSystem.Busy && clock.Elapsed.TotalSeconds < limit) { frames++; yield return null; }
+                    while (Placemaker.Game.Neighbours.NeighbourPolishSystem.Busy && clock.Elapsed.TotalSeconds < limit) { frames++; yield return null; ms.Add(UnityEngine.Time.unscaledDeltaTime * 1000f); }
                     rec["seconds"] = Math.Round(clock.Elapsed.TotalSeconds, 1);
                     rec["frames"] = frames;
                     rec["passes"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPasses - passes0;
                     rec["stillWaiting"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.Waiting;
-                    Mod.Log.Info($"Placemaker lab: polish idle after {clock.Elapsed.TotalSeconds:F1} s, {frames} frames ({(frames > 0 ? clock.Elapsed.TotalMilliseconds / frames : 0):F1} ms a frame), {rec["passes"]} passes, {rec["stillWaiting"]} still waiting");
+                    ms.Sort();
+                    float worst = ms.Count > 0 ? ms[ms.Count - 1] : 0f, p95 = ms.Count > 0 ? ms[(int)(ms.Count * 0.95f)] : 0f, median = ms.Count > 0 ? ms[ms.Count / 2] : 0f;
+                    int over33 = ms.Count(x => x > 33.4f), over50 = ms.Count(x => x > 50f), over100 = ms.Count(x => x > 100f);
+                    rec["frameMs"] = new JObject { ["median"] = Math.Round(median, 1), ["p95"] = Math.Round(p95, 1), ["worst"] = Math.Round(worst, 1), ["over33"] = over33, ["over50"] = over50, ["over100"] = over100 };
+                    Mod.Log.Info($"Placemaker lab: polish idle after {clock.Elapsed.TotalSeconds:F1} s, {frames} frames ({(frames > 0 ? clock.Elapsed.TotalMilliseconds / frames : 0):F1} ms a frame; median {median:F1}, 95% under {p95:F1}, worst {worst:F1} ms; {over33} over 33 ms, {over50} over 50, {over100} over 100), {rec["passes"]} passes, {rec["stillWaiting"]} still waiting");
                     yield break;
                 }
                 case "polishdump":

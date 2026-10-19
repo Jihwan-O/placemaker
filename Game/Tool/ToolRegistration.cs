@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Colossal.IO.AssetDatabase;
 using Game;
 using Game.Input;
@@ -79,7 +80,16 @@ namespace Placemaker.Game.Tool
             r[s.GetOptionTabLocaleID(PlacemakerSettings.SectionMain)] = T("Placemaker.Settings.Tab.Main", "Placemaker");
             foreach (var g in new[] { PlacemakerSettings.GroupGeneral, PlacemakerSettings.GroupBrush, PlacemakerSettings.GroupBuild, PlacemakerSettings.GroupNeighbourhood, PlacemakerSettings.GroupKeys, PlacemakerSettings.GroupMaintenance })
                 r[s.GetOptionGroupLocaleID(g)] = T("Placemaker.Settings.Group." + g, g);
-            foreach (var p in new[]
+            // every property shown on the page (a section, not hidden), also ones added later than the list below
+            var shown = new List<string>();
+            foreach (var prop in typeof(PlacemakerSettings).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly))
+                if (Attribute.IsDefined(prop, typeof(global::Game.Settings.SettingsUISectionAttribute)) && !Attribute.IsDefined(prop, typeof(global::Game.Settings.SettingsUIHiddenAttribute)))
+                {
+                    shown.Add(prop.Name);
+                    if (Attribute.IsDefined(prop, typeof(global::Game.Settings.SettingsUIConfirmationAttribute)))
+                        r[s.GetOptionWarningLocaleID(prop.Name)] = T("Placemaker.Settings." + prop.Name + ".Warning", "Are you sure?");
+                }
+            foreach (var p in shown.Concat(new[]
             {
                 nameof(PlacemakerSettings.ShowCursorTooltips), nameof(PlacemakerSettings.PreviewDetail), nameof(PlacemakerSettings.SnapToRoadsWhenDrawing), nameof(PlacemakerSettings.KeepOffExistingRoads),
                 nameof(PlacemakerSettings.LayoutSize), nameof(PlacemakerSettings.EdgeMargin), nameof(PlacemakerSettings.PaintAvoidBuildings),
@@ -100,15 +110,14 @@ namespace Placemaker.Game.Tool
                 nameof(PlacemakerSettings.ApplyParkStats), nameof(PlacemakerSettings.RealParkStats),
                 nameof(PlacemakerSettings.NeighbourhoodPolish), nameof(PlacemakerSettings.PolishNewHouses), nameof(PlacemakerSettings.PolishLawns),
                 nameof(PlacemakerSettings.PolishPaintedGardens), nameof(PlacemakerSettings.PolishPavedFill), nameof(PlacemakerSettings.PolishPlanting),
-                nameof(PlacemakerSettings.PolishPaths), nameof(PlacemakerSettings.PolishRocks), nameof(PlacemakerSettings.PolishGroundPaint), nameof(PlacemakerSettings.RemoveAllPolish),
-            })
+                nameof(PlacemakerSettings.PolishPaths), nameof(PlacemakerSettings.PolishRocks), nameof(PlacemakerSettings.PolishGroundPaint),
+            }).Distinct())
             {
                 r[s.GetOptionLabelLocaleID(p)] = T("Placemaker.Settings." + p, p);
                 r[s.GetOptionDescLocaleID(p)] = T("Placemaker.Settings." + p + ".Desc", "");
             }
             r[s.GetOptionWarningLocaleID(nameof(PlacemakerSettings.RemoveEverything))] = T("Placemaker.Settings.RemoveEverything.Warning", "Remove everything Placemaker built?");
             r[s.GetOptionWarningLocaleID(nameof(PlacemakerSettings.ResetDefaults))] = T("Placemaker.Settings.ResetDefaults.Warning", "Reset all Placemaker options and saved defaults?");
-            r[s.GetOptionWarningLocaleID(nameof(PlacemakerSettings.RemoveAllPolish))] = T("Placemaker.Settings.RemoveAllPolish.Warning", "Put every garden back as the game made it?");
             foreach (PreviewDetail d in Enum.GetValues(typeof(PreviewDetail)))
                 r[s.GetEnumValueLocaleID(d)] = T("Placemaker.Settings.PreviewDetail." + d, d.ToString());
             r[s.GetBindingMapLocaleID()] = T("Placemaker.Name", "Placemaker");

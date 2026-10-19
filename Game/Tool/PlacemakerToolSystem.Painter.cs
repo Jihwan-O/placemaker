@@ -26,6 +26,24 @@ namespace Placemaker.Game.Tool
         private bool _painter;
         private string _painterTheme = "zone";
 
+        /// <summary>
+        /// The polish tool's own button (next to Placemaker's): opens this tool as the polish painter, which the panel shows
+        /// as its own small window (area tools, themes, Look, Whole city, Polish / Unpolish), or closes it. From Placemaker
+        /// it switches over (Placemaker's own type and area stay for when its button is pressed again).
+        /// </summary>
+        public void TogglePolishTool()
+        {
+            if (m_ToolSystem == null || _building) return;
+            bool active = m_ToolSystem.activeTool == this;
+            if (active && _painter) { Close(); return; }
+            if (_stage == ToolStage.Manage) GoToStage(ToolStage.Area);
+            SetPainter(true);
+            if (!active) { _closeAfterGhost = 0; m_ToolSystem.activeTool = this; }
+        }
+
+        /// <summary>For the game runner: the theme picked in the painter's Style row.</summary>
+        public string PainterTheme => _painterTheme;
+
         /// <summary>The theme the painter's Polish gives: "zone" (by each house's zone) or a theme name.</summary>
         public void SetPainterTheme(string theme)
         {
@@ -64,7 +82,7 @@ namespace Placemaker.Game.Tool
             // a painted area keeps what was painted and is fenced again with the painter's stops (lots and buildings no
             // longer stop it); lots the paint ran up against count as picked too (NeighbourPolishSystem.LotsInside)
             else if ((_mode == SelectionMode.Paint || _mode == SelectionMode.BlockPaint) && _shape != null) ShapeChanged();
-            if (on && _stage == ToolStage.Review) SetStage(ToolStage.Design);
+            if (_stage == ToolStage.Review) SetStage(ToolStage.Design);   // Review is the other tool's: back to its Design
             _countShape = null;
             DesignChanged();
             Touch();
@@ -84,6 +102,70 @@ namespace Placemaker.Game.Tool
             return p.Normalized();
         }
 
+        /// <summary>The panel's look rows (Polish gardens card): saved in the settings, given by Polish from now on and to new buildings.</summary>
+        public void SetPolishOption(string id, double value)
+        {
+            var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
+            if (s == null) return;
+            bool on = value > 0.5;
+            switch (id)
+            {
+                case "painted": s.PolishPaintedGardens = (int)Math.Round(Math.Max(0, Math.Min(100, value))); break;
+                case "lawns": s.PolishLawns = on; break;
+                case "planting": s.PolishPlanting = on; break;
+                case "features": s.PolishFeatures = on; break;
+                case "paths": s.PolishPaths = on; break;
+                case "rocks": s.PolishRocks = on; break;
+                case "groundPaint": s.PolishGroundPaint = on; break;
+                case "shopPaving": s.PolishPavedFill = on; break;
+                default: return;
+            }
+            s.ApplyAndSave();
+            Touch();
+        }
+
+        /// <summary>
+        /// The panel's Whole city rows: "on" / "newHouses" (value "true" / "false"), a kind's theme for new buildings ("homes",
+        /// "shops", "offices", "industry": garden, natural, tidy, yard, off), "polishAll" (every building with the Style picked
+        /// and the look; By kind leaves out the kinds set to Off), "unpolishAll" (every garden back as the game made it). The
+        /// city-wide two run in the background, a few buildings a frame; the panel asks first.
+        /// </summary>
+        public void PolishCity(string what, string value)
+        {
+            var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
+            if (s == null) return;
+            bool on = value == "true";
+            switch (what)
+            {
+                case "on": s.NeighbourhoodPolish = on; break;
+                case "newHouses": s.PolishNewHouses = on; break;
+                case "homes": case "shops": case "offices": case "industry":
+                    if (Array.IndexOf(global::Placemaker.Game.Settings.PlacemakerSettings.PolishThemeValues, value) < 0) return;
+                    if (what == "homes") s.PolishThemeHomes = value;
+                    else if (what == "shops") s.PolishThemeShops = value;
+                    else if (what == "offices") s.PolishThemeOffices = value;
+                    else s.PolishThemeIndustry = value;
+                    break;
+                case "polishAll":
+                    if (!s.NeighbourhoodPolish) s.NeighbourhoodPolish = true;
+                    s.ApplyAndSave();
+                    NeighbourPolishSystem.PolishEverything((byte)Math.Max(0, Array.IndexOf(NeighbourPolishSystem.ThemeNames, _painterTheme)));
+                    Mod.Log.Info($"Placemaker painter: polish the whole city ({_painterTheme})");
+                    Flash(new LocText("Placemaker.Painter.CityPolishing"));
+                    Touch();
+                    return;
+                case "unpolishAll":
+                    NeighbourPolishSystem.RemoveAll();
+                    Mod.Log.Info("Placemaker painter: unpolish the whole city");
+                    Flash(new LocText("Placemaker.Painter.CityUnpolishing"));
+                    Touch();
+                    return;
+                default: return;
+            }
+            s.ApplyAndSave();
+            Touch();
+        }
+
         /// <summary>Polish (yes) or Unpolish (no) the lots in the area. The selection goes; only the flags stay.</summary>
         public void PolishStamp(bool yes)
         {
@@ -93,6 +175,10 @@ namespace Placemaker.Game.Tool
             if (_shape == null) { Flash(new LocText("Placemaker.Reason.NoArea")); return; }
             var lots = PainterLots(polish);
             if (lots.Count == 0) { Flash(new LocText("Placemaker.Painter.NoLots")); return; }
+            // polishing is what the player asked for: the polish runs from now on (Whole city: Neighbourhood polish)
+            var settings = global::Placemaker.Game.Tool.ToolRegistration.Settings;
+            if (yes && settings != null && !settings.NeighbourhoodPolish) { settings.NeighbourhoodPolish = true; settings.ApplyAndSave(); }
+            // "By zone": each lot gets its kind's theme from the settings now; a theme button picks one for all of them
             NeighbourPolishSystem.Stamp(lots, yes, (byte)Math.Max(0, Array.IndexOf(NeighbourPolishSystem.ThemeNames, _painterTheme)));
             LastStamp = (lots.Count, yes);
             Mod.Log.Info($"Placemaker painter: {(yes ? "polish" : "unpolish")} {lots.Count} lots ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
@@ -140,10 +226,21 @@ namespace Placemaker.Game.Tool
         {
             if (!_painter) return null;
             var (lots, yes) = PainterCount;
-            return new PainterView
+            var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
+            var v = new PainterView
             {
                 Lots = lots, Polished = yes, FeatureOn = NeighbourPolishSystem.FeatureEnabled, NewHouses = NeighbourPolishSystem.PolishNew, Theme = _painterTheme,
+                CityPolished = NeighbourPolishSystem.StatusPolished, CityTotal = NeighbourPolishSystem.StatusTotal,
+                Waiting = NeighbourPolishSystem.StatusWaiting, Restoring = NeighbourPolishSystem.StatusRestoring,
             };
+            if (s != null)
+            {
+                v.Painted = s.PolishPaintedGardens;
+                v.Lawns = s.PolishLawns; v.Planting = s.PolishPlanting; v.Features = s.PolishFeatures; v.Paths = s.PolishPaths;
+                v.Rocks = s.PolishRocks; v.GroundPaint = s.PolishGroundPaint; v.ShopPaving = s.PolishPavedFill;
+                v.Homes = s.PolishThemeHomes; v.Shops = s.PolishThemeShops; v.Offices = s.PolishThemeOffices; v.Industry = s.PolishThemeIndustry;
+            }
+            return v;
         }
     }
 }

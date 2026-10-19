@@ -114,7 +114,7 @@ namespace Placemaker.Core.Tool
             if (f.BuildRunning) { r.Add(ToolStage.Building); return r; }
             r.Add(ToolStage.Area);
             if (f.AreaValid) r.Add(ToolStage.Design);
-            if (f.AreaValid && f.HasRecipe && !f.Painter) r.Add(ToolStage.Review);
+            if (f.AreaValid && (f.HasRecipe || f.Painter)) r.Add(ToolStage.Review);
             r.Add(ToolStage.Manage);
             return r;
         }
@@ -130,7 +130,7 @@ namespace Placemaker.Core.Tool
         {
             if (f.BuildRunning) return ToolStage.Building;
             if (current == ToolStage.Building) return f.AreaValid && f.HasRecipe ? ToolStage.Review : ToolStage.Area;
-            if (current == ToolStage.Review && !(f.AreaValid && f.HasRecipe && !f.Painter)) current = ToolStage.Design;
+            if (current == ToolStage.Review && !(f.AreaValid && (f.HasRecipe || f.Painter))) current = ToolStage.Design;
             if (current == ToolStage.Design && !f.AreaValid) current = ToolStage.Area;
             return current;
         }
@@ -143,12 +143,14 @@ namespace Placemaker.Core.Tool
             if (f.MarkerModeActive)
                 return Make(PrimaryKind.PlaceMarkers, "Placemaker.Primary.DoneMarkers", true, null);
 
-            // the painter: the lots in the area are stamped polished (Unpolish is its second button), from Area or Design
+            // the polish tool, Placemaker's steps: Area (Next) → Design, its style and look (Review) → Review, Polish (Unpolish
+            // is its second button). The lots in the area are stamped, nothing is built.
             if (f.Painter && stage != ToolStage.Manage)
             {
-                if (f.AreaValid && f.AreaProblem == null) return Make(PrimaryKind.Polish, "Placemaker.Primary.Polish", true, null);
-                var pa = AreaPrimary(f);
-                return new PrimaryAction { Kind = PrimaryKind.Polish, Label = new LocText("Placemaker.Primary.Polish"), Enabled = false, Reason = pa.Reason ?? new LocText("Placemaker.Reason.NoArea") };
+                if (stage == ToolStage.Area || !f.AreaValid) return AreaPrimary(f);
+                if (stage == ToolStage.Design) return Make(PrimaryKind.ToReview, "Placemaker.Primary.Review", true, null);
+                if (f.AreaProblem == null) return Make(PrimaryKind.Polish, "Placemaker.Primary.Polish", true, null);
+                return new PrimaryAction { Kind = PrimaryKind.Polish, Label = new LocText("Placemaker.Primary.Polish"), Enabled = false, Reason = f.AreaProblem };
             }
 
             switch (stage)

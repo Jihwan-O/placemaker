@@ -155,6 +155,35 @@ export interface PainterState {
   newHouses: boolean;
   /** The theme Polish gives: "zone" (each house by its zone's setting), "garden", "natural", "tidy", "yard". */
   theme: string;
+  /** The look Polish gives (saved on each lot it polishes; new buildings get it too). */
+  look?: PolishLook;
+  /** The whole city: each kind's theme for new buildings, how many are polished, work left. */
+  city?: PolishCity;
+}
+
+export interface PolishLook {
+  /** Painted gardens instead of lawns: share 0–100 (Natural and Yard more, Tidy fewer). */
+  painted: number;
+  lawns: boolean;
+  planting: boolean;
+  features: boolean;
+  paths: boolean;
+  rocks: boolean;
+  groundPaint: boolean;
+  shopPaving: boolean;
+}
+
+export interface PolishCity {
+  /** Each kind's theme for new buildings: "garden" | "natural" | "tidy" | "yard" | "off". */
+  homes: string;
+  shops: string;
+  offices: string;
+  industry: string;
+  polished: number;
+  total: number;
+  /** Buildings waiting to be fitted, gardens being put back (a few a frame). */
+  waiting: number;
+  restoring: number;
 }
 
 /** One control, mirrors Core.ControlSchema. */
@@ -538,12 +567,15 @@ export const Values = {
 
 export const Triggers = {
   toggleTool: "toggleTool",                 // ()
+  togglePolish: "togglePolish",             // () — the neighbourhood-polish tool's own button (state.painter while it is open)
   close: "close",                           // ()
   setPanelCollapsed: "setPanelCollapsed",   // (collapsed: boolean)
 
   goToStage: "goToStage",                   // (stage: Stage) — only if in state.reachable
   primary: "primary",                       // () — same as Enter
   polishTheme: "polishTheme",               // (theme: string) — the theme the painter's Polish gives
+  polishOption: "polishOption",             // (id: string, value: number) — the painter card's look rows (toggles 1/0, painted 0–100)
+  polishCity: "polishCity",                 // (what: string, value: string) — on / newHouses / homes|shops|offices|industry / polishAll / unpolishAll
   polishStamp: "polishStamp",               // (yes: boolean) — (PROTOCOL 25) the painter: Polish (true, = primary) / Unpolish (false) the lots in the area
   undo: "undo",                             // ()
   redo: "redo",                             // ()

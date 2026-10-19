@@ -18,8 +18,8 @@ namespace Placemaker.Game.Settings
     public enum PreviewDetail { Simple = 0, Normal = 1, Detailed = 2 }
 
     [FileLocation("ModsSettings/Placemaker/Placemaker")]
-    [SettingsUIGroupOrder(GroupGeneral, GroupBrush, GroupBuild, GroupNeighbourhood, GroupKeys, GroupMaintenance)]
-    [SettingsUIShowGroupName(GroupGeneral, GroupBrush, GroupBuild, GroupNeighbourhood, GroupKeys, GroupMaintenance)]
+    [SettingsUIGroupOrder(GroupGeneral, GroupBrush, GroupBuild, GroupKeys, GroupMaintenance)]
+    [SettingsUIShowGroupName(GroupGeneral, GroupBrush, GroupBuild, GroupKeys, GroupMaintenance)]
     [SettingsUIKeyboardAction(ActionToggleTool, ActionType.Button)]
     [SettingsUIKeyboardAction(ActionPrimary, ActionType.Button)]
     [SettingsUIKeyboardAction(ActionUndo, ActionType.Button)]
@@ -366,100 +366,28 @@ namespace Placemaker.Game.Settings
         [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(CompanionOff))]
         public float CompanionUpkeepFactor { get; set; }
 
-        /// <summary>Neighbourhood polish: houses that finish building are stitched to their neighbours (one shared fence or hedge line, back fences meeting it, lawns up to it). NeighbourPolishSystem.</summary>
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        public bool NeighbourhoodPolish { get; set; }
+        // ───────────── Neighbourhood polish: shown and changed in Placemaker's panel (Polish gardens), saved here ─────────────
 
-        /// <summary>A lot that spawns is marked polished (off: left as the game made it until the painter polishes it).
-        /// Houses already standing are polished with the painter (Placemaker's "Polish gardens" entry).</summary>
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public bool PolishNewHouses { get; set; }
+        /// <summary>Neighbourhood polish on: polished gardens keep fitting as the city changes (off: nothing changes). NeighbourPolishSystem.</summary>
+        [SettingsUIHidden] public bool NeighbourhoodPolish { get; set; }
+        /// <summary>Buildings that grow are polished, each with its kind's theme and the look below.</summary>
+        [SettingsUIHidden] public bool PolishNewHouses { get; set; }
+        /// <summary>The theme for each kind of building: garden, natural, tidy, yard, or off (new ones of that kind not polished).</summary>
+        [SettingsUIHidden] public string PolishThemeHomes { get; set; }
+        [SettingsUIHidden] public string PolishThemeShops { get; set; }
+        [SettingsUIHidden] public string PolishThemeOffices { get; set; }
+        [SettingsUIHidden] public string PolishThemeIndustry { get; set; }
+        /// <summary>The look Polish gives (and new buildings get), saved on each lot it polishes.</summary>
+        [SettingsUIHidden] public bool PolishLawns { get; set; }
+        [SettingsUIHidden] public int PolishPaintedGardens { get; set; }
+        [SettingsUIHidden] public bool PolishPavedFill { get; set; }
+        [SettingsUIHidden] public bool PolishPlanting { get; set; }
+        [SettingsUIHidden] public bool PolishFeatures { get; set; }
+        [SettingsUIHidden] public bool PolishPaths { get; set; }
+        [SettingsUIHidden] public bool PolishRocks { get; set; }
+        [SettingsUIHidden] public bool PolishGroundPaint { get; set; }
 
-        /// <summary>How homes' gardens are dressed: garden, natural, tidy, yard, or off (new homes not polished).</summary>
-        [SettingsUIDropdown(typeof(PlacemakerSettings), nameof(GetPolishThemes))]
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public string PolishThemeHomes { get; set; }
-
-        /// <summary>Shops (their gaps are paved with their own paving whatever the theme).</summary>
-        [SettingsUIDropdown(typeof(PlacemakerSettings), nameof(GetPolishThemes))]
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public string PolishThemeShops { get; set; }
-
-        [SettingsUIDropdown(typeof(PlacemakerSettings), nameof(GetPolishThemes))]
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public string PolishThemeOffices { get; set; }
-
-        [SettingsUIDropdown(typeof(PlacemakerSettings), nameof(GetPolishThemes))]
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public string PolishThemeIndustry { get; set; }
-
-        public static DropdownItem<string>[] GetPolishThemes() => new[]
-        {
-            new DropdownItem<string> { value = "garden", displayName = "Placemaker.Settings.PolishTheme.garden" },
-            new DropdownItem<string> { value = "natural", displayName = "Placemaker.Settings.PolishTheme.natural" },
-            new DropdownItem<string> { value = "tidy", displayName = "Placemaker.Settings.PolishTheme.tidy" },
-            new DropdownItem<string> { value = "yard", displayName = "Placemaker.Settings.PolishTheme.yard" },
-            new DropdownItem<string> { value = "off", displayName = "Placemaker.Settings.PolishTheme.off" },
-        };
-
-        /// <summary>Lawns grow to the shared fences (off: only the fences and hedges are joined).</summary>
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public bool PolishLawns { get; set; }
-
-        /// <summary>Share of gardens whose new land is painted (lush ground) rather than drawn as lawn: variety along a street.</summary>
-        [SettingsUISlider(min = 0, max = 100, step = 5, scalarMultiplier = 1, unit = global::Game.UI.Unit.kPercentage)]
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public int PolishPaintedGardens { get; set; }
-
-        /// <summary>Shops, offices and works fill their extra land with the surface most of their ground already is (their car park), not lawn.</summary>
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public bool PolishPavedFill { get; set; }
-
-        /// <summary>Planted beds with bushes along new fences and hedges.</summary>
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public bool PolishPlanting { get; set; }
-
-        /// <summary>Something in big new garden land: a rock garden, a sand pit, a wild corner, a bench nook; a storage yard by industry.</summary>
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public bool PolishFeatures { get; set; }
-
-        /// <summary>Garden paths in some big gardens, walkways between some houses.</summary>
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public bool PolishPaths { get; set; }
-
-        /// <summary>Now and then a rock by the street where two gardens meet.</summary>
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public bool PolishRocks { get; set; }
-
-        /// <summary>Ground paint: soft lush edges round the gardens, worn ground along fences facing open land.</summary>
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIDisableByCondition(typeof(PlacemakerSettings), nameof(PolishOff))]
-        public bool PolishGroundPaint { get; set; }
-
-        /// <summary>Every lot to no: fences, hedges and lawns back to the game's own, every bed, path and bush the polish gave taken away.</summary>
-        [SettingsUISection(SectionMain, GroupNeighbourhood)]
-        [SettingsUIButton]
-        [SettingsUIConfirmation]
-        public bool RemoveAllPolish
-        {
-            set
-            {
-                try { global::Placemaker.Game.Neighbours.NeighbourPolishSystem.RemoveAll(); }
-                catch (Exception e) { Mod.Log.Error(e, "Placemaker: remove all polish failed"); }
-            }
-        }
+        public static readonly string[] PolishThemeValues = { "garden", "natural", "tidy", "yard", "off" };
 
         public bool PolishOff() => !NeighbourhoodPolish;
 
@@ -502,6 +430,18 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PolishNew = PolishNewHouses;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = NeighbourhoodPolish;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetZoneThemes(PolishThemeHomes, PolishThemeShops, PolishThemeOffices, PolishThemeIndustry);
+                {
+                    byte parts = 0;
+                    if (PolishLawns) parts |= global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PartLawns;
+                    if (PolishPlanting) parts |= global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PartPlanting;
+                    if (PolishFeatures) parts |= global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PartFeatures;
+                    if (PolishPaths) parts |= global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PartPaths;
+                    if (PolishRocks) parts |= global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PartRocks;
+                    if (PolishGroundPaint) parts |= global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PartPaint;
+                    if (PolishPavedFill) parts |= global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PartShopPaving;
+                    global::Placemaker.Game.Neighbours.NeighbourPolishSystem.LookParts = parts;
+                    global::Placemaker.Game.Neighbours.NeighbourPolishSystem.LookPainted = (byte)System.Math.Max(0, System.Math.Min(100, PolishPaintedGardens));
+                }
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetOptions(new System.Collections.Generic.Dictionary<string, float>
                 {
                     ["lawns"] = PolishLawns ? 1f : 0f,

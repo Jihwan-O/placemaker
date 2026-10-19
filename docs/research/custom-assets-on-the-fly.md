@@ -78,7 +78,7 @@ drawn. Findings:
   update): hide them and lay free-standing ones along the stitched borders (one shared hedge between neighbours, a hedge
   closing each curve wedge), plant bushes/trees along them, and stretch lawns only up to those borders.
 
-## 6. Neighbourhood polish (built: setting "Stitch neighbouring houses", off by default)
+## 6. Neighbourhood polish (built: setting "Neighbourhood polish", off by default)
 
 The answer to "modify houses on the fly so they snap together": the game's own houses are never replaced; their own parts
 are edited after they are placed (Game/Neighbours, Core/Neighbours/YardStitch, 12 tests):
@@ -121,11 +121,21 @@ are edited after they are placed (Game/Neighbours, Core/Neighbours/YardStitch, 1
   50 m), plans it on a worker thread with the houses within 90 m as context, and writes it when done; up to 3 patches far
   apart are planned at once. The house grid and each house's description are kept between passes. A town of 309 houses
   switched on at once: done in 7.9 s, 8.1 ms average frame, worst 59 ms (was 114 s with scattered batches).
-* **Options** (settings panel, Neighbourhood polish): polish houses already standing (off by default: switching it on or
-  loading a city only polishes houses that spawn or are rebuilt from then on, and the neighbours they join), lawns up to
-  the fences, painted gardens (share, default 33 %), shops keep their own paving, beds and bushes, garden paths and
-  walkways, rocks, ground paint.
-* **Painted gardens**: the house's own grass surfaces are tucked away (moved to a small triangle under the house, so
+* **In Placemaker's panel, never the Escape menu**: Neighbourhood → Polish gardens in the Make row. Its Style row holds
+  the themes (By kind, Garden, Natural, Tidy, Yard); the card under it: what the area holds; Look (painted gardens share,
+  lawns, beds and bushes, garden features, paths, rocks, ground paint, shops' paving: rows like any type's options, with
+  reset); Whole city (a live count, Neighbourhood polish on/off, Polish new buildings, each kind's theme for new buildings
+  or Off, Polish the whole city and Unpolish the whole city, each asking first in Placemaker's confirm dialog). Polish and
+  Unpolish are the footer's buttons; Polish switches the polish on. The values are saved in the settings file (hidden
+  from the Options page).
+* **Each building keeps what it was polished with**: its theme and look are saved on its lot (PolishedLot v4: Yes, Theme,
+  Picked, Own, Parts, Painted) and the planner reads them per house (StitchHouse.Options), so a neighbour changing later
+  never changes its style. New buildings get their kind's theme and the Look then. A change in the panel never touches
+  the city by itself; only the two Whole city buttons do, spread out: stamps 2000 a frame, one patch of town (at most 32
+  houses) planned and one written a frame, 150 lots put back a frame. suite/scenarios/polish-panel.json pictures the
+  card and logs the frames during each (lab op polishIdle: median, 95 %, worst, over 33/50/100 ms): on 290 buildings
+  10 ms median, 95 % under 18 ms, worst 42 ms.
+* **Painted gardens** (a mix on every street: the share for Garden houses, more for Natural and Yard, few for Tidy): the house's own grass surfaces are tucked away (moved to a small triangle under the house, so
   given back as they were when the garden is no longer painted) and the whole garden minus the paving is painted lush.
 * **Shops, offices and works** (not homes): the surface covering most of their ground (their car park) fills their extra
   land, as an owned surface; no lawn, beds or garden paths.

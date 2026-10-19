@@ -1,7 +1,14 @@
 // Game runner — the neighbourhood-polish painter and the per-lot flag (GPL-3.0).
-//   {"do":"polish","stamp":"yes"}   the area picked with an "area" step is stamped through the panel: "Polish gardens" picked in
-//                                   the Make row (Design), then Polish (the main button) or Unpolish ("stamp":"no"); waits until
+//   {"do":"polish","stamp":"yes"}   the area picked with an "area" step is stamped through the panel: the polish tool opened with
+//                                   its own button, then Polish (the main button) or Unpolish ("stamp":"no"); waits until
 //                                   the polish is idle ("wait": seconds, default 120) and records every lot in the land
+//   {"do":"polish","theme":"natural"}            a Style chip (the themes) of the polish tool, clicked
+//   {"do":"polish","option":"rocks","value":0}   a Look row of the polish tool (toggles 1/0, "painted" 0-100), clicked
+//   {"do":"polish","city":"homes","value":"natural"}  a Whole city row (on, newHouses: "true"/"false"; homes, shops,
+//                                   offices, industry: a theme or "off"), clicked
+//   {"do":"polish","open":"city"}  a section of the card opened ("look", "city"; "close" to fold it)
+//   {"do":"polish","click":"polish-all"}  any element of the panel clicked by its data-testid (a confirm dialog opens)
+//   {"do":"polish","clickText":"Polish all"}  the element showing exactly this text clicked (the confirm dialog's button)
 //   {"do":"lab","op":"polishFlags"} every growable lot in the land: its flag and what the polish changed on it
 //   {"do":"lab","op":"saveLoad"}    the city saved to a scratch save and loaded back (the flags and the edits must survive)
 //   {"do":"lab","op":"removeAllPolish"}  the settings button "Remove all polish", then until the polish is idle
@@ -28,19 +35,18 @@ namespace Placemaker.Game.Suite
     {
         private IEnumerator StepPolish(ScenarioState st, JObject step, JObject rec)
         {
+            if (step["theme"] != null || step["option"] != null || step["city"] != null || step["open"] != null || step["close"] != null || step["click"] != null || step["clickText"] != null)
+            {
+                yield return PolishCard(st, step, rec);
+                yield break;
+            }
             string stamp = ((string)step["stamp"] ?? "yes").ToLowerInvariant();
             bool yes = stamp != "no";
             bool pickOnly = stamp == "pick";   // {"stamp":"pick"}: the painter picked first, the area painted after (as a player does)
             if (!pickOnly && (!_tool.SuiteHasSelection || _tool.Shape == null)) { rec["error"] = "polish: pick the lots with an area step first"; yield break; }
             // the painter is picked in the Make row, which the panel shows in Design
-            if (!_tool.Painter)
-            {
-                yield return EnsureDesign(st, rec, "The type browser");
-                yield return UiAct(st, rec, "Polish gardens", "recipe-" + PlacemakerToolSystem.PainterId, "selectRecipe", new object[] { PlacemakerToolSystem.PainterId },
-                    () => _tool.Painter, () => _tool.SelectRecipe(PlacemakerToolSystem.PainterId));
-                if (!_tool.Painter) { rec["error"] = "polish: the painter was not picked"; yield break; }
-                yield return Frames(4);
-            }
+            if (!_tool.Painter || !_tool.IsActive) yield return OpenPolishTool(st, rec);
+            if (!_tool.Painter) { rec["error"] = "polish: the polish tool did not open"; yield break; }
             if (pickOnly) { rec["painter"] = true; yield break; }
             var (lots, polished) = _tool.PainterCount;
             rec["areaLots"] = lots;
@@ -61,6 +67,97 @@ namespace Placemaker.Game.Suite
             rec["lotsLine"] = _lastLotsLine;
             Mod.Log.Info($"Placemaker suite: {(yes ? "polish" : "unpolish")} stamped on {_tool.LastStamp.Lots} lots; {_lastLotsLine}");
             Event("build");
+        }
+
+        /// <summary>The painter card and its Style row, as a person uses them (each control clicked; its trigger if it is not on screen).</summary>
+        private IEnumerator PolishCard(ScenarioState st, JObject step, JObject rec)
+        {
+            if (!_tool.Painter || !_tool.IsActive) yield return OpenPolishTool(st, rec);
+            if (!_tool.Painter) { rec["error"] = "polish: the polish tool did not open"; yield break; }
+            var s = ToolRegistration.Settings;
+            if (step["theme"] != null)
+            {
+                string theme = (string)step["theme"];
+                yield return UiAct(st, rec, "style " + theme, "polish-theme-" + theme, "polishTheme", new object[] { theme }, () => _tool.PainterTheme == theme, () => _tool.SetPainterTheme(theme));
+                rec["theme"] = _tool.PainterTheme;
+            }
+            if (step["option"] != null && s != null)
+            {
+                string id = (string)step["option"];
+                double v = (double?)step["value"] ?? 1.0;
+                Func<double> now = () => id switch
+                {
+                    "painted" => s.PolishPaintedGardens, "lawns" => s.PolishLawns ? 1 : 0, "planting" => s.PolishPlanting ? 1 : 0, "features" => s.PolishFeatures ? 1 : 0,
+                    "paths" => s.PolishPaths ? 1 : 0, "rocks" => s.PolishRocks ? 1 : 0, "groundPaint" => s.PolishGroundPaint ? 1 : 0, "shopPaving" => s.PolishPavedFill ? 1 : 0, _ => -1,
+                };
+                // a toggle is clicked (it flips); the slider is set through its trigger (a drag)
+                string testId = id == "painted" ? null : "polish-" + id;
+                yield return UiAct(st, rec, "look " + id, testId, "polishOption", new object[] { id, v }, () => Math.Abs(now() - v) < 0.01, () => _tool.SetPolishOption(id, v));
+                rec["value"] = now();
+            }
+            if (step["city"] != null && s != null)
+            {
+                string what = (string)step["city"];
+                string value = (string)step["value"] ?? "";
+                Func<bool> done = what switch
+                {
+                    "on" => () => s.NeighbourhoodPolish == (value == "true"),
+                    "newHouses" => () => s.PolishNewHouses == (value == "true"),
+                    "homes" => () => s.PolishThemeHomes == value,
+                    "shops" => () => s.PolishThemeShops == value,
+                    "offices" => () => s.PolishThemeOffices == value,
+                    "industry" => () => s.PolishThemeIndustry == value,
+                    _ => null,
+                };
+                if (done == null) { rec["error"] = "polish: unknown city row '" + what + "'"; yield break; }
+                string testId = what == "on" || what == "newHouses" ? "polish-" + what : "polish-kind-" + what + "-" + value;
+                yield return UiAct(st, rec, "city " + what, testId, "polishCity", new object[] { what, value }, done, () => _tool.PolishCity(what, value));
+            }
+            string open = (string)step["open"] ?? (string)step["close"];
+            if (open != null)
+            {
+                bool want = step["open"] != null;
+                JObject reply = null;
+                string js = "var el=document.querySelector('[data-testid=\"polish-" + open + "\"]');if(!el)return {found:false};"
+                    + "var isOpen=el.getAttribute('data-open')==='true';if(isOpen!==" + (want ? "true" : "false") + "){var b=document.querySelector('[data-testid=\"polish-" + open + "-toggle\"]');if(b)b.click();}"
+                    + "return {found:true,was:isOpen};";
+                yield return UiRun(js, r => reply = r);
+                rec["section"] = reply?["value"];
+                if (reply == null || !((bool?)reply["value"]?["found"] ?? false)) rec["error"] = "polish: no section '" + open + "' in the card";
+                yield return Frames(6);
+            }
+            if (step["click"] != null)
+            {
+                string testId = (string)step["click"];
+                JObject reply = null;
+                yield return UiRun(SuiteUiSystem.ElementJs(testId, click: true), r => reply = r);
+                rec["clicked"] = reply?["value"];
+                if (reply == null || !((bool?)reply["value"]?["found"] ?? false)) rec["error"] = "polish: nothing to click with data-testid '" + testId + "'";
+                yield return Frames(10);
+            }
+            if (step["clickText"] != null)
+            {
+                string text = (string)step["clickText"];
+                JObject reply = null;
+                // the deepest element showing exactly this text, then its nearest button (the game's own dialog has no test ids)
+                string js = "var want=" + SuiteUiSystem.Q(text) + ";var all=document.querySelectorAll('*');var el=null;"
+                    + "for(var i=0;i<all.length;i++){var n=all[i];if(String(n.textContent||'').trim()===want)el=n;}"
+                    + "if(!el)return {found:false};var b=el;for(var k=0;k<4&&b&&b.tagName!=='BUTTON';k++)b=b.parentElement;if(!b||b.tagName!=='BUTTON')b=el;"
+                    + "try{b.click();}catch(e){var ev=new MouseEvent('click',{bubbles:true,cancelable:true});b.dispatchEvent(ev);}return {found:true,tag:b.tagName};";
+                yield return UiRun(js, r => reply = r);
+                rec["clicked"] = reply?["value"];
+                if (reply == null || !((bool?)reply["value"]?["found"] ?? false)) rec["error"] = "polish: no element shows '" + text + "'";
+                yield return Frames(10);
+            }
+            var panel = Bound(rec, "state")?["painter"];
+            if (panel != null) rec["panel"] = panel;
+        }
+
+        /// <summary>The polish tool's own button (next to Placemaker's): its trigger, as the button fires it.</summary>
+        private IEnumerator OpenPolishTool(ScenarioState st, JObject rec)
+        {
+            yield return UiAct(st, rec, "Neighbourhood polish button", null, "togglePolish", null, () => _tool.Painter && _tool.IsActive, () => _tool.TogglePolishTool());
+            yield return Frames(6);
         }
 
         /// <summary>Until the polish has nothing waiting (stamps planned, lots put back), then a few frames for the writes.</summary>

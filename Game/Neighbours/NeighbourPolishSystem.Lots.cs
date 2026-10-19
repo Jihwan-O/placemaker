@@ -29,22 +29,77 @@ namespace Placemaker.Game.Neighbours
     {
         // ───────────── the painter and the settings (main thread) ─────────────
 
-        private static readonly List<(Entity Lot, bool Yes, byte Theme)> s_stamps = new List<(Entity, bool, byte)>();
-        private static bool s_removeAll;
+        private static readonly List<(Entity Lot, bool Yes, byte Theme, byte Parts, byte Painted)> s_stamps = new List<(Entity, bool, byte, byte, byte)>();
+        private static bool s_removeAll, s_polishAll, s_retheme;
+        private static byte s_polishAllTheme;
 
         /// <summary>Bumped whenever a lot's flag changes (the painter's overlay redraws).</summary>
         public static int FlagsVersion { get; private set; }
         /// <summary>For the game runner: totals since the game started.</summary>
         public static int TotalStampedYes, TotalStampedNo, TotalRestored, TotalCarried, TotalFlaggedNew, TotalTagged;
 
-        /// <summary>The painter: these lots become polished (yes) or are put back (no). Applied on the next frame.</summary>
+        /// <summary>The painter: these lots become polished (yes) or are put back (no); theme 0: each by its kind's setting.
+        /// Applied from the next frame on, a few thousand a frame.</summary>
         public static void Stamp(IEnumerable<Entity> lots, bool yes, byte theme = 0)
         {
-            foreach (var e in lots) s_stamps.Add((e, yes, theme));
+            foreach (var e in lots) s_stamps.Add((e, yes, theme, LookParts, LookPainted));
         }
 
-        /// <summary>Setting "Remove all polish": every lot to no, everything put back (spread over a few frames).</summary>
+        /// <summary>Setting "Remove all polish": every lot to no, everything put back (a few hundred lots a frame).</summary>
         public static void RemoveAll() => s_removeAll = true;
+
+        /// <summary>The panel's "Polish the whole city": every growable lot standing to yes with this theme (0: each by its
+        /// kind, the kinds set to Off left out) and the look now; stamped 2000 a frame, planned a patch of town a frame.</summary>
+        public static void PolishEverything(byte theme = 0)
+        {
+            s_polishAll = true;
+            s_polishAllTheme = theme;
+        }
+
+        /// <summary>Setting "Redo polished buildings": polished lots get their kind's theme again (not the ones the painter
+        /// gave a theme) and are all planned again with the current settings, a patch of town per frame.</summary>
+        public static void RedoAll()
+        {
+            s_retheme = true;
+            Redo();
+        }
+
+        // ───────────── the status line in the options ─────────────
+
+        /// <summary>For the options page: polished lots, growable lots, lots waiting to be fitted, lots being put back.</summary>
+        public static int StatusPolished, StatusTotal, StatusWaiting, StatusRestoring;
+        /// <summary>Bumped when the status line would read differently (the options page redraws it).</summary>
+        public static int StatusVersion;
+        public static bool StatusInCity;
+        private int _statusFrame = -1000;
+        private readonly Dictionary<Entity, bool> _growablePrefab = new Dictionary<Entity, bool>();
+
+        private void UpdateStatus()
+        {
+            if (LotFrame - _statusFrame < 60) return;
+            _statusFrame = LotFrame;
+            int yes = 0, total = 0;
+            using (var flags = _flaggedLots.ToComponentDataArray<PolishedLot>(Allocator.Temp))
+                foreach (var f in flags) if (f.Yes) yes++;
+            using (var refs = _growables.ToComponentDataArray<PrefabRef>(Allocator.Temp))
+                foreach (var r in refs)
+                {
+                    if (!_growablePrefab.TryGetValue(r.m_Prefab, out var g))
+                        _growablePrefab[r.m_Prefab] = g = EntityManager.HasComponent<SpawnableBuildingData>(r.m_Prefab) && EntityManager.HasComponent<BuildingData>(r.m_Prefab);
+                    if (g) total++;
+                }
+            int waiting = FeatureEnabled ? _dirty.Count + s_stamps.Count : s_stamps.Count;
+            int restoring = _restoreQueue.Count;
+            if (yes != StatusPolished || total != StatusTotal || waiting != StatusWaiting || restoring != StatusRestoring || !StatusInCity)
+            {
+                StatusPolished = yes;
+                StatusTotal = total;
+                StatusWaiting = waiting;
+                StatusRestoring = restoring;
+                StatusInCity = true;
+                StatusVersion++;
+            }
+        }
 
         /// <summary>Pieces the surface and object systems just asked the game to make: tagged ours when they appear.</summary>
         internal struct PendingTag
@@ -62,7 +117,12 @@ namespace Placemaker.Game.Neighbours
         private readonly List<(float2 At, bool Yes)> _goneFlags = new List<(float2, bool)>();
         private readonly List<Entity> _restoreQueue = new List<Entity>();
         private int _removeAllCount;
-        private const int RestoresPerFrame = 2000;
+        // putting a lot back writes its lines and lawns and deletes its pieces: a few hundred a frame never stutter
+        private const int RestoresPerFrame = 150;
+        // a stamp: a flag (yes) or a lot put back (no, ten times the work)
+        private const int StampBudget = 2000, StampCostNo = 10;
+        private int _stampYes, _stampNo, _stampRestored;
+        private bool _sweepThemes = true;
 
         private void CreateLotQueries()
         {
@@ -95,9 +155,70 @@ namespace Placemaker.Game.Neighbours
             RememberGoneFlags();
             FlagNewLots();
             TagNewPieces();
+            if (_sweepThemes) SweepThemes();
+            if (s_retheme) Retheme();
+            if (s_polishAll) StartPolishAll();
             ApplyStamps();
             if (s_removeAll) StartRemoveAll();
             DrainRestores();
+            UpdateStatus();
+        }
+
+        /// <summary>
+        /// Lots polished before themes were kept on the lot (theme 0, "by its zone") get their kind's theme now, once per city:
+        /// a later change of the settings never changes them by itself.
+        /// </summary>
+        private void SweepThemes()
+        {
+            _sweepThemes = false;
+            int n = 0;
+            using (var all = _flaggedLots.ToEntityArray(Allocator.Temp))
+                foreach (var e in all)
+                {
+                    var f = EntityManager.GetComponentData<PolishedLot>(e);
+                    if (!f.Yes || f.Theme != 0) continue;
+                    f.Theme = ThemeByte(EntityManager.GetComponentData<PrefabRef>(e).m_Prefab);
+                    f.Picked = false;
+                    EntityManager.SetComponentData(e, f);
+                    n++;
+                }
+            if (n > 0) Mod.Log.Info($"Placemaker neighbourhood polish: {n} polished lots keep the theme their kind has now.");
+        }
+
+        /// <summary>"Redo polished buildings": every polished lot whose theme came from its kind gets its kind's theme now.</summary>
+        private void Retheme()
+        {
+            s_retheme = false;
+            int n = 0;
+            using (var all = _flaggedLots.ToEntityArray(Allocator.Temp))
+                foreach (var e in all)
+                {
+                    var f = EntityManager.GetComponentData<PolishedLot>(e);
+                    if (!f.Yes || f.Picked) continue;
+                    byte t = ThemeByte(EntityManager.GetComponentData<PrefabRef>(e).m_Prefab);
+                    if (t == f.Theme) continue;
+                    f.Theme = t;
+                    EntityManager.SetComponentData(e, f);
+                    n++;
+                }
+            FlagsVersion++;
+            Mod.Log.Info($"Placemaker neighbourhood polish: redo, {n} polished lots take their kind's new theme.");
+        }
+
+        /// <summary>"Polish every building": every growable lot not yet polished (kinds set to Off left out) is stamped yes.</summary>
+        private void StartPolishAll()
+        {
+            s_polishAll = false;
+            int n = 0, off = 0;
+            using (var all = _growables.ToEntityArray(Allocator.Temp))
+                foreach (var e in all)
+                {
+                    if (!IsGrowable(e)) continue;
+                    if (s_polishAllTheme == 0 && ZoneTheme(ZoneKind(EntityManager.GetComponentData<PrefabRef>(e).m_Prefab)) == "off") { off++; continue; }
+                    s_stamps.Add((e, true, s_polishAllTheme, LookParts, LookPainted));
+                    n++;
+                }
+            Mod.Log.Info($"Placemaker neighbourhood polish: polish the whole city, {n} lots to polish{(s_polishAllTheme > 0 ? " (" + ThemeNames[s_polishAllTheme] + ")" : "")} ({off} left out: their kind is Off).");
         }
 
         /// <summary>A growable building (a house, shop, office or works the game grew on zoned land).</summary>
@@ -114,15 +235,22 @@ namespace Placemaker.Game.Neighbours
         /// <summary>The lot's theme (0: by its zone).</summary>
         public byte ThemeOfLot(Entity lot) => EntityManager.HasComponent<PolishedLot>(lot) ? EntityManager.GetComponentData<PolishedLot>(lot).Theme : (byte)0;
 
-        private void SetFlag(Entity lot, bool yes, byte theme = 0)
+        /// <summary>The lot's flag; a yes lot always gets a theme (0: its kind's setting now; <paramref name="picked"/>: the
+        /// painter chose it).</summary>
+        /// <summary>The lot's flag; a yes lot always gets a theme (0: its kind's setting now; <paramref name="picked"/>: the
+        /// painter chose it) and the look it is polished with.</summary>
+        private void SetFlag(Entity lot, bool yes, byte theme = 0, bool picked = false, byte parts = PartsAll, byte painted = 33)
         {
+            if (yes && theme == 0) { theme = ThemeByte(EntityManager.GetComponentData<PrefabRef>(lot).m_Prefab); picked = false; }
+            var now = yes ? new PolishedLot { Yes = true, Theme = theme, Picked = picked, Own = true, Parts = parts, Painted = painted } : default;
             if (EntityManager.HasComponent<PolishedLot>(lot))
             {
                 var was = EntityManager.GetComponentData<PolishedLot>(lot);
-                if (was.Yes == yes && (!yes || was.Theme == theme)) return;
-                EntityManager.SetComponentData(lot, new PolishedLot { Yes = yes, Theme = yes ? theme : was.Theme });
+                if (!yes) { if (!was.Yes) return; was.Yes = false; now = was; }   // no: what it had is kept (shown if polished again)
+                else if (was.Yes && was.Theme == theme && was.Picked == picked && was.Own && was.Parts == parts && was.Painted == painted) return;
+                EntityManager.SetComponentData(lot, now);
             }
-            else EntityManager.AddComponentData(lot, new PolishedLot { Yes = yes, Theme = theme });
+            else EntityManager.AddComponentData(lot, now);
             FlagsVersion++;
         }
 
@@ -152,8 +280,8 @@ namespace Placemaker.Game.Neighbours
                     var half = (float2)EntityManager.GetComponentData<BuildingData>(prefab).m_LotSize * 4f + 2f;
                     var fwd = math.normalizesafe(math.mul(t.m_Rotation, new float3(0f, 0f, 1f)).xz, new float2(0f, 1f));
                     var right = new float2(fwd.y, -fwd.x);
-                    // a new lot: polished when new houses are, unless its zone's theme is Off in the settings
-                    bool yes = PolishNew && ZoneTheme(ZoneKind(prefab)) != "off";
+                    // a new lot: polished when the polish is on and new houses are, unless its kind's theme is Off
+                    bool yes = FeatureEnabled && PolishNew && ZoneTheme(ZoneKind(prefab)) != "off";
                     for (int k = _goneFlags.Count - 1; k >= 0; k--)
                     {
                         var d = _goneFlags[k].At - t.m_Position.xz;
@@ -163,7 +291,7 @@ namespace Placemaker.Game.Neighbours
                         TotalCarried++;
                         break;
                     }
-                    EntityManager.AddComponentData(e, new PolishedLot { Yes = yes });
+                    EntityManager.AddComponentData(e, yes ? new PolishedLot { Yes = true, Theme = ThemeByte(prefab), Own = true, Parts = LookParts, Painted = LookPainted } : new PolishedLot());
                     TotalFlaggedNew++;
                     FlagsVersion++;
                 }
@@ -212,13 +340,16 @@ namespace Placemaker.Game.Neighbours
         private void ApplyStamps()
         {
             if (s_stamps.Count == 0) return;
-            var stamps = new List<(Entity Lot, bool Yes, byte Theme)>(s_stamps);
-            s_stamps.Clear();
+            // a budget a frame: a whole city stamped at once (Polish every building) is spread over a few frames
+            int take = 0, cost = 0;
+            while (take < s_stamps.Count && cost < StampBudget) cost += s_stamps[take++].Yes ? 1 : StampCostNo;
+            var stamps = s_stamps.GetRange(0, take);
+            s_stamps.RemoveRange(0, take);
             int yes = 0, no = 0, restored = 0;
-            foreach (var (lot, y, theme) in stamps)
+            foreach (var (lot, y, theme, parts, painted) in stamps)
             {
                 if (!EntityManager.Exists(lot) || EntityManager.HasComponent<Deleted>(lot) || !IsGrowable(lot)) continue;
-                SetFlag(lot, y, theme);
+                SetFlag(lot, y, theme, theme != 0, parts, painted);
                 _described.Remove(lot);
                 if (y)
                 {
@@ -237,7 +368,12 @@ namespace Placemaker.Game.Neighbours
             TotalStampedYes += yes;
             TotalStampedNo += no;
             _gridStale = true;
-            Mod.Log.Info($"Placemaker neighbourhood polish: {yes} lots polished, {no} unpolished ({restored} of them put back){(FeatureEnabled ? "" : " (the polish is switched off: gardens change once it is on)")}.");
+            _stampYes += yes;
+            _stampNo += no;
+            _stampRestored += restored;
+            if (s_stamps.Count > 0) return;
+            Mod.Log.Info($"Placemaker neighbourhood polish: {_stampYes} lots polished, {_stampNo} unpolished ({_stampRestored} of them put back){(FeatureEnabled ? "" : " (the polish is switched off: gardens change once it is on)")}.");
+            _stampYes = _stampNo = _stampRestored = 0;
         }
 
         /// <summary>The polished lots near a lot that changed (unpolished, rebuilt): planned again.</summary>
@@ -412,6 +548,9 @@ namespace Placemaker.Game.Neighbours
             _painted.Clear();
             _goneFlags.Clear();
             _restoreQueue.Clear();
+            _sweepThemes = true;
+            StatusInCity = false;
+            StatusVersion++;
             _houseOf.Clear();
             _lawnPrefabOf.Clear();
             _grid = null;
@@ -420,6 +559,8 @@ namespace Placemaker.Game.Neighbours
             _gridStale = true;
             s_stamps.Clear();
             s_removeAll = false;
+            s_polishAll = false;
+            s_retheme = false;
             PendingTags.Clear();
             NeighbourLawnSystem.Queue.Clear();
             NeighbourAreaSystem.Queue.Clear();

@@ -174,8 +174,14 @@ namespace Placemaker.Game.Tool
         {
             // While a build runs the build service owns the tool slot; switching tools would abort it.
             if (m_ToolSystem == null || _building) return;
-            if (m_ToolSystem.activeTool == this) Close();
-            else { _closeAfterGhost = 0; m_ToolSystem.activeTool = this; }
+            // the polish tool (its own button) shares this tool: Placemaker's button switches over to Placemaker
+            if (m_ToolSystem.activeTool == this) { if (_painter) SetPainter(false); else Close(); }
+            else
+            {
+                if (_painter) SetPainter(false);
+                _closeAfterGhost = 0;
+                m_ToolSystem.activeTool = this;
+            }
         }
 
         public void Close()

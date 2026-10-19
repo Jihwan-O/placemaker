@@ -44,6 +44,26 @@ namespace Placemaker.Game.Neighbours
         /// lots are ever edited (PolishedLot, NeighbourPolishSystem.Lots).</summary>
         public static bool PolishNew = true;
 
+        // the look a lot is polished with (PolishedLot.Parts): never renumber
+        public const byte PartLawns = 1, PartPlanting = 2, PartFeatures = 4, PartPaths = 8, PartRocks = 16, PartPaint = 32, PartShopPaving = 64, PartsAll = 127;
+
+        /// <summary>The look Polish gives now (the panel's options, saved in the settings): stamped on the lots it polishes
+        /// and on new buildings.</summary>
+        public static byte LookParts = PartsAll, LookPainted = 33;
+
+        /// <summary>A lot's look as planner knobs (StitchHouse.Options); null: the settings (a lot polished before looks were saved).</summary>
+        private static Dictionary<string, float> OptionsOf(PolishedLot f)
+        {
+            if (!f.Own) return null;
+            bool On(byte bit) => (f.Parts & bit) != 0;
+            return new Dictionary<string, float>
+            {
+                ["lawns"] = On(PartLawns) ? 1f : 0f, ["paintedGardens"] = f.Painted, ["plant"] = On(PartPlanting) ? 1f : 0f,
+                ["features"] = On(PartFeatures) ? 1f : 0f, ["pathChance"] = On(PartPaths) ? 45f : 0f, ["alleyChance"] = On(PartPaths) ? 45f : 0f,
+                ["rockChance"] = On(PartRocks) ? 12f : 0f, ["paint"] = On(PartPaint) ? 1f : 0f, ["pavedFill"] = On(PartShopPaving) ? 1f : 0f,
+            };
+        }
+
         /// <summary>The lot's theme byte as a name (PolishedLot.Theme; 0 = by the zone).</summary>
         public static readonly string[] ThemeNames = { "zone", "garden", "natural", "tidy", "yard" };
 
@@ -55,16 +75,30 @@ namespace Placemaker.Game.Neighbours
 
         public static string ZoneTheme(string zone) => s_zoneTheme.TryGetValue(zone ?? "home", out var t) ? t : "garden";
 
-        /// <summary>Settings changed the zone themes: polished lots that follow their zone are planned again.</summary>
+        /// <summary>
+        /// Settings: the theme for each kind of building. Given to buildings polished from now on (each lot keeps the theme it
+        /// was polished with); "Redo polished buildings" gives it to the ones already polished. Never a city-wide change by
+        /// itself: a big city would replan thousands of houses.
+        /// </summary>
         public static void SetZoneThemes(string homes, string shops, string offices, string industry)
         {
-            bool changed = false;
             foreach (var (k, v) in new[] { ("home", homes), ("shop", shops), ("office", offices), ("industry", industry) })
             {
                 var t = string.IsNullOrEmpty(v) ? ZoneTheme(k) : v;
-                if (ZoneTheme(k) != t) { s_zoneTheme[k] = t; changed = true; }
+                if (ZoneTheme(k) != t) { s_zoneTheme[k] = t; SettingsChanged = true; }
             }
-            if (changed && FeatureEnabled) Redo();
+        }
+
+        /// <summary>A setting changed since the polished buildings were last fitted (the status line says so).</summary>
+        public static bool SettingsChanged { get; private set; }
+
+        /// <summary>The theme byte for a building of this kind (its kind's setting; Off: the kind's usual theme).</summary>
+        private byte ThemeByte(Entity prefab)
+        {
+            var kind = ZoneKind(prefab);
+            var name = ZoneTheme(kind);
+            if (name == "off") name = kind == "home" ? "garden" : kind == "industry" ? "yard" : "tidy";
+            return (byte)Math.Max(1, Array.IndexOf(ThemeNames, name));
         }
 
         /// <summary>What a building prefab is: home, shop, office or industry.</summary>
@@ -77,7 +111,7 @@ namespace Placemaker.Game.Neighbours
             return zd.m_AreaType == global::Game.Zones.AreaType.Residential ? "home" : zd.m_AreaType == global::Game.Zones.AreaType.Commercial ? "shop" : zd.IsOffice() ? "office" : "industry";
         }
 
-        /// <summary>The theme the planner uses for a lot: its own, else its zone's.</summary>
+        /// <summary>The theme the planner uses for a lot: its own (every lot gets one when it is polished), else its zone's.</summary>
         private string ThemeFor(Entity lot, string zone)
         {
             byte t = ThemeOfLot(lot);
@@ -96,19 +130,26 @@ namespace Placemaker.Game.Neighbours
         /// <summary>Every house again with the current rules (lines and lawns no longer planned go back to the game's own).</summary>
         public static void Redo() => s_redo = true;
 
-        /// <summary>The options panel's choices (lawns, painted gardens, planting, paths, rocks, paint) as planner knobs; every
-        /// house again when one changed.</summary>
+        /// <summary>
+        /// The options panel's choices (lawns, painted gardens, planting, paths, rocks, paint) as planner knobs, for every plan
+        /// from now on (new buildings, the painter, buildings the game changes). Never a city-wide replan by itself: "Redo
+        /// polished buildings" does that, a few houses at a time. A new dictionary: plans on workers read the old one.
+        /// </summary>
         public static void SetOptions(Dictionary<string, float> options)
         {
+            var extra = new Dictionary<string, float>(Settings.Extra);
             bool changed = false;
             foreach (var kv in options)
-                if (!Settings.Extra.TryGetValue(kv.Key, out var was) || was != kv.Value) { Settings.Extra[kv.Key] = kv.Value; changed = true; }
-            if (changed && FeatureEnabled) Redo();
+                if (!extra.TryGetValue(kv.Key, out var was) || was != kv.Value) { extra[kv.Key] = kv.Value; changed = true; }
+            if (!changed) return;
+            Settings.Extra = extra;
+            SettingsChanged = true;
         }
 
         // a pass costs ~0.6 ms per house asked (its neighbourhood included): 16 keeps a pass near 10 ms, every 4th frame
-        // a pass takes this many changed houses (more when many wait: a city switched on, a big area rebuilt)
-        private const int HousesPerPass = 16, HousesPerBigPass = 64;
+        // a pass takes this many changed houses (more when many wait: a whole city polished or redone); describing them is the
+        // part on the frame, so a big pass stays small enough to never stutter
+        private const int HousesPerPass = 16, HousesPerBigPass = 32;
         // a plot depends on houses up to ~2 lots away (and a ring's shared green on the whole ring): the pass plans with
         // everything within ClusterRadius but edits only houses within CoreRadius of a dirty one, so a house at the edge of
         // a pass (its neighbours not in it) is never planned half-blind and reset
@@ -129,7 +170,6 @@ namespace Placemaker.Game.Neighbours
         private readonly Dictionary<Entity, string> _names = new Dictionary<Entity, string>();
         private readonly HashSet<Entity> _dirty = new HashSet<Entity>();
         private readonly HashSet<long> _painted = new HashSet<long>();
-        private bool _wasEnabled;
         // the planner runs off the frame: a pass gathers the houses here, plans on a worker, and is applied when it is done
         // plans worked out on workers at once, each for its own patch of town (patches far enough apart never edit the same house)
         private readonly List<Pending> _inFlight = new List<Pending>();
@@ -206,8 +246,7 @@ namespace Placemaker.Game.Neighbours
             base.OnGameLoaded(serializationContext);
             // another city: everything kept in memory names entities of the old one (their indices are reused)
             ForgetCity();
-            // a loaded city is as it was saved: nothing to plan until something changes (switched on later: every yes lot)
-            _wasEnabled = FeatureEnabled;
+            // a loaded city is as it was saved: nothing to plan until something changes
         }
 
         [Preserve]
@@ -220,26 +259,35 @@ namespace Placemaker.Game.Neighbours
                 LotsUpdate();
             }
             catch (Exception e) { if (_errors++ < 5) Mod.Log.Error(e, "Placemaker neighbourhood polish (lots) failed"); }
-            if (!FeatureEnabled) { _wasEnabled = false; Busy = _restoreQueue.Count > 0; Waiting = 0; return; }
+            if (!FeatureEnabled)
+            {
+                // off: nothing is planned or written. Polished houses the game rebuilds meanwhile (a level-up gives back its
+                // own fences) are remembered and fitted again once it is on: switching on never replans the whole city
+                try { CollectChanged(); }
+                catch (Exception e) { if (_errors++ < 5) Mod.Log.Error(e, "Placemaker neighbourhood polish (off) failed"); }
+                Busy = _restoreQueue.Count > 0 || s_stamps.Count > 0;
+                Waiting = 0;
+                return;
+            }
             try
             {
-                if (!_wasEnabled || s_redo)
+                if (s_redo)
                 {
-                    // switched on: every yes lot (one levelled up while it was off has its game fences back). Options
-                    // changed: every yes lot again with the new rules.
+                    // "Redo polished buildings" (and the game runner): every yes lot again with the current rules, a patch
+                    // of town per frame
                     s_redo = false;
-                    _wasEnabled = true;
                     int yes = 0;
                     using (var all = _flaggedLots.ToEntityArray(Allocator.Temp))
                         foreach (var e in all)
                             if (EntityManager.GetComponentData<PolishedLot>(e).Yes) { _dirty.Add(e); yes++; }
                     _described.Clear();
                     _gridStale = true;
-                    Mod.Log.Info($"Placemaker neighbourhood polish: on, {yes} polished lots to look at (new houses {(PolishNew ? "polished" : "left alone")} as they come).");
+                    SettingsChanged = false;
+                    Mod.Log.Info($"Placemaker neighbourhood polish: every polished lot again, {yes} to look at.");
                 }
                 CollectChanged();
                 ++_frame;
-                Busy = _dirty.Count > 0 || _inFlight.Count > 0 || _restoreQueue.Count > 0;
+                Busy = _dirty.Count > 0 || _inFlight.Count > 0 || _restoreQueue.Count > 0 || s_stamps.Count > 0;
                 Waiting = _dirty.Count;
                 // one finished plan written per frame (writing is the part on the frame), one new patch started per frame
                 for (int k = 0; k < _inFlight.Count; k++)
@@ -459,7 +507,8 @@ namespace Placemaker.Game.Neighbours
                     foreach (var (id, lawn) in d.Lawns) { lawnsOf[id] = lawn; ownerOf[id] = d.House.Id; }
                     coreIds.Add(d.House.Id);
                 }
-                stitch.Add(Copy(d.House, isCore, IsYes(e), ThemeFor(e, d.House.Zone)));
+                var flag = EntityManager.HasComponent<PolishedLot>(e) ? EntityManager.GetComponentData<PolishedLot>(e) : default;
+                stitch.Add(Copy(d.House, isCore, flag.Yes, ThemeFor(e, d.House.Zone), OptionsOf(flag)));
             }
             var planner = Planner;
             var settings = Settings;
@@ -765,10 +814,10 @@ namespace Placemaker.Game.Neighbours
         private readonly Dictionary<Entity, Bounds3?> _modelBounds = new Dictionary<Entity, Bounds3?>();
         private readonly Dictionary<long, Entity> _houseOf = new Dictionary<long, Entity>();
         /// <summary>The cached description with this pass's Edit flag and the lot's flag (the lists are shared: the planner only reads them).</summary>
-        private static StitchHouse Copy(StitchHouse h, bool edit, bool polished, string theme) => new StitchHouse
+        private static StitchHouse Copy(StitchHouse h, bool edit, bool polished, string theme, Dictionary<string, float> options = null) => new StitchHouse
         {
             Id = h.Id, Position = h.Position, Forward = h.Forward, HalfLot = h.HalfLot, Lines = h.Lines, Lawns = h.Lawns, Hard = h.Hard,
-            Footprint = h.Footprint, Props = h.Props, Edit = edit, MainSurface = h.MainSurface, Polished = polished, Zone = h.Zone, Theme = theme,
+            Footprint = h.Footprint, Props = h.Props, Edit = edit, MainSurface = h.MainSurface, Polished = polished, Zone = h.Zone, Theme = theme, Options = options,
         };
 
         /// <summary>

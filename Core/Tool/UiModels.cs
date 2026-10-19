@@ -77,6 +77,14 @@ namespace Placemaker.Core.Tool
         public bool NewHouses;
         /// <summary>The theme Polish stamps: "zone" (each house by its zone's setting), "garden", "natural", "tidy", "yard".</summary>
         public string Theme = "zone";
+        /// <summary>The look Polish gives (saved on each lot it polishes; new buildings get it too): the painted-garden share
+        /// 0–100 and the parts.</summary>
+        public int Painted = 33;
+        public bool Lawns = true, Planting = true, Features = true, Paths = true, Rocks = true, GroundPaint = true, ShopPaving = true;
+        /// <summary>The whole city: each kind's theme for new buildings ("off": not polished), polished and growable lots,
+        /// lots waiting to be fitted, lots being put back.</summary>
+        public string Homes = "garden", Shops = "tidy", Offices = "tidy", Industry = "yard";
+        public int CityPolished, CityTotal, Waiting, Restoring;
     }
 
     public sealed class RecipeListEntry
@@ -207,8 +215,15 @@ namespace Placemaker.Core.Tool
                 o.Set("areaLegend", al);
             }
             if (s.Painter != null)
-                o.Set("painter", JsonValue.Obj().Set("lots", s.Painter.Lots).Set("polished", s.Painter.Polished)
-                    .Set("featureOn", s.Painter.FeatureOn).Set("newHouses", s.Painter.NewHouses));
+            {
+                var p = s.Painter;
+                o.Set("painter", JsonValue.Obj().Set("lots", p.Lots).Set("polished", p.Polished)
+                    .Set("featureOn", p.FeatureOn).Set("newHouses", p.NewHouses).Set("theme", p.Theme ?? "zone")
+                    .Set("look", JsonValue.Obj().Set("painted", p.Painted).Set("lawns", p.Lawns).Set("planting", p.Planting).Set("features", p.Features)
+                        .Set("paths", p.Paths).Set("rocks", p.Rocks).Set("groundPaint", p.GroundPaint).Set("shopPaving", p.ShopPaving))
+                    .Set("city", JsonValue.Obj().Set("homes", p.Homes ?? "garden").Set("shops", p.Shops ?? "tidy").Set("offices", p.Offices ?? "tidy").Set("industry", p.Industry ?? "yard")
+                        .Set("polished", p.CityPolished).Set("total", p.CityTotal).Set("waiting", p.Waiting).Set("restoring", p.Restoring)));
+            }
             return o;
         }
 

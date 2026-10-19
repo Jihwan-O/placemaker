@@ -85,11 +85,14 @@ namespace Placemaker.Core.Neighbours
         /// <summary>What gardens never join across nor reach onto, and grow out to meet: the ground surfaces of roads, paths and
         /// tracks and the lots of buildings that are not houses, as rings. Set per plan by the game (WithBarriers).</summary>
         public List<float2[]> Barriers;
+        /// <summary>What each barrier is: 0 a road, path or track, 1 a building's lot (null: all roads).</summary>
+        public List<int> BarrierKinds;
         /// <summary>A copy of these settings for one plan, with the barriers around its houses.</summary>
-        public StitchSettings WithBarriers(List<float2[]> barriers)
+        public StitchSettings WithBarriers(List<float2[]> barriers, List<int> kinds = null)
         {
             var c = (StitchSettings)MemberwiseClone();
             c.Barriers = barriers;
+            c.BarrierKinds = kinds;
             return c;
         }
     }
@@ -134,6 +137,9 @@ namespace Placemaker.Core.Neighbours
         public readonly List<(long House, float2[] Ring)> Beds = new List<(long, float2[])>();
         /// <summary>Bushes on those beds, and rocks by the street, owned by the house: Kind indexes <see cref="YardStitch.BushKinds"/>.</summary>
         public readonly List<(long House, float2 Position, float Yaw, int Kind)> Bushes = new List<(long, float2, float, int)>();
+        /// <summary>Fence or hedge pieces (objects of the house's own fence kind, "…PieceHigh01") closing a garden's open
+        /// edges, owned by the house: where it stands, which way it runs, the piece.</summary>
+        public readonly List<(long House, float2 Position, float Yaw, string Name)> FencePieces = new List<(long, float2, float, string)>();
         /// <summary>Walkways and alleys (a vanilla path surface by name), owned by a house.</summary>
         public readonly List<(long House, float2[] Ring, string Surface)> Paths = new List<(long, float2[], string)>();
     }

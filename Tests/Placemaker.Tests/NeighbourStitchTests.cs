@@ -242,6 +242,22 @@ namespace Placemaker.Tests
             Assert.True(plan2.Plots.TryGetValue(1, out var pb) && pb.Max(p => p.x) < 28f - 0.5f, "stops short of the road");
         }
 
+        [Fact]
+        public void A_big_garden_is_closed_all_round_with_pieces_of_its_own_fence_kind_but_its_street_front_stays_open()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 40f };
+            var plan = YardStitch.Plan(new[] { a }, MiddleLine());
+            Assert.NotEmpty(plan.FencePieces);
+            Assert.All(plan.FencePieces, p => Assert.True(a.ToLocal(p.Position).y < a.HalfLot.y - 1f, $"a piece on the street front at {p.Position}"));
+            // its fence kind: the right fence and back fence are FenceResidentialHigh01
+            Assert.Contains(plan.FencePieces, p => p.Name == "FenceResidentialPieceHigh01");
+            // pieces on both sides and along the back
+            Assert.Contains(plan.FencePieces, p => a.ToLocal(p.Position).x < -40f);
+            Assert.Contains(plan.FencePieces, p => a.ToLocal(p.Position).x > 40f);
+            Assert.Contains(plan.FencePieces, p => a.ToLocal(p.Position).y < -60f);
+        }
+
         private static bool Overlap(float2[] a, float2[] b) =>
             Poly.Boolean(new[] { (IReadOnlyList<float2>)a }, new[] { (IReadOnlyList<float2>)b }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area) > 0.05f;
 

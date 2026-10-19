@@ -38,7 +38,10 @@ namespace Placemaker.Game.Neighbours
         }
 
         /// <summary>Roads, paths and tracks on the ground and the lots of buildings that are not houses, in a box.</summary>
-        private List<float2[]> BarriersIn(float2 min, float2 max)
+        private List<float2[]> BarriersIn(float2 min, float2 max) => BarriersIn(min, max, null);
+
+        /// <summary>The barriers in a box and what each is (0 a road, path or track, 1 a building's lot).</summary>
+        private List<float2[]> BarriersIn(float2 min, float2 max, List<int> kinds)
         {
             var list = new List<float2[]>();
             _netSearch ??= World.GetExistingSystemManaged<global::Game.Net.SearchSystem>();
@@ -68,7 +71,7 @@ namespace Placemaker.Game.Neighbours
                             || EntityManager.HasComponent<TrainTrack>(e) || EntityManager.HasComponent<TramTrack>(e);
                         if (!ground) continue;
                         var strip = Strip(EntityManager.GetComponentData<Curve>(e), data.m_Width * 0.5f);
-                        if (strip != null) list.Add(strip);
+                        if (strip != null) { list.Add(strip); kinds?.Add(0); }
                     }
                 }
                 results.Clear();
@@ -85,7 +88,7 @@ namespace Placemaker.Game.Neighbours
                         if (!seen.Add(e) || !BuildingFootprints.IsBuilding(EntityManager, e)) continue;
                         if (EntityManager.HasComponent<Temp>(e) || EntityManager.HasComponent<Deleted>(e) || IsGrowable(e)) continue;   // houses are the plan's own
                         BuildingFootprints.Of(EntityManager, e, out var lot, out _);
-                        if (lot != null && lot.Length >= 3) list.Add(lot);
+                        if (lot != null && lot.Length >= 3) { list.Add(lot); kinds?.Add(1); }
                     }
                 }
             }

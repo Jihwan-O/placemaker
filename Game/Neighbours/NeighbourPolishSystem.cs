@@ -537,7 +537,8 @@ namespace Placemaker.Game.Neighbours
                 lo = math.min(lo, h.Position - r);
                 hi = math.max(hi, h.Position + r);
             }
-            var settings = Settings.WithBarriers(stitch.Count > 0 ? BarriersIn(lo, hi) : null);
+            var kinds = new List<int>();
+            var settings = Settings.WithBarriers(stitch.Count > 0 ? BarriersIn(lo, hi, kinds) : null, kinds);
             _inFlight.Add(new Pending
             {
                 Stitch = stitch, LanesOf = lanesOf, LawnsOf = lawnsOf, OwnerOf = ownerOf, CoreIds = coreIds, HouseOf = new Dictionary<long, Entity>(_houseOf),
@@ -650,6 +651,7 @@ namespace Placemaker.Game.Neighbours
                 foreach (var (house, ring) in plan.Beds) Want(house, "Forestry Surface 01", Centre(ring));
                 foreach (var (house, ring, surface) in plan.Paths) Want(house, surface, Centre(ring));
                 foreach (var (house, at, yaw, kind) in plan.Bushes) if (kind >= 0 && kind < YardStitch.BushKinds.Length) Want(house, YardStitch.BushKinds[kind], at);
+                foreach (var (house, at, yaw, name) in plan.FencePieces) Want(house, NeighbourObjectSystem.PieceName(name), at);
                 foreach (var id in coreIds)
                 {
                     if (skip.Contains(id) || !_houseOf.TryGetValue(id, out var house)) continue;
@@ -672,6 +674,10 @@ namespace Placemaker.Game.Neighbours
                 foreach (var (house, at, yaw, kind) in plan.Bushes)
                     if (coreIds.Contains(house) && !skip.Contains(house) && _houseOf.TryGetValue(house, out var owner) && kind >= 0 && kind < YardStitch.BushKinds.Length)
                         NeighbourObjectSystem.Queue.Add(new NeighbourObjectSystem.Request { Name = YardStitch.BushKinds[kind], Position = at, Yaw = yaw, Owner = owner });
+                // the fence and hedge pieces closing the gardens
+                foreach (var (house, at, yaw, name) in plan.FencePieces)
+                    if (coreIds.Contains(house) && !skip.Contains(house) && _houseOf.TryGetValue(house, out var owner))
+                        NeighbourObjectSystem.Queue.Add(new NeighbourObjectSystem.Request { Name = NeighbourObjectSystem.PieceName(name), Position = at, Yaw = yaw, Owner = owner });
             }
             // shared land in the middle of a ring (polished all round): a lawn with a mulch bed in its centre, owned by the
             // ring's nearest house (bulldozed or unpolished with it; the next pass makes it again with the ring as it is then)

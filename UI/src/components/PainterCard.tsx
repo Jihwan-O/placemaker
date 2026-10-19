@@ -33,7 +33,19 @@ export const lookName = (t: TFunc, p: PainterState | undefined, id: string) => {
     return l.custom ? l.name : t(l.name, humanize(l.id));
 };
 
-type Knob = { id: string; en: string; tip: string; kind: "toggle" | "slider"; min?: number; max?: number; step?: number; unit?: string };
+type Knob = { id: string; en: string; tip: string; kind: "toggle" | "slider" | "ground" | "choice"; min?: number; max?: number; step?: number; unit?: string; options?: { value: number; en: string; icon?: string }[] };
+
+/** The ground a paint job uses (the map's terrain materials). */
+const GROUNDS = [
+    { value: 0, en: "None" },
+    { value: 1, en: "Dry" },
+    { value: 2, en: "Lush" },
+    { value: 3, en: "Dirt" },
+    { value: 4, en: "Sand" },
+];
+
+/** Built-in looks with an icon of their own (else their base theme's). */
+const LOOK_ICON: Record<string, string> = { meadow: "leaf", rustic: "pickaxe", coastal: "waves", manicured: "topiary" };
 const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Knob[] }[] = [
     {
         id: "reach", en: "Reach and joining", icon: "ruler", open: true,
@@ -52,15 +64,47 @@ const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Kno
         ],
     },
     {
+        id: "fences", en: "Fences", icon: "edgeZoning",
+        knobs: [
+            { id: "closeGardens", en: "Close every garden", tip: "Every open edge of a garden (not its street front) gets fence or hedge pieces, following its bends and the roads it hugs.", kind: "toggle" },
+            {
+                id: "fenceKind", en: "New fences", tip: "What closes the open edges: the house's own fence or hedge kind, or one for every house.", kind: "choice",
+                options: [{ value: 0, en: "Own" }, { value: 1, en: "Low hedge" }, { value: 2, en: "Tall hedge" }, { value: 3, en: "Low fence" }, { value: 4, en: "Tall fence" }],
+            },
+        ],
+    },
+    {
         id: "lawns", en: "Lawns and ground paint", icon: "leaf",
         knobs: [
             { id: "lawns", en: "Lawns up to the fences", tip: "A garden's lawn grows to its new fences, around driveways and paving.", kind: "toggle" },
+            { id: "lawnReach", en: "Lawn near the house", tip: "Mowed lawn this far from the house; a big garden is painted further out (Ground: further out). 400 or more: lawn everywhere.", kind: "slider", min: 0, max: 500, step: 1, unit: "m" },
             { id: "paintedGardens", en: "Painted gardens", tip: "How many gardens are painted (lush ground, soft edges) instead of keeping their lawns. Natural and Yard more often, Tidy seldom.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
             { id: "gardenPaint", en: "Garden paint", tip: "How strong the paint of a painted garden is.", kind: "slider", min: 0, max: 1, step: 0.05 },
             { id: "paint", en: "Ground paint", tip: "Soft lush ground past the gardens and worn ground along fences facing open land.", kind: "toggle" },
             { id: "blendWidth", en: "Paint reach", tip: "How far the lush ground reaches past the gardens.", kind: "slider", min: 0, max: 150, step: 1, unit: "m" },
             { id: "blendFar", en: "Faint reach", tip: "How far the fainter, wider band reaches.", kind: "slider", min: 0, max: 250, step: 1, unit: "m" },
             { id: "blendStrength", en: "Paint strength", tip: "How strong the paint past the gardens is.", kind: "slider", min: 0, max: 1, step: 0.05 },
+        ],
+    },
+    {
+        id: "ground", en: "Ground", icon: "paint",
+        knobs: [
+            { id: "gardenLayer", en: "Painted gardens", tip: "The ground a painted garden is painted with.", kind: "ground" },
+            { id: "meadowLayer", en: "Further out", tip: "The ground of a big garden beyond its lawn near the house.", kind: "ground" },
+            { id: "meadowStrength", en: "Further out strength", tip: "How strong that paint is.", kind: "slider", min: 0, max: 1, step: 0.05 },
+            { id: "blendLayer", en: "Just past the gardens", tip: "The ground of the band just past the gardens.", kind: "ground" },
+            { id: "blendFarLayer", en: "Fainter band", tip: "The ground of the wider, fainter band further out.", kind: "ground" },
+            { id: "edgeLayer", en: "Along open fences", tip: "Worn ground along back fences that face open land.", kind: "ground" },
+            { id: "edgeWidth", en: "Fence band width", tip: "How wide the worn band along those fences is.", kind: "slider", min: 0, max: 15, step: 0.5, unit: "m" },
+            { id: "edgeStrength", en: "Fence band strength", tip: "How strong it is.", kind: "slider", min: 0, max: 1, step: 0.05 },
+            { id: "roadLayer", en: "Along roads", tip: "A band along the roads and paths beside the gardens (sand or dirt by the road…).", kind: "ground" },
+            { id: "roadWidth", en: "Road band width", tip: "How wide the band along roads and paths is.", kind: "slider", min: 0, max: 20, step: 0.5, unit: "m" },
+            { id: "roadStrength", en: "Road band strength", tip: "How strong it is.", kind: "slider", min: 0, max: 1, step: 0.05 },
+            { id: "rockLayer", en: "Under rocks", tip: "The ground under rock gardens and outcrops.", kind: "ground" },
+            { id: "rockGround", en: "Around outcrops", tip: "The wider ground around an outcrop.", kind: "ground" },
+            { id: "yardLayer", en: "Storage yards", tip: "The ground of a storage yard.", kind: "ground" },
+            { id: "patchLayer", en: "Worn patches", tip: "The ground of the worn patches in big gardens.", kind: "ground" },
+            { id: "patchChance", en: "Patch chance", tip: "How many worn patches big gardens get.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
         ],
     },
     {
@@ -71,6 +115,7 @@ const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Kno
             { id: "bushesPerGarden", en: "Bushes", tip: "The most bushes the beds of one garden get.", kind: "slider", min: 0, max: 80, step: 1, unit: "count" },
             { id: "features", en: "Garden features", tip: "Big new garden land gets something by its theme: a rock garden, a sand pit, a log pile, a bench nook, a flower garden, a storage yard.", kind: "toggle" },
             { id: "featureChance", en: "Feature chance", tip: "How many big gardens get a feature.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
+            { id: "featureSpacing", en: "More features every", tip: "A big garden gets one more feature for every this much new land (at most 6).", kind: "slider", min: 50, max: 3000, step: 50, unit: "m2" },
             { id: "featureMinLand", en: "Feature land", tip: "New garden land a feature needs.", kind: "slider", min: 10, max: 600, step: 10, unit: "m2" },
             { id: "rockChance", en: "Rocks", tip: "How often a rock sits where two gardens meet at the street (never against a hedge).", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
         ],
@@ -121,6 +166,20 @@ const KnobRow = ({ k, p }: { k: Knob; p: PainterState }) => {
     const label = t("Placemaker.UI.Polish.Knob." + k.id, k.en);
     const tip = t("Placemaker.UI.Polish.Knob." + k.id + ".Tip", k.tip);
     const set = (x: number) => act.polishKnob(k.id, x);
+    if (k.kind === "ground" || k.kind === "choice") {
+        const opts = k.kind === "ground" ? GROUNDS : k.options ?? [];
+        return (
+            <Row id={k.id} label={label} tip={tip} changed={changed} onReset={() => set(def)}>
+                <Segmented
+                    testId={"polish-" + k.id}
+                    stretch
+                    value={String(Math.round(v))}
+                    onChange={(x) => set(Number(x))}
+                    options={opts.map((o) => ({ value: String(o.value), label: t("Placemaker.UI.Polish.Opt." + k.id + "." + o.value, k.kind === "ground" ? t("Placemaker.UI.Polish.Ground." + o.value, o.en) : o.en) }))}
+                />
+            </Row>
+        );
+    }
     if (k.kind === "toggle")
         return (
             <Row id={k.id} label={label} tip={tip} toggle changed={changed} onReset={() => set(def)}>
@@ -260,7 +319,7 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
                                     key={l.id}
                                     testId={"polish-theme-" + l.id}
                                     nav="preset"
-                                    icon={l.custom ? "star" : THEME_ICON[l.theme] ?? "flower"}
+                                    icon={l.custom ? "star" : LOOK_ICON[l.id] ?? THEME_ICON[l.theme] ?? "flower"}
                                     color={l.custom ? CUSTOM_COLOR : color}
                                     name={lookName(t, p, l.id)}
                                     on={p.theme === l.id}
@@ -352,7 +411,7 @@ const LookChips = ({ p, value, testId, onPick, inherit }: { p: PainterState; val
 
 const lookIcon = (p: PainterState, id: string) => {
     const l = (p.looks ?? []).find((x) => x.id === id);
-    return !l ? "eyeOff" : l.custom ? "star" : THEME_ICON[l.theme] ?? "flower";
+    return !l ? "eyeOff" : l.custom ? "star" : LOOK_ICON[l.id] ?? THEME_ICON[l.theme] ?? "flower";
 };
 
 const KINDS: { id: "home" | "shop" | "office" | "industry"; city: "homes" | "shops" | "offices" | "industry"; en: string; icon: string }[] = [

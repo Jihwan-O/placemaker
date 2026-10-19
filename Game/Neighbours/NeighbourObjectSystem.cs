@@ -38,6 +38,10 @@ namespace Placemaker.Game.Neighbours
         private PrefabSystem _prefabs;
         private TerrainSystem _terrain;
         private Dictionary<string, Entity> _byName;
+        private static HashSet<string> _pieces;
+
+        /// <summary>A piece the game has (its fence kind's), else a low hedge piece.</summary>
+        public static string PieceName(string name) => _pieces == null || _pieces.Contains(name) ? name : "HedgePieceLow01";
         private EntityArchetype _definition;
 
         [Preserve]
@@ -103,13 +107,18 @@ namespace Placemaker.Game.Neighbours
         {
             _byName = new Dictionary<string, Entity>(StringComparer.OrdinalIgnoreCase);
             var wanted = new HashSet<string>(Placemaker.Core.Neighbours.YardStitch.BushKinds, StringComparer.OrdinalIgnoreCase);
+            _pieces = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             using (var q = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<PrefabData>(), ComponentType.ReadOnly<ObjectGeometryData>()))
             using (var all = q.ToEntityArray(Allocator.Temp))
                 foreach (var e in all)
                 {
                     string n;
                     try { n = _prefabs.GetPrefab<PrefabBase>(e)?.name; } catch (Exception) { continue; }
-                    if (!string.IsNullOrEmpty(n) && wanted.Contains(n) && !_byName.ContainsKey(n)) _byName[n] = e;
+                    if (string.IsNullOrEmpty(n) || _byName.ContainsKey(n)) continue;
+                    // fence and hedge pieces (what fences are made of): every kind, for closing gardens
+                    bool piece = n.IndexOf("Piece", StringComparison.OrdinalIgnoreCase) >= 0 && (n.IndexOf("Fence", StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf("Hedge", StringComparison.OrdinalIgnoreCase) >= 0);
+                    if (piece) _pieces.Add(n);
+                    if (wanted.Contains(n) || piece) _byName[n] = e;
                 }
             Mod.Log.Info($"Placemaker neighbourhood bushes: {_byName.Count} of {wanted.Count} kinds found");
         }

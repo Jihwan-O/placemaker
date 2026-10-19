@@ -258,6 +258,27 @@ namespace Placemaker.Tests
             Assert.Contains(plan.FencePieces, p => a.ToLocal(p.Position).y < -60f);
         }
 
+        [Fact]
+        public void At_maximum_reach_houses_facing_every_way_split_the_land_and_no_two_gardens_overlap()
+        {
+            var opts = new Dictionary<string, float>(PolishLooks.Defaults);
+            foreach (var k in PolishLooks.ReachKnobs) opts[k] = 500f;
+            var houses = new List<StitchHouse>();
+            // round the edge of a block: some face north, some east, some south, some west, far apart
+            float2[] at = { new float2(0f, 0f), new float2(90f, 10f), new float2(170f, 60f), new float2(160f, 160f), new float2(60f, 190f), new float2(-40f, 120f) };
+            float2[] fwd = { new float2(0f, -1f), new float2(0f, -1f), new float2(1f, 0f), new float2(0f, 1f), new float2(0f, 1f), new float2(-1f, 0f) };
+            for (int k = 0; k < at.Length; k++) { var h = House(k + 1, at[k], fwd[k]); h.Options = opts; houses.Add(h); }
+            var plan = YardStitch.Plan(houses, MiddleLine());
+            var plots = plan.Plots.ToList();
+            Assert.True(plots.Count >= 4, "the gardens grow");
+            for (int a = 0; a < plots.Count; a++)
+                for (int b = a + 1; b < plots.Count; b++)
+                {
+                    float shared = Poly.Boolean(new[] { (IReadOnlyList<float2>)plots[a].Value }, new[] { (IReadOnlyList<float2>)plots[b].Value }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area);
+                    Assert.True(shared < 2f, $"gardens {plots[a].Key} and {plots[b].Key} overlap by {shared:F0} m²");
+                }
+        }
+
         private static bool Overlap(float2[] a, float2[] b) =>
             Poly.Boolean(new[] { (IReadOnlyList<float2>)a }, new[] { (IReadOnlyList<float2>)b }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area) > 0.05f;
 

@@ -30,6 +30,8 @@ namespace Placemaker.Game.Neighbours
             public float2 Position;
             public float Yaw;
             public Entity Owner;
+            /// <summary>The look of the piece (its colour and mesh variation); 0: by where it stands.</summary>
+            public int Seed;
         }
 
         public static readonly List<Request> Queue = new List<Request>();
@@ -76,7 +78,7 @@ namespace Placemaker.Game.Neighbours
                     EntityManager.SetComponentData(def, new CreationDefinition
                     {
                         m_Prefab = prefab, m_Owner = r.Owner, m_Flags = CreationFlags.Permanent,
-                        m_RandomSeed = (int)math.hash(new float2(math.round(r.Position.x * 4f), math.round(r.Position.y * 4f))),
+                        m_RandomSeed = r.Seed != 0 ? r.Seed : (int)math.hash(new float2(math.round(r.Position.x * 4f), math.round(r.Position.y * 4f))),
                     });
                     EntityManager.SetComponentData(def, new ObjectDefinition
                     {

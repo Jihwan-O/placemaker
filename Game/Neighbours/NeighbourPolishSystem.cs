@@ -677,7 +677,11 @@ namespace Placemaker.Game.Neighbours
                 // the fence and hedge pieces closing the gardens
                 foreach (var (house, at, yaw, name) in plan.FencePieces)
                     if (coreIds.Contains(house) && !skip.Contains(house) && _houseOf.TryGetValue(house, out var owner))
-                        NeighbourObjectSystem.Queue.Add(new NeighbourObjectSystem.Request { Name = NeighbourObjectSystem.PieceName(name), Position = at, Yaw = yaw, Owner = owner });
+                        NeighbourObjectSystem.Queue.Add(new NeighbourObjectSystem.Request
+                        {
+                            Name = NeighbourObjectSystem.PieceName(name), Position = at, Yaw = yaw, Owner = owner,
+                            Seed = (int)math.hash(new int2(owner.Index, name.GetHashCode())) | 1,   // one look for the whole garden
+                        });
             }
             // shared land in the middle of a ring (polished all round): a lawn with a mulch bed in its centre, owned by the
             // ring's nearest house (bulldozed or unpolished with it; the next pass makes it again with the ring as it is then)

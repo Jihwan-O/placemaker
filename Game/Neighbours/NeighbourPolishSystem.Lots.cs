@@ -442,11 +442,72 @@ namespace Placemaker.Game.Neighbours
             using (var all = _growables.ToEntityArray(Allocator.Temp))
                 foreach (var e in all)
                 {
-                    var at = EntityManager.GetComponentData<global::Game.Objects.Transform>(e).m_Position.xz;
-                    if (math.any(at < lo) || math.any(at > hi) || !IsGrowable(e) || !Poly.Contains(outline, at)) continue;
-                    list.Add(e);
+                    var t = EntityManager.GetComponentData<global::Game.Objects.Transform>(e);
+                    var at = t.m_Position.xz;
+                    if (math.any(at < lo - 60f) || math.any(at > hi + 60f) || !IsGrowable(e)) continue;
+                    if (Poly.Contains(outline, at) || PaintedAgainst(e, t, outline)) list.Add(e);
                 }
             return list;
+        }
+
+        /// <summary>Growable lots whose middle lies within <paramref name="margin"/> of the outline's bounds.</summary>
+        public List<Entity> GrowablesNear(IReadOnlyList<float2> outline, float margin)
+        {
+            var list = new List<Entity>();
+            if (outline == null || outline.Count < 3) return list;
+            var lo = new float2(float.MaxValue);
+            var hi = new float2(float.MinValue);
+            foreach (var p in outline) { lo = math.min(lo, p); hi = math.max(hi, p); }
+            lo -= margin;
+            hi += margin;
+            using (var all = _growables.ToEntityArray(Allocator.Temp))
+                foreach (var e in all)
+                {
+                    var at = EntityManager.GetComponentData<global::Game.Objects.Transform>(e).m_Position.xz;
+                    if (math.all(at >= lo) && math.all(at <= hi) && IsGrowable(e)) list.Add(e);
+                }
+            return list;
+        }
+
+        /// <summary>
+        /// The area ran up against the lot: painted with stops at lots (Paint area picked before the painter, or the player's
+        /// stops), the paint stays out of the lot but follows its edge. At least 6 m of the lot's edge lies on or in the area.
+        /// </summary>
+        private bool PaintedAgainst(Entity lot, global::Game.Objects.Transform t, IReadOnlyList<float2> outline)
+        {
+            var prefab = EntityManager.GetComponentData<PrefabRef>(lot).m_Prefab;
+            if (!EntityManager.HasComponent<BuildingData>(prefab)) return false;
+            var half = (float2)EntityManager.GetComponentData<BuildingData>(prefab).m_LotSize * 4f;
+            var fwd = math.normalizesafe(math.mul(t.m_Rotation, new float3(0f, 0f, 1f)).xz, new float2(0f, 1f));
+            var right = new float2(fwd.y, -fwd.x);
+            var c = t.m_Position.xz;
+            var corners = new[] { c - right * half.x - fwd * half.y, c + right * half.x - fwd * half.y, c + right * half.x + fwd * half.y, c - right * half.x + fwd * half.y };
+            float touched = 0f;
+            for (int k = 0; k < 4; k++)
+            {
+                var a = corners[k];
+                var b = corners[(k + 1) % 4];
+                int steps = math.max(1, (int)(math.distance(a, b) / 1f));
+                for (int i = 0; i < steps; i++)
+                {
+                    var p = math.lerp(a, b, (i + 0.5f) / steps);
+                    if (Poly.Contains(outline, p) || DistanceToOutline(outline, p) < 1.5f) touched += math.distance(a, b) / steps;
+                }
+            }
+            return touched >= 6f;
+        }
+
+        private static float DistanceToOutline(IReadOnlyList<float2> ring, float2 p)
+        {
+            float best = float.MaxValue;
+            for (int i = 0; i < ring.Count; i++)
+            {
+                var a = ring[i];
+                var e = ring[(i + 1) % ring.Count] - a;
+                float u = math.saturate(math.dot(p - a, e) / math.max(1e-6f, math.dot(e, e)));
+                best = math.min(best, math.distance(p, a + e * u));
+            }
+            return best;
         }
 
         /// <summary>The polished lots within <paramref name="radius"/> of a point, as rings on the ground (the painter's tint).</summary>

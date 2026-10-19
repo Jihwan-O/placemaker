@@ -61,8 +61,9 @@ namespace Placemaker.Game.Tool
             _hoverFaceAt = new float2(float.MaxValue);
             if (_mode == SelectionMode.Block) RepickBlocks();
             else if (_mode == SelectionMode.Draw && _draw.Closed) ShapeChanged();
-            // a painted area keeps the outline it was painted with (the other stops): it goes, and is painted again
-            else if ((_mode == SelectionMode.Paint || _mode == SelectionMode.BlockPaint) && _shape != null) ClearArea();
+            // a painted area keeps what was painted and is fenced again with the painter's stops (lots and buildings no
+            // longer stop it); lots the paint ran up against count as picked too (NeighbourPolishSystem.LotsInside)
+            else if ((_mode == SelectionMode.Paint || _mode == SelectionMode.BlockPaint) && _shape != null) ShapeChanged();
             if (on && _stage == ToolStage.Review) SetStage(ToolStage.Design);
             _countShape = null;
             DesignChanged();
@@ -90,13 +91,26 @@ namespace Placemaker.Game.Tool
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
             if (polish == null) return;
             if (_shape == null) { Flash(new LocText("Placemaker.Reason.NoArea")); return; }
-            var lots = polish.LotsInside(_shape.Ring2D());
+            var lots = PainterLots(polish);
             if (lots.Count == 0) { Flash(new LocText("Placemaker.Painter.NoLots")); return; }
             NeighbourPolishSystem.Stamp(lots, yes, (byte)Math.Max(0, Array.IndexOf(NeighbourPolishSystem.ThemeNames, _painterTheme)));
             LastStamp = (lots.Count, yes);
             Mod.Log.Info($"Placemaker painter: {(yes ? "polish" : "unpolish")} {lots.Count} lots ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
             ClearArea();
             Flash(new LocText(yes ? "Placemaker.Painter.Polished" : "Placemaker.Painter.Unpolished", lots.Count));
+        }
+
+        /// <summary>The houses the painter acts on: in the area, or (Paint area) painted over by the brush.</summary>
+        private List<Entity> PainterLots(NeighbourPolishSystem polish)
+        {
+            var lots = polish.LotsInside(_shape.Ring2D());
+            if ((_mode == SelectionMode.BlockPaint || _mode == SelectionMode.Paint) && _bpBrushed.Count > 0)
+            {
+                var have = new HashSet<Entity>(lots);
+                foreach (var e in polish.GrowablesNear(_shape.Ring2D(), 80f))
+                    if (!have.Contains(e) && BrushedOver(EntityManager.GetComponentData<global::Game.Objects.Transform>(e).m_Position.xz)) { lots.Add(e); have.Add(e); }
+            }
+            return lots;
         }
 
         /// <summary>Lots in the current area and how many of them are polished (for the panel).</summary>
@@ -112,7 +126,7 @@ namespace Placemaker.Game.Tool
                     _countLots = _countYes = 0;
                     var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
                     if (polish != null)
-                        foreach (var e in polish.LotsInside(_shape.Ring2D()))
+                        foreach (var e in PainterLots(polish))
                         {
                             _countLots++;
                             if (polish.IsYes(e)) _countYes++;

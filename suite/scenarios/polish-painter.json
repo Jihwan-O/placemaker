@@ -19,7 +19,6 @@
         { "do": "lab", "op": "street", "shape": "arc", "radius": 120, "from": 40, "to": 140 },
         { "do": "grow", "seconds": 120 },
         { "do": "wait", "seconds": 4 },
-        { "do": "polish", "stamp": "pick" },
         { "do": "area", "tool": "paint", "size": 60, "cameraDistance": 520, "stroke": [ [ -110, -60 ], [ -60, 0 ], [ -20, 40 ] ] },
         { "do": "polish", "stamp": "yes", "wait": 120 },
         { "do": "lab", "op": "polishFlags" },

@@ -117,8 +117,12 @@ namespace Placemaker.Game.Tool
                     if (_in.HasHit)
                     {
                         int v = _bpMask.Version;
+                        var from = _lastStroke;
                         if (_bpMask.Stroke(_lastStroke, _in.Hit.xz, radius, _gesture == Gesture.Erase, _brushSquare, _brushAngle))
+                        {
+                            _bpBrushed.Add((from, _in.Hit.xz, radius, _gesture == Gesture.Erase));
                             _lastStroke = _in.Hit.xz;
+                        }
                         // Only a stroke that changed cells is an input change; the outline is rebuilt on mouse-up.
                         if (_bpMask.Version != v) ShapeChanged(throttled: true);
                     }
@@ -164,6 +168,7 @@ namespace Placemaker.Game.Tool
             _bpEraseWithLeft = erase && !_in.RightPressed;
             _lastStroke = _in.Hit.xz;
             _bpMask.Stamp(_in.Hit.xz, radius, erase, _brushSquare, _brushAngle);
+            _bpBrushed.Add((_in.Hit.xz, _in.Hit.xz, radius, erase));
             ShapeChanged(throttled: true);
         }
 
@@ -183,6 +188,7 @@ namespace Placemaker.Game.Tool
                     fill = pick?.Fill;
                 }
                 _bpMask.Clear();
+                _bpBrushed.Clear();
                 if (fill != null && fill.Status == FillStatus.Ok)
                 {
                     _bpRing = fill.Ring;
@@ -357,8 +363,29 @@ namespace Placemaker.Game.Tool
             return new BlockPaintState { Ring = _bpRing, Doors = _bpDoors, Mask = mask, Open = _bpOpen, Seed = _bpSeed };
         }
 
+        /// <summary>
+        /// Where the brush went in this painted area (segments with the brush radius; erasing ones too), whatever the stops kept
+        /// out: the painter picks the houses painted over even where the stops (lots, buildings) left them out of the area.
+        /// Gone with a new area or an undo.
+        /// </summary>
+        private readonly List<(float2 A, float2 B, float R, bool Erase)> _bpBrushed = new List<(float2, float2, float, bool)>();
+
+        /// <summary>The brush passed over p (and no later erasing stroke took it back).</summary>
+        public bool BrushedOver(float2 p)
+        {
+            bool on = false;
+            foreach (var (a, b, r, erase) in _bpBrushed)
+            {
+                var e = b - a;
+                float t = math.lengthsq(e) < 1e-6f ? 0f : math.saturate(math.dot(p - a, e) / math.dot(e, e));
+                if (math.distance(p, a + e * t) <= r) on = !erase;
+            }
+            return on;
+        }
+
         private void RestoreBlockPaint(BlockPaintState s)
         {
+            _bpBrushed.Clear();
             if (s?.Mask != null) _bpMask.Restore(s.Mask); else _bpMask.Clear();
             _bpSnap = s?.Mask;
             _bpSnapVersion = _bpMask.Version;

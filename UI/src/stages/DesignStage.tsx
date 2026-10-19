@@ -22,6 +22,8 @@ import { usePanelLayout } from "../lib/layout";
 import { Tip } from "../lib/tips";
 import { Btn, Icon, Section, Switch } from "../components/common";
 import { ControlList, controlsSummary } from "../controls/Controls";
+import { isZoneMix, ZoneMix } from "../controls/ZoneMix";
+import { ControlEx, valueOf } from "../lib/schema";
 import { useAssetName } from "../components/picker";
 import { BarMode, PresetBar, Tile, TypeBrowser } from "./PresetBrowser";
 import s from "./design.module.scss";
@@ -471,6 +473,34 @@ const MisfitChip = ({ step, catalog }: { step: StepView; catalog: Catalog }) => 
 
 // ───────────── step options ─────────────
 
+/**
+ * A Zoning type: two tools in one, each with its switch. Zoning (zones for the empty land: ZoneMix) on top, Shape (how
+ * the lots grow: the look's settings in their groups) under it.
+ */
+const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: LayerType; state: ToolState; scope: string }) => {
+    const { t } = useT();
+    const shapeCtl = (layer.controls as ControlEx[]).find((c) => c.id === "shapeLots");
+    const shapeOn = !shapeCtl || valueOf(step, shapeCtl) === true;
+    const zoningIds = new Set((layer.controls as ControlEx[]).filter((c) => c.group === "zone" || c.id === "shapeLots").map((c) => c.id));
+    return (
+        <>
+            <div className={s.shape} data-testid="zoning">
+                <Heading title={t("Placemaker.UI.Zoning", "Zoning")} sub={t("Placemaker.UI.Zoning.Sub", "zones for the empty land")} />
+                <ErrorBoundary name="zoning">
+                    <ZoneMix step={step} layer={layer} rows={(ids) => <ControlList step={step} layer={layer} state={state} only={ids} flat />} />
+                </ErrorBoundary>
+            </div>
+            <div className={s.shape} data-testid="shape">
+                <Heading title={t("Placemaker.UI.Shape", "Shape")} sub={t("Placemaker.UI.ShapeLots.Sub", "how the lots grow")} />
+                <ErrorBoundary name="controls">
+                    <ControlList step={step} layer={layer} state={state} only={["shapeLots"]} flat />
+                    {shapeOn ? <ControlList step={step} layer={layer} state={state} scope={scope} exclude={new Set([...featureOptionIds(step), ...zoningIds])} /> : null}
+                </ErrorBoundary>
+            </div>
+        </>
+    );
+};
+
 const StepOptions = ({ catalog, design, state, step }: { catalog: Catalog; design: DesignState; state: ToolState; step: StepView }) => {
     const { t } = useT();
     const layer = layerOf(catalog, step.layer);
@@ -509,12 +539,16 @@ const StepOptions = ({ catalog, design, state, step }: { catalog: Catalog; desig
                         </Tip>
                     ) : null}
                     {typed ? <Entrances step={step} state={state} /> : null}
-                    <div className={s.shape} data-testid="shape">
-                        {parent ? null : <Heading title={t("Placemaker.UI.Shape", "Shape")} sub={t("Placemaker.UI.Shape.Sub", "how it's built")} />}
-                        <ErrorBoundary name="controls">
-                            <ControlList step={step} layer={layer} state={state} scope={scope} exclude={featureOptionIds(step)} />
-                        </ErrorBoundary>
-                    </div>
+                    {!parent && isZoneMix(layer) ? (
+                        <ZoningShape step={step} layer={layer} state={state} scope={scope} />
+                    ) : (
+                        <div className={s.shape} data-testid="shape">
+                            {parent ? null : <Heading title={t("Placemaker.UI.Shape", "Shape")} sub={t("Placemaker.UI.Shape.Sub", "how it's built")} />}
+                            <ErrorBoundary name="controls">
+                                <ControlList step={step} layer={layer} state={state} scope={scope} exclude={featureOptionIds(step)} />
+                            </ErrorBoundary>
+                        </div>
+                    )}
                     <Extras catalog={catalog} design={design} state={state} step={step} />
                     {subSteps.map((c) => (
                         <ErrorBoundary key={c.path} name={"step-" + c.path}>

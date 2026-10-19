@@ -74,8 +74,11 @@ namespace Placemaker.Game.Tool
             if (layer == null) return false;
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
             if (polish == null || _shape == null) return true;
-            var lots = PainterLots(polish);
+            // Shape off: the buildings are left as they are (only the zoning is built)
+            bool shape = !_recipe.Root.Settings.Values.TryGetValue("shapeLots", out var sv) || !(sv is bool sb) || sb;
+            var lots = shape ? PainterLots(polish) : new List<global::Unity.Entities.Entity>();
             bool zoning = _plan != null && _plan.Layers.Any(l => l.Zoning.Count > 0);
+            if (!shape && !zoning) { Flash(new LocText("Placemaker.Polish.Nothing")); return true; }
             if (lots.Count == 0 && !zoning) { Flash(new LocText("Placemaker.Painter.NoLots")); return true; }
             var look = (PolishLooks.BuiltIn.FirstOrDefault(l => l.Id == layer.LookId) ?? PolishLooks.BuiltIn[0]).Values();
             var values = PolishValues(layer);
@@ -84,7 +87,7 @@ namespace Placemaker.Game.Tool
             NeighbourPolishSystem.NoteReach(values);
             if (zoning)
             {
-                NeighbourPolishSystem.AddLookArea(_shape.Ring2D(), layer.LookId, changes.Count > 0 ? changes : null);
+                if (shape) NeighbourPolishSystem.AddLookArea(_shape.Ring2D(), layer.LookId, changes.Count > 0 ? changes : null);
                 int cells = _plan.Layers.Sum(l => l.Zoning.Count);
                 Mod.Log.Info($"Placemaker zoning: {cells} zone cells to zone with {layer.LookId}, {lots.Count} buildings polished now ({changes.Count} settings changed from the look; {AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
                 return false;

@@ -335,6 +335,7 @@
   "Placemaker.UI.Save": "Save",
   "Placemaker.UI.Shape": "Shape",
   "Placemaker.UI.Shape.Sub": "how it's built",
+  "Placemaker.UI.ShapeLots.Sub": "how the lots grow",
   "Placemaker.UI.Stage.Area": "Area",
   "Placemaker.UI.Stage.Design": "Design",
   "Placemaker.UI.Stage.Review": "Review",
@@ -381,7 +382,13 @@
   "Placemaker.UI.X": "English",
   "Placemaker.UI.ZoneMix.Add": "Mix in another zone",
   "Placemaker.UI.ZoneMix.All": "the whole area",
+  "Placemaker.UI.ZoneMix.Depth": "Depth",
+  "Placemaker.UI.ZoneMix.DepthTip": "How deep its lots go back from the road, in zone cells: each lot picks a depth in this range (6 at most).",
   "Placemaker.UI.ZoneMix.Exact": "exact",
   "Placemaker.UI.ZoneMix.ExactPick": "Pick an exact zone (mods' too)…",
-  "Placemaker.UI.ZoneMix.Remove": "Remove this zone"
+  "Placemaker.UI.ZoneMix.Remove": "Remove this zone",
+  "Placemaker.UI.ZoneMix.Width": "Width",
+  "Placemaker.UI.ZoneMix.WidthTip": "How wide its lots are along the road, in zone cells (8 m): each lot picks a width in this range.",
+  "Placemaker.UI.Zoning": "Zoning",
+  "Placemaker.UI.Zoning.Sub": "zones for the empty land"
 }

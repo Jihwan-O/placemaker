@@ -1,6 +1,7 @@
-// The Zoning types' "Zone this area" group (Core/Layers/Types/Zoning/PolishLookLayer) as one editor instead of a row per
-// setting: a bar of the mix, one line per zone (its colour and icon, its type from a short menu or an exact zone of the
-// game, its share), "Add a zone", then the pattern and the road rule. It writes the same settings the rows would
+// The Zoning types' Zoning tool (Core/Layers/Types/Zoning/PolishLookLayer; the Design page's Zoning section) as one editor
+// instead of a row per setting: a bar of the mix, one line per zone (its colour and icon, its type from a short menu or an
+// exact zone of the game, its share) with its lots' width and depth ranges, "Mix in another zone", then the mix pattern and
+// the road rule. It writes the same settings the rows would
 // (zoneA/B/C, zoneAssetA/B/C, shareA/B/C, …), so styles, undo, locks and Randomize keep working.
 import React, { ReactNode, useState } from "react";
 import classNames from "classnames";
@@ -67,8 +68,16 @@ function reader(step: StepView, layer: LayerType) {
         const c = ctl(id);
         return c ? valueOf(step, c) : undefined;
     };
+    const num = (id: string, d: number) => {
+        const v = Number(val(id));
+        return Number.isFinite(v) ? Math.round(v) : d;
+    };
     const slots = SLOTS.map((sl) => ({
         sl,
+        w0: num("widthMin" + sl, 2),
+        w1: num("widthMax" + sl, 4),
+        d0: num("depthMin" + sl, 2),
+        d1: num("depthMax" + sl, 4),
         kind: String(val("zone" + sl) ?? ""),
         asset: typeof val("zoneAsset" + sl) === "string" ? (val("zoneAsset" + sl) as string) : "",
         share: Math.max(0, Number(val("share" + sl)) || 0),
@@ -88,6 +97,44 @@ export function zoneMixSummary(step: StepView, layer: LayerType, t: TFunc, asset
     const total = used.reduce((n, x) => n + x.share, 0) || 1;
     return used.map((x) => (x.asset ? assetName("zone", x.asset) : kindLabel(t, ctl, x.kind)) + " " + Math.round((x.share / total) * 100) + "%").join(" · ");
 }
+
+/** A range of whole cells: two small steppers. */
+const Range = ({ label, tip, lo, hi, max, onLo, onHi, testId }: { label: string; tip: string; lo: number; hi: number; max: number; onLo: (v: number) => void; onHi: (v: number) => void; testId: string }) => (
+    <div className={z.range} data-testid={testId} title={tip}>
+        <div className={z.rangeLabel}>{label}</div>
+        <Stepper value={lo} max={max} on={onLo} testId={testId + "-min"} />
+        <div className={z.rangeDash}>{"\u2013"}</div>
+        <Stepper value={hi} max={max} on={onHi} testId={testId + "-max"} />
+    </div>
+);
+
+const Stepper = ({ value, max, on, testId }: { value: number; max: number; on: (v: number) => void; testId: string }) => (
+    <div className={z.stepper}>
+        <button
+            type="button"
+            className={classNames(z.stepButton, { [z.stepOff]: value <= 1 })}
+            data-testid={testId + "-down"}
+            onClick={(e) => {
+                e.stopPropagation();
+                if (value > 1) on(value - 1);
+            }}
+        >
+            {"\u2212"}
+        </button>
+        <div className={z.stepValue}>{value}</div>
+        <button
+            type="button"
+            className={classNames(z.stepButton, { [z.stepOff]: value >= max })}
+            data-testid={testId + "-up"}
+            onClick={(e) => {
+                e.stopPropagation();
+                if (value < max) on(value + 1);
+            }}
+        >
+            +
+        </button>
+    </div>
+);
 
 export const ZoneMix = ({ step, layer, rows }: { step: StepView; layer: LayerType; rows: (ids: string[]) => ReactNode }) => {
     const { t } = useT();
@@ -286,6 +333,28 @@ export const ZoneMix = ({ step, layer, rows }: { step: StepView; layer: LayerTyp
                                     <div className={z.all}>{t("Placemaker.UI.ZoneMix.All", "the whole area")}</div>
                                 )}
                             </div>
+                            <div className={z.lots} data-testid={"zonemix-lots-" + x.sl}>
+                                <Range
+                                    label={t("Placemaker.UI.ZoneMix.Width", "Width")}
+                                    tip={t("Placemaker.UI.ZoneMix.WidthTip", "How wide its lots are along the road, in zone cells (8 m): each lot picks a width in this range.")}
+                                    lo={x.w0}
+                                    hi={x.w1}
+                                    max={12}
+                                    testId={"zonemix-width-" + x.sl}
+                                    onLo={(v) => { set("widthMin" + x.sl, v); if (v > x.w1) set("widthMax" + x.sl, v); }}
+                                    onHi={(v) => { set("widthMax" + x.sl, v); if (v < x.w0) set("widthMin" + x.sl, v); }}
+                                />
+                                <Range
+                                    label={t("Placemaker.UI.ZoneMix.Depth", "Depth")}
+                                    tip={t("Placemaker.UI.ZoneMix.DepthTip", "How deep its lots go back from the road, in zone cells: each lot picks a depth in this range (6 at most).")}
+                                    lo={x.d0}
+                                    hi={x.d1}
+                                    max={6}
+                                    testId={"zonemix-depth-" + x.sl}
+                                    onLo={(v) => { set("depthMin" + x.sl, v); if (v > x.d1) set("depthMax" + x.sl, v); }}
+                                    onHi={(v) => { set("depthMax" + x.sl, v); if (v < x.d0) set("depthMin" + x.sl, v); }}
+                                />
+                            </div>
                             {menu === x.sl ? <Menu id={x.sl} kind={x.kind} /> : null}
                         </React.Fragment>
                     ))}
@@ -303,7 +372,7 @@ export const ZoneMix = ({ step, layer, rows }: { step: StepView; layer: LayerTyp
                             <div className={z.chipText}>{t("Placemaker.UI.ZoneMix.Add", "Mix in another zone")}</div>
                         </button>
                     ) : null}
-                    {rows(val("zonePattern") === "speckled" ? ["zonePattern"] : ["zonePattern", "zoneGrain"])}
+                    {rows(val("zonePattern") === "clumps" ? ["zonePattern", "zoneGrain"] : ["zonePattern"])}
                     {rows(["roadRule"])}
                     {val("roadRule") === true ? (
                         <>

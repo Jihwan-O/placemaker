@@ -1,25 +1,103 @@
 {
-  "_about": "The Zoning types' zone mix editor and Review: an unzoned street, its land picked, the Garden look (Zone this area on by default), the Zoning group opened, a second zone mixed in (30 %), Review with the cells per zone. Send with tools/hot/Send-Hot.ps1 -File suite/scenarios/polish-zone-ui.json.",
+  "_about": "The Zoning types' panel: Zoning (zones for the empty land: the zone editor, lots from the road with width and depth) then Shape (how the lots grow). An unzoned street, its land picked, the Garden look, a second zone mixed in, its menu, Review with the cells per zone. Send with tools/hot/Send-Hot.ps1 -File suite/scenarios/polish-zone-ui.json.",
   "scenarios": [
     {
       "id": "polish-zone-ui",
-      "land": { "shape": "rect", "size": [320, 240], "ground": "flat", "roads": "none" },
+      "land": {
+        "shape": "rect",
+        "size": [
+          320,
+          240
+        ],
+        "ground": "flat",
+        "roads": "none"
+      },
       "steps": [
-        { "do": "lab", "op": "street", "shape": "arc", "radius": 120, "from": 40, "to": 140, "zone": "none" },
-        { "do": "area", "tool": "paint", "size": 80, "cameraDistance": 520, "stroke": [[-110, -60], [-60, 0], [-20, 40], [30, 60]] },
-        { "do": "type", "layer": "polishGarden", "preset": "standard" },
-        { "do": "polish", "click": "group-zone-toggle" },
-        { "do": "shot", "name": "zone-one-ui", "shotMode": "ui" },
-        { "do": "polish", "click": "zonemix-add" },
-        { "do": "wait", "seconds": 2 },
-        { "do": "shot", "name": "zone-two-ui", "shotMode": "ui" },
-        { "do": "polish", "click": "zonemix-pick-B" },
-        { "do": "polish", "click": "zonemix-B-commercialLow" },
-        { "do": "polish", "click": "zonemix-pick-A" },
-        { "do": "shot", "name": "zone-menu-ui", "shotMode": "ui" },
-        { "do": "polish", "click": "zonemix-pick-A" },
-        { "do": "preview" },
-        { "do": "shot", "name": "review-ui", "shotMode": "ui" }
+        {
+          "do": "lab",
+          "op": "street",
+          "shape": "arc",
+          "radius": 120,
+          "from": 40,
+          "to": 140,
+          "zone": "none"
+        },
+        {
+          "do": "area",
+          "tool": "paint",
+          "size": 80,
+          "cameraDistance": 520,
+          "stroke": [
+            [
+              -110,
+              -60
+            ],
+            [
+              -60,
+              0
+            ],
+            [
+              -20,
+              40
+            ],
+            [
+              30,
+              60
+            ]
+          ]
+        },
+        {
+          "do": "type",
+          "layer": "polishGarden",
+          "preset": "standard"
+        },
+        {
+          "do": "shot",
+          "name": "zone-one-ui",
+          "shotMode": "ui"
+        },
+        {
+          "do": "polish",
+          "click": "zonemix-add"
+        },
+        {
+          "do": "wait",
+          "seconds": 2
+        },
+        {
+          "do": "shot",
+          "name": "zone-two-ui",
+          "shotMode": "ui"
+        },
+        {
+          "do": "polish",
+          "click": "zonemix-pick-B"
+        },
+        {
+          "do": "polish",
+          "click": "zonemix-B-commercialLow"
+        },
+        {
+          "do": "polish",
+          "click": "zonemix-pick-A"
+        },
+        {
+          "do": "shot",
+          "name": "zone-menu-ui",
+          "shotMode": "ui"
+        },
+        {
+          "do": "polish",
+          "click": "zonemix-pick-A"
+        },
+        {
+          "do": "preview"
+        },
+        {
+          "do": "shot",
+          "name": "review-ui",
+          "shotMode": "ui"
+        }
       ]
     }
   ]

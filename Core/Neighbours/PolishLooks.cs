@@ -39,11 +39,11 @@ namespace Placemaker.Core.Neighbours
         public static readonly IReadOnlyDictionary<string, float> Defaults = new Dictionary<string, float>
         {
             // reach and joining
-            ["sideReach"] = 60f, ["maxFrontGap"] = 70f, ["maxBackGap"] = 100f, ["maxRearGap"] = 40f, ["maxFacingGap"] = 35f,
-            ["maxDeepen"] = 40f, ["hug"] = 1f, ["hugReach"] = 45f, ["wrap"] = 1f, ["closeBacks"] = 1f,
+            ["sideReach"] = 100f, ["maxFrontGap"] = 100f, ["maxBackGap"] = 150f, ["maxRearGap"] = 60f, ["maxFacingGap"] = 50f,
+            ["maxDeepen"] = 60f, ["hug"] = 1f, ["hugReach"] = 80f, ["openReach"] = 20f, ["wrap"] = 1f, ["closeBacks"] = 1f,
             ["alleys"] = 1f, ["alleyChance"] = 45f,
             // lawns and ground paint
-            ["lawns"] = 1f, ["paintedGardens"] = 33f, ["paint"] = 1f, ["blendWidth"] = 16f, ["blendFar"] = 30f,
+            ["lawns"] = 1f, ["paintedGardens"] = 33f, ["paint"] = 1f, ["blendWidth"] = 20f, ["blendFar"] = 40f,
             ["blendStrength"] = 0.6f, ["gardenPaint"] = 0.85f,
             // planting and features
             ["plant"] = 1f, ["bedChance"] = 65f, ["bushesPerGarden"] = 14f, ["features"] = 1f, ["featureChance"] = 55f,
@@ -51,6 +51,9 @@ namespace Placemaker.Core.Neighbours
             // paths and shops
             ["pathChance"] = 45f, ["pavedFill"] = 1f,
         };
+
+        /// <summary>The knobs that say how far a garden reaches: the plan looks this far around its houses.</summary>
+        public static readonly string[] ReachKnobs = { "sideReach", "maxFrontGap", "maxBackGap", "maxRearGap", "maxFacingGap", "maxDeepen", "hugReach", "openReach" };
 
         public static readonly string[] Themes = { "garden", "natural", "tidy", "yard" };
 

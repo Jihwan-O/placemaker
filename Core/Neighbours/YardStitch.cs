@@ -198,10 +198,10 @@ namespace Placemaker.Core.Neighbours
                     }
                 }
                 // (never a shop, office or works: a paved slab behind a short shop reads as an empty car park)
-                foreach (int k in row) rowDeepen[k] = !string.IsNullOrEmpty(houses[k].MainSurface) ? 0f : ring ? 2f * (depth - houses[k].HalfLot.y) : math.min(2f * (depth - houses[k].HalfLot.y), K(houses[k], s, "maxDeepen", 40f));
+                foreach (int k in row) rowDeepen[k] = !string.IsNullOrEmpty(houses[k].MainSurface) ? 0f : ring ? 2f * (depth - houses[k].HalfLot.y) : math.min(2f * (depth - houses[k].HalfLot.y), K(houses[k], s, "maxDeepen", 60f));
             }
 
-            float maxRear = n > 0 ? houses.Max(h => K(h, s, "maxRearGap", 40f)) : 24f;
+            float maxRear = n > 0 ? houses.Max(h => K(h, s, "maxRearGap", 60f)) : 24f;
             var rear = Enumerable.Repeat(-1, n).ToArray();
             for (int i = 0; i < n; i++)
             {
@@ -209,7 +209,7 @@ namespace Placemaker.Core.Neighbours
                 for (int j = 0; j < n; j++)
                 {
                     if (i == j || math.dot(houses[i].Forward, houses[j].Forward) > -0.5f || ringCut[i] != null || ringCut[j] != null) continue;
-                    if (!RearGap(houses[i], houses[j], out float gap, out float overlap) || gap > math.min(K(houses[i], s, "maxRearGap", 40f), K(houses[j], s, "maxRearGap", 40f)) || overlap < s.Knob("minRearOverlap", 6f)) continue;
+                    if (!RearGap(houses[i], houses[j], out float gap, out float overlap) || gap > math.min(K(houses[i], s, "maxRearGap", 60f), K(houses[j], s, "maxRearGap", 60f)) || overlap < s.Knob("minRearOverlap", 6f)) continue;
                     if (gap > 0.5f && Blocked(Hull(new[] { houses[i].BackLeft, houses[i].BackRight, houses[j].BackLeft, houses[j].BackRight }))) continue;
                     if (gap < best) { best = gap; rear[i] = j; }
                 }
@@ -233,7 +233,7 @@ namespace Placemaker.Core.Neighbours
             for (int i = 0; i < n; i++) { free[i, 0] = left[i] < 0; free[i, 1] = right[i] < 0; free[i, 2] = ringCut[i] == null; }
             foreach (var (i, j) in rearPairs) free[i, 2] = free[j, 2] = false;
             var candidates = new List<(int I, int EI, int J, int EJ, float Gap, Cut Cut)>();
-            float maxFacing = n > 0 ? houses.Max(h => K(h, s, "maxFacingGap", 35f)) : 20f;
+            float maxFacing = n > 0 ? houses.Max(h => K(h, s, "maxFacingGap", 50f)) : 20f;
             for (int i = 0; i < n; i++)
                 for (int j = i + 1; j < n; j++)
                 {
@@ -241,7 +241,7 @@ namespace Placemaker.Core.Neighbours
                     for (int ei = 0; ei < 3; ei++)
                         for (int ej = 0; ej < 3; ej++)
                         {
-                            if (!free[i, ei] || !free[j, ej] || !Faces(houses[i], ei, houses[j], ej, math.min(K(houses[i], s, "maxFacingGap", 35f), K(houses[j], s, "maxFacingGap", 35f)), s.Knob("minFacingOverlap", 4f), out float g, out var cut)) continue;
+                            if (!free[i, ei] || !free[j, ej] || !Faces(houses[i], ei, houses[j], ej, math.min(K(houses[i], s, "maxFacingGap", 50f), K(houses[j], s, "maxFacingGap", 50f)), s.Knob("minFacingOverlap", 4f), out float g, out var cut)) continue;
                             if (g > 0.5f)
                             {
                                 var (fa0, fa1, _) = Edge(houses[i], ei);
@@ -390,16 +390,26 @@ namespace Placemaker.Core.Neighbours
             // a polished garden with a side or back nobody else's: it reaches out to a road, path, track or building this near
             // and hugs it (the line of its edge, just clear of it); its own lines on that side follow (fences, below)
             var hugs = new List<(int I, int E, Cut Cut)>();
-            if (s_barriers.Count > 0)
-                for (int i = 0; i < n; i++)
+            for (int i = 0; i < n; i++)
                 {
-                    if (!Pol(i) || K(houses[i], s, "hug", 1f) < 0.5f) continue;
+                    if (!Pol(i)) continue;
+                    bool hugOn = K(houses[i], s, "hug", 1f) > 0.5f;
                     var h = houses[i];
                     for (int e = 0; e < 3; e++)
                     {
                         bool used = e == 0 ? left[i] >= 0 : e == 1 ? right[i] >= 0 : rear[i] >= 0 || ringCut[i] != null || deepen[i];
                         if (used || extra[i, e] > 0f) continue;
-                        if (!Hug(houses, i, e, s, out var hcut, out float reach)) continue;
+                        Cut hcut = null;
+                        float reach = 0f;
+                        if (!hugOn || !Hug(houses, i, e, s, out hcut, out reach))
+                        {
+                            // nothing near to meet: it still grows this far into open land (cut back later at anything there)
+                            float open = K(h, s, "openReach", 0f);
+                            if (open < 1f || !string.IsNullOrEmpty(h.MainSurface) && e != 2) continue;
+                            extra[i, e] = open;
+                            touched[i] = true;
+                            continue;
+                        }
                         extra[i, e] = reach + 2f;
                         cuts[i].Add(hcut);
                         hugs.Add((i, e, hcut));
@@ -416,17 +426,17 @@ namespace Placemaker.Core.Neighbours
                 foreach (var c in cuts[i]) poly = ClipHalfPlane(poly, c.P, c.D, c.Keep ?? FrontMid(houses[i]));
                 kept[i] = poly.Count >= 3 && Poly.Area(poly) > 1f ? poly.ToArray() : Lot(houses[i]);
             }
-            float sideReach = n > 0 ? houses.Max(h => K(h, s, "sideReach", 60f)) : 40f;
+            float sideReach = n > 0 ? houses.Max(h => K(h, s, "sideReach", 100f)) : 40f;
             var plots = new float2[n][];
             for (int i = 0; i < n; i++)
             {
                 var h = houses[i];
                 var lot = Lot(h);
                 if (!touched[i]) { plots[i] = lot; continue; }
-                float reachH = K(h, s, "sideReach", 60f);
+                float reachH = K(h, s, "sideReach", 100f);
                 float xl = -h.HalfLot.x - (left[i] >= 0 ? reachH : extra[i, 0]);
                 float xr = h.HalfLot.x + (right[i] >= 0 ? reachH : extra[i, 1]);
-                float zb = -h.HalfLot.y - math.max(math.max(deepen[i] ? K(h, s, "maxRearGap", 40f) : 0f, extra[i, 2]), rowDeepen[i]);
+                float zb = -h.HalfLot.y - math.max(math.max(deepen[i] ? K(h, s, "maxRearGap", 60f) : 0f, extra[i, 2]), rowDeepen[i]);
                 var poly = new List<float2> { h.ToWorld(new float2(xl, zb)), h.ToWorld(new float2(xr, zb)), h.ToWorld(new float2(xr, h.HalfLot.y)), h.ToWorld(new float2(xl, h.HalfLot.y)) };
                 foreach (var c in cuts[i]) poly = ClipHalfPlane(poly, c.P, c.D, c.Keep ?? FrontMid(h));
                 // never into the part of a lot its own house keeps, when not paired with it
@@ -879,14 +889,14 @@ namespace Placemaker.Core.Neighbours
 
             // ground paint round every polished house, joined or not: the gardens of a pass as one shape, grown outward with
             // rounded corners into a near band and a wider, fainter one, minus the gardens themselves (lush, soft, uneven)
-            var blenders = Enumerable.Range(0, n).Where(i => houses[i].Edit && houses[i].Polished && plots[i] != null && K(houses[i], s, "paint", 1f) > 0.5f && K(houses[i], s, "blendWidth", 16f) > 0.5f).ToList();
+            var blenders = Enumerable.Range(0, n).Where(i => houses[i].Edit && houses[i].Polished && plots[i] != null && K(houses[i], s, "paint", 1f) > 0.5f && K(houses[i], s, "blendWidth", 20f) > 0.5f).ToList();
             if (blenders.Count > 0)
             {
                 var gardens = blenders.Select(i => (IReadOnlyList<float2>)Ccw(plots[i])).ToList();
                 var allPlots = Enumerable.Range(0, n).Where(i => plots[i] != null).Select(i => new Region(Ccw(plots[i]))).ToList();
                 var joined = gardens.Count > 0 ? Poly.UnionAll(gardens) : new List<Region>();
                 // the widest of the pass's looks (the bands are painted once round all of its gardens)
-                float near = blenders.Max(i => K(houses[i], s, "blendWidth", 16f)), far = math.max(near, blenders.Max(i => K(houses[i], s, "blendFar", 30f)));
+                float near = blenders.Max(i => K(houses[i], s, "blendWidth", 20f)), far = math.max(near, blenders.Max(i => K(houses[i], s, "blendFar", 40f)));
                 float nearStrength = blenders.Max(i => K(houses[i], s, "blendStrength", 0.6f));
                 foreach (var (width, strength, feather, seed) in new[] { (far, nearStrength * s.Knob("blendFarStrength", 0.32f) / 0.6f, far * 0.45f, 0xFA2u), (near, nearStrength, near * 0.55f, 0xB1EDu) })
                     foreach (var g in joined)
@@ -1978,7 +1988,7 @@ namespace Placemaker.Core.Neighbours
             cut = null;
             reach = 0f;
             var h = houses[i];
-            float maxReach = s.Knob("hugReach", 45f), margin = s.Knob("barrierMargin", 0.8f);
+            float maxReach = s.Knob("hugReach", 80f), margin = s.Knob("barrierMargin", 0.8f);
             var (e0, e1, nrm) = Edge(h, e);
             // its own street (just in front of its lot) is never hugged from a side: the street it faces
             var skip = new HashSet<float2[]>();

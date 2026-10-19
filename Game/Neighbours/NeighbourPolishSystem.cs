@@ -153,7 +153,21 @@ namespace Placemaker.Game.Neighbours
         // a plot depends on houses up to ~2 lots away (and a ring's shared green on the whole ring): the pass plans with
         // everything within ClusterRadius but edits only houses within CoreRadius of a dirty one, so a house at the edge of
         // a pass (its neighbours not in it) is never planned half-blind and reset
-        private const float ClusterRadius = 120f;
+        private const float ClusterRadiusMin = 120f, ClusterRadiusMax = 400f;
+        /// <summary>The biggest reach of any look in use (the looks, the polish tool's changed values): a plan looks this far
+        /// (plus a margin) around its houses, so far-reaching gardens see what they reach for.</summary>
+        public static float ReachInUse = 100f;
+
+        /// <summary>The polish tool's values changed: the reach in use again.</summary>
+        public static void NoteReach(IReadOnlyDictionary<string, float> working)
+        {
+            float r = 0f;
+            foreach (var look in Looks) { var v = look.Values(); foreach (var k in PolishLooks.ReachKnobs) if (v.TryGetValue(k, out var x)) r = math.max(r, x); }
+            if (working != null) foreach (var k in PolishLooks.ReachKnobs) if (working.TryGetValue(k, out var x)) r = math.max(r, x);
+            ReachInUse = r;
+        }
+
+        private static float ClusterRadius => math.clamp(ReachInUse + 60f, ClusterRadiusMin, ClusterRadiusMax);
         private const float CoreRadius = 40f;
         // a bulldozed house: the houses this near it are planned again (a neighbour's line on the shared side goes back)
         private const float GoneRadius = 70f;
@@ -463,13 +477,15 @@ namespace Placemaker.Game.Neighbours
             {
                 if (!index.TryGetValue(e, out int i)) continue;
                 var p = houses[i].T.m_Position.xz;
-                for (int dx = -2; dx <= 2; dx++)
-                    for (int dz = -2; dz <= 2; dz++)
+                float clusterRadius = ClusterRadius;
+                int cells = (int)math.ceil(clusterRadius / Cell) + 1;
+                for (int dx = -cells; dx <= cells; dx++)
+                    for (int dz = -cells; dz <= cells; dz++)
                         if (grid.TryGetValue(Key(p + new float2(dx, dz) * Cell), out var near))
                             foreach (int j in near)
                             {
                                 float d = math.distance(houses[j].T.m_Position.xz, p);
-                                if (d <= ClusterRadius) cluster.Add(j);
+                                if (d <= clusterRadius) cluster.Add(j);
                                 if (d <= CoreRadius && IsYes(houses[j].E)) core.Add(j);   // only yes lots are edited
                             }
             }
@@ -517,7 +533,7 @@ namespace Placemaker.Game.Neighbours
             var hi = new float2(float.MinValue);
             foreach (var h in stitch)
             {
-                float r = math.length(h.HalfLot) + 160f;
+                float r = math.length(h.HalfLot) + ClusterRadius + 40f;
                 lo = math.min(lo, h.Position - r);
                 hi = math.max(hi, h.Position + r);
             }

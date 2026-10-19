@@ -46,6 +46,7 @@ namespace Placemaker.Game.Tool
             _painterTheme = id;
             _lookValues = look != null ? look.Values() : new Dictionary<string, float>(PolishLooks.Defaults);
             _lookTheme = look?.Theme ?? "garden";
+            NeighbourPolishSystem.NoteReach(_lookValues);
             LiveChanged();
             var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
             if (remember && s != null && s.PolishLookLast != id) { s.PolishLookLast = id; s.ApplyAndSave(); }
@@ -110,6 +111,7 @@ namespace Placemaker.Game.Tool
             if (id == "theme") { int t = (int)Math.Round(value); if (t >= 0 && t < PolishLooks.Themes.Length) _lookTheme = PolishLooks.Themes[t]; }
             else if (PolishLooks.Defaults.ContainsKey(id)) _lookValues[id] = (float)value;
             else return;
+            NeighbourPolishSystem.NoteReach(_lookValues);
             LiveChanged();
             Touch();
         }

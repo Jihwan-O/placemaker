@@ -228,6 +228,20 @@ namespace Placemaker.Tests
             Assert.False(Overlap(pa, road), "the garden overlaps the road");
         }
 
+        [Fact]
+        public void A_lone_garden_balloons_into_open_land_as_far_as_its_look_lets_it_but_never_onto_a_road()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 60f };
+            var plan = YardStitch.Plan(new[] { a }, MiddleLine());
+            Assert.True(plan.Plots.TryGetValue(1, out var pa), "the garden grows");
+            Assert.True(pa.Min(p => p.x) < -8f - 55f && pa.Max(p => p.x) > 8f + 55f && pa.Min(p => p.y) < -24f - 55f, "60 m into the open land on both sides and at the back");
+            Assert.True(pa.Max(p => p.y) <= 24.01f, "never past its street edge");
+            // a road 20 m to its right: it stops there
+            var plan2 = YardStitch.Plan(new[] { a }, MiddleLine().WithBarriers(new List<float2[]> { Strip(28f, -200f, 36f, 200f) }));
+            Assert.True(plan2.Plots.TryGetValue(1, out var pb) && pb.Max(p => p.x) < 28f - 0.5f, "stops short of the road");
+        }
+
         private static bool Overlap(float2[] a, float2[] b) =>
             Poly.Boolean(new[] { (IReadOnlyList<float2>)a }, new[] { (IReadOnlyList<float2>)b }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area) > 0.05f;
 

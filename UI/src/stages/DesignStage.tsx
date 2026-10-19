@@ -22,7 +22,8 @@ import { usePanelLayout } from "../lib/layout";
 import { Tip } from "../lib/tips";
 import { Btn, Icon, Section, Switch } from "../components/common";
 import { ControlList, controlsSummary } from "../controls/Controls";
-import { isZoneMix, ZoneMix } from "../controls/ZoneMix";
+import { isZoneMix, knobSlotOf, useZoneTabs, ZoneMix } from "../controls/ZoneMix";
+import zm from "../controls/zoneMix.module.scss";
 import { ControlEx, valueOf } from "../lib/schema";
 import { useAssetName } from "../components/picker";
 import { BarMode, PresetBar, Tile, TypeBrowser } from "./PresetBrowser";
@@ -474,14 +475,19 @@ const MisfitChip = ({ step, catalog }: { step: StepView; catalog: Catalog }) => 
 // ───────────── step options ─────────────
 
 /**
- * A Zoning type: two tools in one, each with its switch. Zoning (zones for the empty land: ZoneMix) on top, Outgrow (lots
- * grow past their borders: the look's settings in their groups) under it.
+ * A Zoning type: two tools in one. Zoning (zone the empty land, or only edit the buildings there: ZoneMix) on top, Outgrow
+ * (lots grow past their borders) under it: its switch, then a tab per zone and that zone's own copy of the look's settings
+ * in their groups (B's and C's ids end in _B, _C).
  */
 const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: LayerType; state: ToolState; scope: string }) => {
     const { t } = useT();
+    const tabs = useZoneTabs(step, layer);
+    const [tab, setTab] = useState(0);
     const shapeCtl = (layer.controls as ControlEx[]).find((c) => c.id === "shapeLots");
     const shapeOn = !shapeCtl || valueOf(step, shapeCtl) === true;
-    const zoningIds = new Set((layer.controls as ControlEx[]).filter((c) => c.group === "zone" || c.id === "shapeLots").map((c) => c.id));
+    const slot = (tabs.find((x) => x.index === tab) ?? tabs[0])?.index ?? 0;
+    const zoningIds = (layer.controls as ControlEx[]).filter((c) => c.group === "zone" || c.id === "shapeLots").map((c) => c.id);
+    const otherZones = (layer.controls as ControlEx[]).filter((c) => c.group !== "zone" && c.id !== "shapeLots" && knobSlotOf(c.id) !== slot).map((c) => c.id);
     return (
         <>
             <div className={s.shape} data-testid="zoning">
@@ -494,7 +500,30 @@ const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: Lay
                 <Heading title={t("Placemaker.UI.Outgrow", "Outgrow")} sub={t("Placemaker.UI.Outgrow.Sub", "lots grow past their borders")} />
                 <ErrorBoundary name="controls">
                     <ControlList step={step} layer={layer} state={state} only={["shapeLots"]} flat />
-                    {shapeOn ? <ControlList step={step} layer={layer} state={state} scope={scope} exclude={new Set([...featureOptionIds(step), ...zoningIds])} /> : null}
+                    {shapeOn ? (
+                        <>
+                            {tabs.length > 1 ? (
+                                <div className={zm.tabs} data-testid="outgrow-tabs">
+                                    {tabs.map((x) => (
+                                        <button
+                                            key={x.index}
+                                            type="button"
+                                            className={classNames(zm.tab, { [zm.tabOn]: x.index === slot })}
+                                            data-testid={"outgrow-tab-" + x.index}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setTab(x.index);
+                                            }}
+                                        >
+                                            <div className={zm.swatch} style={{ backgroundColor: x.colour }} />
+                                            <div className={zm.zoneName}>{x.name}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : null}
+                            <ControlList step={step} layer={layer} state={state} scope={scope + ":" + slot} exclude={new Set([...featureOptionIds(step), ...zoningIds, ...otherZones])} />
+                        </>
+                    ) : null}
                 </ErrorBoundary>
             </div>
         </>

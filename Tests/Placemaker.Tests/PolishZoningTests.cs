@@ -125,17 +125,40 @@ namespace Placemaker.Tests
         }
 
         [Fact]
-        public void RoadRuleZonesTheWideRoadsBlocks()
+        public void EachZoneGoesOnlyOnTheRoadsItsWidthsAllow()
         {
             float medium = RoadRoles.Find(SuiteLayout.MediumRoad).Width, small = RoadRoles.Find(SuiteLayout.SmallRoad).Width;
             Assert.True(medium > small);
-            var plan = Plan(("zoneArea", true), ("roadRule", true), ("roadZone", ZoneKinds.OfficeLow), ("roadMinWidth", (double)((medium + small) * 0.5f)), ("roadDepth", 2.0));
+            double cut = (medium + small) * 0.5;
+            // homes on the small streets only, offices on the big roads only
+            var plan = Plan(out var site, ("zoneArea", true), ("shareA", 50.0), ("roadMaxA", cut), ("shareB", 50.0), ("zoneB", ZoneKinds.OfficeLow), ("roadMinB", cut));
             var cells = Cells(plan);
             var office = cells.Where(c => c.ZoneId == ZoneKinds.PrefabId(ZoneKinds.OfficeLow)).ToArray();
             var homes = cells.Where(c => c.ZoneId == ZoneKinds.PrefabId(ZoneKinds.ResidentialLow)).ToArray();
             Assert.NotEmpty(office);
             Assert.NotEmpty(homes);
-            Assert.Equal(cells.Length, office.Length + homes.Length);
+            // every block's zoned cells are allowed on its road (the road nearest its front middle, as the planner reads it)
+            float RoadAt(float2 p) => site.NearbyNets.Where(n => n.Category == NetCategory.Road)
+                .OrderBy(n => Enumerable.Range(0, 17).Select(k => { float t = k / 16f, u = 1f - t; var q = u * u * u * n.A + 3f * u * u * t * n.B + 3f * u * t * t * n.C + t * t * t * n.D; return math.distance(q.xz, p); }).Min())
+                .First().Width;
+            foreach (var (g, zz) in ByBlock(plan, site))
+            {
+                float road = RoadAt(ZoneGuard.CellCentre(g, g.Size.x / 2, 0));
+                foreach (var id in zz)
+                {
+                    if (id == ZoneKinds.PrefabId(ZoneKinds.OfficeLow)) Assert.True(road >= cut, "an office block on a " + road + " m road");
+                    if (id == ZoneKinds.PrefabId(ZoneKinds.ResidentialLow)) Assert.True(road <= cut, "a home block on a " + road + " m road");
+                }
+            }
+        }
+
+        [Fact]
+        public void ShareOfTheLandLeavesTheRestEmpty()
+        {
+            int full = Cells(Plan(("zoneArea", true), ("shareA", 100.0))).Length;
+            int part = Cells(Plan(("zoneArea", true), ("shareA", 40.0))).Length;
+            float ratio = part / (float)full;
+            Assert.True(ratio > 0.15f && ratio < 0.65f, $"40 % of the land zoned {part} of {full} cells");
         }
 
         [Fact]

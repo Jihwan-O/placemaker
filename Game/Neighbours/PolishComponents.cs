@@ -112,12 +112,14 @@ namespace Placemaker.Game.Neighbours
     /// <summary>An area zoned with a look: buildings that grow in it get it (NeighbourPolishSystem.Areas).</summary>
     public struct PolishLookArea : IComponentData, IQueryTypeParameter, ISerializable
     {
-        public const int CurrentVersion = 1;
+        public const int CurrentVersion = 2;
         /// <summary>PolishLooks.Hash of the look's id.</summary>
         public int Look;
         /// <summary>Newer areas win where they overlap.</summary>
         public int Order;
         public float2 Min, Max;
+        /// <summary>(v2) Only buildings of this zone (PolishLooks.Hash of NeighbourPolishSystem.ZoneKey; 0: any zone).</summary>
+        public int Zone;
 
         public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
         {
@@ -126,6 +128,7 @@ namespace Placemaker.Game.Neighbours
             writer.Write(Order);
             writer.Write(Min);
             writer.Write(Max);
+            writer.Write(Zone);
         }
 
         public void Deserialize<TReader>(TReader reader) where TReader : IReader
@@ -135,6 +138,7 @@ namespace Placemaker.Game.Neighbours
             reader.Read(out Order);
             reader.Read(out Min);
             reader.Read(out Max);
+            if (version >= 2) reader.Read(out Zone); else Zone = 0;
         }
     }
 

@@ -1,4 +1,5 @@
-// The Zoning types' zone mix (ZoneMix.tsx): a bar of the mix, one line per zone, a short menu of zone types.
+// The Zoning types' zoning editor (ZoneMix.tsx): the mode switch, the land as a bar with draggable dividers, one line per
+// zone (button, width, depth, roads, remove), a short menu of zone types.
 @use "../styles/tokens" as *;
 
 $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the text colour
@@ -8,12 +9,29 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     min-width: 0;
 }
 
+.modeGap {
+    height: 8rem;
+}
+
+// ── the land as a bar ──
+.barBox {
+    position: relative;
+    margin: 10rem 0 10rem 0;
+}
+
+.barBoxAbove {
+    padding-top: 22rem;
+}
+
+.barBoxBelow {
+    padding-bottom: 22rem;
+}
+
 .bar {
+    position: relative;
     @include row;
-    height: 22rem;
-    margin: 4rem 0 8rem 0;
+    height: 26rem;
     border-radius: $radius;
-    overflow: hidden;
     background-color: $c-surface;
 }
 
@@ -23,14 +41,20 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     height: 100%;
     min-width: 0;
     overflow: hidden;
-    border-right-width: 1rem;
-    border-right-style: solid;
-    border-right-color: rgba(0, 0, 0, 0.35);
+}
+
+.barPart:first-child {
+    border-top-left-radius: $radius;
+    border-bottom-left-radius: $radius;
+}
+
+.barPart:last-of-type {
+    border-top-right-radius: $radius;
+    border-bottom-right-radius: $radius;
 }
 
 .barEmpty {
     background-color: rgba(255, 255, 255, 0.07);
-    border-right-width: 0;
 }
 
 .barText {
@@ -47,116 +71,86 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     font-weight: normal;
 }
 
-// a zone: its line (button, share, remove) and its lots' rows lined up under the share
+// a divider: a wide invisible grab area with a white grip
+.barEdge {
+    position: absolute;
+    top: -3rem;
+    bottom: -3rem;
+    width: 14rem;
+    margin-left: -7rem;
+    @include row;
+    justify-content: center;
+    cursor: ew-resize;
+}
+
+.barGrip {
+    width: 4rem;
+    height: 100%;
+    border-radius: 2rem;
+    background-color: #ffffff;
+    box-shadow: 0 0 3rem rgba(0, 0, 0, 0.6);
+}
+
+.barEdge:hover .barGrip {
+    width: 6rem;
+}
+
+// a label that does not fit its part: above or below the bar, on a line to it
+.callout {
+    position: absolute;
+    @include col;
+    align-items: center;
+    width: 160rem;
+    margin-left: -80rem;
+    pointer-events: none;
+}
+
+.calloutAbove {
+    top: 0;
+    flex-direction: column-reverse;
+}
+
+.calloutBelow {
+    bottom: 0;
+}
+
+.calloutLine {
+    width: 1rem;
+    height: 8rem;
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+.calloutText {
+    font-size: 11rem;
+    color: #ffffff;
+    white-space: nowrap;
+}
+
+// ── a zone: one line ──
 .zone {
     @include col;
     min-width: 0;
-    margin-bottom: 6rem;
+    margin-bottom: 4rem;
     padding-bottom: 4rem;
     border-bottom-width: 1rem;
     border-bottom-style: solid;
     border-bottom-color: $c-line;
 }
 
-.cell {
-    @include row;
-    flex: 1 1 auto;
-    min-width: 0;
-    margin-left: 10rem;
-}
-
-.endSpacer {
-    flex: 0 0 auto;
-    width: 22rem;
-}
-
-.sub {
-    @include row;
-    min-width: 0;
-    min-height: 24rem;
-}
-
-.subLabel {
-    flex: 0 0 auto;
-    width: 172rem;
-    padding-right: 2rem;
-    text-align: right;
-    font-size: 11rem;
-    color: $c-text-dim;
-    @include ellipsis;
-}
-
-.value {
-    width: 58rem;
-    flex-shrink: 0;
-    text-align: right;
-    font-size: $fs;
-    color: #ffffff;
-    @include ellipsis;
-}
-
-.rangeWrap {
-    @include row;
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.rangeTrack {
-    position: relative;
-    flex: 1 1 auto;
-    min-width: 0;
-    height: 22rem;
-    cursor: pointer;
-    @include row;
-}
-
-.rangeRail {
-    position: relative;
-    width: 100%;
-    height: 8rem;
-    border-radius: 4rem;
-    background-color: rgba(255, 255, 255, 0.45);
-}
-
-.rangeFill {
-    position: absolute;
-    top: 0;
-    height: 8rem;
-    border-radius: 4rem;
-    background-color: var(--accentColorNormal);
-}
-
-.rangeThumb {
-    position: absolute;
-    top: 2rem;
-    width: 18rem;
-    height: 18rem;
-    margin-left: -9rem;
-    border-radius: 9rem;
-    background-color: #ffffff;
-    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.5);
-}
-
 .line {
     @include row;
     min-width: 0;
-    min-height: 26rem;
-    margin-bottom: 3rem;
+    min-height: 28rem;
 }
 
-.lineLabel {
-    flex: 0 0 auto;
-    width: 172rem;
-    font-size: $fs-s;
-    color: $c-text-dim;
-    @include ellipsis;
+.flex {
+    flex: 1 1 auto;
 }
 
 .zoneButton {
     @include row;
-    flex: 0 1 auto;
-    width: 172rem;
-    min-width: 0;
+    flex: 0 0 auto;
+    width: 160rem;
     height: 24rem;
     padding: 0 7rem 0 5rem;
     border-radius: $radius;
@@ -202,10 +196,79 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     background-color: $c-surface-strong;
 }
 
-.all {
+// width, depth and roads side by side (wrapping on a narrow panel)
+.ranges {
+    @include row;
     flex: 1 1 auto;
-    font-size: $fs-s;
-    color: $c-text-faint;
+    flex-wrap: wrap;
+    min-width: 0;
+    margin-left: 8rem;
+}
+
+.range {
+    @include row;
+    flex: 1 1 0;
+    min-width: 130rem;
+    margin-right: 8rem;
+}
+
+.rangeLabel {
+    flex: 0 0 auto;
+    margin-right: 5rem;
+    font-size: 11rem;
+    color: $c-text-dim;
+}
+
+.rangeWrap {
+    @include row;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.rangeTrack {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 40rem;
+    height: 22rem;
+    cursor: pointer;
+    @include row;
+}
+
+.rangeRail {
+    position: relative;
+    width: 100%;
+    height: 6rem;
+    border-radius: 3rem;
+    background-color: rgba(255, 255, 255, 0.4);
+}
+
+.rangeFill {
+    position: absolute;
+    top: 0;
+    height: 6rem;
+    border-radius: 3rem;
+    background-color: var(--accentColorNormal);
+}
+
+.rangeThumb {
+    position: absolute;
+    top: 4rem;
+    width: 14rem;
+    height: 14rem;
+    margin-left: -7rem;
+    border-radius: 7rem;
+    background-color: #ffffff;
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.5);
+}
+
+.rangeValue {
+    flex: 0 0 auto;
+    width: 44rem;
+    margin-left: 5rem;
+    text-align: right;
+    font-size: 11rem;
+    color: #ffffff;
+    @include ellipsis;
 }
 
 .remove {
@@ -214,8 +277,6 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     flex: 0 0 auto;
     width: 18rem;
     height: 18rem;
-    margin-left: 4rem;
-    margin-right: 0;
     border-radius: 9rem;
     color: $text;
     cursor: pointer;
@@ -225,11 +286,16 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     background-color: $c-surface-hover;
 }
 
+.endSpacer {
+    flex: 0 0 auto;
+    width: 18rem;
+}
+
 .add {
     @include row;
     align-self: flex-start;
     height: 22rem;
-    margin: 1rem 0 6rem 0;
+    margin: 2rem 0 6rem 0;
     padding: 0 8rem 0 6rem;
     border-radius: $radius;
     @include border(1rem, $c-line);
@@ -242,10 +308,11 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     background-color: $c-surface-hover;
 }
 
+// ── the zone types' menu ──
 .menu {
     @include col;
     min-width: 0;
-    margin: 0 0 6rem 0;
+    margin: 2rem 0 4rem 0;
     padding: 6rem 6rem 2rem 6rem;
     border-radius: $radius;
     background-color: rgba(143, 209, 255, 0.07);
@@ -313,4 +380,34 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 
 .exactButton:hover {
     background-color: $c-surface-hover;
+}
+
+// ── Outgrow: a tab per zone ──
+.tabs {
+    @include row;
+    flex-wrap: wrap;
+    min-width: 0;
+    margin: 4rem 0 6rem 0;
+}
+
+.tab {
+    @include row;
+    height: 22rem;
+    margin: 0 4rem 4rem 0;
+    padding: 0 9rem 0 6rem;
+    border-radius: $radius;
+    background-color: $c-surface;
+    @include border(1rem, $c-line);
+    color: $text;
+    font-size: $fs-s;
+    cursor: pointer;
+}
+
+.tab:hover {
+    background-color: $c-surface-hover;
+}
+
+.tabOn {
+    background-color: rgba(143, 209, 255, 0.18);
+    @include border(1rem, rgba(143, 209, 255, 0.75));
 }

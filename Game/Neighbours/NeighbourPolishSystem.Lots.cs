@@ -320,7 +320,7 @@ namespace Placemaker.Game.Neighbours
                         break;
                     }
                     // grown in an area zoned with a look (a Zoning type): that look and its changes
-                    var area = carried ? null : LookAreaAt(t.m_Position.xz);
+                    var area = carried ? null : LookAreaAt(t.m_Position.xz, ZoneName(prefab));
                     if (area != null) { yes = true; TotalByArea++; }
                     var look = yes ? (area != null ? LookByHash(area.Look) : null) ?? LookById(zoneLook) ?? PolishLooks.BuiltIn[0] : null;
                     EntityManager.AddComponentData(e, yes ? new PolishedLot { Yes = true, Theme = (byte)Math.Max(1, Array.IndexOf(ThemeNames, look.Theme)), Look = PolishLooks.Hash(look.Id) } : new PolishedLot());

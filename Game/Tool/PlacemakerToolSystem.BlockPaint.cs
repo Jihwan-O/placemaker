@@ -64,7 +64,7 @@ namespace Placemaker.Game.Tool
             _bpOpen ? c.Open && math.all(c.Seed == _bpSeed) : !c.Open && ReferenceEquals(c.Ring, _bpRing);
 
         /// <summary>The player's brush rules (Options / the panel's Stops at); plain Paint never reads them.</summary>
-        public BrushRules BrushRules => (_painter || _wasPolishType) && _painterRules != null ? _painterRules : PlayerBrushRules;
+        public BrushRules BrushRules => OwnBrushRules ? _painterRules : PlayerBrushRules;
 
         /// <summary>The rules saved in the settings (the painter keeps its own copy for the session: PlacemakerToolSystem.Painter).</summary>
         private BrushRules PlayerBrushRules => _settings != null ? _settings.GetBrushRules() : BrushRules.Defaults();
@@ -76,7 +76,8 @@ namespace Placemaker.Game.Tool
             var before = BrushRules;
             if (rules.Equals(before)) return;
             bool fillChanged = !rules.ForOutline().SameWalls(before.ForOutline()) || rules.Gap != before.Gap || rules.Reach != before.Reach;
-            if (_painter) _painterRules = rules;
+            // the painter and a Zoning type use their own copy (BrushRules): a change goes there, or it would never show
+            if (OwnBrushRules) _painterRules = rules;
             else if (_settings != null) { _settings.SetBrushRules(rules); _settings.ApplyAndSave(); }
             // The fence is rebuilt from the cached walls on the next frame (UpdateBlockPaint) and the painted outline at
             // the next stroke; the bucket fills its spots again; Points cut their outline again.
@@ -91,7 +92,10 @@ namespace Placemaker.Game.Tool
             Touch();
         }
 
-        public void ResetBrushRules() => SetBrushRules(_painter ? PainterRulesFrom(BrushRules.Defaults()) : BrushRules.Defaults());
+        public void ResetBrushRules() => SetBrushRules(OwnBrushRules ? PainterRulesFrom(BrushRules.Defaults()) : BrushRules.Defaults());
+
+        /// <summary>The painter or a Zoning type is in use: the brush rules are its own copy, not the settings' ones.</summary>
+        private bool OwnBrushRules => (_painter || _wasPolishType) && _painterRules != null;
 
         /// <summary>A new stroke at p continues the current selection (inside the same fill / the same side of the roads).</summary>
         private static bool Continues(BlockPaintContext c, float2 p) =>

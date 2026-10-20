@@ -69,6 +69,10 @@ namespace Placemaker.Core
         public bool IsOneWay;
         /// <summary>Carries bicycles on their own lane: a bike path, a pathway with bike lanes or a road with bike lanes.</summary>
         public bool HasBikeLane;
+        /// <summary>(appended) A road under highway rules (motorways, highway ramps): new roads never join or cross it at grade.</summary>
+        public bool IsHighway;
+        /// <summary>(appended) Speed limit in km/h, 0 = unknown.</summary>
+        public float SpeedLimit;
     }
 
     public enum NetCategory { Road = 0, Pathway = 1, Track = 2, Other = 3 }

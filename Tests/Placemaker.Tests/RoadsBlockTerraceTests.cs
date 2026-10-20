@@ -32,6 +32,7 @@ namespace Placemaker.Tests
             var s = new RoadsLayer().Defaults();
             s.Values[RoadsIds.Pattern] = pattern;
             s.Values[RoadsIds.PreZone] = Placemaker.Core.Layers.Common.ZoneKinds.Default;
+            s.Values[RoadsIds.LandShape] = "terrace";   // (smarter roads) terracing is the player's choice now, off by default
             foreach (var (id, v) in values) s.Values[id] = v;
             return s;
         }

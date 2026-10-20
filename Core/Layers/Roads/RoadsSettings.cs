@@ -87,6 +87,12 @@ namespace Placemaker.Core.Layers.Roads
         public const string FollowTerrain = "followTerrain";
         public const string AvoidObstacles = "avoidObstacles";
         public const string ConnectExisting = "connectExisting";
+        /// <summary>(Smarter roads) Which existing roads new roads join: "streets" (all but highways and ramps) | "small" | "any".</summary>
+        public const string ConnectTo = "connectTo";
+        /// <summary>(Smarter roads) Ground the streets wear in (desire paths, corner wear, verges): "off" | "subtle" | "lived".</summary>
+        public const string GroundWear = "roadWear";
+        /// <summary>(Smarter roads) Grid character: "strict" (the plain grid) | "auto" (gives way to hills and desire lines) | "lively" (more: brick blocks, a square).</summary>
+        public const string GridCharacter = "gridCharacter";
         public const string CapStyle = "capStyle";                  // "none" | "asphalt" | "grass" | "trees"
         public const string CapSize = "capSize";                    // "auto" | "small" | "medium" | "large" | "xl"
         public const string LocalAsset = "localAsset";
@@ -160,6 +166,10 @@ namespace Placemaker.Core.Layers.Roads
     public static class RoadsSchema
     {
         public const string KeyPrefix = "Placemaker.Roads.";
+        /// <summary>Default perimeter corner (m): the tightest a two-lane road turns cleanly (its half width 8 m + 6 m, rounded up).</summary>
+        public const float TightCorner = 15f;
+        /// <summary>Perimeter corner of the winding styles (m): their streets curve, a tight corner would look out of place.</summary>
+        public const float SoftCorner = 30f;
 
         public static readonly string[] PatternValues =
             { "grid", "tree", "organic", "contour", "mixed", "loop", "superblock", "concentric", "radial", "terraces" };
@@ -200,6 +210,7 @@ namespace Placemaker.Core.Layers.Roads
 
             c.Add(Slider(RoadsIds.GridSpacing, ControlTier.Essential, "layout", 60, 300, 10, "m", 100, "pattern=grid"));
             c.Add(Slider(RoadsIds.GridAngle, ControlTier.Essential, "layout", -90, 90, 1, "deg", 0, "pattern=grid", label: "angle"));
+            c.Add(Choice(RoadsIds.GridCharacter, ControlTier.Essential, "layout", RoadCharacter.Auto, RoadCharacter.Values, "pattern=grid"));
             c.Add(Slider(RoadsIds.TreeBranchSpacing, ControlTier.Essential, "layout",
                 GridGenerator.MinTreeBranchSpacing, GridGenerator.MaxTreeBranchSpacing, 10, "m", GridGenerator.TreeBranchSpacingDefault, "pattern=tree"));
             c.Add(Slider(RoadsIds.TreeCulDeSacLength, ControlTier.Essential, "layout",
@@ -262,8 +273,11 @@ namespace Placemaker.Core.Layers.Roads
 
             // ── More: network-wide ────────────────────────────────────────
             c.Add(Choice(RoadsIds.PerimeterRoad, ControlTier.More, "connections", "auto", new[] { "auto", "on", "off" }));
-            c.Add(Slider(RoadsIds.PerimeterCornerRadius, ControlTier.More, "connections", 0, 80, 5, "m", FreeAreaPerimeter.CornerRadius));
+            // Smarter roads: the perimeter hugs the selection: the tightest corner the road turns cleanly (winding styles set more).
+            c.Add(Slider(RoadsIds.PerimeterCornerRadius, ControlTier.More, "connections", 0, 80, 5, "m", TightCorner));
             c.Add(Toggle(RoadsIds.ConnectExisting, ControlTier.More, "connections", true));
+            c.Add(Choice(RoadsIds.ConnectTo, ControlTier.More, "connections", ConnectTo.Streets, ConnectTo.Values, "connectExisting=true"));
+            c.Add(Choice(RoadsIds.GroundWear, ControlTier.Essential, "terrain", RoadPaint.Subtle, RoadPaint.Values));
             c.Add(Toggle(RoadsIds.AvoidObstacles, ControlTier.More, "connections", true));
             c.Add(Toggle(RoadsIds.FollowTerrain, ControlTier.More, "connections", true));
             c.Add(Asset(RoadsIds.LocalAsset, ControlTier.More, "roadTypes", AssetCategories.Road));
@@ -284,7 +298,8 @@ namespace Placemaker.Core.Layers.Roads
             c.Add(Choice(RoadsIds.TipStyle, ControlTier.More, "culDeSacs", "same", new[] { "same", "gravel", "mixed" }));
             c.Add(Asset(RoadsIds.LaneAsset, ControlTier.More, "roadTypes", AssetCategories.Road));
             c.Add(Choice(RoadsIds.TerrainFit, ControlTier.Essential, "terrain", "auto", new[] { "auto", "follow", "ignore" }));
-            c.Add(Choice(RoadsIds.LandShape, ControlTier.Essential, "terrain", "terrace", new[] { "terrace", "natural" }));
+            // Smarter roads: no terracing unless the player asks for it (the user: terrain flattening and terracing off by default).
+            c.Add(Choice(RoadsIds.LandShape, ControlTier.Essential, "terrain", "natural", new[] { "terrace", "natural" }));
             c.Add(Slider(RoadsIds.MaxGrade, ControlTier.More, "terrain", 4, 16, 1, "%", 10));
             var preZone = Choice(RoadsIds.PreZone, ControlTier.Essential, "zoning", RoadPreZone.Default, RoadPreZone.Values());
             // The zone types read like everywhere else (Placemaker.Zone.<kind>).

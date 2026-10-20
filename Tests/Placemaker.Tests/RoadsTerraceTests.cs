@@ -34,6 +34,7 @@ namespace Placemaker.Tests
         {
             var s = new RoadsLayer().Defaults();
             s.Values[RoadsIds.Pattern] = "terraces";
+            s.Values[RoadsIds.LandShape] = "terrace";   // (smarter roads) terracing is the player's choice now, off by default
             foreach (var (id, v) in values) s.Values[id] = v;
             return s;
         }
@@ -441,7 +442,7 @@ namespace Placemaker.Tests
             Assert.True(gentle.Plan.Facts["terraces.spacing"] > standard.Plan.Facts["terraces.spacing"]);
             Assert.True(gentle.Ground.SteepestBank <= 0.27f);
             // Walks, paint and trees can each be switched off.
-            var bare = Plan(Terraces((RoadsIds.Walkways, 0.0), (RoadsIds.TerracePaint, false), (RoadsIds.TerraceTrees, false)), "steep");
+            var bare = Plan(Terraces((RoadsIds.Walkways, 0.0), (RoadsIds.TerracePaint, false), (RoadsIds.TerraceTrees, false), (RoadsIds.GroundWear, "off")), "steep");
             Assert.DoesNotContain(bare.Plan.Nets, n => n.Role == NetRole.Pathway);
             Assert.Empty(bare.Plan.Paint);
             Assert.DoesNotContain(bare.Plan.Objects, o => o.Role == ObjectRole.Tree);

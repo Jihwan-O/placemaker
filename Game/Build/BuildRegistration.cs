@@ -53,6 +53,8 @@ namespace Placemaker.Game.Build
             updateSystem.UpdateAfter<global::Placemaker.Game.Neighbours.NeighbourDeleteSystem, global::Game.Objects.SubElementDeleteSystem>(SystemUpdatePhase.PostTool);
             // its bushes: owned objects, permanent definitions right before GenerateObjectsSystem
             updateSystem.UpdateBefore<global::Placemaker.Game.Neighbours.NeighbourObjectSystem, global::Game.Tools.GenerateObjectsSystem>(SystemUpdatePhase.Modification1);
+            // its pieces the game hid this frame (Objects.OverrideSystem, Modification5): shown again before culling
+            updateSystem.UpdateAt<global::Placemaker.Game.Neighbours.NeighbourShowSystem>(SystemUpdatePhase.ModificationEnd);
 
             // ── Groups ─────────────────────────────────────────────────────────────────
             // Removal marks Deleted in PreTool: SubElementDeleteSystem (PostTool) cascades and

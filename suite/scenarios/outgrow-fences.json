@@ -76,7 +76,8 @@
         {
           "do": "lab",
           "op": "outgrowCheck",
-          "closeups": 2
+          "closeups": 3,
+          "hiddenFirst": true
         },
         {
           "do": "shot",

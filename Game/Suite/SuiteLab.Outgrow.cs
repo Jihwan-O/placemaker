@@ -100,6 +100,7 @@ namespace Placemaker.Game.Suite
             var fences = new List<OutgrowFence>();
             int lanes = 0, lanesHidden = 0, piecesAll = 0, piecesHidden = 0, ourPieces = 0, ourPiecesHidden = 0;
             var hiddenAt = new List<float2>();
+            var whyHidden = new List<string>();
             using (var q = em.CreateEntityQuery(ComponentType.ReadOnly<Lane>(), ComponentType.ReadOnly<Curve>(), ComponentType.ReadOnly<global::Game.Net.UtilityLane>(), ComponentType.ReadOnly<PrefabRef>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>()))
             using (var all = q.ToEntityArray(Allocator.Temp))
                 foreach (var e in all)
@@ -138,7 +139,7 @@ namespace Placemaker.Game.Suite
                     bool ours = em.HasComponent<PolishPiece>(e);
                     piecesAll++;
                     if (hidden) { piecesHidden++; hiddenAt.Add(t.m_Position.xz); }
-                    if (ours) { ourPieces++; if (hidden) ourPiecesHidden++; }
+                    if (ours) { ourPieces++; if (hidden) { ourPiecesHidden++; if (whyHidden.Count < 40) whyHidden.Add(sys.WhyHidden(e)); } }
                     fences.Add(new OutgrowFence { Pts = new[] { a, c }, Hidden = hidden, Lo = math.min(a, c), Hi = math.max(a, c) });
                 }
 
@@ -279,6 +280,8 @@ namespace Placemaker.Game.Suite
                 + $"fence {edge:F0} m of edges, {open:F1} m open, {hiddenFence:F1} m hidden by the game; fence lanes {lanes} ({lanesHidden} hidden), fence pieces {piecesAll} ({piecesHidden} hidden; Outgrow's {ourPieces}, {ourPiecesHidden} hidden); "
                 + $"{painted} painted gardens, {misfits} with lawn or paving short of the fence ({bare:F0} m² bare inside, {covered:F0} m² covered past the lot)");
             foreach (var h in rec["worst"]) Mod.Log.Info("Placemaker lab: outgrow check: " + h.ToString(Newtonsoft.Json.Formatting.None));
+            foreach (var w in whyHidden) Mod.Log.Info("Placemaker lab: outgrow check: hidden " + w);
+            rec["whyHidden"] = new JArray(whyHidden);
 
             // close-ups of the worst spots
             int closeups = (int?)step["closeups"] ?? 6;
@@ -294,6 +297,8 @@ namespace Placemaker.Game.Suite
                     n++;
                 }
             }
+            // "hiddenFirst": close-ups of hidden fences before anything else
+            if ((bool?)step["hiddenFirst"] == true) Pick("hidden", hiddenAt, 3);
             Pick("road", roadSpots.OrderByDescending(r => r.Round ? 1 : 0).ThenByDescending(r => r.Area).Select(r => r.At), 2);
             Pick("gap", gapSpots.OrderByDescending(g => g.Len).Select(g => g.At), 2);
             Pick("hidden", hiddenAt, 1);

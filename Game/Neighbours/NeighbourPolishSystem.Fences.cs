@@ -222,7 +222,7 @@ namespace Placemaker.Game.Neighbours
         /// <summary>Other fences or hedges lie along this piece (nearly parallel, within 0.7 m) over nearly all of its length,
         /// drawn: a doubled border, where the game is right to show only one. Covering only part of it is no double: hiding
         /// the piece then left the rest of its stretch open (gaps seen in the game runner).</summary>
-        private bool Doubled(Entity e, float2 a, float2 b)
+        private bool Doubled(Entity e, float2 a, float2 b, List<string> why = null)
         {
             float len = math.distance(a, b);
             if (len < 0.5f) return false;
@@ -240,7 +240,7 @@ namespace Placemaker.Game.Neighbours
                 open += math.max(0f, len - reach);
                 return open <= math.max(0.4f, len * 0.1f);
             }
-            bool Along(float2 p, float2 q)
+            bool Along(float2 p, float2 q, Entity by)
             {
                 float l = math.distance(p, q);
                 if (l < 0.5f) return false;
@@ -251,6 +251,7 @@ namespace Placemaker.Game.Neighbours
                 float t1 = math.clamp(math.max(math.dot(p - a, d), math.dot(q - a, d)), 0f, len);
                 if (t1 - t0 < 0.05f) return false;
                 spans.Add((t0, t1));
+                why?.Add($"{NameOf(EntityManager.GetComponentData<PrefabRef>(by).m_Prefab)}{(EntityManager.HasComponent<Overridden>(by) ? " (hidden)" : "")} {math.abs(math.dot((p + q) * 0.5f - a, n)):F2} m off, {t0:F1}-{t1:F1} of {len:F1} m");
                 return Covered();
             }
             var lo = math.min(a, b) - 1.5f;
@@ -275,7 +276,7 @@ namespace Placemaker.Game.Neighbours
                         if (!PieceSegment(o, out var p, out var q, out bool fence) || !fence) continue;
                         // one that is hidden too only counts when it comes first (of two hidden ones, one is shown)
                         if (EntityManager.HasComponent<Overridden>(o) && o.Index > e.Index) continue;
-                        if (Along(p, q)) return true;
+                        if (Along(p, q, o)) return true;
                     }
                 }
                 found.Clear();
@@ -294,12 +295,24 @@ namespace Placemaker.Game.Neighbours
                         var c = EntityManager.GetComponentData<Curve>(l);
                         if (c.m_Length < 0.3f) continue;
                         for (int k = 0; k < 4; k++)
-                            if (Along(MathUtils.Position(c.m_Bezier, k / 4f).xz, MathUtils.Position(c.m_Bezier, (k + 1) / 4f).xz)) return true;
+                            if (Along(MathUtils.Position(c.m_Bezier, k / 4f).xz, MathUtils.Position(c.m_Bezier, (k + 1) / 4f).xz, l)) return true;
                     }
                 }
             }
             finally { found.Dispose(); }
             return false;
+        }
+
+        /// <summary>For the game runner: why one of our pieces is hidden now (what lies along it, or a road or lot under it).</summary>
+        internal string WhyHidden(Entity e)
+        {
+            if (!PieceSegment(e, out var a, out var b, out bool fence)) return "no shape";
+            var why = new List<string>();
+            bool doubled = fence && Doubled(e, a, b, why);
+            bool road = OnRoadOrBuilding(e, (a + b) * 0.5f);
+            string name = NameOf(EntityManager.GetComponentData<PrefabRef>(e).m_Prefab);
+            return $"{name} ({math.distance(a, b):F1} m) at ({(a.x + b.x) * 0.5f:F1}, {(a.y + b.y) * 0.5f:F1}): {(_keptHidden.ContainsKey(e) ? "kept hidden" : "not judged yet")}, "
+                + $"{(doubled ? "doubled" : "not doubled")}{(why.Count > 0 ? " [" + string.Join("; ", why) + "]" : "")}{(road ? ", on a road or lot" : "")}";
         }
 
         /// <summary>The point is on a road, path or track surface, or more than a metre inside the lot of a building that is

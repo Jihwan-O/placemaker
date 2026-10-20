@@ -71,7 +71,7 @@ namespace Placemaker.Game.Neighbours
                     var r = Queue[qi];
                     if (r.Owner == Entity.Null || !EntityManager.Exists(r.Owner) || EntityManager.HasComponent<Deleted>(r.Owner)) continue;
                     if (string.IsNullOrEmpty(r.Name) || !_byName.TryGetValue(r.Name, out var prefab)) continue;
-                    if (Owns(r.Owner, prefab, r.Position)) continue;
+                    if (Owns(r.Owner, prefab, r.Position, r.Yaw)) continue;
                     var pos = new float3(r.Position.x, TerrainUtils.SampleHeight(ref heights, new float3(r.Position.x, 0f, r.Position.y)), r.Position.y);
                     var rot = quaternion.RotateY(r.Yaw);
                     var def = EntityManager.CreateEntity(_definition);
@@ -94,8 +94,9 @@ namespace Placemaker.Game.Neighbours
             Queue.RemoveRange(0, Math.Min(Queue.Count, MaxPerFrame));
         }
 
-        /// <summary>The house already owns a piece of this kind here (after a load, our list of what we made is empty).</summary>
-        private bool Owns(Entity owner, Entity prefab, float2 at)
+        /// <summary>The house already owns this piece: of this kind, at this spot, at this angle (PieceIdentity; after a load our
+        /// list of what we made is empty).</summary>
+        private bool Owns(Entity owner, Entity prefab, float2 at, float yaw)
         {
             if (!EntityManager.HasBuffer<global::Game.Objects.SubObject>(owner)) return false;
             var subs = EntityManager.GetBuffer<global::Game.Objects.SubObject>(owner, true);
@@ -104,7 +105,8 @@ namespace Placemaker.Game.Neighbours
                 var o = subs[i].m_SubObject;
                 if (!EntityManager.Exists(o) || EntityManager.HasComponent<Deleted>(o) || !EntityManager.HasComponent<PrefabRef>(o)) continue;
                 if (EntityManager.GetComponentData<PrefabRef>(o).m_Prefab != prefab || !EntityManager.HasComponent<Transform>(o)) continue;
-                if (math.distance(EntityManager.GetComponentData<Transform>(o).m_Position.xz, at) < 0.5f) return true;
+                var t = EntityManager.GetComponentData<Transform>(o);
+                if (PieceIdentity.SameSpot(t.m_Position.xz, PieceIdentity.YawOf(t.m_Rotation), at, yaw)) return true;
             }
             return false;
         }

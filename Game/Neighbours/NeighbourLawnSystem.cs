@@ -30,6 +30,8 @@ namespace Placemaker.Game.Neighbours
         }
 
         public static readonly List<Write> Queue = new List<Write>();
+        /// <summary>For the game runner: lawns written (reshaped or put back).</summary>
+        public static int TotalWritten;
 
         [Preserve]
         protected override void OnUpdate()
@@ -54,6 +56,16 @@ namespace Placemaker.Game.Neighbours
                 {
                     ring = w.Nodes;
                     if (ring == null || ring.Length < 3) continue;
+                    // the same outline it has: nothing to write (writing makes the game build the lawn again)
+                    if (kept)
+                    {
+                        var have = EntityManager.GetBuffer<global::Game.Areas.Node>(lawn, true);
+                        var now = new float2[have.Length];
+                        for (int i = 0; i < now.Length; i++) now[i] = have[i].m_Position.xz;
+                        var next = new float2[ring.Length];
+                        for (int i = 0; i < next.Length; i++) next[i] = ring[i].xz;
+                        if (PieceIdentity.SameRing(next, now)) continue;
+                    }
                     if (!kept)
                     {
                         var now = EntityManager.GetBuffer<global::Game.Areas.Node>(lawn, true);
@@ -67,6 +79,7 @@ namespace Placemaker.Game.Neighbours
                 nodes.Clear();
                 foreach (var p in ring) nodes.Add(new global::Game.Areas.Node(p, float.MinValue));
                 EntityManager.AddComponent<Updated>(lawn);
+                TotalWritten++;
             }
             Queue.Clear();
         }

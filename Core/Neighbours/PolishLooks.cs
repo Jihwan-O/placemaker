@@ -55,8 +55,8 @@ namespace Placemaker.Core.Neighbours
             ["pathChance"] = 45f, ["pavedFill"] = 1f,
             // closing gardens: pieces of the house's own fence kind (or one picked) along every open edge
             ["closeGardens"] = 1f, ["fenceKind"] = 0f,
-            // lawn near the house, painted ground further out
-            ["lawnReach"] = 25f,
+            // lawn up to the fence (400 m or more: everywhere); less: lawn near the house, painted ground further out
+            ["lawnReach"] = 500f,
             // ground types (0 none, 1 dry grass, 2 lush, 3 dirt, 4 sand) for every job paint does, with widths and strengths
             ["gardenLayer"] = 2f, ["meadowLayer"] = 1f, ["meadowStrength"] = 0.6f, ["blendLayer"] = 2f, ["blendFarLayer"] = 1f,
             ["edgeLayer"] = 3f, ["edgeWidth"] = 2.4f, ["edgeStrength"] = 0.45f, ["roadLayer"] = 0f, ["roadWidth"] = 4f, ["roadStrength"] = 0.5f,
@@ -152,7 +152,7 @@ namespace Placemaker.Core.Neighbours
             new PolishLook { Id = "tidy", Name = "Placemaker.UI.Painter.Theme.tidy", Theme = "tidy", Knobs = { ["bedChance"] = 90f, ["rockChance"] = 0f } },
             new PolishLook { Id = "yard", Name = "Placemaker.UI.Painter.Theme.yard", Theme = "yard", Knobs = { ["bedChance"] = 0f, ["rockChance"] = 0f, ["gardenLayer"] = 3f, ["meadowLayer"] = 3f, ["blendLayer"] = 3f, ["patchChance"] = 60f } },
             // more ready looks, each a different mix of ground
-            new PolishLook { Id = "meadow", Name = "Placemaker.UI.Painter.Theme.meadow", Theme = "natural", Knobs = { ["paintedGardens"] = 70f, ["gardenLayer"] = 1f, ["meadowLayer"] = 1f, ["blendLayer"] = 2f, ["blendFarLayer"] = 1f, ["lawnReach"] = 12f, ["featureChance"] = 75f, ["rockChance"] = 35f, ["bedChance"] = 0f, ["patchChance"] = 30f, ["patchLayer"] = 1f } },
+            new PolishLook { Id = "meadow", Name = "Placemaker.UI.Painter.Theme.meadow", Theme = "natural", Knobs = { ["paintedGardens"] = 70f, ["gardenLayer"] = 1f, ["meadowLayer"] = 1f, ["blendLayer"] = 2f, ["blendFarLayer"] = 1f, ["featureChance"] = 75f, ["rockChance"] = 35f, ["bedChance"] = 0f, ["patchChance"] = 30f, ["patchLayer"] = 1f } },
             new PolishLook { Id = "rustic", Name = "Placemaker.UI.Painter.Theme.rustic", Theme = "garden", Knobs = { ["paintedGardens"] = 50f, ["gardenLayer"] = 1f, ["meadowLayer"] = 1f, ["edgeLayer"] = 3f, ["edgeWidth"] = 3.5f, ["edgeStrength"] = 0.6f, ["patchChance"] = 70f, ["patchLayer"] = 3f, ["rockChance"] = 30f, ["roadLayer"] = 3f, ["roadWidth"] = 3f, ["roadStrength"] = 0.45f } },
             new PolishLook { Id = "coastal", Name = "Placemaker.UI.Painter.Theme.coastal", Theme = "natural", Knobs = { ["paintedGardens"] = 60f, ["gardenLayer"] = 4f, ["meadowLayer"] = 1f, ["blendLayer"] = 4f, ["blendFarLayer"] = 1f, ["roadLayer"] = 4f, ["roadWidth"] = 5f, ["roadStrength"] = 0.6f, ["rockLayer"] = 4f, ["rockGround"] = 4f, ["patchLayer"] = 4f, ["patchChance"] = 40f, ["rockChance"] = 30f } },
             new PolishLook { Id = "manicured", Name = "Placemaker.UI.Painter.Theme.manicured", Theme = "tidy", Knobs = { ["paintedGardens"] = 0f, ["lawnReach"] = 500f, ["blendLayer"] = 2f, ["blendFarLayer"] = 0f, ["edgeLayer"] = 0f, ["patchChance"] = 0f, ["rockChance"] = 0f, ["bedChance"] = 95f } },

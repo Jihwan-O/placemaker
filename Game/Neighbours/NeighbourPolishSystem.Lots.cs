@@ -407,7 +407,7 @@ namespace Placemaker.Game.Neighbours
                 if (y)
                 {
                     // its plan edits the polished neighbours near it too (they are in the same pass); the player's: first
-                    _dirty.Add(lot);
+                    if (_dirty.Add(lot)) DirtyBy[4]++;
                     _first.Add(lot);
                     yes++;
                 }
@@ -494,6 +494,7 @@ namespace Placemaker.Game.Neighbours
             foreach (var (lane, curve) in writes)
             {
                 _written.Remove(lane);
+                _laneCurve[lane] = curve;
                 var cur = EntityManager.GetComponentData<Curve>(lane);
                 cur.m_Bezier = curve;
                 cur.m_Length = MathUtils.Length(curve);
@@ -522,6 +523,9 @@ namespace Placemaker.Game.Neighbours
                 }
             }
             _described.Remove(house);
+            // its garden is its lot again
+            _gardenOf.Remove(house);
+            if (EntityManager.HasBuffer<PolishGarden>(house)) EntityManager.RemoveComponent<PolishGarden>(house);
             if (changed) TotalRestored++;
             return changed;
         }
@@ -569,6 +573,35 @@ namespace Placemaker.Game.Neighbours
             return (IsYes(house), moved.Count, lawns, pieces);
         }
 
+        /// <summary>The house's own pieces the polish made of one kind, with what tells one from another (PieceIdentity).</summary>
+        private List<PieceIdentity.Have> OwnPieceShapes(Entity house, PolishPieceKind kind)
+        {
+            var list = new List<PieceIdentity.Have>();
+            if (!EntityManager.Exists(house)) return list;
+            if (EntityManager.HasBuffer<global::Game.Areas.SubArea>(house))
+                foreach (var sa in EntityManager.GetBuffer<global::Game.Areas.SubArea>(house, true))
+                {
+                    var a = sa.m_Area;
+                    if (!EntityManager.Exists(a) || EntityManager.HasComponent<Deleted>(a) || !EntityManager.HasComponent<PolishPiece>(a) || !EntityManager.HasBuffer<global::Game.Areas.Node>(a)) continue;
+                    if (EntityManager.GetComponentData<PolishPiece>(a).Kind != kind) continue;
+                    var nodes = EntityManager.GetBuffer<global::Game.Areas.Node>(a, true);
+                    if (nodes.Length == 0) continue;
+                    var ring = new float2[nodes.Length];
+                    for (int i = 0; i < ring.Length; i++) ring[i] = nodes[i].m_Position.xz;
+                    list.Add(new PieceIdentity.Have { Entity = a, Name = NameOf(EntityManager.GetComponentData<PrefabRef>(a).m_Prefab), At = PieceIdentity.Centre(ring), Yaw = float.NaN, Ring = ring });
+                }
+            if (EntityManager.HasBuffer<global::Game.Objects.SubObject>(house))
+                foreach (var so in EntityManager.GetBuffer<global::Game.Objects.SubObject>(house, true))
+                {
+                    var o = so.m_SubObject;
+                    if (!EntityManager.Exists(o) || EntityManager.HasComponent<Deleted>(o) || !EntityManager.HasComponent<PolishPiece>(o) || !EntityManager.HasComponent<global::Game.Objects.Transform>(o)) continue;
+                    if (EntityManager.GetComponentData<PolishPiece>(o).Kind != kind) continue;
+                    var t = EntityManager.GetComponentData<global::Game.Objects.Transform>(o);
+                    list.Add(new PieceIdentity.Have { Entity = o, Name = NameOf(EntityManager.GetComponentData<PrefabRef>(o).m_Prefab), At = t.m_Position.xz, Yaw = PieceIdentity.YawOf(t.m_Rotation) });
+                }
+            return list;
+        }
+
         /// <summary>The house's own pieces the polish made (tagged PolishPiece) of one kind: entity, prefab name, centre.</summary>
         private List<(Entity Piece, string Name, float2 At)> OwnPieces(Entity house, PolishPieceKind kind)
         {
@@ -601,6 +634,11 @@ namespace Placemaker.Game.Neighbours
         private void ForgetCity()
         {
             _gardenOf.Clear();
+            _laneCurve.Clear();
+            _prefabSeen.Clear();
+            _keptHidden.Clear();
+            _shownTimes.Clear();
+            _roadShapes.Clear();
             _areaCache = null;
             s_newAreas.Clear();
             _written.Clear();
@@ -608,6 +646,7 @@ namespace Placemaker.Game.Neighbours
             _described.Clear();
             _dirty.Clear();
             _first.Clear();
+            DropSampling();
             _inFlight.Clear();
             _painted.Clear();
             _goneFlags.Clear();

@@ -29,6 +29,7 @@ namespace Placemaker.Game.Suite
             {
                 case "street": yield return LabStreet(st, step, rec); yield break;
                 case "yards": yield return LabYards(st, step, rec); yield break;
+                case "outgrowcheck": yield return LabOutgrowCheck(st, step, rec); yield break;
                 case "yardscheck": LabYardsCheck(rec); yield break;
                 case "anatomy": LabAnatomy(st, rec); yield break;
                 case "lineup": yield return LabLineup(st, step, rec); yield break;
@@ -205,6 +206,38 @@ namespace Placemaker.Game.Suite
                     yield return Frames(30);
                     yield break;
                 }
+                case "outgrowquiet":
+                {
+                    // after Outgrow is idle: nothing it made should change any more (made again, deleted, shown again, lawns
+                    // rewritten, lines moved): that is flicker
+                    float wait = (float?)step["seconds"] ?? 15f;
+                    var N = typeof(Placemaker.Game.Neighbours.NeighbourPolishSystem);
+                    int objects0 = Placemaker.Game.Neighbours.NeighbourObjectSystem.TotalMade, areas0 = Placemaker.Game.Neighbours.NeighbourAreaSystem.TotalMade;
+                    int deleted0 = Placemaker.Game.Neighbours.NeighbourDeleteSystem.TotalDeleted, shown0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalShownAgain;
+                    int lawns0 = Placemaker.Game.Neighbours.NeighbourLawnSystem.TotalWritten, passes0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPasses;
+                    int moved0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalMoved;
+                    var clock = System.Diagnostics.Stopwatch.StartNew();
+                    while (clock.Elapsed.TotalSeconds < wait) yield return null;
+                    rec["seconds"] = wait;
+                    rec["objectsMade"] = Placemaker.Game.Neighbours.NeighbourObjectSystem.TotalMade - objects0;
+                    rec["surfacesMade"] = Placemaker.Game.Neighbours.NeighbourAreaSystem.TotalMade - areas0;
+                    rec["deleted"] = Placemaker.Game.Neighbours.NeighbourDeleteSystem.TotalDeleted - deleted0;
+                    rec["shownAgain"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalShownAgain - shown0;
+                    rec["lawnsWritten"] = Placemaker.Game.Neighbours.NeighbourLawnSystem.TotalWritten - lawns0;
+                    rec["passes"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPasses - passes0;
+                    rec["linesMoved"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalMoved - moved0;
+                    Mod.Log.Info("Placemaker lab: outgrow quiet " + new JObject { ["seconds"] = rec["seconds"], ["objectsMade"] = rec["objectsMade"], ["surfacesMade"] = rec["surfacesMade"], ["deleted"] = rec["deleted"], ["shownAgain"] = rec["shownAgain"], ["lawnsWritten"] = rec["lawnsWritten"], ["passes"] = rec["passes"], ["linesMoved"] = rec["linesMoved"] }.ToString(Newtonsoft.Json.Formatting.None));
+                    yield break;
+                }
+                case "polishpassdump":
+                {
+                    // every pass Outgrow plans from now on written down (its houses, barriers, ground) for the offline benchmark
+                    var dir = System.IO.Path.Combine(_out, "passes");
+                    Placemaker.Game.Neighbours.NeighbourPolishSystem.StartPassDump(dir, (int?)step["max"] ?? 40);
+                    rec["dir"] = dir;
+                    Mod.Log.Info("Placemaker lab: Outgrow passes will be written to " + dir);
+                    yield break;
+                }
                 case "polishidle":
                 {
                     // until the polish has looked at every house it was asked to (a city switched on): how long it took, how
@@ -212,6 +245,9 @@ namespace Placemaker.Game.Suite
                     float limit = (float?)step["seconds"] ?? 300f;
                     var clock = System.Diagnostics.Stopwatch.StartNew();
                     int passes0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPasses;
+                    double upd0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.UpdateMs, pass0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.PassMainMs, fin0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.FinishMainMs, plan0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.PlanWorkerMs;
+                    int plans0 = Placemaker.Game.Neighbours.NeighbourPolishSystem.PlansTimed;
+                    Placemaker.Game.Neighbours.NeighbourPolishSystem.ResetWorst();
                     int frames = 0;
                     var ms = new System.Collections.Generic.List<float>();
                     yield return Frames(4);
@@ -220,6 +256,25 @@ namespace Placemaker.Game.Suite
                     rec["frames"] = frames;
                     rec["passes"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPasses - passes0;
                     rec["stillWaiting"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.Waiting;
+                    {
+                        int plans = Placemaker.Game.Neighbours.NeighbourPolishSystem.PlansTimed - plans0;
+                        rec["outgrowMs"] = new JObject
+                        {
+                            ["frameTotal"] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.UpdateMs - upd0, 1), ["frameWorst"] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.UpdateMaxMs, 1),
+                            ["passGather"] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.PassMainMs - pass0, 1), ["passGatherWorst"] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.PassMainMaxMs, 1),
+                            ["write"] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.FinishMainMs - fin0, 1), ["writeWorst"] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.FinishMainMaxMs, 1),
+                            ["plans"] = plans, ["planWorker"] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.PlanWorkerMs - plan0, 1), ["planWorst"] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.PlanWorkerMaxMs, 1),
+                        };
+                        var parts = new JObject();
+                        for (int k = 0; k < Placemaker.Game.Neighbours.NeighbourPolishSystem.PassPartMs.Length; k++) parts[Placemaker.Game.Neighbours.NeighbourPolishSystem.PassPartNames[k]] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.PassPartMs[k], 1);
+                        for (int k = 0; k < Placemaker.Game.Neighbours.NeighbourPolishSystem.BarrierPartMs.Length; k++) parts["barriers." + Placemaker.Game.Neighbours.NeighbourPolishSystem.BarrierPartNames[k]] = Math.Round(Placemaker.Game.Neighbours.NeighbourPolishSystem.BarrierPartMs[k], 1);
+                        rec["outgrowMs"]["gatherParts"] = parts;
+                        var why = new JObject();
+                        for (int k = 0; k < Placemaker.Game.Neighbours.NeighbourPolishSystem.DirtyBy.Length; k++) why[Placemaker.Game.Neighbours.NeighbourPolishSystem.DirtyByNames[k]] = Placemaker.Game.Neighbours.NeighbourPolishSystem.DirtyBy[k];
+                        why["linesUnmovedSkipped"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.DirtySkipped;
+                        rec["outgrowMs"]["dirtyBy"] = why;
+                        Mod.Log.Info("Placemaker lab: Outgrow time " + rec["outgrowMs"].ToString(Newtonsoft.Json.Formatting.None));
+                    }
                     ms.Sort();
                     float worst = ms.Count > 0 ? ms[ms.Count - 1] : 0f, p95 = ms.Count > 0 ? ms[(int)(ms.Count * 0.95f)] : 0f, median = ms.Count > 0 ? ms[ms.Count / 2] : 0f;
                     int over33 = ms.Count(x => x > 33.4f), over50 = ms.Count(x => x > 50f), over100 = ms.Count(x => x > 100f);

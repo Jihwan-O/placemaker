@@ -89,6 +89,10 @@ namespace Placemaker.Core.Layers.Roads
         public const string ConnectExisting = "connectExisting";
         /// <summary>(Smarter roads) Which existing roads new roads join: "streets" (all but highways and ramps) | "small" | "any".</summary>
         public const string ConnectTo = "connectTo";
+        /// <summary>(Smarter roads) Ground the streets wear in (desire paths, corner wear, verges): "off" | "subtle" | "lived".</summary>
+        public const string GroundWear = "roadWear";
+        /// <summary>(Smarter roads) Grid character: "strict" (the plain grid) | "auto" (gives way to hills and desire lines) | "lively" (more: brick blocks, a square).</summary>
+        public const string GridCharacter = "gridCharacter";
         public const string CapStyle = "capStyle";                  // "none" | "asphalt" | "grass" | "trees"
         public const string CapSize = "capSize";                    // "auto" | "small" | "medium" | "large" | "xl"
         public const string LocalAsset = "localAsset";
@@ -206,6 +210,7 @@ namespace Placemaker.Core.Layers.Roads
 
             c.Add(Slider(RoadsIds.GridSpacing, ControlTier.Essential, "layout", 60, 300, 10, "m", 100, "pattern=grid"));
             c.Add(Slider(RoadsIds.GridAngle, ControlTier.Essential, "layout", -90, 90, 1, "deg", 0, "pattern=grid", label: "angle"));
+            c.Add(Choice(RoadsIds.GridCharacter, ControlTier.Essential, "layout", RoadCharacter.Auto, RoadCharacter.Values, "pattern=grid"));
             c.Add(Slider(RoadsIds.TreeBranchSpacing, ControlTier.Essential, "layout",
                 GridGenerator.MinTreeBranchSpacing, GridGenerator.MaxTreeBranchSpacing, 10, "m", GridGenerator.TreeBranchSpacingDefault, "pattern=tree"));
             c.Add(Slider(RoadsIds.TreeCulDeSacLength, ControlTier.Essential, "layout",
@@ -272,6 +277,7 @@ namespace Placemaker.Core.Layers.Roads
             c.Add(Slider(RoadsIds.PerimeterCornerRadius, ControlTier.More, "connections", 0, 80, 5, "m", TightCorner));
             c.Add(Toggle(RoadsIds.ConnectExisting, ControlTier.More, "connections", true));
             c.Add(Choice(RoadsIds.ConnectTo, ControlTier.More, "connections", ConnectTo.Streets, ConnectTo.Values, "connectExisting=true"));
+            c.Add(Choice(RoadsIds.GroundWear, ControlTier.Essential, "terrain", RoadPaint.Subtle, RoadPaint.Values));
             c.Add(Toggle(RoadsIds.AvoidObstacles, ControlTier.More, "connections", true));
             c.Add(Toggle(RoadsIds.FollowTerrain, ControlTier.More, "connections", true));
             c.Add(Asset(RoadsIds.LocalAsset, ControlTier.More, "roadTypes", AssetCategories.Road));

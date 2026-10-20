@@ -74,7 +74,7 @@ namespace Placemaker.RoadLab
 
     public static class Cases
     {
-        public static readonly string[] All = { "open", "city", "highway", "avenue", "smallroad", "hill", "steep", "irregular", "rotated", "everything" };
+        public static readonly string[] All = { "open", "city", "highway", "avenue", "smallroad", "hill", "steep", "irregular", "rotated", "everything", "desire", "bighill" };
 
         public static float3[] Rect(float w, float d, float rotDeg = 0f, float2 centre = default)
         {
@@ -265,6 +265,31 @@ namespace Placemaker.RoadLab
                     b.Street(new float2(560, -45), new float2(800, -45));
                     b.SplitCurve(new float2(-200, 90), new float2(20, 120), new float2(180, 150), a2, 2, 16f);
                     b.Street(a2, new float2(520, 160)).Street(new float2(520, 160), new float2(780, 170));
+                    break;
+                }
+                case "desire":
+                {
+                    c.Title = "Town to station: two streets meet the area at opposite corners";
+                    c.Expect = "Auto lays a diagonal along the desire line between the two streets (the grid would make people zig-zag); strict does not.";
+                    c.Ring = Rect(640, 480);
+                    var b = B();
+                    // the old town street from the south-west, the station street from the north-east (dead ends at the area)
+                    b.Chain(16f, new float2(-260, -170), new float2(-140, -95), new float2(-40, -30));
+                    b.Street(new float2(-140, -95), new float2(-140, -230)).Street(new float2(-140, -95), new float2(-300, -60));
+                    b.Chain(16f, new float2(900, 680), new float2(780, 600), new float2(680, 530));
+                    b.Street(new float2(780, 600), new float2(780, 760)).Street(new float2(780, 600), new float2(950, 560));
+                    // a street along the south, one along the west
+                    b.Chain(16f, new float2(-60, -50), new float2(120, -50), new float2(300, -50), new float2(480, -50), new float2(700, -50));
+                    b.Chain(16f, new float2(-50, -40), new float2(-50, 160), new float2(-50, 360), new float2(-50, 560));
+                    break;
+                }
+                case "bighill":
+                {
+                    c.Title = "A big area over a 45 m hill (grades to ~20 %)";
+                    c.Expect = "The grid gives way: junctions bend, the steepest streets become steps, the steep top a hillside park; strict keeps every street.";
+                    c.Ring = Rect(700, 560);
+                    c.Height = Hill(new float2(380, 300), 150f, 45f);
+                    CityAround(B(), 700, 560, north: false);
                     break;
                 }
                 default: throw new ArgumentException("unknown case " + id);

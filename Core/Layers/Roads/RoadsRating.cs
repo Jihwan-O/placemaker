@@ -47,7 +47,9 @@ namespace Placemaker.Core.Layers.Roads
         }
 
         // ── scores (0..100) ──
-        public float Grades = 100f, Junctions = 100f, Segments = 100f, Perimeter = 100f, Links = 100f, Fit = 100f, Total = 100f;
+        public float Grades = 100f, Junctions = 100f, Segments = 100f, Perimeter = 100f, Links = 100f, Fit = 100f, Directness = 100f, Total = 100f;
+        /// <summary>Mean road distance / straight distance between far-apart points of the network (1 = straight there).</summary>
+        public float DetourMean = 1f;
 
         // ── raw numbers ──
         public int CarNets;
@@ -57,6 +59,12 @@ namespace Placemaker.Core.Layers.Roads
         public int JunctionCount, AwkwardJunctions, AcuteJunctions, Overloaded, CrowdedJunctions;
         public float MinJunctionAngle = 180f;
         public int Crumbs, ShortLinks, Kinks, Hooks, BareDeadEnds, Slivers;
+        /// <summary>Dead ends stopping within 30 m of another road they do not join (a stub beside a road).</summary>
+        public int StrayStubs;
+        /// <summary>Streets of ours running alongside another road with no room for a building row between.</summary>
+        public int Alongside;
+        /// <summary>Two of our streets crossing with no junction where they cross (they would merge into one in the game).</summary>
+        public int SelfCrossings;
         public bool HasPerimeter;
         public float OutlineMeanGap, OutlineMaxGap, CornerMeanGap, CornerMaxGap, OutlineCovered = 1f;
         public bool CityNear;
@@ -68,7 +76,7 @@ namespace Placemaker.Core.Layers.Roads
 
         public const string MarkSteep = "steep", MarkAwkward = "awkward", MarkAcute = "acute", MarkCrowded = "crowded", MarkCrumb = "crumb",
             MarkShort = "short", MarkKink = "kink", MarkHook = "hook", MarkDeadEnd = "deadEnd", MarkSliver = "sliver", MarkCorner = "corner",
-            MarkGap = "gap", MarkHighwayLink = "highwayLink", MarkSkewLink = "skewLink", MarkGoodLink = "goodLink", MarkCrowdedLink = "crowdedLink",
+            MarkGap = "gap", MarkStub = "stub", MarkAlongside = "alongside", MarkSelfCross = "selfCross", MarkHighwayLink = "highwayLink", MarkSkewLink = "skewLink", MarkGoodLink = "goodLink", MarkCrowdedLink = "crowdedLink",
             MarkHighwayCross = "highwayCross", MarkCross = "cross", MarkDoubled = "doubled", MarkHierarchy = "hierarchy", MarkAccess = "access",
             MarkSpine = "spineCrowd";
 
@@ -76,8 +84,8 @@ namespace Placemaker.Core.Layers.Roads
         {
             var c = CultureInfo.InvariantCulture;
             var sb = new StringBuilder();
-            sb.AppendFormat(c, "total {0:0} | grades {1:0} junctions {2:0} segments {3:0} perimeter {4:0} links {5:0} fit {6:0}",
-                Total, Grades, Junctions, Segments, Perimeter, Links, Fit);
+            sb.AppendFormat(c, "total {0:0} | grades {1:0} junctions {2:0} segments {3:0} perimeter {4:0} links {5:0} fit {6:0} directness {7:0}",
+                Total, Grades, Junctions, Segments, Perimeter, Links, Fit, Directness);
             return sb.ToString();
         }
 
@@ -87,13 +95,14 @@ namespace Placemaker.Core.Layers.Roads
             return new Dictionary<string, double>
             {
                 ["total"] = Total, ["grades"] = Grades, ["junctions"] = Junctions, ["segments"] = Segments, ["perimeter"] = Perimeter,
-                ["links"] = Links, ["fit"] = Fit,
+                ["links"] = Links, ["fit"] = Fit, ["directness"] = Directness, ["detourMean"] = DetourMean,
                 ["roadLength"] = RoadLength, ["carNets"] = CarNets,
                 ["steepestGrade"] = SteepestGrade * 100f, ["meanGrade"] = MeanGrade * 100f, ["steepShare"] = SteepShare * 100f,
                 ["steepPieces"] = SteepPieces, ["verySteepPieces"] = VerySteepPieces,
                 ["junctionCount"] = JunctionCount, ["minJunctionAngle"] = MinJunctionAngle, ["awkwardJunctions"] = AwkwardJunctions,
                 ["acuteJunctions"] = AcuteJunctions, ["overloaded"] = Overloaded, ["crowdedJunctions"] = CrowdedJunctions,
                 ["crumbs"] = Crumbs, ["shortLinks"] = ShortLinks, ["kinks"] = Kinks, ["hooks"] = Hooks, ["bareDeadEnds"] = BareDeadEnds, ["slivers"] = Slivers,
+                ["strayStubs"] = StrayStubs, ["alongside"] = Alongside, ["selfCrossings"] = SelfCrossings,
                 ["outlineMeanGap"] = OutlineMeanGap, ["outlineMaxGap"] = OutlineMaxGap, ["cornerMeanGap"] = CornerMeanGap, ["cornerMaxGap"] = CornerMaxGap,
                 ["outlineCovered"] = OutlineCovered * 100f,
                 ["cityLinks"] = CityLinks, ["highwayLinks"] = HighwayLinks, ["skewLinks"] = SkewLinks, ["linksOnJunction"] = LinksOnJunction,
@@ -124,6 +133,8 @@ namespace Placemaker.Core.Layers.Roads
             public NetRole Role;
             public int A, D;
             public float Length;
+            /// <summary>How far the piece turns along its length (degrees).</summary>
+            public float Turning;
         }
 
         private sealed class XRoad
@@ -252,11 +263,12 @@ namespace Placemaker.Core.Layers.Roads
             }
 
             MeasureGrades(r, nets, height, o);
-            var junctions = MeasureJunctions(r, nodes, xnodes);
-            MeasureSegments(r, plan, nets, nodes, outline, o);
+            var junctions = MeasureJunctions(r, nodes, xnodes, nets, roads);
+            MeasureSegments(r, plan, nets, nodes, roads, outline, o);
             MeasurePerimeter(r, nets, roads, outline, o);
             MeasureLinks(r, nets, nodes, roads, xnodes, outline, o);
             MeasureFit(r, nets, nodes, roads, xnodes, outline, o, junctions);
+            MeasureDirectness(r, nets, nodes);
             Score(r, o);
             return r;
         }
@@ -282,12 +294,19 @@ namespace Placemaker.Core.Layers.Roads
             r.MeanGrade = r.RoadLength > 1f ? weighted / r.RoadLength : 0f;
         }
 
-        private static List<float2> MeasureJunctions(RoadsRating r, List<NNode> nodes, List<XNode> xnodes)
+        private static List<float2> MeasureJunctions(RoadsRating r, List<NNode> nodes, List<XNode> xnodes, List<NNet> nets, List<XRoad> roads)
         {
             var at = new List<float2>();
-            foreach (var nd in nodes)
+            var arms = new List<List<float2>>();
+            var atNode = new List<int>();
+            for (int ni = 0; ni < nodes.Count; ni++)
             {
+                var nd = nodes[ni];
                 if (nd.Out.Count == 0 || nd.Degree < 3) continue;
+                atNode.Add(ni);
+                var a = new List<float2>(nd.Existing);
+                foreach (var (d, _) in nd.Out) a.Add(d);
+                arms.Add(a);
                 var dirs = new List<float>();
                 foreach (var (d, _) in nd.Out) dirs.Add(math.atan2(d.y, d.x));
                 foreach (var d in nd.Existing) dirs.Add(math.atan2(d.y, d.x));
@@ -305,24 +324,48 @@ namespace Placemaker.Core.Layers.Roads
                 else if (worst < 60f) { r.AwkwardJunctions++; r.Marks.Add(new Mark(MarkAwkward, nd.P, worst)); }
                 if (nd.Degree >= 5) r.Overloaded++;
             }
-            // Junctions crowding each other: two of ours (or ours and an existing junction) closer than 30 m.
+            // Junctions crowding each other: two of ours (or ours and an existing junction) closer than 45 m along one road
+            // (the hard rule), or a connecting street under 30 m; only with road between them (two junctions on parallel roads
+            // across a strip of land do not crowd each other).
+            float OffRoad(float2 p)
+            {
+                float best = float.MaxValue;
+                foreach (var e in nets) best = math.min(best, e.Curve.DistanceXZ(p, out _) - PlannedHalfWidth(e.Role));
+                foreach (var x in roads) best = math.min(best, x.Curve.DistanceXZ(p, out _) - x.HalfWidth);
+                return best;
+            }
             var all = new List<float2>(at);
-            foreach (var x in xnodes) if (x.Out.Count >= 3) all.Add(x.P);
+            var allArms = new List<List<float2>>(arms);
+            foreach (var x in xnodes)
+                if (x.Out.Count >= 3)
+                {
+                    all.Add(x.P);
+                    var a = new List<float2>();
+                    foreach (var (d, _) in x.Out) a.Add(d);
+                    allArms.Add(a);
+                }
             for (int i = 0; i < at.Count; i++)
             {
-                float nearest = float.MaxValue;
+                float worst = 0f, nearest = 0f;
                 for (int j = 0; j < all.Count; j++)
                 {
                     if (j == i) continue;
                     float d = math.distance(at[i], all[j]);
-                    if (d > 0.5f) nearest = math.min(nearest, d);
+                    if (d <= 0.5f || d >= RoadTopology.MinJunctionGap) continue;
+                    // two junctions of ours keep the full gap; against a city junction a connecting street needs the rung
+                    // gap, and so does a link onto a city road (its two junctions set by the selection and the city)
+                    float need = j < at.Count ? RoadTopology.MinJunctionGap : RoadTopology.GapNeeded(at[i], arms[i], all[j], allArms[j]);
+                    if (j < at.Count && (nodes[atNode[i]].Attached || nodes[atNode[j]].Attached))
+                        foreach (var (_, k) in nodes[atNode[i]].Out)
+                            if (nets[k].A == atNode[j] || nets[k].D == atNode[j]) need = math.min(need, RoadTopology.RungGap);
+                    if (d < need - RoadTopology.GapSlack && need - d > worst && RoadTopology.RoadBetween(at[i], all[j], OffRoad)) { worst = need - d; nearest = d; }
                 }
-                if (nearest < 30f) { r.CrowdedJunctions++; r.Marks.Add(new Mark(MarkCrowded, at[i], nearest)); }
+                if (worst > 0f) { r.CrowdedJunctions++; r.Marks.Add(new Mark(MarkCrowded, at[i], nearest)); }
             }
             return at;
         }
 
-        private static void MeasureSegments(RoadsRating r, AreaPlan plan, List<NNet> nets, List<NNode> nodes, float2[] outline, Options o)
+        private static void MeasureSegments(RoadsRating r, AreaPlan plan, List<NNet> nets, List<NNode> nodes, List<XRoad> roads, float2[] outline, Options o)
         {
             var caps = new List<float2>();
             foreach (var ob in plan.Objects)
@@ -339,7 +382,44 @@ namespace Placemaker.Core.Layers.Roads
                     total += RoadGraph.Angle(prev, d);
                     prev = d;
                 }
-                if (total > 100f && e.Role != NetRole.Roundabout) { r.Hooks++; r.Marks.Add(new Mark(MarkHook, e.Curve.Position(0.5f).xz, total)); }
+                e.Turning = total;
+            }
+            // Hooks: a short street (junction to junction, under 150 m) turning back on itself, bends and corners together.
+            {
+                bool RealH(int n) => nodes[n].Degree != 2 || nodes[n].Attached;
+                var seenH = new HashSet<int>();
+                for (int s = 0; s < nodes.Count; s++)
+                {
+                    if (nodes[s].Out.Count == 0 || !RealH(s)) continue;
+                    foreach (var (_, start) in nodes[s].Out)
+                    {
+                        if (seenH.Contains(start)) continue;
+                        float len = 0f, turn = 0f;
+                        int cur = s, ei = start, t = -1;
+                        bool ring = false, winding = true;
+                        float2 mid = nets[start].Curve.Position(0.5f).xz;
+                        for (int guard = 0; guard < 64; guard++)
+                        {
+                            seenH.Add(ei);
+                            len += nets[ei].Length;
+                            turn += nets[ei].Turning;
+                            ring |= nets[ei].Role == NetRole.Roundabout;
+                            winding &= nets[ei].Role == NetRole.CulDeSac;
+                            int nxt = nets[ei].A == cur ? nets[ei].D : nets[ei].A;
+                            if (RealH(nxt) || nodes[nxt].Out.Count != 2) { t = nxt; break; }
+                            int next = nodes[nxt].Out[0].net == ei ? nodes[nxt].Out[1].net : nodes[nxt].Out[0].net;
+                            float2 dIn = nodes[nxt].Out[0].net == ei ? nodes[nxt].Out[0].dir : nodes[nxt].Out[1].dir;
+                            float2 dOut = nodes[nxt].Out[0].net == next ? nodes[nxt].Out[0].dir : nodes[nxt].Out[1].dir;
+                            turn += 180f - RoadGraph.Angle(dIn, dOut);
+                            if (turn > RoadTopology.HookTurn) mid = nodes[nxt].P;
+                            cur = nxt; ei = next;
+                        }
+                        // (the winding lanes of the organic styles, cul-de-sac roads, may curl as they like)
+                        if (t < 0 || ring || winding || len > RoadTopology.HookChain || turn <= RoadTopology.HookTurn) continue;
+                        r.Hooks++;
+                        r.Marks.Add(new Mark(MarkHook, mid, turn));
+                    }
+                }
             }
             for (int i = 0; i < nodes.Count; i++)
             {
@@ -354,9 +434,83 @@ namespace Placemaker.Core.Layers.Roads
                 {
                     bool capped = false;
                     foreach (var c in caps) if (math.distance(c, nd.P) < 1f) { capped = true; break; }
-                    bool onOutline = outline.Length >= 3 && Poly.DistanceToBoundary(outline, nd.P) < 6f;
-                    if (!capped && !(onOutline && !o.Perimeter)) { r.BareDeadEnds++; r.Marks.Add(new Mark(MarkDeadEnd, nd.P)); }
+                    if (!capped) { r.BareDeadEnds++; r.Marks.Add(new Mark(MarkDeadEnd, nd.P)); }   // a street stopping at the edge with nothing there too
                 }
+            }
+            // Two of our streets crossing with no junction where they cross.
+            {
+                var lines = new List<List<float2>>(nets.Count);
+                foreach (var e in nets) lines.Add(RoadGraph.Sample(e.Curve, 3f));
+                for (int i = 0; i < nets.Count; i++)
+                    for (int k = i + 1; k < nets.Count; k++)
+                    {
+                        var a = nets[i]; var b = nets[k];
+                        if (a.A == b.A || a.A == b.D || a.D == b.A || a.D == b.D) continue;
+                        bool hit = false;
+                        for (int p = 0; p + 1 < lines[i].Count && !hit; p++)
+                            for (int q = 0; q + 1 < lines[k].Count && !hit; q++)
+                                if (Seg.Intersect(lines[i][p], lines[i][p + 1], lines[k][q], lines[k][q + 1], out float ta, out float tb)
+                                    && ta > 0.001f && ta < 0.999f && tb > 0.001f && tb < 0.999f)
+                                {
+                                    hit = true;
+                                    r.SelfCrossings++;
+                                    r.Marks.Add(new Mark(MarkSelfCross, math.lerp(lines[i][p], lines[i][p + 1], ta)));
+                                }
+                    }
+            }
+            // Streets running alongside another road with no room for a building row between (not the ring or a main road).
+            for (int i = 0; i < nets.Count; i++)
+            {
+                var e = nets[i];
+                if (e.Role == NetRole.PerimeterRoad || e.Role == NetRole.Avenue || e.Role == NetRole.Roundabout || e.Length < 20f) continue;
+                float Gap(float2 p, float2 tan)
+                {
+                    float best = float.MaxValue;
+                    for (int k = 0; k < nets.Count; k++)
+                    {
+                        var o = nets[k];
+                        if (k == i || o.A == e.A || o.A == e.D || o.D == e.A || o.D == e.D) continue;
+                        float d = o.Curve.DistanceXZ(p, out float t);
+                        if (t < 0.01f || t > 0.99f) continue;   // end on: the same street going on, not one beside it
+                        if (math.abs(math.dot(o.Curve.TangentXZ(t), tan)) < 0.85f) continue;
+                        best = math.min(best, d - PlannedHalfWidth(o.Role));
+                    }
+                    foreach (var x in roads)
+                    {
+                        float d = x.Curve.DistanceXZ(p, out float t);
+                        if (t < 0.01f || t > 0.99f) continue;
+                        if (math.abs(math.dot(x.Curve.TangentXZ(t), tan)) < 0.85f) continue;
+                        best = math.min(best, d - x.HalfWidth);
+                    }
+                    return best;
+                }
+                if (RoadTopology.RunsAlongside(e.Curve, PlannedHalfWidth(e.Role), Gap)) { r.Alongside++; r.Marks.Add(new Mark(MarkAlongside, e.Curve.Position(0.5f).xz)); }
+            }
+            // Dead ends stopping right beside another road (ours or the city's) they do not join: a stub left over.
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                var nd = nodes[i];
+                if (nd.Out.Count != 1 || nd.Attached || nd.Existing.Count > 0 || IsWalk(nets[nd.Out[0].net].Role)) continue;
+                // the tip's own chain (back to its junction) does not count
+                var own = new HashSet<int>();
+                int cur = i, ei = nd.Out[0].net;
+                for (int guard = 0; guard < 64; guard++)
+                {
+                    own.Add(ei);
+                    int nxt = nets[ei].A == cur ? nets[ei].D : nets[ei].A;
+                    if (nodes[nxt].Out.Count != 2) { foreach (var (_, k) in nodes[nxt].Out) own.Add(k); break; }
+                    int next = nodes[nxt].Out[0].net == ei ? nodes[nxt].Out[1].net : nodes[nxt].Out[0].net;
+                    cur = nxt; ei = next;
+                }
+                float near = float.MaxValue;
+                for (int k = 0; k < nets.Count; k++)
+                {
+                    if (own.Contains(k)) continue;
+                    if (IsWalk(nets[k].Role)) continue;
+                    near = math.min(near, nets[k].Curve.DistanceXZ(nd.P, out _) - PlannedHalfWidth(nets[k].Role));
+                }
+                foreach (var x in roads) near = math.min(near, x.Curve.DistanceXZ(nd.P, out _) - x.HalfWidth);
+                if (near < 30f - 8f) { r.StrayStubs++; r.Marks.Add(new Mark(MarkStub, nd.P, near)); }
             }
             // Junction to junction pieces too short to hold a building row (chains through plain bends).
             bool Real(int n) => nodes[n].Degree != 2 || nodes[n].Attached;
@@ -390,11 +544,12 @@ namespace Placemaker.Core.Layers.Roads
             foreach (var reg in plan.Regions)
             {
                 if (reg?.Ring == null || reg.Ring.Length < 3 || Array.IndexOf(reg.Tags, RegionTags.Block) < 0) continue;
+                if (Array.IndexOf(reg.Tags, RegionTags.Green) >= 0) continue;   // a planned pocket green (a diagonal's triangle), not a leftover
                 var ring = Poly.To2D(reg.Ring);
                 float area = Poly.Area(ring), per = Poly.Perimeter(ring);
                 if (per <= 1f) continue;
                 float width = 2f * area / per;   // mean width of a thin shape
-                if (area < 1200f || width < 12f) { r.Slivers++; r.Marks.Add(new Mark(MarkSliver, Poly.Centroid(ring), area)); }
+                if (RoadsPlanner.IsSliver(ring)) { r.Slivers++; r.Marks.Add(new Mark(MarkSliver, Poly.Centroid(ring), area)); }
             }
         }
 
@@ -591,7 +746,7 @@ namespace Placemaker.Core.Layers.Roads
                         float2 p = e.Curve.Position(t).xz;
                         float d = x.Curve.DistanceXZ(p, out float xt);
                         float par = math.abs(math.dot(e.Curve.TangentXZ(t), x.Curve.TangentXZ(xt)));
-                        if (par < 0.9f) continue;
+                        if (par < 0.9f || !RoadConnections.Beside(x.Curve, p, xt)) continue;   // in line beyond its end: a continuation
                         if (d < (hw + x.HalfWidth) * 0.8f) inside++;
                         else if (d < hw + x.HalfWidth + 24f) near++;
                     }
@@ -641,6 +796,78 @@ namespace Placemaker.Core.Layers.Roads
             }
         }
 
+        /// <summary>
+        /// How directly the network crosses the district: from up to eight far-apart points (farthest-point sampling) to every
+        /// junction or end far from them, road distance over straight distance. A plain grid is about 1.27 (the diagonal
+        /// trips go round two sides); a diagonal street or a network following the desire lines brings it down.
+        /// </summary>
+        private static void MeasureDirectness(RoadsRating r, List<NNet> nets, List<NNode> nodes)
+        {
+            var ids = new List<int>();
+            for (int i = 0; i < nodes.Count; i++) if (nodes[i].Out.Count > 0 && nodes[i].Out.Count != 2) ids.Add(i);
+            if (ids.Count < 8) return;
+            float2 mn = new float2(float.MaxValue), mx = new float2(float.MinValue);
+            foreach (int i in ids) { mn = math.min(mn, nodes[i].P); mx = math.max(mx, nodes[i].P); }
+            float diameter = math.distance(mn, mx);
+            if (diameter < 150f) return;
+            // sources: farthest-point sampling
+            var sources = new List<int>();
+            float2 centre = (mn + mx) * 0.5f;
+            int first = ids[0];
+            foreach (int i in ids) if (math.distance(nodes[i].P, centre) > math.distance(nodes[first].P, centre)) first = i;
+            sources.Add(first);
+            while (sources.Count < 8)
+            {
+                int far = -1; float fd = -1f;
+                foreach (int i in ids)
+                {
+                    float d = float.MaxValue;
+                    foreach (int s in sources) d = math.min(d, math.distance(nodes[i].P, nodes[s].P));
+                    if (d > fd) { fd = d; far = i; }
+                }
+                if (far < 0 || fd < 1f) break;
+                sources.Add(far);
+            }
+            double sum = 0; int count = 0;
+            foreach (int s in sources)
+            {
+                var dist = Dijkstra(nets, nodes, s);
+                foreach (int t in ids)
+                {
+                    float straight = math.distance(nodes[s].P, nodes[t].P);
+                    if (straight < 0.35f * diameter || float.IsPositiveInfinity(dist[t])) continue;
+                    sum += math.min(3f, dist[t] / straight);
+                    count++;
+                }
+            }
+            if (count > 0) r.DetourMean = (float)(sum / count);
+        }
+
+        private static float[] Dijkstra(List<NNet> nets, List<NNode> nodes, int source)
+        {
+            var dist = new float[nodes.Count];
+            for (int i = 0; i < dist.Length; i++) dist[i] = float.PositiveInfinity;
+            dist[source] = 0f;
+            var open = new SortedSet<(float, int)> { (0f, source) };
+            while (open.Count > 0)
+            {
+                var (d, n) = open.Min;
+                open.Remove(open.Min);
+                if (d > dist[n]) continue;
+                foreach (var (_, k) in nodes[n].Out)
+                {
+                    var e = nets[k];
+                    int o = e.A == n ? e.D : e.A;
+                    float nd = d + e.Length;
+                    if (nd >= dist[o]) continue;
+                    if (!float.IsPositiveInfinity(dist[o])) open.Remove((dist[o], o));
+                    dist[o] = nd;
+                    open.Add((nd, o));
+                }
+            }
+            return dist;
+        }
+
         private static float Clamp(float v) => math.clamp(v, 0f, 100f);
 
         private static void Score(RoadsRating r, Options o)
@@ -652,7 +879,7 @@ namespace Placemaker.Core.Layers.Roads
                 r.Junctions = Clamp(100f - 150f * bad - 80f * (float)r.CrowdedJunctions / r.JunctionCount);
             }
             float km = math.max(1f, r.RoadLength / 1000f);
-            float segBad = r.Crumbs * 1f + r.ShortLinks * 1f + r.Kinks * 1.2f + r.Hooks * 1.5f + r.BareDeadEnds * 1f + r.Slivers * 0.8f;
+            float segBad = r.Crumbs * 1f + r.ShortLinks * 1f + r.Kinks * 1.2f + r.Hooks * 1.5f + r.BareDeadEnds * 1f + r.Slivers * 0.8f + r.StrayStubs * 1.2f + r.Alongside * 1.2f + r.SelfCrossings * 3f;
             r.Segments = Clamp(100f - 12f * segBad / km);
             if (r.HasPerimeter)
                 r.Perimeter = Clamp(100f - 8f * r.OutlineMeanGap - 1.2f * r.CornerMeanGap - 60f * (1f - r.OutlineCovered));
@@ -665,7 +892,8 @@ namespace Placemaker.Core.Layers.Roads
             else if (r.CityNear) r.Links = 35f;
             r.Fit = Clamp(100f - 40f * r.HighwayCrossings - 15f * r.Crossings - 10f * r.DoubledPieces - 20f * r.HierarchyBreaks
                 - 8f * r.AccessBreaks - 12f * r.SpineCrowding);
-            r.Total = 0.2f * r.Grades + 0.2f * r.Junctions + 0.15f * r.Segments + 0.15f * r.Perimeter + 0.15f * r.Links + 0.15f * r.Fit;
+            r.Directness = Clamp(100f - 200f * (r.DetourMean - 1.15f));
+            r.Total = 0.18f * r.Grades + 0.18f * r.Junctions + 0.13f * r.Segments + 0.14f * r.Perimeter + 0.14f * r.Links + 0.13f * r.Fit + 0.10f * r.Directness;
             if (r.HighwayLinks > 0 || r.HighwayCrossings > 0) r.Total = math.min(r.Total, 50f);
             if (r.CarNets == 0) r.Total = 0f;
         }

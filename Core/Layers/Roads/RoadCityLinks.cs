@@ -69,7 +69,7 @@ namespace Placemaker.Core.Layers.Roads
         }
 
         private const float MinLength = 6f;
-        private const float JunctionClear = 35f;
+        private const float JunctionClear = RoadTopology.MinJunctionGap;
         private const float PlanJunctionClear = 30f;
 
         public static Result Plan(RoadNetwork net, Options o)
@@ -86,16 +86,29 @@ namespace Placemaker.Core.Layers.Roads
                     if (net.Nodes[n].Attach >= 0 && inc0[n].Count > 0) taken.Add(net.Nodes[n].Position.xz);
             }
             var cityTaken = new List<float2>(taken);
-            for (int guard = 0; guard < 16 && CountSpread(taken, o.Spacing) < wanted; guard++)
+            // Beyond the links wanted, a street that runs straight on into an existing junction (a clean four-way crossing
+            // with the city's own street) still joins, every ~90 m: a grid inside a city stays as permeable as the city.
+            int perfectMax = math.clamp((int)math.round(Poly.Perimeter(o.Boundary) / 180f), wanted, 16);
+            for (int guard = 0; guard < 24; guard++)
             {
+                bool extra = CountSpread(taken, o.Spacing) >= wanted;
+                if (extra && res.Links + CountSpread(taken, o.Spacing) >= wanted + perfectMax) break;
                 var cands = Candidates(net, o, nodes);
                 res.Candidates = math.max(res.Candidates, cands.Count);
                 cands.Sort((a, b) => a.Cost.CompareTo(b.Cost));
                 Cand pick = null;
                 foreach (var c in cands)
                 {
+                    // beyond the links wanted: a perfect continuation, or the first join on a stretch of outline with none
+                    if (extra && !(c.Continued && c.OnJunction))
+                    {
+                        bool lonely = true;
+                        foreach (var t in taken) if (math.distance(t, c.P.xz) < 220f) { lonely = false; break; }
+                        if (!lonely) continue;
+                    }
+                    float spacing = extra ? math.min(o.Spacing, 90f) : o.Spacing;
                     bool far = true;
-                    foreach (var t in taken) if (math.distance(t, c.P.xz) < o.Spacing || math.distance(t, c.Q.xz) < o.Spacing) { far = false; break; }
+                    foreach (var t in taken) if (math.distance(t, c.P.xz) < spacing || math.distance(t, c.Q.xz) < spacing) { far = false; break; }
                     if (!far) continue;
                     foreach (var t in cityTaken) if (math.distance(t, c.Q.xz) < JunctionClear) { far = false; break; }
                     if (!far) continue;
@@ -207,7 +220,7 @@ namespace Placemaker.Core.Layers.Roads
                         c.P = net.Nodes[best].Position;
                         // it continues an inside street when that street leaves the node straight on
                         foreach (int ej in inc[best])
-                            if (net.Edges[ej].Role != NetRole.PerimeterRoad && RoadGraph.Angle(RoadGraph.Leaving(net.Edges[ej], best), dir) < 12f) c.Continued = true;
+                            if (net.Edges[ej].Role != NetRole.PerimeterRoad && RoadGraph.Angle(RoadGraph.Leaving(net.Edges[ej], best), math.normalizesafe(net.Nodes[best].Position.xz - n.P)) < 4f) c.Continued = true;
                     }
                     else
                     {
@@ -284,6 +297,8 @@ namespace Placemaker.Core.Layers.Roads
                 c.CityNode = best;
                 c.Q = new float3(nodes[best].P.x, HeightOfNode(o, nodes[best]), nodes[best].P.y);
                 c.OnJunction = nodes[best].Out.Count >= 2;
+                // a link bent off the street's line (to reach the junction) no longer continues it
+                if (bd > math.max(1.5f, dist * 0.07f)) c.Continued = false;
                 return true;
             }
             c.CityRoad = ri;
@@ -306,7 +321,8 @@ namespace Placemaker.Core.Layers.Roads
             var ignore = new HashSet<int>();
             if (c.PlanNode >= 0) foreach (int k in inc[c.PlanNode]) ignore.Add(k);
             if (c.PlanEdge >= 0) ignore.Add(c.PlanEdge);
-            if (all.Crosses(line, 1.5f, ignore)) return false;
+            // (no end skip: a street end a metre short of the perimeter must not send its link across it)
+            if (all.Crosses(line, 0.05f, ignore)) return false;
             if (RoadConnections.CrossesAny(line, o.Barriers, 0.5f)) return false;
             if (CrossesCity(line, o.Existing, c)) return false;
             float hw = o.HalfWidth(NetRole.Street);

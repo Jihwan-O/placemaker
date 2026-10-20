@@ -375,7 +375,8 @@ namespace Placemaker.Core.Layers.Roads
                     {
                         float k = math.round((a - b) / s);
                         float near = b + k * s;
-                        if (math.abs(a - near) <= AlignTol && near >= pos[0] - 0.5f && near <= pos[pos.Count - 1] + 0.5f) { score += w; count++; }
+                        float err = math.abs(a - near);
+                        if (err <= AlignTol && near >= pos[0] - 0.5f && near <= pos[pos.Count - 1] + 0.5f) { score += w * (1f - 0.5f * err / AlignTol); count++; }   // exact beats a near miss
                     }
                     // stretched spacing costs a little, so does a far edge block much wider than the rest
                     score -= math.abs(f - 1f) * 3f;
@@ -460,7 +461,7 @@ namespace Placemaker.Core.Layers.Roads
                         float2 m = math.lerp(a, b, i / 6f);
                         float d = all[r].Curve.DistanceXZ(m, out float rt);
                         if (d > hw(NetRole.Street) + all[r].HalfWidth + 20f || d < (hw(NetRole.Street) + all[r].HalfWidth) * 0.6f) continue;
-                        if (math.abs(math.dot(dir, all[r].Curve.TangentXZ(rt))) > 0.9f) close++;
+                        if (math.abs(math.dot(dir, all[r].Curve.TangentXZ(rt))) > 0.9f && RoadConnections.Beside(all[r].Curve, m, rt)) close++;
                     }
                     if (close >= 4) cost += 4f;
                 }
@@ -518,7 +519,7 @@ namespace Placemaker.Core.Layers.Roads
                     {
                         if (r.Rank >= RoadRank.Medium) continue;
                         float dist = r.Curve.DistanceXZ(q, out float rt);
-                        if (dist < 12f && math.abs(math.dot(d, r.Curve.TangentXZ(rt))) > 0.9f) { on++; break; }
+                        if (dist < 12f && math.abs(math.dot(d, r.Curve.TangentXZ(rt))) > 0.9f && RoadConnections.Beside(r.Curve, q, rt)) { on++; break; }
                     }
                 }
                 return n > 0 && on > n * 0.2f;

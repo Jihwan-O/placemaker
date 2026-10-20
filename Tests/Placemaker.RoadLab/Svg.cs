@@ -15,6 +15,8 @@ namespace Placemaker.RoadLab
     public static class Svg
     {
         private static readonly CultureInfo C = CultureInfo.InvariantCulture;
+        /// <summary>--zoom x0,z0,x1,z1: draw only this part of the world (metres).</summary>
+        public static float[] Zoom;
         private static string F(float v) => v.ToString("0.#", C);
 
         public static string Draw(LabCase lc, string variant, AreaPlan plan, RoadsRating rating, RoadsRating before, double ms)
@@ -22,6 +24,7 @@ namespace Placemaker.RoadLab
             var ring = lc.Ring.Select(p => p.xz).ToArray();
             float2 mn = ring.Aggregate(new float2(float.MaxValue), math.min) - 110f;
             float2 mx = ring.Aggregate(new float2(float.MinValue), math.max) + 110f;
+            if (Zoom != null) { mn = new float2(Zoom[0], Zoom[1]); mx = new float2(Zoom[2], Zoom[3]); }
             float w = mx.x - mn.x, h = mx.y - mn.y;
             const float panel = 300f;
             float2 P(float2 p) => new float2(p.x - mn.x, mx.y - p.y);
@@ -72,6 +75,49 @@ namespace Placemaker.RoadLab
                 sb.Append("</g>\n");
             }
 
+            // ── ground paint: each field sampled on a 2 m grid (what the game rasterises), in its material's colour ──
+            if (plan.Paint.Count > 0)
+            {
+                const float cell = 2f;
+                int gx = (int)math.ceil(w / cell), gz = (int)math.ceil(h / cell);
+                var acc = new float[gx * gz * 4];
+                foreach (var pp in plan.Paint)
+                {
+                    if (pp?.Shape == null || pp.Erase) continue;
+                    int layer = math.clamp(pp.Layer, 1, 4) - 1;
+                    float2 lo = math.max(pp.Shape.Min, mn), hi = math.min(pp.Shape.Max, mx);
+                    if (!math.all(math.isfinite(lo)) || !math.all(math.isfinite(hi)) || hi.x <= lo.x || hi.y <= lo.y) continue;
+                    int i0 = (int)((lo.x - mn.x) / cell), i1 = (int)((hi.x - mn.x) / cell), j0 = (int)((mx.y - hi.y) / cell), j1 = (int)((mx.y - lo.y) / cell);
+                    for (int j = math.max(0, j0); j <= math.min(gz - 1, j1); j++)
+                        for (int i = math.max(0, i0); i <= math.min(gx - 1, i1); i++)
+                        {
+                            float2 q = new float2(mn.x + (i + 0.5f) * cell, mx.y - (j + 0.5f) * cell);
+                            float v = pp.Shape.Sample(q) * pp.Strength;
+                            int k = (j * gx + i) * 4 + layer;
+                            if (v > acc[k]) acc[k] = v;
+                        }
+                }
+                string[] cols = { "#c9c48a", "#2c3a1c", "#b08a5a", "#d8ccb0" };   // dry grass, forest floor, dirt, sand (exaggerated to read)
+                sb.Append("<g shape-rendering=\"crispEdges\">");
+                for (int layer = 0; layer < 4; layer++)
+                    for (int j = 0; j < gz; j++)
+                    {
+                        int i = 0;
+                        while (i < gx)
+                        {
+                            float v = acc[(j * gx + i) * 4 + layer];
+                            int q = (int)math.floor(math.min(1f, v * 1.4f) * 8f);
+                            if (q <= 0) { i++; continue; }
+                            int i1 = i + 1;
+                            while (i1 < gx && (int)math.floor(math.min(1f, acc[(j * gx + i1) * 4 + layer] * 1.4f) * 8f) == q) i1++;
+                            sb.AppendFormat(C, "<rect x=\"{0}\" y=\"{1}\" width=\"{2}\" height=\"{3}\" fill=\"{4}\" fill-opacity=\"{5}\"/>",
+                                F(i * cell), F(j * cell), F((i1 - i) * cell), F(cell), cols[layer], (0.2f + 0.8f * q / 8f).ToString("0.##", C));
+                            i = i1;
+                        }
+                    }
+                sb.Append("</g>\n");
+            }
+
             // ── existing roads ──
             sb.Append("<g fill=\"none\" stroke-linecap=\"round\">");
             foreach (var n in lc.Nets.Where(n => n.Category == NetCategory.Road))
@@ -88,7 +134,10 @@ namespace Placemaker.RoadLab
             sb.AppendFormat(C, "<polygon points=\"{0}\" fill=\"#4da3ff\" fill-opacity=\"0.06\" stroke=\"#4da3ff\" stroke-width=\"2\" stroke-dasharray=\"8 6\"/>\n",
                 string.Join(" ", ring.Select(p => { var q = P(p); return F(q.x) + "," + F(q.y); })));
 
-            // ── blocks (light outline) ──
+            // ── blocks (light outline); green blocks (hillside parks, pocket greens, the square) tinted ──
+            foreach (var r in plan.Regions.Where(r => r.Tags.Contains(RegionTags.Block) && r.Tags.Contains(RegionTags.Green)))
+                sb.AppendFormat(C, "<polygon points=\"{0}\" fill=\"{1}\" fill-opacity=\"0.35\"/>", string.Join(" ", r.Ring.Select(p => { var q = P(p.xz); return F(q.x) + "," + F(q.y); })),
+                    r.Tags.Contains(RegionTags.Core) ? "#7fbf6a" : "#4f9a45");
             sb.Append("<g fill=\"none\" stroke=\"#ffffff\" stroke-opacity=\"0.12\" stroke-width=\"1\">");
             foreach (var r in plan.Regions.Where(r => r.Tags.Contains(RegionTags.Block)))
                 sb.AppendFormat(C, "<polygon points=\"{0}\"/>", string.Join(" ", r.Ring.Select(p => { var q = P(p.xz); return F(q.x) + "," + F(q.y); })));
@@ -158,6 +207,7 @@ namespace Placemaker.RoadLab
             {
                 ("Grades", rating.Grades, before?.Grades), ("Junctions", rating.Junctions, before?.Junctions), ("Segments", rating.Segments, before?.Segments),
                 ("Perimeter", rating.Perimeter, before?.Perimeter), ("Links", rating.Links, before?.Links), ("Fit", rating.Fit, before?.Fit),
+                ("Directness", rating.Directness, before?.Directness),
             })
                 Line(string.Format(C, "{0,-10} {1:0}{2}", name, v, Delta(v, b)), 13f, ScoreCol(v));
             y += 6f * s;
@@ -174,9 +224,14 @@ namespace Placemaker.RoadLab
             Line(string.Format(C, "Hierarchy breaks {0} · access {1} · spine crowding {2}", rating.HierarchyBreaks, rating.AccessBreaks, rating.SpineCrowding), 12f);
             double F_(string k) => plan.Facts.TryGetValue(k, out var v) ? v : -1;
             double frame = F_(RoadsPlanner.FactLayoutFrame), variantWon = F_(RoadsPlanner.FactVariant), tried = F_(RoadsPlanner.FactVariants);
-            string frameName = variantWon == 2 ? "along the contours" : frame == 2 ? "on the spine road" : frame == 1 ? "terrain" : frame == 0 ? "outline" : "-";
-            Line(string.Format(C, "Layout: {0}{1} · streets lined up {2:0}", frameName, tried > 1 ? string.Format(C, " (best of {0:0})", tried) : "",
+            string diag = (F_(RoadsPlanner.FactBrick) > 0.5 ? " + brick pattern" : "") + (F_(RoadsPlanner.FactDiagonal) > 0.5 ? " + desire-line diagonal" : "");
+            string frameName = variantWon == 2 ? "along the contours" : variantWon == 3 ? "turned against the slope" : frame == 2 ? "on the spine road" : frame == 1 ? "terrain" : frame == 0 ? "outline" : "-";
+            Line(string.Format(C, "Layout: {0}{1} · streets lined up {2:0}", frameName + diag, tried > 1 ? string.Format(C, " (best of {0:0})", tried) : "",
                 math.max(0, F_(RoadsPlanner.FactStubsAligned))), 12f, "#9fd3ff");
+            Line(string.Format(C, "Hill: {0:0} junctions bent · {1:0} streets made steps · {2:0} hillside parks", math.max(0, F_(RoadsPlanner.FactBent)),
+                math.max(0, F_(RoadsPlanner.FactStairs)), math.max(0, F_(RoadsPlanner.FactHillParks))), 12f, "#a8d8a0");
+            Line(string.Format(C, "Ground: {0:0} desire paths · {1:0} worn corners · {2} paints", math.max(0, F_(RoadsPlanner.FactDesirePaths)),
+                math.max(0, F_(RoadsPlanner.FactWornCorners)), plan.Paint.Count), 12f, "#d8c49a");
             Line(string.Format(C, "Planned in {0:0} ms", ms), 11f, "#8a949c");
             y += 8f * s;
             Line("Expect:", 12f, "#ffffff", true);
@@ -187,6 +242,8 @@ namespace Placemaker.RoadLab
             {
                 ("#f2f2f2", "street"), ("#59d9ff", "avenue"), ("#ffa64d", "perimeter"), ("#8fe07a", "local / cul-de-sac"), ("#c9a27a", "lane"),
                 ("#8c8c8c", "existing road"), ("#c0504d", "existing highway / ramp"), ("#ff3b30", "steeper than 10 % (red edge)"),
+                ("#b08a5a", "painted worn dirt (desire paths, corners)"), ("#c9c48a", "painted dry grass (verges)"),
+                ("#4f9a45", "green block (hillside park, pocket green)"), ("#ffd173", "footpath / steps (dashed)"),
             })
             {
                 sb.AppendFormat(C, "<rect x=\"{0}\" y=\"{1}\" width=\"{2}\" height=\"{3}\" fill=\"{4}\"/>", F(x0), F(y - 9f * s), F(18f * s), F(8f * s), col);

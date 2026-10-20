@@ -135,6 +135,24 @@ namespace Placemaker.Core.Layers.Roads
                         ranges.Add(new float2(math.max(0f, lo), math.min(1f, hi)));
                     }
                 }
+                // an end lying on (or right beside) a barrier, touching it without crossing: that end goes too
+                foreach (var bar in barriers)
+                {
+                    float gap = bar.HalfWidth + halfWidth(e.Role) + 4f;
+                    const float step = 1f / 256f;
+                    if (bar.Curve.DistanceXZ(e.Curve.A.xz, out _) < gap)
+                    {
+                        float t = 0f;
+                        while (t < 1f && bar.Curve.DistanceXZ(e.Curve.Position(t).xz, out _) < gap) t += step;
+                        ranges.Add(new float2(0f, math.min(1f, t)));
+                    }
+                    if (bar.Curve.DistanceXZ(e.Curve.D.xz, out _) < gap)
+                    {
+                        float t = 1f;
+                        while (t > 0f && bar.Curve.DistanceXZ(e.Curve.Position(t).xz, out _) < gap) t -= step;
+                        ranges.Add(new float2(math.max(0f, t), 1f));
+                    }
+                }
                 if (ranges.Count == 0) continue;
                 ranges.Sort((x, y) => x.x.CompareTo(y.x));
                 var keep = new List<float2>();
@@ -227,7 +245,7 @@ namespace Placemaker.Core.Layers.Roads
                     {
                         float d = existing[r].Curve.DistanceXZ(p, out float rt);
                         if (d > (hw + existing[r].HalfWidth) * 0.6f) continue;
-                        if (math.abs(math.dot(dir, existing[r].Curve.TangentXZ(rt))) < 0.94f) continue;
+                        if (math.abs(math.dot(dir, existing[r].Curve.TangentXZ(rt))) < 0.94f || !Beside(existing[r].Curve, p, rt)) continue;
                         on[i] = true; road[i] = r; onCount++;
                         break;
                     }
@@ -317,7 +335,7 @@ namespace Placemaker.Core.Layers.Roads
                     {
                         float d = r.Curve.DistanceXZ(p, out float rt);
                         if (d > hw + r.HalfWidth + 20f) continue;
-                        if (math.abs(math.dot(dir, r.Curve.TangentXZ(rt))) < 0.9f) continue;
+                        if (math.abs(math.dot(dir, r.Curve.TangentXZ(rt))) < 0.9f || !Beside(r.Curve, p, rt)) continue;
                         close++;
                         break;
                     }
@@ -325,6 +343,19 @@ namespace Placemaker.Core.Layers.Roads
                 if (close >= 7) { e.Removed = true; removed++; }
             }
             return removed;
+        }
+
+        /// <summary>
+        /// Is p beside the road (its nearest point at parameter <paramref name="t"/>), not out beyond one of its ends? A street
+        /// continuing an existing road in line with it is not "alongside" it.
+        /// </summary>
+        public static bool Beside(RoadCurve road, float2 p, float t)
+        {
+            if (t > 0.002f && t < 0.998f) return true;
+            bool end = t >= 0.5f;
+            float2 e = end ? road.D.xz : road.A.xz;
+            float2 outward = end ? road.TangentXZ(1f) : -road.TangentXZ(0f);
+            return math.dot(p - e, outward) <= 1f;
         }
 
         /// <summary>Snap distance for an existing road: wide roads catch ends that stop at their curb.</summary>
@@ -470,7 +501,7 @@ namespace Placemaker.Core.Layers.Roads
                     {
                         float d = r.Curve.DistanceXZ(p, out float rt);
                         if (d > (r.HalfWidth + hw) * reach + extra) continue;
-                        if (math.abs(math.dot(dir, r.Curve.TangentXZ(rt))) < (extra > 0f ? 0.7f : 0.85f)) continue;
+                        if (math.abs(math.dot(dir, r.Curve.TangentXZ(rt))) < (extra > 0f ? 0.7f : 0.85f) || !Beside(r.Curve, p, rt)) continue;
                         inside++;
                         break;
                     }

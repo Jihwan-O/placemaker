@@ -283,6 +283,11 @@ namespace Placemaker.Core.Layers.Roads.Generators
         public float AnchorV;
         /// <summary>(Smarter roads) Spacing of the columns / rows (m), 0 = SpacingMeters (the search may stretch it a little).</summary>
         public float SpacingU, SpacingV;
+        /// <summary>
+        /// (Smarter roads) No border road: the outermost columns / rows run this far (m) inside the outline (one lot deep), the
+        /// rest spread evenly between them, so nothing runs out to the edge looking for a border. 0 = the usual spread.
+        /// </summary>
+        public float EdgeInset;
         public static GridParameters Default => new GridParameters
         {
             Mode = SpacingMode.FitToArea,
@@ -644,8 +649,10 @@ namespace Placemaker.Core.Layers.Roads.Generators
             {
                 float su = parameters.SpacingU > 0.5f ? parameters.SpacingU : parameters.SpacingMeters;
                 float sv = parameters.SpacingV > 0.5f ? parameters.SpacingV : parameters.SpacingMeters;
-                uPositions = parameters.AnchoredU ? DistributeAnchored(lmin.x, lmax.x, su, parameters.AnchorU) : DistributeFixed(lmin.x, lmax.x, su);
-                vPositions = parameters.AnchoredV ? DistributeAnchored(lmin.y, lmax.y, sv, parameters.AnchorV) : DistributeFixed(lmin.y, lmax.y, sv);
+                uPositions = parameters.AnchoredU ? DistributeAnchored(lmin.x, lmax.x, su, parameters.AnchorU, parameters.EdgeInset)
+                    : parameters.EdgeInset > 0.5f ? DistributeInset(lmin.x, lmax.x, su, parameters.EdgeInset) : DistributeFixed(lmin.x, lmax.x, su);
+                vPositions = parameters.AnchoredV ? DistributeAnchored(lmin.y, lmax.y, sv, parameters.AnchorV, parameters.EdgeInset)
+                    : parameters.EdgeInset > 0.5f ? DistributeInset(lmin.y, lmax.y, sv, parameters.EdgeInset) : DistributeFixed(lmin.y, lmax.y, sv);
             }
         }
 
@@ -661,16 +668,41 @@ namespace Placemaker.Core.Layers.Roads.Generators
         }
 
         /// <summary>
+        /// (Smarter roads) The first and last line <paramref name="inset"/> m inside [min, max], the others evenly between them about
+        /// <paramref name="spacing"/> apart; a span too short for two lines gets one in the middle.
+        /// </summary>
+        internal static List<float> DistributeInset(float min, float max, float spacing, float inset)
+        {
+            var result = new List<float>();
+            float span = max - min - 2f * inset;
+            if (spacing <= 0.5f || max - min < 2f * MinSegmentLength) return result;
+            if (span < 0.45f * spacing)
+            {
+                if (max - min >= inset) result.Add(0.5f * (min + max));
+                return result;
+            }
+            int n = math.max(1, (int)math.round(span / spacing));
+            for (int k = 0; k <= n; k++) result.Add(min + inset + span * k / n);
+            return result;
+        }
+
+        /// <summary>
         /// (Smarter roads) Lines through <paramref name="anchor"/> every <paramref name="spacing"/> m, those at least 0.4 spacing
         /// inside [min, max] (a thinner edge block would be a sliver).
         /// </summary>
-        internal static List<float> DistributeAnchored(float min, float max, float spacing, float anchor)
+        internal static List<float> DistributeAnchored(float min, float max, float spacing, float anchor, float inset = 0f)
         {
             var result = new List<float>();
             if (spacing <= 0.5f || !math.isfinite(anchor)) return result;
             float lo = min + 0.4f * spacing, hi = max - 0.4f * spacing;
             float k0 = math.ceil((lo - anchor) / spacing);
             for (float k = k0; anchor + k * spacing <= hi && result.Count < 4096; k++) result.Add(anchor + k * spacing);
+            // No border: an edge block much deeper than a lot gets one more line a lot deep inside the edge.
+            if (inset > 0.5f && result.Count > 0)
+            {
+                if (result[0] - (min + inset) > 0.6f * spacing) result.Insert(0, min + inset);
+                if ((max - inset) - result[result.Count - 1] > 0.6f * spacing) result.Add(max - inset);
+            }
             return result;
         }
 

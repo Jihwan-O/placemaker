@@ -81,6 +81,16 @@ namespace Placemaker.Core.Layers.Types.Yards
             if (list.Count > 0) list[list.Count - 1].Elevation = -m;
         }
 
+        /// <summary>Inside one of a block yard's blocks (their pads and slabs are concrete: no stones on them).</summary>
+        private static bool InBlock(IndustrialSite s, float2 p)
+        {
+            if (s.Blocks.Count == 0) return false;
+            var f = s.F(p);
+            foreach (var b in s.Blocks)
+                if (f.x > b.U0 - 0.5f && f.x < b.U1 + 0.5f && f.y > b.V0 - 0.5f && f.y < b.V1 + 0.5f) return true;
+            return false;
+        }
+
         private static bool NearGate(IndustrialSite s, float2 p, float extra)
         {
             foreach (var g in s.Gates) if (math.distance(g.Position, p) < s.Spec.Aisle * 0.5f + extra + 2.7f) return true;
@@ -147,14 +157,20 @@ namespace Placemaker.Core.Layers.Types.Yards
                 TerrainPaint.Field(ctx, LeisureKit.Blob(c, depth * 0.62f, Hashing.Mix(v, 1u), 18, 0.25f), YardGround.Dirt, 1f, 2f, 1.5f, null, 0f, 0f, 0f, Hashing.Mix(v, 2u));
                 foreach (var end in new[] { a, b })
                     TerrainPaint.Field(ctx, LeisureKit.Blob(end, depth * 0.6f, Hashing.Mix(v, 3u), 16, 0.3f), YardGround.Dirt, 1f, 2f, 1.5f, null, 0f, 0f, 0f, Hashing.Mix(v, 4u));
-                // The dirt heaps along the crest, one every 7-9 m, turned a little off the line.
+                // Along the crest, one every 6-8 m: spoil worked into the bank (mixed and concrete rubble sunk to their tops), now and
+                // then a boulder, rarely the dirt heap (seen in the game: the heap is clay-orange, a row of them reads as rugs).
                 int j = 0;
-                for (float d = 3.5f; d < len - 3.5f; d += 7f + Hashing.Unit(Hashing.Mix(v, 10u + (uint)j)) * 2f, j++)
+                for (float d = 3.5f; d < len - 3.5f; d += 6f + Hashing.Unit(Hashing.Mix(v, 10u + (uint)j)) * 2f, j++)
                 {
                     uint w = Hashing.Mix(v, 0x40u + (uint)j);
                     var p = ra + t * (len * 0.5f - math.min(len, 48f) * 0.5f + d) + inw * (depth * 0.5f + 0.4f + setBack + (Hashing.Unit(w) - 0.5f) * 1.6f);
                     var dir = YardFill.Turn(t, 1.57f + (Hashing.Unit(Hashing.Mix(w, 1u)) - 0.5f) * 0.9f);
-                    if (s.Put(DirtHeap, DirtHeap.Pick(w), p, dir, w, 0.02f)) { Sink(s, 0.2f + Hashing.Unit(Hashing.Mix(w, 2u)) * 0.4f); made++; }
+                    float pick = Hashing.Unit(Hashing.Mix(w, 3u));
+                    var item = pick < 0.12f ? DirtHeap : pick < 0.32f ? Boulder : pick < 0.66f ? IndustrialAssets.MixedRubble : IndustrialAssets.Rubble;
+                    float sink = item.Category == AssetCategories.Rock ? 0.5f + Hashing.Unit(Hashing.Mix(w, 2u)) * 0.6f
+                        : item.Z > 8.5f && item.X > 7f && item.Category != AssetCategories.ConstructionRubble ? 0.6f + Hashing.Unit(Hashing.Mix(w, 2u)) * 0.3f
+                        : 0.35f + Hashing.Unit(Hashing.Mix(w, 2u)) * 0.4f;
+                    if (s.Put(item, item.Pick(w), p, dir, w, 0.02f)) { Sink(s, sink); made++; }
                 }
                 // Stones at its foot on the yard side; a dead bush or two.
                 for (int q = 0; q < 3 + (int)(len / 14f); q++)
@@ -214,6 +230,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             {
                 if (ValueNoise.Clumps(p, 16f, Hashing.Mix(salt, 10u)) > 0.18f + 0.42f * amount) continue;
                 if (s.F(p).y < s.Spec.Front + 3f) continue;
+                if (InBlock(s, p)) continue;
                 float c = s.Occ.Clearance(p, 3.5f);
                 if (c < 0.8f || c > 3.2f) continue;
                 uint v = Hashing.Mix(salt, 0x5000u + (uint)gaps++);

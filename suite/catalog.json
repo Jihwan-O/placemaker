@@ -1,6 +1,6 @@
 {
   "generatedBy": "the in-game suite from GeneratorRegistry",
-  "assembly": "0.1.1+96edfc5",
+  "assembly": "0.1.1+4ac5ac4",
   "categories": [
     {
       "id": "zoning",
@@ -19932,6 +19932,7 @@
             "blocks",
             "containers",
             "wrecks",
+            "boulders",
             "plain"
           ],
           "default": "blocks"
@@ -19974,6 +19975,29 @@
           "id": "spoil",
           "kind": "Toggle",
           "default": true
+        },
+        {
+          "id": "banks",
+          "kind": "Toggle",
+          "default": true
+        },
+        {
+          "id": "stones",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 10.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "rubble",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 10.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "level",
@@ -20052,6 +20076,7 @@
             "blocks",
             "containers",
             "wrecks",
+            "boulders",
             "plain"
           ],
           "default": "blocks"
@@ -20094,6 +20119,29 @@
           "id": "spoil",
           "kind": "Toggle",
           "default": true
+        },
+        {
+          "id": "banks",
+          "kind": "Toggle",
+          "default": true
+        },
+        {
+          "id": "stones",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 10.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "rubble",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 10.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "level",
@@ -20172,6 +20220,7 @@
             "blocks",
             "containers",
             "wrecks",
+            "boulders",
             "plain"
           ],
           "default": "blocks"
@@ -20214,6 +20263,29 @@
           "id": "spoil",
           "kind": "Toggle",
           "default": true
+        },
+        {
+          "id": "banks",
+          "kind": "Toggle",
+          "default": true
+        },
+        {
+          "id": "stones",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 10.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "rubble",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 10.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "level",
@@ -20292,6 +20364,7 @@
             "blocks",
             "containers",
             "wrecks",
+            "boulders",
             "plain"
           ],
           "default": "blocks"
@@ -20334,6 +20407,29 @@
           "id": "spoil",
           "kind": "Toggle",
           "default": true
+        },
+        {
+          "id": "banks",
+          "kind": "Toggle",
+          "default": true
+        },
+        {
+          "id": "stones",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 10.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "rubble",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 10.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "level",

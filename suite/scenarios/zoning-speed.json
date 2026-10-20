@@ -33,8 +33,38 @@
           "do": "build"
         },
         {
+          "do": "camera",
+          "target": "block",
+          "view": "top",
+          "shot": "roads-top"
+        },
+        {
+          "_": "the zoning outline spans the whole grid, its roads too (as the user's did): the area tools' stops off; its corners 15 m inside the grid's corners (on them, the corners snap to the road ends and no outline came)",
+          "do": "setting",
+          "name": "BrushPaintOverAnything",
+          "value": true
+        },
+        {
           "do": "area",
-          "tool": "land"
+          "tool": "points",
+          "points": [
+            [
+              -215,
+              -215
+            ],
+            [
+              215,
+              -215
+            ],
+            [
+              215,
+              215
+            ],
+            [
+              -215,
+              215
+            ]
+          ]
         },
         {
           "do": "type",

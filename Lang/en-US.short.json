@@ -157,6 +157,7 @@
   "Placemaker.Parking.Issue.TooLarge.Short": "Too large",
   "Placemaker.Parking.Issue.TooManyEntrances.Short": "{1} entrances cut",
   "Placemaker.Parking.Issue.TooSmall.Short": "Too small",
+  "Placemaker.Parking.Issue.TooNarrow.Short": "Too narrow",
   "Placemaker.Parking.Issue.UnreachableStalls.Short": "{0} spaces cut",
   "Placemaker.Parking.Issue.ZoningLeavesNoRoom.Short": "No building strips",
   "Placemaker.Parking.Issue.ZoningNoStreet.Short": "No street to zone",

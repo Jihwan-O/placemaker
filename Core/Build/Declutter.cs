@@ -114,7 +114,11 @@ namespace Placemaker.Core.Build
         {
             f = default;
             if (o == null || assets == null || string.IsNullOrEmpty(o.Asset.Id) || !assets.TryGetValue(o.Asset.Id, out var info)) return false;
-            return TryFootprint(o.Position, o.Yaw, o.Scale, info.BoundsMin, info.BoundsMax, out f);
+            if (!TryFootprint(o.Position, o.Yaw, o.Scale, info.BoundsMin, info.BoundsMax, out f)) return false;
+            // (Industrial) a prop stacked on another stands higher: their boxes meet in plan, not in height.
+            if (math.abs(math.abs(o.Roll) - math.PI) < 0.1f) { float lo = o.Elevation - f.MaxY, hi = o.Elevation - f.MinY; f.MinY = lo; f.MaxY = hi; }
+            else if (o.Elevation > 0f) { f.MinY += o.Elevation; f.MaxY += o.Elevation; }
+            return true;
         }
 
         public static bool TryFootprint(float3 position, float yaw, float scale, float3 min, float3 max, out Footprint f)

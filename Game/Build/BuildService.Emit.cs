@@ -372,20 +372,24 @@ namespace Placemaker.Game.Build
             _itemByKey[key] = w;
             // Uniform categories (benches, lamps, bins…): one random seed per build, so colour/mesh
             // variations do not turn a row of one bench into a mix (FEEDBACK-2 #1).
-            int? seed = AutoAssets.IsUniform(w.Category) ? AutoAssets.UniformSeed(w.Category, (uint)_groupId) : (int?)null;
+            int? seed = AutoAssets.IsUniform(w.Category) ? AutoAssets.UniformSeed(w.Category, (uint)_groupId) : o.ColorSeed >= 0 ? o.ColorSeed : (int?)null;
             float elevation = SinkDecals && (o.Role == ObjectRole.Decal || SinkStallMarkings && PlanWork.SinkInBuild(o.Role)) ? DecalSink : 0f;
-            EmitObjectDefinition(prefab, o.Position, o.Yaw, o.Scale, o.Age, o.Variation, key, true, seed, elevation, optional: !IgnoreOwnCollisions && !PlanWork.IsFunctional(o.Role));   // (s59) anarchy: the ghost shows what the build places — nothing is cancelled
+            if (o.Elevation > 0.01f && o.Role != ObjectRole.Decal) elevation = o.Elevation;   // (Industrial) stacked on another prop
+            EmitObjectDefinition(prefab, o.Position, o.Yaw, o.Scale, o.Age, o.Variation, key, true, seed, elevation, optional: !IgnoreOwnCollisions && !PlanWork.IsFunctional(o.Role), roll: o.Roll, pitch: o.Pitch);   // (s59) anarchy: the ghost shows what the build places — nothing is cancelled
             NoteUsed(prefab);
         }
 
-        private static readonly float[] AgeStages = { 0f, 0.17500001f, 0.425f, 0.77500004f };   // ToolUtils.GetRandomAge
+        private static readonly float[] AgeStages = { 0f, 0.17500001f, 0.425f, 0.77500004f, 0.97f };   // ToolUtils.GetRandomAge; [4] = dead (ObjectUtils.InitializeTreeState: age ≥ 0.95)
 
-        private void EmitObjectDefinition(Entity prefab, float3 position, float yaw, float scale, int age, uint variation, long key, bool snapToGround, int? randomSeed = null, float elevation = 0f, bool optional = true)
+        private void EmitObjectDefinition(Entity prefab, float3 position, float yaw, float scale, int age, uint variation, long key, bool snapToGround, int? randomSeed = null, float elevation = 0f, bool optional = true, float roll = 0f, float pitch = 0f)
         {
             _objectIndex = _objectIndex ?? new PlanIndex();
             var p = position;
             if (snapToGround || !math.isfinite(p.y)) p.y = GroundHeight(p.xz);
+            if (elevation > 0f) p.y += elevation;   // raised props (stacked containers) stand this high above the ground
             var rotation = quaternion.RotateY(yaw);
+            // (Industrial) a tilted prop: a wreck on its roof or its side.
+            if (roll != 0f || pitch != 0f) rotation = math.mul(rotation, math.mul(quaternion.RotateX(pitch), quaternion.RotateZ(roll)));
             var def = NewDefinition();
             EntityManager.AddComponentData(def, new CreationDefinition
             {

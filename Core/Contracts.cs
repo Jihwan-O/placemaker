@@ -691,7 +691,18 @@ namespace Placemaker.Core
         /// <summary>(s16) Asset control (ControlSchema.Id) that chose this asset, or null: lets the panel say what "Automatic" became.</summary>
         public string Control;
         public float Scale = 1f;
-        /// <summary>Tree growth stage 0..3 (young..old), -1 = n/a.</summary>
+        /// <summary>
+        /// (Industrial) Height above the ground in metres for a prop standing on another (a container on a container): the
+        /// build raises it this high and gives it the game's object Elevation. 0 = on the ground.
+        /// </summary>
+        public float Elevation;
+        /// <summary>(Industrial) Tilt in radians: Roll about the prop's own length (π = on its roof, ±π/2 = on its side), Pitch
+        /// about its width. 0 = upright (every other type). The build turns the prop by yaw, then pitch, then roll.</summary>
+        public float Roll, Pitch;
+        /// <summary>(Industrial) The game's random seed for this prop (its colour variation) when >= 0: boxes of one row share a
+        /// couple of seeds so a row reads as one shipping line's boxes. -1 = the build's own per-object seed.</summary>
+        public int ColorSeed = -1;
+        /// <summary>Tree growth stage 0..3 (young..old), 4 = dead (PlannedAge.Dead), -1 = n/a.</summary>
         public int Age = -1;
         public uint Variation;
         /// <summary>Optional: which planned net this object belongs to (index into AreaPlan.Nets), -1 none.</summary>
@@ -702,6 +713,14 @@ namespace Placemaker.Core
         /// otherwise automatic resolution falls back to "decoration" (FEEDBACK-2 #1: sandwich boards).
         /// </summary>
         public string Category;
+    }
+
+    /// <summary>Tree growth stages for PlannedObject.Age (the build maps them to ObjectDefinition.m_Age, ObjectUtils.InitializeTreeState).</summary>
+    public static class PlannedAge
+    {
+        public const int Young = 0, Teen = 1, Adult = 2, Old = 3;
+        /// <summary>A dead tree (m_Age ≥ 0.95: TreeState.Dead, bare branches).</summary>
+        public const int Dead = 4;
     }
 
     public enum AreaRole { PedestrianArea = 0, Hangaround = 1, Lot = 2 }

@@ -3,7 +3,7 @@
 // certain sections of dead trees"). A yard's ground tells where the work happens, so every mark has a reason:
 //
 //   * the terrain itself is painted (no flat surface polygon over the yard): worked earth or gravel over the yard, fading to
-//     dry grass along the fence;
+//     2.5 m past the fence (no grass inside a yard);
 //   * mud where the wheels are: dark strips along both sides of every aisle, a mud patch at every aisle crossing and at the
 //     gate apron;
 //   * oil-soaked dark ground round the heaps, the mountain, the bays and the machines; the ground under a row of wrecks is
@@ -37,8 +37,11 @@ namespace Placemaker.Core.Layers.Types.Yards
         {
             var ctx = s.Ctx;
             float a = s.Spec.Aisle;
-            // Earth right up to the fence (no grass inside a yard: the user, 2026-10-19).
-            TerrainPaint.Field(ctx, s.Region.Ring, Dirt, s.Organic ? 0.85f : 1f, 1f, 1f, null, 0f, 0f, 0f, Hashing.Mix(salt, 1u));
+            // Earth right up to the fence (no grass inside a yard: the user, 2026-10-19). Painted 2.5 m past it: the game's
+            // paint texels are 3.5 m and the feather fades inward, so a field that stops at the fence left a strip of grass
+            // inside it (seen in the game on a 45 x 35 m yard). Outside, the earth trodden out of the gate is right anyway.
+            var grown = Poly.Offset(s.Region.Ring, -2.5f);
+            TerrainPaint.Field(ctx, grown.Count == 1 ? grown[0] : s.Region.Ring, Dirt, s.Organic ? 0.85f : 1f, 1f, 1f, null, 0f, 0f, 0f, Hashing.Mix(salt, 1u));
             int baseLayer = ground == "gravel" ? Gravel : Dirt;
             TerrainPaint.Field(ctx, s.Inner.Ring, baseLayer, s.Organic ? 0.85f : 1f, 4f, 2f, null, 0f, 0f, 0f, Hashing.Mix(salt, 2u));
             int k = 0;

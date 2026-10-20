@@ -7,10 +7,10 @@
       "steps": [
         { "do": "lab", "op": "oldDecalCleanup", "on": false },
         { "do": "lab", "op": "loadCity", "name": "PlacemakerSuiteReload" },
-        { "do": "camera", "target": "point", "at": [0, 0], "abs": true, "view": "oblique", "distance": 70, "shot": "before-cleanup" },
+        { "do": "camera", "target": "point", "at": [275, -430], "abs": true, "view": "oblique", "distance": 70, "shot": "before-cleanup" },
         { "do": "lab", "op": "oldDecalCleanup", "on": true },
         { "do": "lab", "op": "loadCity", "name": "PlacemakerSuiteReload", "delete": true },
-        { "do": "camera", "target": "point", "at": [0, 0], "abs": true, "view": "oblique", "distance": 70, "shot": "after-cleanup" }
+        { "do": "camera", "target": "point", "at": [275, -430], "abs": true, "view": "oblique", "distance": 70, "shot": "after-cleanup" }
       ]
     }
   ]

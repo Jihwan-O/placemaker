@@ -38,6 +38,7 @@ namespace Placemaker.Game.Assets
 
         /// <summary>Slot name → prop prefab entity (for the log and the suite).</summary>
         public static readonly Dictionary<string, string> Made = new Dictionary<string, string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, float3> _sizes = new Dictionary<string, float3>(StringComparer.Ordinal);
 
         [Preserve]
         protected override void OnCreate()
@@ -72,7 +73,11 @@ namespace Placemaker.Game.Assets
                     var e = list[i];
                     if (!_prefabs.TryGetPrefab<PrefabBase>(e, out var p) || !(p is ObjectGeometryPrefab g) || g.m_Meshes == null || g.m_Meshes.Length == 0) continue;
                     var kind = KindOf(e, g);
-                    if (kind != null && byKind.TryGetValue(kind, out var l)) l.Add(g);
+                    if (kind != null && byKind.TryGetValue(kind, out var l))
+                    {
+                        l.Add(g);
+                        if (EntityManager.HasComponent<ObjectGeometryData>(e)) _sizes[g.name] = EntityManager.GetComponentData<ObjectGeometryData>(e).m_Size;
+                    }
                 }
             int made = 0;
             var summary = new List<string>();
@@ -86,7 +91,12 @@ namespace Placemaker.Game.Assets
                 {
                     var src = l[(i - 1) % l.Count];
                     string slot = VehicleProps.Prefix + kind + " " + i;
-                    if (Make(slot, src)) { made++; Made[slot] = src.name; if (i <= l.Count) names.Add(src.name); }
+                    if (Make(slot, src))
+                    {
+                        made++; Made[slot] = src.name;
+                        // The size goes in the log: the yards space their rows by it (IndustrialAssets).
+                        if (i <= l.Count) names.Add(_sizes.TryGetValue(src.name, out var z) ? $"{src.name} {z.x:0.0}x{z.z:0.0}x{z.y:0.0} m" : src.name);
+                    }
                 }
                 summary.Add($"{kind}: {string.Join(", ", names)}");
             }
@@ -102,9 +112,10 @@ namespace Placemaker.Game.Assets
             bool trailer = em.HasComponent<CarTrailerData>(e);
             float3 size = em.HasComponent<ObjectGeometryData>(e) ? em.GetComponentData<ObjectGeometryData>(e).m_Size : float3.zero;
             if (Has(n, "Camper", "Caravan") && trailer) return "Camper";
-            if (trailer) return null;
+            if (trailer || Has(n, "Motorbike", "Bicycle", "Scooter", "Moped")) return null;
             if (em.HasComponent<GarbageTruckData>(e)) return "Garbage";
-            if (Has(n, "FrontendLoader", "WheelLoader", "Excavator", "Bulldozer")) return "Loader";
+            // A loader fits a 5 × 9 m slot; the mining excavator (25 m) does not.
+            if (Has(n, "FrontendLoader", "WheelLoader")) return "Loader";
             if (Has(n, "Tractor") && !Has(n, "TruckTractor", "Trailer")) return "Tractor";
             if (em.HasComponent<PersonalCarData>(e))
             {
@@ -113,10 +124,8 @@ namespace Placemaker.Game.Assets
                 return "Car";
             }
             if (em.HasComponent<DeliveryTruckData>(e))
-            {
-                if (size.z > 0f && size.z <= 6.5f) return "Van";
-                if (size.z <= 10f) return "Truck";
-            }
+                // By name: the geometry size of a cab or a van says little (the 2026-10-19 run sorted a truck cab as a van).
+                return Has(n, "DeliveryVan", "Van0") ? "Van" : Has(n, "Truck") ? "Truck" : null;
             return null;
         }
 

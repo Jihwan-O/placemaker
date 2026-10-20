@@ -25,13 +25,13 @@ namespace Placemaker.Core.Layers.Types.Yards
 
         protected override void DefinePresets()
         {
-            Preset("salvage", ("style", "salvage"), ("ground", "gravel"), ("edge", "blocks"), ("aisle", 7.0), ("fill", 90.0), ("weighbridge", false));
-            Preset("crusher", ("style", "crusher"), ("ground", "dirt"), ("edge", "blocks"), ("aisle", 9.0), ("fill", 85.0), ("weighbridge", true));
+            Preset("salvage", ("style", "salvage"), ("ground", "dirt"), ("edge", "wrecks"), ("aisle", 7.0), ("fill", 90.0), ("weighbridge", false));
+            Preset("crusher", ("style", "crusher"), ("ground", "dirt"), ("edge", "wrecks"), ("aisle", 9.0), ("fill", 85.0), ("weighbridge", true));
             Preset("breakers", ("style", "breakers"), ("ground", "gravel"), ("edge", "trees"), ("aisle", 8.0), ("fill", 85.0), ("weighbridge", false));
         }
 
         // Two wrecks nose to tail (4.7 m each) with a walkway between their tails.
-        private const float DoubleRow = 2f * 4.7f + 1.0f + 2f * 0.5f;
+        private const float DoubleRow = 2f * 4.8f + 1.0f + 2f * 0.5f + 0.5f;
 
         protected override SiteSpec Spec(LayerContext ctx, string style)
         {
@@ -89,7 +89,9 @@ namespace Placemaker.Core.Layers.Types.Yards
                 }
                 if (back && style == "crusher" && YardFill.HeapRow(s, b, IndustrialAssets.MetalHeap, 2.5f, fill, salt) > 0) { b.Use = "crushed"; continue; }
                 // Wrecks: nose to the aisle, a few degrees off true (they were dropped by a forklift, not parked).
-                int n = YardFill.RowsAcross(s, b, car, 0.75f, fill, salt, style == "salvage" ? 0.06f : 0.03f);
+                // Piled higher towards the back: a few on top of each other at the front, most at the back.
+                float pile = b.Band < 0 ? 0.08f : math.min(0.55f, 0.15f + 0.15f * b.Band);
+                int n = YardFill.RowsAcross(s, b, car, 0.75f, fill, salt, YardFill.Mess.Wrecks(pile));
                 if (n > 0)
                 {
                     b.Use = "wrecks";
@@ -107,13 +109,31 @@ namespace Placemaker.Core.Layers.Types.Yards
             else YardFill.Grid(s, c, face, w, d, item, 0.25f, 0.75f, v);
         }
 
-        /// <summary>A barrel pile at each end of a wreck row (the oil drained out of the cars).</summary>
+        private static readonly YardItem DeadBush = new YardItem(AssetCategories.Bush, 1.8f, 1.8f, "FlowerBushWildDead02");
+
+        /// <summary>
+        /// What collects round a row of wrecks: a loose pile of drums, gas bottles and crates at the row's outer end (the
+        /// fluids and the small parts taken out), weeds and dead bushes coming up along the walkway between the rows.
+        /// </summary>
         private static void EndStacks(IndustrialSite s, YardBlock b, uint salt)
         {
-            var item = IndustrialAssets.Barrels;
-            float uOut = b.UMid >= 0f ? b.U1 - item.X * 0.5f - 0.2f : b.U0 + item.X * 0.5f + 0.2f;
-            foreach (float v in new[] { b.V0 + item.Z * 0.5f + 0.2f, b.V1 - item.Z * 0.5f - 0.2f })
-                s.Put(item, item.Pick(salt), s.W(uOut, v), s.U, Hashing.Mix(salt, (uint)(v * 10f)), 0.05f);
+            float uOut = b.UMid >= 0f ? b.U1 - 2.4f : b.U0 + 2.4f;
+            var c = s.W(uOut, b.VMid + (Hashing.Unit(salt) - 0.5f) * b.Depth * 0.4f);
+            YardFill.Clump(s, c, 2.4f, IndustrialAssets.Drums, 7, Hashing.Mix(salt, 1u));
+            YardFill.Clump(s, c + s.V * 1.8f, 1.6f, (salt & 1u) == 0 ? IndustrialAssets.Gas : IndustrialAssets.Crates, 2, Hashing.Mix(salt, 2u));
+            // The walkway between back-to-back rows: weeds in it every few metres, some of them dead.
+            if (!b.AisleFront || !b.AisleBack) return;
+            int i = 0;
+            for (float u = b.U0 + 3f; u < b.U1 - 3f; u += 4f + Hashing.Unit(Hashing.Mix(salt, (uint)(i + 40))) * 6f, i++)
+            {
+                uint v = Hashing.Mix(salt, (uint)(i + 100));
+                if (Hashing.Unit(v) < 0.45f) continue;
+                var p = s.W(u, b.VMid + (Hashing.Unit(Hashing.Mix(v, 1u)) - 0.5f) * 0.6f);
+                if (!s.Occ.Free(p, 0.7f, 0.2f, 0.05f)) continue;
+                bool dead = Hashing.Unit(Hashing.Mix(v, 2u)) < 0.4f;
+                s.Ctx.Object(p, Hashing.Unit(Hashing.Mix(v, 3u)) * 6.283f, ObjectRole.Bush, dead ? DeadBush.Pick(v) : new AssetRef(""), v, -1, AssetCategories.Bush);
+                s.Occ.Take(p, 0.7f, Scrapyard.YardKit.KindStuff);
+            }
         }
     }
 }

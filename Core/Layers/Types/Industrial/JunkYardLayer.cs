@@ -86,11 +86,17 @@ namespace Placemaker.Core.Layers.Types.Yards
                     continue;
                 }
                 // Between the bays and the gate: rows of skips on the spine side, heaps of one kind per block further out.
-                if (b.Band == 0 && YardFill.RowsAcross(s, b, IndustrialAssets.OpenSkip, 1.0f, fill, salt) > 0) { b.Use = "skips"; continue; }
-                var heap = (heapRows++ & 1) == 0 ? IndustrialAssets.MetalHeap : IndustrialAssets.Rubble;
+                if (b.Band == 0 && YardFill.RowsAcross(s, b, IndustrialAssets.OpenSkip, 1.0f, fill, salt, Skips) > 0) { b.Use = "skips"; continue; }
+                // Further out: metal heaps, loose material (sand, dirt, spoil, a rock pile), rubble, in turn.
+                int kind = heapRows++ % 3;
+                if (kind == 1 && YardFill.Stockpiles(s, b, salt) > 0) { b.Use = "stockpiles"; continue; }
+                var heap = kind == 0 ? IndustrialAssets.MetalHeap : IndustrialAssets.Rubble;
                 if (YardFill.HeapRow(s, b, heap, 2.4f, fill, salt) > 0) b.Use = "heaps";
             }
         }
+
+        private static readonly YardFill.Mess Skips = new YardFill.Mess { Pos = 0.35f, Yaw = 0.12f, Missing = 0.12f };
+        private static readonly YardFill.Mess Lorries = new YardFill.Mess { Pos = 0.25f, Yaw = 0.06f, Missing = 0.1f };
 
         private static void Bay(IndustrialSite s, YardItem[] kinds, int i, float2 c, float2 face, float w, float d, uint salt)
         {
@@ -106,10 +112,12 @@ namespace Placemaker.Core.Layers.Types.Yards
             foreach (var b in Ordered(s))
             {
                 uint salt = s.Salt(0x2EC0u + (uint)b.Index * 7919u);
+                // Every fourth block is the builders' end of the yard: sand, gravel and a rock pile.
+                if (k % 4 == 2 && YardFill.Stockpiles(s, b, salt) > 0) { b.Use = "stockpiles"; k++; continue; }
                 var item = Goods[k % Goods.Length];
                 int n = item.Z > 5f
-                    ? YardFill.RowsAcross(s, b, item, 0.6f, fill, salt)          // timber bundles and pipe stacks nose to the aisle
-                    : YardFill.RowsAlong(s, b, item, 0.5f, 0.9f, fill, salt);   // small goods in straight lines
+                    ? YardFill.RowsAcross(s, b, item, 0.6f, fill, salt, YardFill.Mess.Goods)          // timber bundles and pipe stacks nose to the aisle
+                    : YardFill.RowsAlong(s, b, item, 0.5f, 0.9f, fill, salt, YardFill.Mess.Goods);   // small goods in lines
                 if (n > 0) { b.Use = "goods"; k++; }
             }
         }
@@ -126,15 +134,15 @@ namespace Placemaker.Core.Layers.Types.Yards
                         // Rubbish in the bays, a mixed-rubble bay and a wood bay at the ends.
                         var item = i % 4 == 3 ? IndustrialAssets.WoodRubble : i % 4 == 2 ? IndustrialAssets.MixedRubble : IndustrialAssets.Trash;
                         if (item.X >= 7f) YardFill.Heap(s, c, face, w, d, item, Hashing.Mix(salt, (uint)i));
-                        else YardFill.Grid(s, c, face, w, d, item, 0.4f, 0.7f, Hashing.Mix(salt, (uint)i), true);
+                        else YardFill.Grid(s, c, face, w, d, item, 0.8f, 0.7f, Hashing.Mix(salt, (uint)i), true);
                     }) > 0) b.Use = "bays";
                     continue;
                 }
                 // The bin lorries park in the band nearest the gate on the office side; skips everywhere else.
-                if (b.Band == 0 && b.Side == s.OfficeSide && YardFill.RowsAcross(s, b, IndustrialAssets.GarbageTruck, 1.4f, math.min(fill, 0.8f), salt) > 0)
+                if (b.Band == 0 && b.Side == s.OfficeSide && YardFill.RowsAcross(s, b, IndustrialAssets.GarbageTruck, 1.4f, math.min(fill, 0.8f), salt, Lorries) > 0)
                 { b.Use = "lorries"; s.Machines++; continue; }
                 var skip = (b.Index & 1) == 0 ? IndustrialAssets.OpenSkip : IndustrialAssets.BigSkip;
-                if (YardFill.RowsAcross(s, b, skip, 1.2f, fill, salt) > 0) b.Use = "skips";
+                if (YardFill.RowsAcross(s, b, skip, 1.2f, fill, salt, Skips) > 0) b.Use = "skips";
             }
         }
     }

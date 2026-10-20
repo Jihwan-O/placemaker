@@ -26,9 +26,9 @@ namespace Placemaker.Core.Layers.Types.Yards
 
         protected override void DefinePresets()
         {
-            Preset("recycling", ("style", "recycling"), ("ground", "concrete"), ("edge", "trees"), ("aisle", 10.0), ("fill", 90.0), ("weighbridge", true));
+            Preset("recycling", ("style", "recycling"), ("ground", "gravel"), ("edge", "trees"), ("aisle", 10.0), ("fill", 90.0), ("weighbridge", true));
             Preset("salvage", ("style", "salvage"), ("ground", "dirt"), ("edge", "containers"), ("aisle", 9.0), ("fill", 85.0), ("weighbridge", true));
-            Preset("works", ("style", "works"), ("ground", "gravel"), ("edge", "blocks"), ("aisle", 11.0), ("fill", 85.0), ("weighbridge", false));
+            Preset("works", ("style", "works"), ("ground", "dirt"), ("edge", "blocks"), ("aisle", 11.0), ("fill", 85.0), ("weighbridge", false));
         }
 
         protected override SiteSpec Spec(LayerContext ctx, string style)
@@ -77,33 +77,33 @@ namespace Placemaker.Core.Layers.Types.Yards
                 {
                     case "recycling":
                         if (back && YardFill.Bays(s, b, 9.4f, fill, salt, (i, c, face, w, d) => Bay(s, RecyclingBays, i, c, face, w, d, salt)) > 0) { b.Use = "bays"; break; }
-                        if (b.Band == 0 && b.Side != s.OfficeSide && YardFill.RowsAcross(s, b, IndustrialAssets.GarbageTruck, 1.4f, math.min(fill, 0.8f), salt) > 0)
+                        if (b.Band == 0 && b.Side != s.OfficeSide && YardFill.RowsAcross(s, b, IndustrialAssets.GarbageTruck, 1.4f, math.min(fill, 0.8f), salt, new YardFill.Mess { Pos = 0.25f, Yaw = 0.06f, Missing = 0.1f }) > 0)
                         { b.Use = "lorries"; break; }
-                        if (YardFill.RowsAcross(s, b, IndustrialAssets.OpenSkip, 1.0f, fill, salt) > 0) b.Use = "skips";
+                        if (YardFill.RowsAcross(s, b, IndustrialAssets.OpenSkip, 1.0f, fill, salt, new YardFill.Mess { Pos = 0.35f, Yaw = 0.12f, Missing = 0.12f }) > 0) b.Use = "skips";
                         break;
                     case "salvage":
                         if (back && YardFill.Bays(s, b, 9.4f, fill, salt, (i, c, face, w, d) => Bay(s, new[] { IndustrialAssets.MetalHeap, IndustrialAssets.Tyres, IndustrialAssets.Barrels }, i, c, face, w, d, salt)) > 0)
                         { b.Use = "bays"; break; }
                         if (b.Side == s.OfficeSide)
                         {
-                            int n = YardFill.RowsAcross(s, b, IndustrialAssets.Box20, 0.35f, fill, salt, 0f, true);
+                            int n = YardFill.RowsAcross(s, b, IndustrialAssets.Box20, 0.35f, fill, salt, YardFill.Mess.Containers, true, 0.5f, 2);
                             if (n > 0) { b.Use = "containers"; s.Containers += n; }
                         }
                         else
                         {
-                            int n = YardFill.RowsAcross(s, b, IndustrialAssets.Car, 0.75f, fill, salt, 0.05f);
+                            int n = YardFill.RowsAcross(s, b, IndustrialAssets.Car, 0.75f, fill, salt, YardFill.Mess.Wrecks(0.35f));
                             if (n > 0) { b.Use = "wrecks"; s.Wrecks += n; }
                         }
                         break;
                     default:
-                        if (b.Band == 0 && YardFill.Stacks(s, b, 0, fill, salt, false) > 0) { b.Use = "stacks"; break; }
+                        if (b.Band <= 0 && YardFill.RowsAcross(s, b, IndustrialAssets.Box20, 0.35f, fill, salt, YardFill.Mess.Containers, true, 0.5f, 2) > 0) { b.Use = "stacks"; break; }
                         if (back)
                         {
-                            var heap = (k++ & 1) == 0 ? IndustrialAssets.Rubble : IndustrialAssets.StoneHeap;
-                            if (YardFill.HeapRow(s, b, heap, 3f, fill, salt) > 0) { b.Use = "heaps"; break; }
+                            if ((k++ & 1) == 0 && YardFill.Stockpiles(s, b, salt) > 0) { b.Use = "stockpiles"; break; }
+                            if (YardFill.HeapRow(s, b, IndustrialAssets.Rubble, 3f, fill, salt) > 0) { b.Use = "heaps"; break; }
                         }
                         var goods = (b.Index & 1) == 0 ? IndustrialAssets.Pipes : IndustrialAssets.Reels;
-                        if ((goods.Z > 5f ? YardFill.RowsAcross(s, b, goods, 0.6f, fill, salt) : YardFill.RowsAlong(s, b, goods, 0.8f, 1f, fill, salt)) > 0) b.Use = "goods";
+                        if ((goods.Z > 5f ? YardFill.RowsAcross(s, b, goods, 0.6f, fill, salt, YardFill.Mess.Goods) : YardFill.RowsAlong(s, b, goods, 0.8f, 1f, fill, salt, YardFill.Mess.Goods)) > 0) b.Use = "goods";
                         break;
                 }
             }

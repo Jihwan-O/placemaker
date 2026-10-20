@@ -120,7 +120,7 @@ namespace Placemaker.Core.Layers.Types.Yards
         // ───────────── vehicles (wrecks, staff cars, machines) ─────────────
 
         /// <summary>Cars (wrecks in the yard, staff cars at the office): Placemaker's car props, then pack props, then a trailer.</summary>
-        public static readonly YardItem Car = new YardItem(AssetCategories.ScrapWreck, 1.95f, 4.7f,
+        public static readonly YardItem Car = new YardItem(AssetCategories.ScrapWreck, 2.0f, 4.8f,
             VehicleProps.Car(1) + "|Prop_ParkMaintenanceVehicle01|Prop_CarTrailer01|CarTrailer01_Props02",
             VehicleProps.Car(2) + "|Prop_ParkMaintenanceVehicle01|Prop_CarTrailer01|CarTrailer01_Props01",
             VehicleProps.Car(3) + "|Prop_CarTrailer01|Prop_ParkMaintenanceVehicle01|CarTrailer01_Props03",
@@ -177,12 +177,15 @@ namespace Placemaker.Core.Layers.Types.Yards
         /// <summary>Rusty metal: ore-coloured truck loads (the scrap look from above).</summary>
         public static readonly YardItem MetalHeap = new YardItem(AssetCategories.ScrapHeap, 7.6f, 9.0f,
             "OreMiningTruck01_OrePile03|OreMiningTruck01_OrePile02", "OreMiningTruck01_OrePile02|OreMiningTruck01_OrePile03");
-        /// <summary>A big tipped heap of metal (8.9 × 14.7 m, 3.6 m high).</summary>
-        public static readonly YardItem MetalMountain = new YardItem(AssetCategories.ScrapHeap, 8.9f, 14.7f, "PileOreSmall01|OreMiningTruck01_OrePile03");
-        public static readonly YardItem DarkHeap = new YardItem(AssetCategories.ScrapHeap, 8.9f, 14.7f, "PileCoalSmall01|CoalTruck01_CoalPile01");
-        public static readonly YardItem StoneHeap = new YardItem(AssetCategories.ConstructionPile, 8.9f, 14.7f, "PileStoneSmall01|CoalTruck01_StonePile01");
-        public static readonly YardItem SandHeap = new YardItem(AssetCategories.ConstructionPile, 8.9f, 14.7f, "PileSandSmall01|CoalTruck01_StonePile01");
-        public static readonly YardItem GarbageHeap = new YardItem(AssetCategories.LandfillGarbage, 8.9f, 14.7f, "PileGarbageSmall01|CoalTruck01_GarbagePile01");
+        /// <summary>
+        /// The big tipped heaps (8.9 × 14.7 m): the vanilla Pile*Small01 props are EMPTY on their own (their mesh needs the
+        /// building's resource state; seen in the game 2026-10-19), so only the asset packs' filled copies are named.
+        /// </summary>
+        public static readonly YardItem MetalMountain = new YardItem(AssetCategories.ScrapHeap, 8.9f, 14.7f, "Prop_PileOreSmall01_Full|OreMiningTruck01_OrePile03");
+        public static readonly YardItem DarkHeap = new YardItem(AssetCategories.ScrapHeap, 8.9f, 14.7f, "Prop_PileCoalSmall01_Full|OreMiningTruck01_OrePile01");
+        public static readonly YardItem StoneHeap = new YardItem(AssetCategories.ConstructionPile, 8.9f, 14.7f, "Prop_PileStoneSmall01_Full|RubblePileConcrete02");
+        public static readonly YardItem SandHeap = new YardItem(AssetCategories.ConstructionPile, 8.9f, 14.7f, "Prop_PileSandSmall01_Full|RubblePileConcrete03");
+        public static readonly YardItem GarbageHeap = new YardItem(AssetCategories.LandfillGarbage, 8.9f, 14.7f, "Prop_PileGarbageSmall01_Full|Trashpile01");
         public static readonly YardItem Rubble = new YardItem(AssetCategories.ConstructionRubble, 9.5f, 8.6f,
             "RubblePileConcrete01", "RubblePileConcrete02", "RubblePileConcrete03", "RubblePileConcrete04");
         public static readonly YardItem MixedRubble = new YardItem(AssetCategories.ConstructionRubble, 7.6f, 6.0f,

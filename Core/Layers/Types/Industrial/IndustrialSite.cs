@@ -429,6 +429,9 @@ namespace Placemaker.Core.Layers.Types.Yards
                     var q = r.Local(-su + 2f * su * i / nu, -sv + 2f * sv * j / nv);
                     if (Occ.Discs.Overlaps(q, probe, gap) || Occ.Corridors.Overlaps(q, probe, gap) || Occ.HitsPolygon(q, probe)) return false;
                 }
+            // The corners, which the inset probes miss: a turned prop's corner must not poke into its neighbour.
+            foreach (var q in ring)
+                if (Occ.Discs.Overlaps(q, 0.15f, gap) || Occ.Corridors.Overlaps(q, 0.15f, gap)) return false;
             return true;
         }
 
@@ -442,6 +445,9 @@ namespace Placemaker.Core.Layers.Types.Yards
             if (math.abs(hl - hw) < 0.05f) { Occ.Take(r.Center, hw, YardKit.KindStuff); return; }
             if (hl > hw) Occ.TakeCorridor(r.Local(-(hl - hw), 0f), r.Local(hl - hw, 0f), hw, YardKit.KindStuff);
             else Occ.TakeCorridor(r.Local(0f, -(hw - hl)), r.Local(0f, hw - hl), hl, YardKit.KindStuff);
+            // The corners the capsule leaves out, so a turned neighbour cannot slide its corner in there.
+            float cr = math.min(hl, hw) * 0.3f;
+            foreach (var q in r.Ring) Occ.Take(q - math.normalizesafe(q - r.Center) * cr, cr, YardKit.KindStuff);
         }
 
         /// <summary>A surface patch (clipped to the outline).</summary>

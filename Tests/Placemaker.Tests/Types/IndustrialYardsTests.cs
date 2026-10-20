@@ -92,23 +92,31 @@ namespace Placemaker.Tests.Types
         }
 
         /// <summary>
-        /// Handcrafted, part 1: on a rectangle with the street along the bottom every prop stands square to the street (a
-        /// multiple of 90°); only wrecks may be a few degrees off (and the spoil mounds' dead wood and the wear decals).
+        /// Handcrafted, part 1 (the user, 2026-10-19: designed, but "a little too perfect ... like a mathematician"): the built
+        /// things (containers, offices, barriers, masts) stand square to the yard within a couple of degrees; the loose things
+        /// (wrecks, goods, skips) wander, but no ground wreck more than ~10° off its row; heaps and dead wood lie any way.
         /// </summary>
         [Theory]
         [MemberData(nameof(All))]
-        public void EveryPropIsSquareToTheYard(string type, string preset)
+        public void BuiltThingsAreSquareLooseThingsWanderALittle(string type, string preset)
         {
             var plan = YardTestKit.PlanPreset(type, preset, Site15, TestKit.RoadAlongBottom(140));
+            int wrecks = 0, offRow = 0;
             foreach (var o in plan.Objects)
             {
-                // Nature on the spoil mounds (dead trees, bushes, a fallen log) and wear decals lie as they fell.
-                if (o.Role == ObjectRole.Tree || o.Role == ObjectRole.Bush || o.Role == ObjectRole.Decal || o.Category == AssetCategories.Rock) continue;
                 float q = math.PI * 0.5f;
-                float m = o.Yaw - q * math.round(o.Yaw / q);
-                float tol = o.Category == AssetCategories.ScrapWreck ? 0.08f : 0.01f;
-                Assert.True(math.abs(m) <= tol, $"{type}/{preset}: {o.Asset.Id} ({o.Category}) at {o.Position.xz} is {math.degrees(m):0.0}° off the yard's frame");
+                float m = math.abs(o.Yaw - q * math.round(o.Yaw / q));
+                if (o.Category == AssetCategories.ScrapCabin || o.Category == AssetCategories.FloodLight || (o.Category == AssetCategories.ScrapBarrier && o.Role == ObjectRole.Furniture))
+                    Assert.True(m <= 0.01f, $"{type}/{preset}: {o.Asset.Id} at {o.Position.xz} is {math.degrees(m):0.0}° off the yard's frame");
+                else if (o.Category == AssetCategories.ScrapContainer)
+                    Assert.True(m <= 0.06f, $"{type}/{preset}: container at {o.Position.xz} is {math.degrees(m):0.0}° off");
+                else if (o.Category == AssetCategories.ScrapWreck && o.Elevation == 0f && o.Roll == 0f)
+                {
+                    wrecks++;
+                    if (m > 0.2f) offRow++;
+                }
             }
+            Assert.True(offRow <= wrecks / 10, $"{type}/{preset}: {offRow} of {wrecks} wrecks more than 11° off their rows");
         }
 
         /// <summary>
@@ -124,6 +132,9 @@ namespace Placemaker.Tests.Types
             foreach (var o in plan.Objects)
             {
                 if (o.Role == ObjectRole.Decal || o.Role == ObjectRole.Tree || o.Role == ObjectRole.Bush) continue;
+                // Stacked or tipped props stand on others on purpose; heaps, rocks and loose drums are tipped together.
+                if (o.Elevation > 0f || o.Roll != 0f) continue;
+                if (o.Category == AssetCategories.ScrapHeap || o.Category == AssetCategories.Rock || o.Category == AssetCategories.ConstructionRubble || o.Category == AssetCategories.ScrapBarrel) continue;
                 if (!Footprint(o, out var ring)) continue;
                 boxes.Add((o, ring));
             }

@@ -50,7 +50,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             c.Toggle("weighbridge", false, ControlTier.More, "front").Tip();
             c.Toggle("floodlights", true, ControlTier.More, "front");
 
-            c.Choice("edge", "blocks", ControlTier.More, "edge", "trees", "blocks", "containers", "plain").Tip();
+            c.Choice("edge", "blocks", ControlTier.More, "edge", "trees", "blocks", "containers", "wrecks", "plain").Tip();
             c.Choice("fence", "fence", ControlTier.More, "edge", "none", "fence").Tip();
             c.Asset("fenceAsset", AssetCategories.Fence, ControlTier.More, "edge").When("fence=fence");
             c.AssetMulti("treeSpecies", AssetCategories.Tree, ControlTier.More, "edge").When("edge=trees");
@@ -119,7 +119,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             ctx.Check();
 
             // Whatever is still automatic (pads, aisles, the fence, decals) gets the curated industrial look.
-            GritAssets.Apply(ctx.Plan, ctx.Seed);
+            GritAssets.Apply(ctx.Plan, ctx.Seed, null, null, SecurityFence);
             GritAssets.CapDecals(ctx.Plan, region.Area, 110f);
             var terrain = Shape(ctx, region, mounds);
             YardKit.Settle(ctx, terrain);
@@ -147,10 +147,15 @@ namespace Placemaker.Core.Layers.Types.Yards
             if (DebugBlocks) foreach (var b in s.Blocks) { ctx.Plan.Facts[$"blk{b.Index}.band"] = b.Band; ctx.Plan.Facts[$"blk{b.Index}.u0"] = b.U0; ctx.Plan.Facts[$"blk{b.Index}.u1"] = b.U1; ctx.Plan.Facts[$"blk{b.Index}.v0"] = b.V0; ctx.Plan.Facts[$"blk{b.Index}.v1"] = b.V1; }
         }
 
+        /// <summary>A yard is fenced high (2.3 m chain-link), the low industrial fence only where no high one exists.</summary>
+        private static readonly GritAssets.Set SecurityFence = new GritAssets.Set(true, "FenceIndustrialHigh01|FenceIndustrialHigh02|FenceIndustrialLow02|FenceIndustrialLow01");
+
         // ───────────── ground ─────────────
 
         private static readonly AssetRef Gravel = new AssetRef("Terrain Surfaces Pack Rock gaga TTP - Smaller Pebbles grey M Surface", "Sand Surface 02", "Sand Surface 01");
         private static readonly AssetRef Dirt = new AssetRef("EAI - Surface Pack Ground Mud Surface", "Terrain Surfaces Pack Ground gaga TTP - Soil M Surface", "Oil Surface 01");
+        /// <summary>Aisles: weathered asphalt from the surface packs, else the dark vanilla pavement (concrete would vanish on a concrete yard).</summary>
+        private static readonly AssetRef AisleSurface = new AssetRef("EAI - Surface Pack Concrete Weathered Asphalt Surface", "EAI - Surface Pack Concrete Cracked Asphalt Surface", "Pavement Surface 01");
         private static readonly AssetRef Concrete = new AssetRef("Concrete Surface 01", "Pavement Surface 02", "Concrete Surface 02");
 
         /// <summary>The yard surface, then the aisles on top (asphalt, so the lanes read from above).</summary>
@@ -165,9 +170,12 @@ namespace Placemaker.Core.Layers.Types.Yards
                 case "dirt": if (!ctx.B("paint")) ctx.Surface(s.Inner.Ring, SurfaceRole.Ground, Dirt, AssetCategories.SurfaceDirt); break;
                 default: if (!ctx.B("paint")) ctx.Surface(s.Inner.Ring, SurfaceRole.Ground, Gravel, AssetCategories.SurfaceNatural); break;
             }
+            // Concrete yards drive on dark pavement lanes; dirt and gravel yards on their own trodden ground (the paint's
+            // mud tracks), the way a real scrap yard does: no white roads through the mud.
             float hw = s.Spec.Aisle * 0.5f;
-            foreach (var (a, b) in s.Aisles)
-                YardKit.Strip(ctx, a, b, hw, SurfaceRole.Asphalt, AssetMix.One(""), AssetCategories.SurfaceAsphalt);
+            if (ctx.S("ground") == "concrete" || !ctx.B("paint"))
+                foreach (var (a, b) in s.Aisles)
+                    YardKit.Strip(ctx, a, b, hw, SurfaceRole.Asphalt, AisleSurface, AssetCategories.SurfaceAsphalt);
         }
 
         /// <summary>The yard levelled to one pad (blended to the ground at the outline) with the mounds on it: one sculpt.</summary>

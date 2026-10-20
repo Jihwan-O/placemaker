@@ -37,12 +37,11 @@ namespace Placemaker.Core.Layers.Types.Yards
             if (s.Spec.Edge >= 2f) TerrainPaint.Field(ctx, s.Region.Ring, DryGrass, 0.85f, 1.5f, 1.5f, null, 0f, 0f, 0f, Hashing.Mix(salt, 1u));
             if (ground != "concrete")
             {
-                // The yard: worked earth or gravel, full strength a few metres inside the edge band.
-                int baseLayer = ground == "dirt" ? Dirt : Gravel;
-                TerrainPaint.Field(ctx, s.Inner.Ring, baseLayer, 1f, 4f, 2f, null, 0f, 0f, 0f, Hashing.Mix(salt, 2u));
-                if (ground == "gravel")
-                    // Gravel yards wear to dirt in the middle of the traffic.
-                    TerrainPaint.Field(ctx, s.Inner.InsetVertices(math.min(12f, s.Spec.Edge + 6f)), Dirt, 0.45f, 8f, 4f, null, 0f, 0f, 0f, Hashing.Mix(salt, 3u));
+                // The yard: dark trodden mud (dirt yards) or grey gravel, below full strength so the mud tracks, the oil and the
+                // worn patches painted at full strength show over it (the terrain shader lets the stronger weight win; dirt's
+                // height offset +0.20 beats forest floor's +0.09 and sand's +0.07 at equal weight: docs/TERRAIN-PAINT.md).
+                int baseLayer = ground == "dirt" ? Mud : Gravel;
+                TerrainPaint.Field(ctx, s.Inner.Ring, baseLayer, 0.8f, 4f, 2f, null, 0f, 0f, 0f, Hashing.Mix(salt, 2u));
             }
             // Mud along both sides of every aisle: a 4 m strip each side, darker at the crossings.
             int k = 0;
@@ -56,7 +55,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 {
                     var c = (p + q) * 0.5f + n * side * (a * 0.5f + 1.6f);
                     var strip = LayerRegion.Rect(c, dir, len * 0.5f, 2.2f);
-                    TerrainPaint.Field(ctx, Clip(s, strip), Mud, ground == "concrete" ? 0.35f : 0.7f, 1.6f, 1.2f, null, 0f, 0f, 0f, Hashing.Mix(salt, 10u + (uint)k++));
+                    TerrainPaint.Field(ctx, Clip(s, strip), Mud, ground == "concrete" ? 0.5f : 1f, 1.6f, 1.2f, null, 0f, 0f, 0f, Hashing.Mix(salt, 10u + (uint)k++));
                 }
             }
             foreach (var c in Crossings(s))

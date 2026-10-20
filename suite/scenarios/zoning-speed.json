@@ -39,32 +39,14 @@
           "shot": "roads-top"
         },
         {
-          "_": "the zoning outline spans the whole grid, its roads too (as the user's did): the area tools' stops off; its corners 15 m inside the grid's corners (on them, the corners snap to the road ends and no outline came)",
+          "_": "the zoning outline spans the whole grid, its roads too (as the user's did): the area tools' stops off. Its corners on the land's corners, by the new grid's rounded corners: the first corner snaps onto the road and the closing click back on that spot did not close (fixed in PolygonEditor.ClosesAt)",
           "do": "setting",
           "name": "BrushPaintOverAnything",
           "value": true
         },
         {
           "do": "area",
-          "tool": "points",
-          "points": [
-            [
-              -215,
-              -215
-            ],
-            [
-              215,
-              -215
-            ],
-            [
-              215,
-              215
-            ],
-            [
-              -215,
-              215
-            ]
-          ]
+          "tool": "land"
         },
         {
           "do": "type",

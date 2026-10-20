@@ -83,3 +83,41 @@ road, dirt roads, both done). The container yards, the reclamation yard, the tip
 
 In the game: stacked cars rest 1.3 m up (cars are 1.4–2.0 m tall); tipped props keep their tilt (`Roll`); the build hides
 one of two props whose boxes meet, so piles touch but never overlap. 20 ha organic yards plan in about 1.5 s (11 000 props).
+
+## The earth of a yard: the game's own ground pieces (2026-10-19)
+
+The user: "3D objects that make like a dirt pile on the ground ... Let your mind take you to amazing lands", and "we're not
+going to use any add-on packs". So every yard is built from the game's own assets only: the add-on names that stood first
+in a few fallback chains (asset-pack vehicle props, surface packs) are gone, and the wear decals (puddles, oil, litter) are
+off, since every decal of that kind comes from an add-on pack.
+
+Surveyed in the game first (the runner's lab "lineup", `suite/scenarios/lab-ground.json`, `Game/Suite/SuiteLab.Lineup.cs`:
+every match of a name pattern in rows, sizes in the log, optional sink/turn/roll):
+
+| Piece | Size (m) | In the game |
+|---|---|---|
+| Rock01-30 | 1 x 0.3 x 1 | small stones, grey; read as scree in clumps |
+| Boulder01-08 | 5 x 2 x 5 | big grey boulders; set 0.3-1 m into the ground they look bedded in |
+| OreMiningTruck01_OrePile03 | 7.6 x 1.2 x 9 | a smooth clay-orange mound, the only heap that draws on its own |
+| RubblePileConcrete01-04 | 9 x 1.6 x 9 | grey crushed concrete; sunk 0.5 m it reads as rubble strewn in the earth |
+| RubblePileMixed/Wood01-04 | 8 x 1.5 x 6-9 | plank and mixed debris heaps |
+| Log01-18 | 0.6 x 10 | single logs |
+| Pile{Sand,Stone,Coal,Ore,Garbage,Crop}{Small..Massive}01 | 9-50 x 4-16 x 15-200 | draw NOTHING alone (they follow a stored resource) |
+| any ...Random01 | | a blue placeholder: never use |
+| StandingStone01-08, StoneHead01-03 | 2 x 5 x 1 | monuments, not yard stone |
+
+Sinking works: a prop lowered into the ground (PlannedObject.Elevation < 0, emitted lower without the game's Elevation)
+stays where it is put.
+
+`YardEarth`: a bund of boulders inside the fence (edge "boulders", laid before the fill: a 5 m boulder reaches past the edge
+band; the band is 6.4 m deep for it), dirt banks (terraformed banks along the back and side fence, spoil worked into the crest: sunk
+mixed and concrete rubble, boulders, rarely the clay-orange heap, since a row of them read as rugs in the game; stones
+and a dead bush at the foot; option "Dirt banks"), stones at the foot of everything (round the heaps and the
+pad, along the dirt roads and wherever free ground lies within a few metres of something, in drifting patches; slider
+"Stones", a third on a concrete yard), rubble worked into the ground (sunk concrete, mixed and plank rubble in drifting patches; slider "Ground rubble";
+none on concrete, half in a block yard), crushed concrete heaps by the work pad, a burn barrel with pallets to sit on by
+the office. No stones on a block yard's pads.
+
+Sunk pieces get the game's negative Elevation: ObjectUtils.GetCollisionMask then gives them the Underground mask only, so
+they hide nothing standing on them (seen in the game runner, `lab-ground3`: a car on sunk rubble, barrels in it, all drawn;
+sunk without it, the game hid one of each pair). Declutter leaves them out. The junk yard's sorted style and the works style have the boulder bund.

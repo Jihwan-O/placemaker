@@ -325,6 +325,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             }
             s.Occ.Take(c, r, YardKit.KindStuff);
             s.Anchors.Add((c, r));
+            s.PadAt = c; s.PadR = r;
             return true;
         }
 

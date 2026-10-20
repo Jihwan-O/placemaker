@@ -83,7 +83,10 @@ namespace Placemaker.Core.Layers.Types.Yards
         public bool Organic;
         /// <summary>Terrain mounds the types raise (the scrap mountain stands on one).</summary>
         public readonly List<Mound> Mounds = new List<Mound>();
-        public int Items, Containers, Wrecks, Heaps, Bays, Machines, Lights, Offices, Parked;
+        public int Items, Containers, Wrecks, Heaps, Bays, Machines, Lights, Offices, Parked, Banks, Stones, Strewn;
+        /// <summary>The organic yard's work pad (OrganicYard.WorkPad): its centre and radius; 0 = none.</summary>
+        public float2 PadAt;
+        public float PadR;
 
         public float2 W(float u, float v) => O + U * u + V * v;
         public float2 F(float2 p) { var d = p - O; return new float2(math.dot(d, U), math.dot(d, V)); }

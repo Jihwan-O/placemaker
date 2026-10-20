@@ -25,7 +25,7 @@ namespace Placemaker.Core.Layers.Types.Yards
 
         protected override void DefinePresets()
         {
-            Preset("sorted", ("style", "sorted"), ("ground", "dirt"), ("edge", "blocks"), ("aisle", 8.0), ("fill", 90.0), ("weighbridge", true));
+            Preset("sorted", ("style", "sorted"), ("ground", "dirt"), ("edge", "boulders"), ("aisle", 8.0), ("fill", 90.0), ("weighbridge", true));
             Preset("reclaim", ("style", "reclaim"), ("ground", "gravel"), ("edge", "trees"), ("aisle", 7.0), ("fill", 85.0), ("weighbridge", false));
             Preset("tip", ("style", "tip"), ("ground", "concrete"), ("edge", "blocks"), ("aisle", 8.0), ("fill", 90.0), ("weighbridge", true));
         }

@@ -3,9 +3,9 @@
 //
 // Every item names a vanilla prefab (the clean game the runner uses has nothing else) and, where something better exists,
 // prefers it: Placemaker's own vehicle props (Game/Assets/VehiclePropSystem: the game's cars, vans, trucks, tractors and
-// campers made into static props, VehicleProps below), then the "Prop_" vehicle props some asset packs add. The build takes
-// the first id that exists (AssetCatalogSystem.Resolve: id, fallbacks, category default), so a playset without the better
-// prop still builds the vanilla stand-in in the same slot.
+// campers made into static props, VehicleProps below), then a vanilla stand-in. Never an add-on pack's asset (the user,
+// 2026-10-19: "we're not going to use any add-on packs"): the user's game builds what the clean game runner showed. The
+// build takes the first id that exists (AssetCatalogSystem.Resolve: id, fallbacks, category default).
 //
 // Sizes are the catalog's bounds (catalog-dump.json, x = local width, z = local depth along the prop's facing). Local +Z is
 // where the prop faces: yaw = atan2(dir.x, dir.y) turns it to world direction dir (LeisureKit.Yaw).
@@ -123,38 +123,38 @@ namespace Placemaker.Core.Layers.Types.Yards
         /// <summary>Cars (wrecks in the yard, staff cars at the office): Placemaker's car props, then pack props, then a trailer.</summary>
         // Footprint of the largest car the game has (Car10 2.2 × 5.2 m, VehiclePropSystem log): rows never let two touch.
         public static readonly YardItem Car = new YardItem(AssetCategories.ScrapWreck, 2.25f, 5.2f,
-            VehicleProps.Car(1) + "|Prop_ParkMaintenanceVehicle01|Prop_CarTrailer01|CarTrailer01_Props02",
-            VehicleProps.Car(2) + "|Prop_ParkMaintenanceVehicle01|Prop_CarTrailer01|CarTrailer01_Props01",
-            VehicleProps.Car(3) + "|Prop_CarTrailer01|Prop_ParkMaintenanceVehicle01|CarTrailer01_Props03",
-            VehicleProps.Car(4) + "|Prop_ParkMaintenanceVehicle01|Prop_CarTrailer01|CarTrailer01_Props02",
-            VehicleProps.Car(5) + "|Prop_CarTrailer01|Prop_ParkMaintenanceVehicle01|CarTrailer01_Props01",
-            VehicleProps.Car(6) + "|Prop_ParkMaintenanceVehicle01|Prop_CarTrailer01|CarTrailer01_Props03",
-            VehicleProps.Car(7) + "|Prop_CarTrailer01|Prop_ParkMaintenanceVehicle01|CarTrailer01_Props02",
-            VehicleProps.Car(8) + "|Prop_ParkMaintenanceVehicle01|Prop_CarTrailer01|CarTrailer01_Props01",
-            VehicleProps.Car(9) + "|Prop_CarTrailer01|Prop_ParkMaintenanceVehicle01|CarTrailer01_Props03",
-            VehicleProps.Car(10) + "|Prop_ParkMaintenanceVehicle01|Prop_CarTrailer01|CarTrailer01_Props02");
+            VehicleProps.Car(1) + "|CarTrailer01_Props02",
+            VehicleProps.Car(2) + "|CarTrailer01_Props01",
+            VehicleProps.Car(3) + "|CarTrailer01_Props03",
+            VehicleProps.Car(4) + "|CarTrailer01_Props02",
+            VehicleProps.Car(5) + "|CarTrailer01_Props01",
+            VehicleProps.Car(6) + "|CarTrailer01_Props03",
+            VehicleProps.Car(7) + "|CarTrailer01_Props02",
+            VehicleProps.Car(8) + "|CarTrailer01_Props01",
+            VehicleProps.Car(9) + "|CarTrailer01_Props03",
+            VehicleProps.Car(10) + "|CarTrailer01_Props02");
         public static readonly YardItem Van = new YardItem(AssetCategories.ScrapWreck, 2.1f, 5.4f,
-            VehicleProps.Van(1) + "|Prop_ParkMaintenanceVehicle01|" + VehicleProps.Car(1) + "|CarTrailer01_Props02",
-            VehicleProps.Van(2) + "|Prop_ParkMaintenanceVehicle01|" + VehicleProps.Car(2) + "|CarTrailer01_Props01",
-            VehicleProps.Van(3) + "|Prop_ParkMaintenanceVehicle01|" + VehicleProps.Car(3) + "|CarTrailer01_Props03");
+            VehicleProps.Van(1) + "|" + VehicleProps.Car(1) + "|CarTrailer01_Props02",
+            VehicleProps.Van(2) + "|" + VehicleProps.Car(2) + "|CarTrailer01_Props01",
+            VehicleProps.Van(3) + "|" + VehicleProps.Car(3) + "|CarTrailer01_Props03");
         public static readonly YardItem Truck = new YardItem(AssetCategories.LogisticsTruck, 2.8f, 8.4f,
-            VehicleProps.Truck(1) + "|Prop_CoalTruck01|Prop_OilTruck01|CoalTruck01_OrePile01",
-            VehicleProps.Truck(2) + "|Prop_OilTruck01|Prop_CoalTruck01|CoalTruck01_CoalPile01",
-            VehicleProps.Truck(3) + "|Prop_CoalTruck01|Prop_OilTruck01|CoalTruck01_StonePile01");
+            VehicleProps.Truck(1) + "|CoalTruck01_OrePile01",
+            VehicleProps.Truck(2) + "|CoalTruck01_CoalPile01",
+            VehicleProps.Truck(3) + "|CoalTruck01_StonePile01");
         public static readonly YardItem GarbageTruck = new YardItem(AssetCategories.LandfillSkip, 2.9f, 8.6f,
-            VehicleProps.Garbage(1) + "|Prop_EU_GarbageTruck01|Prop_NA_GarbageTruck01|TrashContainerEmpty03",
-            VehicleProps.Garbage(2) + "|Prop_NA_GarbageTruck01|Prop_EU_GarbageTruck01|TrashContainerEmpty03");
+            VehicleProps.Garbage(1) + "|TrashContainerEmpty03",
+            VehicleProps.Garbage(2) + "|TrashContainerEmpty03");
         public static readonly YardItem Tractor = new YardItem(AssetCategories.ScrapMachine, 3.2f, 4.8f,
-            VehicleProps.Tractor(1) + "|Prop_Tractor01|Prop_OreMiningTractor01|CableReel02",
-            VehicleProps.Tractor(2) + "|Prop_OreMiningTractor01|Prop_Tractor01|CableReel02");
+            VehicleProps.Tractor(1) + "|CableReel02",
+            VehicleProps.Tractor(2) + "|CableReel02");
         /// <summary>Wheel loader / material handler working a heap.</summary>
         public static readonly YardItem Loader = new YardItem(AssetCategories.ScrapMachine, 5.0f, 9.1f,
-            VehicleProps.Loader(1) + "|Prop_FrontendLoader01|Prop_OreMiningTractor01|BackupGenerator01",
-            VehicleProps.Loader(2) + "|Prop_FrontendLoader01|Prop_OreMiningTractor01|BackupGenerator01");
+            VehicleProps.Loader(1) + "|BackupGenerator01",
+            VehicleProps.Loader(2) + "|BackupGenerator01");
         /// <summary>Mobile home / caravan (an office or a night watchman's home).</summary>
         public static readonly YardItem Camper = new YardItem(AssetCategories.ScrapCabin, 2.6f, 7.4f,
-            VehicleProps.Camper(1) + "|Prop_CamperTrailer01|ShippingContainer01",
-            VehicleProps.Camper(2) + "|Prop_CamperTrailer01|ShippingContainer02");
+            VehicleProps.Camper(1) + "|ShippingContainer01",
+            VehicleProps.Camper(2) + "|ShippingContainer02");
 
         // ───────────── offices, gate, lights ─────────────
 
@@ -183,11 +183,11 @@ namespace Placemaker.Core.Layers.Types.Yards
         /// The big tipped heaps (8.9 × 14.7 m): the vanilla Pile*Small01 props are EMPTY on their own (their mesh needs the
         /// building's resource state; seen in the game 2026-10-19), so only the asset packs' filled copies are named.
         /// </summary>
-        public static readonly YardItem MetalMountain = new YardItem(AssetCategories.ScrapHeap, 8.9f, 14.7f, "Prop_PileOreSmall01_Full|OreMiningTruck01_OrePile03");
-        public static readonly YardItem DarkHeap = new YardItem(AssetCategories.ScrapHeap, 8.9f, 14.7f, "Prop_PileCoalSmall01_Full|OreMiningTruck01_OrePile01");
-        public static readonly YardItem StoneHeap = new YardItem(AssetCategories.ConstructionPile, 8.9f, 14.7f, "Prop_PileStoneSmall01_Full|RubblePileConcrete02");
-        public static readonly YardItem SandHeap = new YardItem(AssetCategories.ConstructionPile, 8.9f, 14.7f, "Prop_PileSandSmall01_Full|RubblePileConcrete03");
-        public static readonly YardItem GarbageHeap = new YardItem(AssetCategories.LandfillGarbage, 8.9f, 14.7f, "Prop_PileGarbageSmall01_Full|Trashpile01");
+        public static readonly YardItem MetalMountain = new YardItem(AssetCategories.ScrapHeap, 8.9f, 14.7f, "OreMiningTruck01_OrePile03");
+        public static readonly YardItem DarkHeap = new YardItem(AssetCategories.ScrapHeap, 8.9f, 14.7f, "OreMiningTruck01_OrePile01");
+        public static readonly YardItem StoneHeap = new YardItem(AssetCategories.ConstructionPile, 8.9f, 14.7f, "RubblePileConcrete02");
+        public static readonly YardItem SandHeap = new YardItem(AssetCategories.ConstructionPile, 8.9f, 14.7f, "RubblePileConcrete03");
+        public static readonly YardItem GarbageHeap = new YardItem(AssetCategories.LandfillGarbage, 8.9f, 14.7f, "Trashpile01");
         public static readonly YardItem Rubble = new YardItem(AssetCategories.ConstructionRubble, 9.5f, 8.6f,
             "RubblePileConcrete01", "RubblePileConcrete02", "RubblePileConcrete03", "RubblePileConcrete04");
         public static readonly YardItem MixedRubble = new YardItem(AssetCategories.ConstructionRubble, 7.6f, 6.0f,
@@ -198,7 +198,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             "CoalTruck01_OrePile01", "CoalTruck01_CoalPile01", "CoalTruck01_StonePile01");
         /// <summary>Tyres: no vanilla tyre prop exists; dark rubber-black truck loads stand in, laid in rows.</summary>
         public static readonly YardItem Tyres = new YardItem(AssetCategories.ScrapTire, 2.5f, 5.8f,
-            "CoalTruck01_CoalPile01", "Prop_CoalTruck01_CoalPile01_Full|CoalTruck01_CoalPile01");
+            "CoalTruck01_CoalPile01", "CoalTruck01_CoalPile01");
         public static readonly YardItem Trash =new YardItem(AssetCategories.LandfillGarbage, 2.0f, 2.0f,
             "Trashpile01", "Trashpile02", "Trashpile03", "Trashpile06", "Trashpile04", "Trashpile08");
         public static readonly YardItem Pallets = new YardItem(AssetCategories.ScrapPallet, 1.25f, 1.3f, "Pallet02", "Pallet01", "Pallet03", "Pallet04");

@@ -50,7 +50,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             c.Toggle("weighbridge", false, ControlTier.More, "front").Tip();
             c.Toggle("floodlights", true, ControlTier.More, "front");
 
-            c.Choice("edge", "blocks", ControlTier.More, "edge", "trees", "blocks", "containers", "wrecks", "plain").Tip();
+            c.Choice("edge", "blocks", ControlTier.More, "edge", "trees", "blocks", "containers", "wrecks", "boulders", "plain").Tip();
             c.Choice("fence", "fence", ControlTier.More, "edge", "none", "fence").Tip();
             c.Asset("fenceAsset", AssetCategories.Fence, ControlTier.More, "edge").When("fence=fence");
             c.AssetMulti("treeSpecies", AssetCategories.Tree, ControlTier.More, "edge").When("edge=trees");
@@ -58,6 +58,9 @@ namespace Placemaker.Core.Layers.Types.Yards
             c.Choice("ground", "gravel", ControlTier.More, "ground", "gravel", "concrete", "dirt").Tip();
             c.Toggle("paint", true, ControlTier.More, "ground").Tip();
             c.Toggle("spoil", true, ControlTier.More, "ground").Tip();
+            c.Toggle("banks", true, ControlTier.More, "ground").Tip();
+            c.Slider("stones", 60, 0, 100, 10, "%", ControlTier.More, "ground").Tip();
+            c.Slider("rubble", 50, 0, 100, 10, "%", ControlTier.More, "ground").Tip();
             c.Toggle("level", true, ControlTier.More, "ground").Tip();
             EntranceMarkers(c);
 
@@ -105,6 +108,8 @@ namespace Placemaker.Core.Layers.Types.Yards
                 front.Offices = math.min(front.Offices, 1);
                 if (region.Area < 2000f) front.Parking = false;
             }
+            // A bund of 5 m boulders needs a band that deep inside the fence.
+            if (ctx.S("edge") == "boulders" && region.Area >= 4000f) spec.Edge = math.max(spec.Edge, 6.4f);
             // The office row or the parking row, whichever reaches further from the spine, plus a walkway.
             float officeZone = front.Offices > 0 ? 3.2f + front.Office.Z + 0.6f : front.Booth ? 4f : 0f;
             float parkingZone = front.Parking ? 6.8f : 0f;
@@ -120,12 +125,26 @@ namespace Placemaker.Core.Layers.Types.Yards
             // Masts first: the edge walls leave them their gap.
             if (ctx.B("floodlights")) YardFill.Lights(s, s.Salt(0x11A5u));
             YardFill.FrontYard(s, front, s.Salt(0xF407u));
+            if (front.Offices > 0 || front.Booth) YardEarth.BurnBarrel(s, s.Salt(0xB0B1u));
             ctx.Check();
 
+            // Dirt banks along the back and side fence (YardEarth): an organic yard's claim their ground before the scrap field
+            // fills it, a block yard's go where its blocks left room.
+            int bankMax = ctx.B("banks") ? math.clamp((int)(region.Area / 9000f), 1, 4) : 0;
+            // The boulder bund is laid before the fill too: a 5 m boulder reaches past the edge band (YardFill.Edge skips it).
+            if (ctx.S("edge") == "boulders") YardEarth.Bund(s, s.Salt(0xED6Eu));
+            if (s.Organic) YardEarth.Banks(s, bankMax, s.Salt(0xBA4Bu), ctx.S("edge") == "boulders" ? 1.6f : 0f);
             Fill(s, style);
+            if (!s.Organic) YardEarth.Banks(s, bankMax, s.Salt(0xBA4Bu), ctx.S("edge") == "boulders" ? 1.6f : 0f);
+            YardEarth.Crushed(s, s.Salt(0xC0C0u));
             ctx.Check();
 
             YardFill.Edge(s, ctx.S("edge"), ctx.L("treeSpecies"), s.Salt(0xED6Eu));
+            // Stones spilled round the heaps, the pad and the banks, and along the dirt roads.
+            // Fewer on a concrete yard: stones on a slab read as a mess, not as ground.
+            YardEarth.Scree(s, ctx.F("stones") / 100f * (ctx.S("ground") == "concrete" ? 0.35f : 1f), s.Salt(0x5C2Eu));
+            // Rubble worked into the earth (none on a concrete yard, half in a block yard: the scrap field is where it lies).
+            YardEarth.Strewn(s, ctx.F("rubble") / 100f * (ctx.S("ground") == "concrete" ? 0f : s.Organic ? 1f : 0.5f), s.Salt(0x57E1u));
             ctx.Check();
 
             // The ground art (YardGround): spoil mounds in the leftover corners, the painted ground, the wear decals.
@@ -138,7 +157,9 @@ namespace Placemaker.Core.Layers.Types.Yards
                 YardGround.Slabs(s, ctx.S("ground"), s.Salt(0x51ABu));
             }
             YardGround.Rocks(s, s.Salt(0x20C4u));
-            int decals = YardGround.Decals(s, s.Salt(0xDECAu));
+            // No wear decals: every decal of the kind (puddles, oil, litter) comes from an add-on pack, and the yards use the
+            // game's own pieces only (the user, 2026-10-19). YardGround.Decals stays for a later vanilla set.
+            int decals = 0;
             ctx.Check();
 
             // Whatever is still automatic (pads, aisles, the fence, decals) gets the curated industrial look.
@@ -166,6 +187,13 @@ namespace Placemaker.Core.Layers.Types.Yards
             ctx.Plan.Facts["mounds"] = mounds.Count;
             ctx.Plan.Facts["decals"] = decals;
             ctx.Plan.Facts["paints"] = ctx.Plan.Paint.Count;
+            ctx.Plan.Facts["banks"] = s.Banks;
+            ctx.Plan.Facts["stones"] = s.Stones;
+            ctx.Plan.Facts["strewn"] = s.Strewn;
+            int sunk = 0, boulders = 0;
+            foreach (var o in ctx.Plan.Objects) { if (o.Elevation < -0.01f) sunk++; if (o.Category == AssetCategories.Rock && (o.Asset.Id ?? "").StartsWith("Boulder")) boulders++; }
+            ctx.Plan.Facts["sunk"] = sunk;
+            ctx.Plan.Facts["boulders"] = boulders;
             if (DebugBlocks) { ctx.Plan.Facts["dbg.Ox"] = s.O.x; ctx.Plan.Facts["dbg.Oy"] = s.O.y; ctx.Plan.Facts["dbg.Vx"] = s.V.x; ctx.Plan.Facts["dbg.Vy"] = s.V.y; ctx.Plan.Facts["dbg.umin"] = s.UMin; ctx.Plan.Facts["dbg.umax"] = s.UMax; ctx.Plan.Facts["dbg.vmin"] = s.VMin; ctx.Plan.Facts["dbg.vmax"] = s.VMax; ctx.Plan.Facts["dbg.front"] = s.Spec.Front; ctx.Plan.Facts["dbg.gates"] = s.Gates.Count; }
             if (DebugBlocks) foreach (var b in s.Blocks) { ctx.Plan.Facts[$"blk{b.Index}.band"] = b.Band; ctx.Plan.Facts[$"blk{b.Index}.u0"] = b.U0; ctx.Plan.Facts[$"blk{b.Index}.u1"] = b.U1; ctx.Plan.Facts[$"blk{b.Index}.v0"] = b.V0; ctx.Plan.Facts[$"blk{b.Index}.v1"] = b.V1; }
         }
@@ -175,10 +203,10 @@ namespace Placemaker.Core.Layers.Types.Yards
 
         // ───────────── ground ─────────────
 
-        private static readonly AssetRef Gravel = new AssetRef("Terrain Surfaces Pack Rock gaga TTP - Smaller Pebbles grey M Surface", "Sand Surface 02", "Sand Surface 01");
-        private static readonly AssetRef Dirt = new AssetRef("EAI - Surface Pack Ground Mud Surface", "Terrain Surfaces Pack Ground gaga TTP - Soil M Surface", "Oil Surface 01");
+        private static readonly AssetRef Gravel = new AssetRef("Sand Surface 02", "Sand Surface 01");
+        private static readonly AssetRef Dirt = new AssetRef("Oil Surface 01");
         /// <summary>Aisles: weathered asphalt from the surface packs, else the dark vanilla pavement (concrete would vanish on a concrete yard).</summary>
-        private static readonly AssetRef AisleSurface = new AssetRef("EAI - Surface Pack Concrete Weathered Asphalt Surface", "EAI - Surface Pack Concrete Cracked Asphalt Surface", "Pavement Surface 01");
+        private static readonly AssetRef AisleSurface = new AssetRef("Pavement Surface 01");
         private static readonly AssetRef Concrete = new AssetRef("Concrete Surface 01", "Pavement Surface 02", "Concrete Surface 02");
 
         /// <summary>The yard surface, then the aisles on top (asphalt, so the lanes read from above).</summary>

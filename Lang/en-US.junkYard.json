@@ -16,7 +16,7 @@
   "Placemaker.JunkYard.weighbridge.Tooltip": "A concrete weighbridge across the way in, just inside the gate.",
   "Placemaker.JunkYard.floodlights": "Floodlights",
   "Placemaker.JunkYard.edge": "Edge",
-  "Placemaker.JunkYard.edge.Tooltip": "What lines the inside of the fence: a screen of trees, a wall of concrete blocks, a two-high wall of containers or a wall of scrap cars piled two and three high (back and sides only), or plain ground.",
+  "Placemaker.JunkYard.edge.Tooltip": "What lines the inside of the fence: a screen of trees, a wall of concrete blocks, a two-high wall of containers, a wall of scrap cars piled two and three high (back and sides only), a bund of big boulders bedded into the ground (open at the gates), or plain ground.",
   "Placemaker.JunkYard.edge.trees": "Trees",
   "Placemaker.JunkYard.edge.blocks": "Concrete blocks",
   "Placemaker.JunkYard.edge.containers": "Containers",
@@ -45,5 +45,12 @@
   "Placemaker.JunkYard.paint.Tooltip": "Paints the terrain: the yard ground, mud where the wheels go, oil-soaked ground round the heaps, worn dirt under the rows, dry grass at the fence. Permanent.",
   "Placemaker.JunkYard.spoil": "Spoil mounds",
   "Placemaker.JunkYard.spoil.Tooltip": "Mounds of dirt in the corners no block fits, painted, with a dead tree and dead bushes on them. Raises real terrain. Permanent.",
-  "Placemaker.JunkYard.edge.wrecks": "Scrap cars"
+  "Placemaker.JunkYard.edge.wrecks": "Scrap cars",
+  "Placemaker.JunkYard.edge.boulders": "Boulders",
+  "Placemaker.JunkYard.banks": "Dirt banks",
+  "Placemaker.JunkYard.banks.Tooltip": "Long banks of earth along the back and side fence where there is room, spoil worked into their tops (rubble, boulders, now and then a heap of clay), stones and a dead bush at their foot. Raises real terrain. Permanent.",
+  "Placemaker.JunkYard.stones": "Stones",
+  "Placemaker.JunkYard.stones.Tooltip": "How many stones lie spilled round the heaps, the work pad and the banks, and along the dirt roads.",
+  "Placemaker.JunkYard.rubble": "Ground rubble",
+  "Placemaker.JunkYard.rubble.Tooltip": "Concrete, board and mixed rubble worked into the ground in drifting patches: only the tops show, like a yard that has been driven over for years. Never on the roads or a concrete yard; less in a yard laid out in blocks."
 }

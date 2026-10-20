@@ -295,9 +295,7 @@ namespace Placemaker.Game.Neighbours
                 LotsUpdate();
             }
             catch (Exception e) { if (_errors++ < 5) Mod.Log.Error(e, "Placemaker neighbourhood polish (lots) failed"); }
-            // our own pieces the game hid (fences touching bushes, trees and lots beside them): shown again
-            try { ShowHiddenPieces(); }
-            catch (Exception e) { if (_errors++ < 5) Mod.Log.Error(e, "Placemaker neighbourhood polish (hidden pieces) failed"); }
+            // (our own pieces the game hid: shown again by NeighbourShowSystem, after the game's check of this frame)
             if (!FeatureEnabled)
             {
                 // off: nothing is planned or written. Polished houses the game rebuilds meanwhile (a level-up gives back its
@@ -739,8 +737,10 @@ namespace Placemaker.Game.Neighbours
                 bool ours = true;
                 if (plan.HideLines.Contains(kv.Key))
                 {
-                    // a 2 cm stub: drawn as nothing (lanes under 0.1 m are skipped) and never a zero tangent
-                    var mid = (lr.A + lr.B) * 0.5f;
+                    // a 2 cm stub: drawn as nothing (lanes under 0.1 m are skipped) and never a zero tangent. 8 m under the
+                    // ground: Net.OverrideSystem cuts a fence lane where another one lies along it within about 2 m (3D), and a
+                    // stub on the border cut a gap into the line it doubled whenever its kind ranked higher
+                    var mid = (lr.A + lr.B) * 0.5f - new float3(0f, 8f, 0f);
                     var dir = math.normalizesafe(lr.B - lr.A, new float3(1f, 0f, 0f)) * 0.01f;
                     want = NetUtils.StraightCurve(mid - dir, mid + dir);
                     _hidden++;
@@ -922,7 +922,7 @@ namespace Placemaker.Game.Neighbours
                     if (!EntityManager.Exists(o) || EntityManager.HasComponent<global::Game.Objects.Tree>(o) || EntityManager.HasComponent<global::Game.Objects.Plant>(o)) continue;
                     if (!EntityManager.HasComponent<global::Game.Objects.Transform>(o) || !EntityManager.HasComponent<PrefabRef>(o) || EntityManager.HasComponent<PolishPiece>(o)) continue;
                     var op = EntityManager.GetComponentData<PrefabRef>(o).m_Prefab;
-                    if (!EntityManager.HasComponent<ObjectGeometryData>(op) || Array.IndexOf(YardStitch.BushKinds, NameOf(op)) >= 0) continue;   // not our own rocks
+                    if (!EntityManager.HasComponent<ObjectGeometryData>(op) || Array.IndexOf(YardStitch.BushKinds, NameOf(op), 0, YardStitch.GardenKinds) >= 0) continue;   // not our own rocks (a shop's own bins and bay marks are obstacles)
                     var gb = EntityManager.GetComponentData<ObjectGeometryData>(op).m_Bounds;
                     var size = gb.max - gb.min;
                     if (size.x * size.z < 1.5f || size.y < 0.25f) continue;

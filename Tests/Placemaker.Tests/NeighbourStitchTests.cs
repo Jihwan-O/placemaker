@@ -856,15 +856,88 @@ namespace Placemaker.Tests
         [Fact]
         public void A_shops_paving_fills_its_ground_up_to_the_fence_whatever_its_lawn_reach()
         {
-            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
-            a.MainSurface = "Concrete Surface 01";
-            a.Zone = "shop";
-            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 40f, ["lawnReach"] = 10f };
+            // without a shop yard (and always for a works): one slab to the fence
+            foreach (var (zone, options) in new[] { ("shop", new Dictionary<string, float> { ["shopYard"] = 0f }), ("industry", new Dictionary<string, float>()) })
+            {
+                var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+                a.MainSurface = "Concrete Surface 01";
+                a.Zone = zone;
+                a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 40f, ["lawnReach"] = 10f };
+                foreach (var kv in options) a.Options[kv.Key] = kv.Value;
+                var plan = YardStitch.Plan(new[] { a }, MiddleLine());
+                Assert.True(plan.Plots.TryGetValue(1, out var pa), "the yard grows at the back");
+                var paving = plan.Paths.Where(p => p.House == 1 && p.Surface == "Concrete Surface 01").ToList();
+                Assert.NotEmpty(paving);
+                Assert.True(paving.Min(p => p.Ring.Min(q => q.y)) < pa.Min(p => p.y) + 1f, $"{zone}: the paving reaches the back fence ({paving.Min(p => p.Ring.Min(q => q.y)):F1} vs {pa.Min(p => p.y):F1})");
+                Assert.DoesNotContain(plan.Bushes, b => b.Kind >= 29);
+            }
+        }
+
+        private static float2[] Box(float2 c, float2 half, float yaw)
+        {
+            var rx = new float2(math.cos(yaw), -math.sin(yaw)) * half.x;
+            var rz = new float2(math.sin(yaw), math.cos(yaw)) * half.y;
+            return new[] { c - rx - rz, c + rx - rz, c + rx + rz, c - rx + rz };
+        }
+
+        [Fact]
+        public void A_shops_big_back_lot_gets_green_edges_a_service_corner_an_overflow_car_park_and_green_ground_further_out()
+        {
+            // a 5x4 shop (40 x 32 m lot), its car park in front, its building at the back of the lot; 50 m of land behind it
+            var a = new StitchHouse { Id = 1, Position = new float2(0f, 0f), Forward = new float2(0f, 1f), HalfLot = new float2(20f, 16f), MainSurface = "Concrete Surface 01", Zone = "shop" };
+            a.Footprint = new[] { a.ToWorld(new float2(-14f, -14f)), a.ToWorld(new float2(14f, -14f)), a.ToWorld(new float2(14f, 2f)), a.ToWorld(new float2(-14f, 2f)) };
+            a.Hard.Add(new[] { a.ToWorld(new float2(-19f, 3f)), a.ToWorld(new float2(19f, 3f)), a.ToWorld(new float2(19f, 15.5f)), a.ToWorld(new float2(-19f, 15.5f)) });
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 50f };
             var plan = YardStitch.Plan(new[] { a }, MiddleLine());
-            Assert.True(plan.Plots.TryGetValue(1, out var pa), "the yard grows at the back");
-            var paving = plan.Paths.Where(p => p.House == 1 && p.Surface == "Concrete Surface 01").ToList();
-            Assert.NotEmpty(paving);
-            Assert.True(paving.Min(p => p.Ring.Min(q => q.y)) < pa.Min(p => p.y) + 1f, $"the paving reaches the back fence ({paving.Min(p => p.Ring.Min(q => q.y)):F1} vs {pa.Min(p => p.y):F1})");
+            Assert.True(plan.Plots.TryGetValue(1, out var plot), "the yard grows");
+            var lot = new[] { a.BackLeft, a.BackRight, a.FrontRight, a.FrontLeft };
+            string Name(int k) => YardStitch.BushKinds[k];
+            var mine = plan.Bushes.Where(b => b.House == 1).ToList();
+
+            // a grass strip inside the fence, street trees on it
+            Assert.Contains(plan.Paths, p => p.House == 1 && p.Surface == "Grass Surface 01");
+            Assert.Contains(mine, b => Name(b.Kind).Contains("Tree"));
+            // the service corner: bins and yard stock, by the building's back
+            var bins = mine.Where(b => Name(b.Kind).StartsWith("TrashContainer")).ToList();
+            Assert.True(bins.Count == 2, $"{bins.Count} bins: " + string.Join(" | ", plan.Notes.Where(n => n.StartsWith("1:"))));
+            Assert.Contains(mine, b => Name(b.Kind).StartsWith("Pallet"));
+            Assert.Contains(mine, b => Name(b.Kind).StartsWith("CardboardBoxPile"));
+            // ...in one corner, not a row along the whole back of the lot
+            var service = mine.Where(b => b.Kind == 17 || b.Kind == 18 || (b.Kind >= 29 && b.Kind < 40)).ToList();
+            float spread = service.Max(x => service.Max(y => math.distance(x.Position, y.Position)));
+            Assert.True(spread < 20f, $"the service corner spreads over {spread:F1} m");
+            Assert.True(service.All(x => math.abs(x.Position.x) > 3f) && (service.All(x => x.Position.x > 0f) || service.All(x => x.Position.x < 0f)), "the service corner sits to one side");
+            // the overflow car park: marked bays, most with a parked car or van, each car on a bay
+            var bays = mine.Where(b => Name(b.Kind) == "ParkingLotDecal01").ToList();
+            var cars = mine.Where(b => Name(b.Kind).StartsWith("Placemaker Vehicle")).ToList();
+            Assert.True(bays.Count >= 8, $"{bays.Count} bays");
+            Assert.True(cars.Count >= bays.Count / 3 && cars.Count < bays.Count, $"{cars.Count} cars on {bays.Count} bays");
+            foreach (var c in cars) Assert.Contains(bays, b => math.distance(b.Position, c.Position) < 0.5f);
+            // nothing on the shop's own lot or outside its plot, and nothing on top of anything else
+            var placed = mine.Where(b => b.Kind >= 29 && !Name(b.Kind).StartsWith("Placemaker Vehicle") && !Name(b.Kind).Contains("Tree")).ToList();
+            foreach (var b in placed)
+            {
+                var size = Name(b.Kind) == "ParkingLotDecal01" ? new float2(1.6f, 3.1f) : new float2(0.5f, 0.5f);
+                var box = Box(b.Position, size * 0.95f, b.Yaw);
+                Assert.True(box.All(p => Poly.Contains(plot, p)), $"{Name(b.Kind)} at {b.Position} outside the plot");
+                Assert.False(Overlap(box, lot), $"{Name(b.Kind)} at {b.Position} on the shop's lot");
+            }
+            for (int i = 0; i < bays.Count; i++)
+                for (int j = i + 1; j < bays.Count; j++)
+                    Assert.False(Overlap(Box(bays[i].Position, new float2(1.6f, 3f) * 0.95f, bays[i].Yaw), Box(bays[j].Position, new float2(1.6f, 3f) * 0.95f, bays[j].Yaw)), $"bays at {bays[i].Position} and {bays[j].Position} overlap");
+            foreach (var bin in bins)
+                Assert.DoesNotContain(bays, b => Overlap(Box(b.Position, new float2(1.6f, 3f), b.Yaw), Box(bin.Position, new float2(1.3f, 0.6f), bin.Yaw)));
+            // further out: no concrete, painted green
+            var farPoint = new float2(0f, -16f - 42f);
+            Assert.True(Poly.Contains(plot, farPoint), $"the plot reaches 42 m behind the lot ({plot.Min(p => p.y):F1})");
+            Assert.DoesNotContain(plan.Paths, p => p.House == 1 && p.Surface == "Concrete Surface 01" && Poly.Contains(p.Ring, farPoint));
+            Assert.Contains(plan.Paints, p => Poly.Contains(p.Ring.Select(q => q.xz).ToArray(), farPoint));
+            Assert.Contains(plan.Paths, p => p.House == 1 && p.Surface == "Concrete Surface 01");
+            Assert.Contains(plan.Notes, n => n.Contains("shop yard"));
+
+            // the same land plans the same yard (no flicker)
+            var again = YardStitch.Plan(new[] { a }, MiddleLine());
+            Assert.Equal(plan.Bushes.Select(b => (b.Kind, b.Position, b.Yaw)), again.Bushes.Select(b => (b.Kind, b.Position, b.Yaw)));
         }
     }
 }

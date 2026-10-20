@@ -23,9 +23,10 @@ using Unity.Mathematics;
 
 namespace Placemaker.Core.Neighbours
 {
-    public static class YardStitch
+    public static partial class YardStitch
     {
-        /// <summary>The vanilla bushes beds are planted with (StitchPlan.Bushes Kind indexes this).</summary>
+        /// <summary>The objects gardens and shop yards are given (StitchPlan.Bushes Kind indexes this; only ever appended to: a
+        /// saved city's pieces are matched by name, but the order is the plan's).</summary>
         public static readonly string[] BushKinds =
         {
             "GreenBushWild01", "GreenBushWild02", "FlowerBushWild01", "FlowerBushWild02", "GreenBushWildAdult01",   // 0-4 bushes
@@ -35,8 +36,20 @@ namespace Placemaker.Core.Neighbours
             "Pallet01", "Pallet02", "CratePile01", "CratePile02", "BarrelPile01", "Barrel01",                         // 17-22 yard stock
             "Log01", "Log04", "Log07",                                                                                // 23-25 logs
             "GardenBench01", "GardenBench02", "Flowerbed01",                                                          // 26-28 garden things
+            // 29-40 a shop's service corner and car park (YardStitch.ShopYard)
+            "TrashContainerEmpty02", "TrashContainerEmpty03", "LargeOpenContainer01", "Pallet03", "CratePile03",
+            "CardboardBoxPile01", "CardboardBoxPile03", "GasBottlePallet01", "ToolShed03", "ShippingContainer01", "BackupGenerator01",
+            "ParkingLotDecal01",
+            // 41-53 parked cars and vans (Placemaker's vehicle props, Game/Assets/VehiclePropSystem)
+            "Placemaker Vehicle Car 1", "Placemaker Vehicle Car 2", "Placemaker Vehicle Car 3", "Placemaker Vehicle Car 4", "Placemaker Vehicle Car 5",
+            "Placemaker Vehicle Car 6", "Placemaker Vehicle Car 7", "Placemaker Vehicle Car 8", "Placemaker Vehicle Car 9", "Placemaker Vehicle Car 10",
+            "Placemaker Vehicle Van 1", "Placemaker Vehicle Van 2", "Placemaker Vehicle Van 3",
+            // 54-56 trees along a shop yard's fence
+            "EU_PoplarTree01", "BirchTree01", "NA_LindenTree01",
         };
         private const int FirstRock = 5, FirstStone = 8, FirstRubble = 13, FirstStock = 17, FirstLog = 23, FirstBench = 26, Flowerbed = 28;
+        /// <summary>The kinds gardens are given (0-28); the rest are a shop yard's.</summary>
+        public const int GardenKinds = 29;
 
         public static readonly string[] Themes = { "garden", "natural", "tidy", "yard" };
 
@@ -915,6 +928,12 @@ namespace Placemaker.Core.Neighbours
                     float spare0 = spare.Sum(r => r.Area);
                     var off = hard0.Concat(h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3).Select(l => new Region(Ccw(l.Ring)))).ToList();
                     if (off.Count > 0) spare = Poly.Boolean(spare, off, BoolOp.Difference);
+                    // a shop's or an office's bigger back lot: green edges, a service corner, an overflow car park, green further out
+                    if (h.Zone != "industry" && K(h, s, "shopYard", 1f) > 0.5f && spare.Sum(r => r.Area) >= K(h, s, "shopYardMin", 80f))
+                    {
+                        ShopYard(houses, h, plot, spare.Where(r => r.Area >= 1f).ToList(), plan, s);
+                        continue;
+                    }
                     int made = 0, failed = 0;
                     foreach (var r in spare.Where(r => r.Area >= 10f))
                     {

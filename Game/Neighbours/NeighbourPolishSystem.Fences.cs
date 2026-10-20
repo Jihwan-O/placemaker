@@ -10,9 +10,10 @@
 //   * The game hides (Game.Objects.OverrideSystem: Overridden, and the object's mask zeroed in the static search tree) any
 //     overridable object that touches another one or a building's lot volume. A closing piece on a garden's edge touches
 //     the bushes, trees and lots beside it, so whole stretches of fence stood there unseen ("invisible until I hover over
-//     the asset"). Our own pieces are shown again (as Placemaker's builds do it, BuildService.Audit) unless the game is
-//     right to hide them: a fence or hedge piece lying along another fence or hedge (a doubled border: one is enough), or a
-//     piece standing on a road or inside another building's lot.
+//     the asset": hovering draws a copy of the house with its pieces, which the game does not hide). Our own pieces are
+//     shown again in the frame the game hid them (NeighbourShowSystem), as Placemaker's builds do it (BuildService.Audit),
+//     unless the game is right to hide them: a fence or hedge piece lying along another fence or hedge (a doubled border:
+//     one is enough), or a piece standing on a road or inside another building's lot.
 
 using System;
 using System.Collections.Generic;
@@ -135,46 +136,46 @@ namespace Placemaker.Game.Neighbours
         private EntityQuery _hiddenPieces;
         // pieces left hidden on purpose, and when it was decided (looked at again later: what was in the way may be gone)
         private readonly Dictionary<Entity, int> _keptHidden = new Dictionary<Entity, int>();
-        // how often each piece was shown again: one the game hides again and again (something beside it keeps changing) is
-        // left hidden after a few times, so it never flickers
+        // how often each piece was shown again (the log only)
         private readonly Dictionary<Entity, int> _shownTimes = new Dictionary<Entity, int>();
-        private const int MaxShowAgain = 3;
         /// <summary>For the game runner: our pieces shown again after the game hid them, and the ones left hidden.</summary>
         public static int TotalShownAgain, TotalKeptHidden;
-        private int _shownSinceLog, _keptSinceLog;
+        private int _shownSinceLog, _keptSinceLog, _againSinceLog;
+        // pieces queued for deletion (NeighbourDeleteSystem, next frame's PostTool)
+        private readonly HashSet<Entity> _goingSoon = new HashSet<Entity>();
 
         private void CreateHiddenQuery()
         {
+            // tags only: reading it never waits for a job moving objects
             _hiddenPieces = GetEntityQuery(new EntityQueryDesc
             {
-                All = new[] { ComponentType.ReadOnly<PolishPiece>(), ComponentType.ReadOnly<Overridden>(), ComponentType.ReadOnly<global::Game.Objects.Object>(), ComponentType.ReadOnly<global::Game.Objects.Transform>(), ComponentType.ReadOnly<PrefabRef>() },
+                All = new[] { ComponentType.ReadOnly<PolishPiece>(), ComponentType.ReadOnly<Overridden>() },
                 None = new[] { ComponentType.ReadOnly<Deleted>(), ComponentType.ReadOnly<Temp>() },
             });
         }
 
         /// <summary>
-        /// Our pieces the game hid, shown again (every 16th frame): Overridden removed, the object redrawn (BatchesUpdated) and
-        /// put back in the static search tree with the mask a visible one has (OverrideSystem zeroes it, and the renderer culls
-        /// through that tree). The game hides one again when something new beside it makes it check (a frame later it is back).
+        /// Our pieces the game hid, shown again in the same frame (NeighbourShowSystem, ModificationEnd: after
+        /// Objects.OverrideSystem hid them in Modification5, before culling and rendering): Overridden removed, the object redrawn
+        /// (BatchesUpdated) and put back in the static search tree with the mask a visible one has (OverrideSystem zeroes it, and
+        /// the renderer culls through that tree). The game hides one again whenever something beside it changes; it is shown
+        /// again before it is ever drawn hidden. Before, this ran every 16th frame and ahead of the game's check (a piece was
+        /// drawn hidden for up to 16 frames, so after three times it was left hidden for minutes: in a growing town most
+        /// fences stood unseen until the player hovered their house).
         /// </summary>
-        private void ShowHiddenPieces()
+        internal void ShowHiddenPieces()
         {
-            if ((LotFrame & 15) != 0 || _hiddenPieces.IsEmptyIgnoreFilter) return;
+            if (_hiddenPieces.IsEmptyIgnoreFilter) return;
             if (_keptHidden.Count > 20000) _keptHidden.Clear();
+            _goingSoon.Clear();
+            foreach (var q in NeighbourDeleteSystem.Queue) _goingSoon.Add(q);
             var show = new List<Entity>();
             using (var all = _hiddenPieces.ToEntityArray(Allocator.Temp))
                 foreach (var e in all)
                 {
-                    if (_keptHidden.TryGetValue(e, out int when) && LotFrame - when < 900) continue;
-                    if (_shownTimes.TryGetValue(e, out int times) && times >= MaxShowAgain && !_keptHidden.ContainsKey(e))
-                    {
-                        // hidden again and again: left so for a minute, then two, three... (it comes back once things settle
-                        // beside it, and never blinks meanwhile)
-                        TotalKeptHidden++; _keptSinceLog++;
-                        _keptHidden[e] = LotFrame + 3600 * (times - MaxShowAgain + 1);
-                        continue;
-                    }
-                    if (!PieceSegment(e, out var a, out var b, out bool fence)) continue;
+                    // looked at again every 2 s (what it doubled may be gone: a garden planned again)
+                    if (_keptHidden.TryGetValue(e, out int when) && LotFrame - when < 120) continue;
+                    if (!EntityManager.HasComponent<global::Game.Objects.Object>(e) || !PieceSegment(e, out var a, out var b, out bool fence)) continue;
                     if ((fence && Doubled(e, a, b)) || OnRoadOrBuilding(e, (a + b) * 0.5f))
                     {
                         if (!_keptHidden.ContainsKey(e)) { TotalKeptHidden++; _keptSinceLog++; }
@@ -188,7 +189,9 @@ namespace Placemaker.Game.Neighbours
             foreach (var e in show)
             {
                 _keptHidden.Remove(e);
-                _shownTimes[e] = (_shownTimes.TryGetValue(e, out int t) ? t : 0) + 1;
+                int times = _shownTimes.TryGetValue(e, out int t) ? t + 1 : 1;
+                _shownTimes[e] = times;
+                if (times > 1) _againSinceLog++;
                 EntityManager.RemoveComponent<Overridden>(e);
                 EntityManager.AddComponent<BatchesUpdated>(e);
             }
@@ -209,29 +212,47 @@ namespace Placemaker.Game.Neighbours
             }
             TotalShownAgain += show.Count;
             _shownSinceLog += show.Count;
-            if (_shownSinceLog >= 50 || (LotFrame & 1023) == 0)
+            if (_shownSinceLog >= 500 || (LotFrame & 4095) == 0)
             {
-                Mod.Log.Info($"Placemaker neighbourhood polish: {_shownSinceLog} of its own pieces the game hid shown again, {_keptSinceLog} left hidden (along another fence, on a road or in another building's lot)");
-                _shownSinceLog = _keptSinceLog = 0;
+                Mod.Log.Info($"Placemaker neighbourhood polish: {_shownSinceLog} of its own pieces the game hid shown again in the same frame ({_againSinceLog} of them hidden before), {_keptSinceLog} left hidden (along another fence, on a road or in another building's lot)");
+                _shownSinceLog = _keptSinceLog = _againSinceLog = 0;
             }
         }
 
-        /// <summary>Another fence or hedge lies along this piece (nearly parallel, within 0.7 m, overlapping by over a metre),
-        /// drawn: a doubled border, where the game is right to show only one.</summary>
-        private bool Doubled(Entity e, float2 a, float2 b)
+        /// <summary>Other fences or hedges lie along this piece (nearly parallel, within 0.7 m) over nearly all of its length,
+        /// drawn: a doubled border, where the game is right to show only one. Covering only part of it is no double: hiding
+        /// the piece then left the rest of its stretch open (gaps seen in the game runner).</summary>
+        private bool Doubled(Entity e, float2 a, float2 b, List<string> why = null)
         {
             float len = math.distance(a, b);
             if (len < 0.5f) return false;
             var d = (b - a) / len;
-            bool Along(float2 p, float2 q)
+            var spans = new List<(float From, float To)>();
+            bool Covered()
+            {
+                spans.Sort((x, y) => x.From.CompareTo(y.From));
+                float reach = 0f, open = 0f;
+                foreach (var (from, to) in spans)
+                {
+                    if (from > reach) open += from - reach;
+                    reach = math.max(reach, to);
+                }
+                open += math.max(0f, len - reach);
+                return open <= math.max(0.4f, len * 0.1f);
+            }
+            bool Along(float2 p, float2 q, Entity by)
             {
                 float l = math.distance(p, q);
                 if (l < 0.5f) return false;
                 if (math.abs(math.dot((q - p) / l, d)) < 0.95f) return false;
                 var n = new float2(-d.y, d.x);
                 if (math.abs(math.dot((p + q) * 0.5f - a, n)) > 0.7f) return false;
-                float t0 = math.dot(p - a, d), t1 = math.dot(q - a, d);
-                return math.min(len, math.max(t0, t1)) - math.max(0f, math.min(t0, t1)) > 1f;
+                float t0 = math.clamp(math.min(math.dot(p - a, d), math.dot(q - a, d)), 0f, len);
+                float t1 = math.clamp(math.max(math.dot(p - a, d), math.dot(q - a, d)), 0f, len);
+                if (t1 - t0 < 0.05f) return false;
+                spans.Add((t0, t1));
+                why?.Add($"{NameOf(EntityManager.GetComponentData<PrefabRef>(by).m_Prefab)}{(EntityManager.HasComponent<Overridden>(by) ? " (hidden)" : "")} {math.abs(math.dot((p + q) * 0.5f - a, n)):F2} m off, {t0:F1}-{t1:F1} of {len:F1} m");
+                return Covered();
             }
             var lo = math.min(a, b) - 1.5f;
             var hi = math.max(a, b) + 1.5f;
@@ -249,10 +270,13 @@ namespace Placemaker.Game.Neighbours
                     {
                         var o = found[i];
                         if (o == e || !EntityManager.Exists(o) || EntityManager.HasComponent<Deleted>(o) || EntityManager.HasComponent<Temp>(o)) continue;
+                        // a piece its garden no longer wants (deleted next frame) doubles nothing: the new piece taking its
+                        // place was kept hidden for good
+                        if (_goingSoon.Contains(o)) continue;
                         if (!PieceSegment(o, out var p, out var q, out bool fence) || !fence) continue;
                         // one that is hidden too only counts when it comes first (of two hidden ones, one is shown)
                         if (EntityManager.HasComponent<Overridden>(o) && o.Index > e.Index) continue;
-                        if (Along(p, q)) return true;
+                        if (Along(p, q, o)) return true;
                     }
                 }
                 found.Clear();
@@ -271,12 +295,24 @@ namespace Placemaker.Game.Neighbours
                         var c = EntityManager.GetComponentData<Curve>(l);
                         if (c.m_Length < 0.3f) continue;
                         for (int k = 0; k < 4; k++)
-                            if (Along(MathUtils.Position(c.m_Bezier, k / 4f).xz, MathUtils.Position(c.m_Bezier, (k + 1) / 4f).xz)) return true;
+                            if (Along(MathUtils.Position(c.m_Bezier, k / 4f).xz, MathUtils.Position(c.m_Bezier, (k + 1) / 4f).xz, l)) return true;
                     }
                 }
             }
             finally { found.Dispose(); }
             return false;
+        }
+
+        /// <summary>For the game runner: why one of our pieces is hidden now (what lies along it, or a road or lot under it).</summary>
+        internal string WhyHidden(Entity e)
+        {
+            if (!PieceSegment(e, out var a, out var b, out bool fence)) return "no shape";
+            var why = new List<string>();
+            bool doubled = fence && Doubled(e, a, b, why);
+            bool road = OnRoadOrBuilding(e, (a + b) * 0.5f);
+            string name = NameOf(EntityManager.GetComponentData<PrefabRef>(e).m_Prefab);
+            return $"{name} ({math.distance(a, b):F1} m) at ({(a.x + b.x) * 0.5f:F1}, {(a.y + b.y) * 0.5f:F1}): {(_keptHidden.ContainsKey(e) ? "kept hidden" : "not judged yet")}, "
+                + $"{(doubled ? "doubled" : "not doubled")}{(why.Count > 0 ? " [" + string.Join("; ", why) + "]" : "")}{(road ? ", on a road or lot" : "")}";
         }
 
         /// <summary>The point is on a road, path or track surface, or more than a metre inside the lot of a building that is

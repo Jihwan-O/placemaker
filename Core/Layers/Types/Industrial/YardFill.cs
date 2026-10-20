@@ -379,7 +379,9 @@ namespace Placemaker.Core.Layers.Types.Yards
             if (!s.Put(heap, heap.Pick(salt), c, across ? face : s.U, salt, -0.2f)) return false;
             s.Heaps++;
             // The heap stands on a real mound: the mountain rises out of the yard, not off a flat floor.
-            s.Mounds.Add(new Mound { Center = c, Radius = wide * 0.5f + 5f, Height = 2.2f, Flat = 0.55f });
+            // Kept inside the block: the mound never lifts an aisle.
+            float mr = math.min(math.min(b.Depth, b.Length) * 0.5f - 0.5f, wide * 0.5f + 5f);
+            if (mr > 4f) s.Mounds.Add(new Mound { Center = s.W(b.UMid, b.VMid), Radius = mr, Height = 1.8f, Flat = 0.5f });
             s.Anchors.Add((c, wide * 0.5f));
             // The loader at the heap's foot, on the spine side, nose to the heap.
             var loader = IndustrialAssets.Loader;

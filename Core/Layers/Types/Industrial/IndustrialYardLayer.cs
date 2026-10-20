@@ -113,6 +113,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             // The ground art (YardGround): spoil mounds in the leftover corners, the painted ground, the wear decals.
             var mounds = new List<Mound>(s.Mounds);
             if (ctx.B("spoil")) mounds.AddRange(YardGround.Spoil(s, math.clamp((int)(region.Area / 6000f), 1, 6), s.Salt(0x5B0Au)));
+            if (ctx.B("spoil")) YardGround.DeadCorners(s, s.Salt(0xDEADu));
             if (ctx.B("paint")) YardGround.Paint(s, ctx.S("ground"), s.Salt(0x9A17u));
             int decals = YardGround.Decals(s, s.Salt(0xDECAu));
             ctx.Check();
@@ -181,7 +182,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 float m = 0f;
                 for (int i = 0; i < mounds.Count; i++) m = math.max(m, mounds[i].Offset(p));
                 return o + m;
-            }, 45f, 12f, 5f);
+            }, 45f, 12f, 4f);
         }
 
         // ───────────── shared helpers for the types ─────────────

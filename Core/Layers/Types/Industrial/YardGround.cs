@@ -127,37 +127,46 @@ namespace Placemaker.Core.Layers.Types.Yards
             var mounds = new List<Mound>();
             if (max <= 0) return mounds;
             var ctx = s.Ctx;
-            var picked = new List<float2>();
-            float front = s.Spec.Front;
-            var cands = YardKit.Shuffled(Scatter.Candidates(s.Inner, 4f, Hashing.Mix(salt, 1u), 900, ctx.Cancel), Hashing.Mix(salt, 2u));
-            var spots = new List<(float2 p, float clear)>();
-            foreach (var p in cands)
+            float front = s.Spec.Front, a = s.Spec.Aisle;
+            // Left-over ground only: never in a block, never near an aisle, never in the front yard.
+            var spots = new List<(float2 p, float r)>();
+            foreach (var p in Scatter.Candidates(s.Inner, 3f, Hashing.Mix(salt, 1u), 1500, ctx.Cancel))
             {
                 var f = s.F(p);
-                if (f.y < front + s.Spec.Aisle && math.abs(f.x) < s.Spec.FrontZone + 4f) continue;   // never in the front yard
-                float clear = math.min(s.Occ.Clearance(p, 14f), s.Inner.BoundaryDistance(p, 14f) + s.Spec.Edge * 0.6f);
-                if (clear >= 6.5f) spots.Add((p, clear));
+                if (f.y < front + a && math.abs(f.x) < s.Spec.FrontZone + 3f) continue;
+                float r = math.min(10f, s.Inner.BoundaryDistance(p, 12f) + s.Spec.Edge * 0.5f);
+                foreach (var bl in s.Blocks)
+                {
+                    float du = math.max(0f, math.max(bl.U0 - f.x, f.x - bl.U1)), dv = math.max(0f, math.max(bl.V0 - f.y, f.y - bl.V1));
+                    r = math.min(r, math.sqrt(du * du + dv * dv) - 1.5f);
+                    if (r < 4.5f) break;
+                }
+                if (r < 4.5f) continue;
+                foreach (var (q0, q1) in s.Aisles) r = math.min(r, math.sqrt(SegmentIndex.DistSq(p, q0, q1)) - a * 0.5f - 2f);
+                if (r < 4.5f) continue;
+                r = math.min(r, s.Occ.Clearance(p, 12f) - 1f);
+                if (r >= 4.5f) spots.Add((p, r));
             }
-            spots.Sort((x, y) => y.clear.CompareTo(x.clear));
+            spots.Sort((x, y) => y.r.CompareTo(x.r));
+            var picked = new List<float2>();
             int n = 0;
-            foreach (var (p, clear) in spots)
+            foreach (var (p, r0) in spots)
             {
                 if (n >= max) break;
                 bool near = false;
-                foreach (var q in picked) if (math.distance(p, q) < 30f) { near = true; break; }
+                foreach (var q in picked) if (math.distance(p, q) < r0 + 18f) { near = true; break; }
                 if (near) continue;
-                float r = math.min(clear - 1f, 11f);
+                float r = r0;
                 picked.Add(p);
                 uint v = Hashing.Mix(salt, 0x5B01u + (uint)n);
-                float h = math.clamp(r * 0.28f, 1.5f, 3.2f);
+                float h = math.clamp(r * 0.3f, 1.2f, 3f);
                 mounds.Add(new Mound { Center = p, Radius = r, Height = h, Flat = 0.25f });
-                s.Occ.Take(p, r, YardKit.KindStuff);
+                s.Occ.Take(p, r * 0.7f, YardKit.KindStuff);
                 // Paint: dirt on the mound, dry grass round its foot.
-                TerrainPaint.Field(ctx, LeisureKit.Blob(p, r + 2.5f, Hashing.Mix(v, 1u), 16, 0.25f), DryGrass, 0.9f, 2.5f, 2f, null, 0f, 0f, 0f, Hashing.Mix(v, 2u));
+                TerrainPaint.Field(ctx, LeisureKit.Blob(p, r + 2f, Hashing.Mix(v, 1u), 16, 0.25f), DryGrass, 0.9f, 2.5f, 2f, null, 0f, 0f, 0f, Hashing.Mix(v, 2u));
                 TerrainPaint.Field(ctx, LeisureKit.Blob(p, r * 0.85f, Hashing.Mix(v, 3u), 16, 0.3f), Dirt, 1f, 2.5f, 2f, null, 0f, 0f, 0f, Hashing.Mix(v, 4u));
-                // The dead tree on top (tree age 4 = dead), dead bushes round the flanks, a fallen log at the foot.
-                ctx.Object(p + new float2(Hashing.Unit(v) - 0.5f, Hashing.Unit(Hashing.Mix(v, 5u)) - 0.5f), Hashing.Unit(Hashing.Mix(v, 6u)) * 6.283f,
-                    ObjectRole.Tree, DeadTree, v, PlannedAge.Dead);
+                // The dead tree on top (tree age 4 = dead), dead bushes on the flanks, a fallen log at the foot.
+                ctx.Object(p, Hashing.Unit(Hashing.Mix(v, 6u)) * 6.283f, ObjectRole.Tree, DeadTree, v, PlannedAge.Dead);
                 int bushes = 3 + (int)(Hashing.Unit(Hashing.Mix(v, 7u)) * 3f);
                 for (int i = 0; i < bushes; i++)
                 {
@@ -165,17 +174,46 @@ namespace Placemaker.Core.Layers.Types.Yards
                     var bp = p + new float2(math.cos(ang), math.sin(ang)) * r * 0.6f;
                     ctx.Object(bp, ang, ObjectRole.Bush, DeadBush.Pick(v), Hashing.Mix(v, 20u + (uint)i), -1, DeadBush.Category);
                 }
-                if (r >= 7f)
+                // The log along the mound's foot, only where it lies wholly on free ground.
+                for (int t = 0; t < 4; t++)
                 {
-                    var lp = p + new float2(math.cos(Hashing.Unit(v) * 6.283f), math.sin(Hashing.Unit(v) * 6.283f)) * (r * 0.95f);
-                    var tan = math.normalizesafe(lp - p);
-                    tan = new float2(-tan.y, tan.x);
-                    if (s.Region.ContainsDisc(lp, 5.5f))
-                        ctx.Object(lp, math.atan2(tan.x, tan.y), ObjectRole.Furniture, FallenLog.Pick(v), Hashing.Mix(v, 30u), -1, FallenLog.Category);
+                    float ang = Hashing.Unit(Hashing.Mix(v, 40u + (uint)t)) * 6.283f;
+                    var dir = new float2(math.cos(ang), math.sin(ang));
+                    var lp = p + dir * (r * 0.9f);
+                    if (s.Put(FallenLog, FallenLog.Pick(v), lp, new float2(-dir.y, dir.x), Hashing.Mix(v, 30u), 0.3f)) break;
                 }
                 n++;
             }
             return mounds;
+        }
+
+        /// <summary>A dead tree and dead bushes in each corner of the edge band that has room (weathered corners).</summary>
+        public static int DeadCorners(IndustrialSite s, uint salt)
+        {
+            if (s.Spec.Edge < 3f) return 0;
+            var ring = s.Region.Ring;
+            int made = 0;
+            for (int i = 0; i < ring.Length; i++)
+            {
+                var prev = ring[(i + ring.Length - 1) % ring.Length]; var c = ring[i]; var next = ring[(i + 1) % ring.Length];
+                var e0 = math.normalizesafe(c - prev); var e1 = math.normalizesafe(next - c);
+                if (Poly.SignedArea(ring) * (e0.x * e1.y - e0.y * e1.x) <= 0f) continue;   // reflex corner
+                if (math.dot(e0, e1) > 0.5f) continue;                                      // not a real corner
+                var bis = math.normalizesafe(-e0 + e1);
+                var p = c + bis * (s.Spec.Edge * 0.9f + 1.2f);
+                if (!s.Region.ContainsDisc(p, 1.5f) || !s.Occ.Free(p, 1.6f, 0.5f, 0.2f)) continue;
+                uint v = Hashing.Mix(salt, (uint)i);
+                s.Ctx.Object(p, Hashing.Unit(v) * 6.283f, ObjectRole.Tree, DeadTree, v, PlannedAge.Dead);
+                s.Occ.Take(p, 1.6f, YardKit.KindStuff);
+                foreach (var d in new[] { e1, -e0 })
+                {
+                    var bp = p + d * 2.6f;
+                    if (s.Region.ContainsDisc(bp, 1f) && s.Occ.Free(bp, 0.9f, 0.3f, 0.1f))
+                        s.Ctx.Object(bp, Hashing.Unit(Hashing.Mix(v, 2u)) * 6.283f, ObjectRole.Bush, DeadBush.Pick(v), Hashing.Mix(v, 3u), -1, DeadBush.Category);
+                }
+                made++;
+            }
+            return made;
         }
 
         // ───────────── decals ─────────────

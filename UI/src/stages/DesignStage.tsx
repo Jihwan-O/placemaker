@@ -540,7 +540,7 @@ export const DesignStage = ({ catalog, design, state }: { catalog: Catalog; desi
             </ErrorBoundary>
             <PlacesInside />
             {!root ? (
-                <div className={s.emptyNote}>{t("Placemaker.UI.PickRecipe", "Pick a type")}</div>
+                <div className={s.emptyNote}>{t("Placemaker.UI.PickRecipe", "Nothing picked yet: pick a category to start")}</div>
             ) : (
                 <div className={s.options} data-testid="options">
                     <ErrorBoundary name="preset-bar">

@@ -172,7 +172,7 @@
   "Placemaker.UI.ParkStats.Upkeep": "Upkeep",
   "Placemaker.UI.ParkStats.Upkeep.Meaning": "Monthly running cost a vanilla park this good would have.",
   "Placemaker.UI.PerMonth": "/mo",
-  "Placemaker.UI.PickRecipe": "Pick a type",
+  "Placemaker.UI.PickRecipe": "Nothing picked yet: pick a category to start",
   "Placemaker.UI.Picker.All": "All ({0})",
   "Placemaker.UI.Picker.Auto": "Automatic",
   "Placemaker.UI.Picker.AutoIs": "Automatic · {0}",

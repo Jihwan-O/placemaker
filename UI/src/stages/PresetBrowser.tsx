@@ -220,7 +220,10 @@ export const TypeBrowser = ({ catalog, design, onNew }: { catalog: Catalog; desi
     const cats = makeGroups(catalog).map((g, order) => ({ id: g.id, title: t(g.key, g.en), order, types: list.filter((r) => recipeGroup(r) === g.id) }))
         .filter((c) => c.types.length);   // the shelf's order (Recipes/shelf/*.json), "Other" last
     const exists = (id: string | null) => !!id && cats.some((c) => c.id === id);
-    const category = exists(chosen) ? chosen! : exists(selectedGroup) ? selectedGroup : cats[0]?.id ?? "";
+    // No type picked (the tool cleared it, e.g. back to Design after "keep area"): no category looks picked either and the
+    // Type row stays empty (user: "it looks like zoning is highlighted, but it's not ... it should just show nothing").
+    // A category click picks its first type, so one click still starts a design.
+    const category = !design.recipeId ? "" : exists(chosen) ? chosen! : exists(selectedGroup) ? selectedGroup : cats[0]?.id ?? "";
     const setCategory = (c: string) => {
         save(CATEGORY_KEY, c);
         setChosen(c);

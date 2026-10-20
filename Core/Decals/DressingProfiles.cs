@@ -198,12 +198,12 @@ namespace Placemaker.Core.Decals
             var list = new List<ControlSchema>();
             var p = DressingProfiles.For(layerId);
             if (p == null) return list;
-            var amount = Slider(AmountId, 100, Group);
-            amount.Cheap = false;
-            list.Add(amount);
+            // (issue #2, 2026-10-19) No decals from decal packs any more: the Decals amount and the per-family decal sliders
+            // are gone. The style (Clean / Lived-in / Gritty) still sets how worn the painted ground looks: it joined the
+            // Ground paint section.
             var style = new ControlSchema
             {
-                Id = StyleId, Kind = ControlKind.Choice, Tier = ControlTier.More, Group = Group, Default = Styles[(int)p.Style],
+                Id = StyleId, Kind = ControlKind.Choice, Tier = ControlTier.More, Group = PaintGroup, Default = Styles[(int)p.Style],
                 LabelKey = KeyPrefix + StyleId, TooltipKey = KeyPrefix + StyleId + ".Tooltip",
             };
             foreach (var s in Styles)
@@ -231,14 +231,6 @@ namespace Placemaker.Core.Decals
             var clear = PaintToggle(ClearPaintId, false);
             clear.EnabledWhen = "";
             list.Add(clear);
-            foreach (var f in p.Families)
-            {
-                string group = Group;
-                if (hasGroup != null && HostGroups.TryGetValue(f, out var hosts))
-                    foreach (var h in hosts) if (hasGroup(h)) { group = h; break; }
-                var c = Slider(FamilyId(f), 100, group);
-                list.Add(c);
-            }
             return list;
         }
 
@@ -273,7 +265,7 @@ namespace Placemaker.Core.Decals
             var p = DressingProfiles.For(gen.Id);
             if (p == null) return null;
             bool has = false;
-            if (gen.Controls != null) foreach (var c in gen.Controls) if (c != null && c.Id == AmountId) { has = true; break; }
+            if (gen.Controls != null) foreach (var c in gen.Controls) if (c != null && c.Id == StyleId) { has = true; break; }
             if (!has) return null;
             var s = new DressSettings { LayerId = gen.Id };
             s.Master = Pct(values, AmountId);

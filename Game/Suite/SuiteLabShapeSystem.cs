@@ -53,6 +53,7 @@ namespace Placemaker.Game.Suite
             public float2[] Ring;
             public float Height;
             public string Material;   // substring of "<render prefab>#<k> <template>", or null: the first suitable building surface
+            public string CopyOf;     // instead of a shape: a renamed copy of this static object prefab (same meshes), named Name
             // results
             public bool Done;
             public string Error;
@@ -182,6 +183,7 @@ namespace Placemaker.Game.Suite
 
         private void Make(Request r)
         {
+            if (r.CopyOf != null) { MakeCopy(r); return; }
             var surf = Pick(r.Material);
             if (surf == null) { r.Error = "no building surface found to borrow"; return; }
             r.Info["surface"] = surf.Label;
@@ -227,6 +229,31 @@ namespace Placemaker.Game.Suite
             r.Prefab = _prefabs.GetEntity(obj);
             r.ReadyFrame = UnityEngine.Time.frameCount + 3;
             Mod.Log.Info($"Placemaker lab: made shape '{r.Name}': {mesh.vertexCount} vertices, bounds {b.size}, surface {surf.Label} ({surf.Template}, VT {surf.Vt}, octahedral {surf.Octo}), keywords [{string.Join(" ", surf.Keywords)}]");
+        }
+
+        /// <summary>
+        /// A static object prefab under another name, sharing the original's meshes (CreateInstance + AddComponentFrom, as
+        /// DecalOpacitySystem made its copies). Used to put an object that only this game knows into a save (issue #2).
+        /// </summary>
+        private void MakeCopy(Request r)
+        {
+            StaticObjectPrefab original = null;
+            using (var q = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<PrefabData>(), ComponentType.ReadOnly<ObjectGeometryData>()))
+            using (var all = q.ToEntityArray(Allocator.Temp))
+                foreach (var e in all)
+                    if (_prefabs.TryGetPrefab<StaticObjectPrefab>(e, out var p) && p != null && p.name == r.CopyOf) { original = p; break; }
+            if (original == null || original.m_Meshes == null || original.m_Meshes.Length == 0) { r.Error = "no static object prefab '" + r.CopyOf + "' with meshes"; return; }
+            var obj = (StaticObjectPrefab)ScriptableObject.CreateInstance(original.GetType());
+            obj.name = r.Name;
+            obj.m_Meshes = (ObjectMeshInfo[])original.m_Meshes.Clone();
+            obj.m_Circular = original.m_Circular;
+            foreach (var component in original.components)
+                if (component != null && !(component is UIObject) && !(component is ObsoleteIdentifiers)) obj.AddComponentFrom(component);
+            if (!Placemaker.Game.Assets.AssetCatalogSystem.AddOwnPrefab(_prefabs, obj)) { r.Error = "AddPrefab refused the copy"; return; }
+            r.Prefab = _prefabs.GetEntity(obj);
+            r.ReadyFrame = UnityEngine.Time.frameCount + 3;
+            r.Info["copyOf"] = original.name;
+            Mod.Log.Info($"Placemaker lab: made '{r.Name}', a copy of {original.GetType().Name} '{original.name}'");
         }
 
         // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ vertex packing (as Colossal.AssetPipeline's AttributePackingPostProcessor) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

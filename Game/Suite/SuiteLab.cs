@@ -33,6 +33,14 @@ namespace Placemaker.Game.Suite
                 case "anatomy": LabAnatomy(st, rec); yield break;
                 case "polishflags": yield return LabPolishFlags(st, rec); yield break;
                 case "saveload": yield return LabSaveLoad(st, rec); yield break;
+                case "olddecal": yield return LabOldDecal(st, step, rec); yield break;
+                case "savecity": yield return LabSaveCity(step, rec); yield break;
+                case "loadcity": yield return LabLoadCity(step, rec); yield break;
+                case "olddecalcleanup":
+                    Placemaker.Game.Build.OldDecalCleanupSystem.SuiteSkip = (bool?)step["on"] == false;
+                    rec["oldDecalCleanup"] = !Placemaker.Game.Build.OldDecalCleanupSystem.SuiteSkip;
+                    Mod.Log.Info("Placemaker lab: the old-decal clean-up after loads is " + (Placemaker.Game.Build.OldDecalCleanupSystem.SuiteSkip ? "off" : "on"));
+                    yield break;
                 case "removeallpolish": yield return LabRemoveAllPolish(st, rec); yield break;
                 case "polishparts":
                 {

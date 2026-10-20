@@ -27,7 +27,7 @@ namespace Placemaker.Core.Layers.Types.Yards
         {
             Preset("recycling", ("style", "recycling"), ("ground", "gravel"), ("edge", "trees"), ("aisle", 8.0), ("fill", 90.0), ("weighbridge", true));
             Preset("salvage", ("style", "salvage"), ("ground", "dirt"), ("edge", "containers"), ("aisle", 8.0), ("fill", 85.0), ("weighbridge", true));
-            Preset("works", ("style", "works"), ("ground", "dirt"), ("edge", "blocks"), ("aisle", 9.0), ("fill", 85.0), ("weighbridge", false));
+            Preset("works", ("style", "works"), ("ground", "dirt"), ("edge", "boulders"), ("aisle", 9.0), ("fill", 85.0), ("weighbridge", false));
         }
 
         protected override SiteSpec Spec(LayerContext ctx, string style)

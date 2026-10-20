@@ -780,6 +780,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 YardKit.Screen(s.Ctx, s.Occ, s.Gates, math.min(e * 0.5f + 0.3f, 3.2f), 8f, treeIds, salt);
                 return;
             }
+            if (mode == "boulders") return;   // laid before the fill (YardEarth.Bund)
             // Wrecks: a wall of scrap cars piled two and three high along the back and the sides, nose to the fence.
             var item = mode == "containers" ? IndustrialAssets.Box20 : mode == "wrecks" ? IndustrialAssets.Car : IndustrialAssets.Block;
             int n = region.Ring.Length;

@@ -25,9 +25,9 @@ namespace Placemaker.Core.Layers.Types.Yards
 
         protected override void DefinePresets()
         {
-            Preset("terminal", ("style", "terminal"), ("ground", "concrete"), ("edge", "blocks"), ("aisle", 10.0), ("fill", 85.0), ("weighbridge", false));
+            Preset("terminal", ("style", "terminal"), ("ground", "concrete"), ("edge", "blocks"), ("aisle", 10.0), ("fill", 85.0), ("weighbridge", false), ("banks", false), ("stones", 10.0));
             Preset("depot", ("style", "depot"), ("ground", "gravel"), ("edge", "containers"), ("aisle", 8.0), ("fill", 80.0), ("weighbridge", false));
-            Preset("storage", ("style", "storage"), ("ground", "concrete"), ("edge", "trees"), ("aisle", 7.0), ("fill", 100.0), ("weighbridge", false));
+            Preset("storage", ("style", "storage"), ("ground", "concrete"), ("edge", "trees"), ("aisle", 7.0), ("fill", 100.0), ("weighbridge", false), ("banks", false), ("stones", 0.0));
         }
 
         protected override SiteSpec Spec(LayerContext ctx, string style)

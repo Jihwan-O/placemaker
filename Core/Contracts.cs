@@ -693,7 +693,9 @@ namespace Placemaker.Core
         public float Scale = 1f;
         /// <summary>
         /// (Industrial) Height above the ground in metres for a prop standing on another (a container on a container): the
-        /// build raises it this high and gives it the game's object Elevation. 0 = on the ground.
+        /// build raises it this high and gives it the game's object Elevation. 0 = on the ground. Negative: set this deep into
+        /// the ground (a boulder half buried, rubble strewn in the earth), with the game's negative Elevation: it then collides
+        /// with nothing (Underground mask), so it may lie under other props.
         /// </summary>
         public float Elevation;
         /// <summary>(Industrial) Tilt in radians: Roll about the prop's own length (π = on its roof, ±π/2 = on its side), Pitch

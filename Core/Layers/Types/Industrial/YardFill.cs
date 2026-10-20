@@ -471,7 +471,7 @@ namespace Placemaker.Core.Layers.Types.Yards
         };
         public static readonly Part[] TrashMix =
         {
-            new Part(IndustrialAssets.Trash, 0.35f), new Part(IndustrialAssets.Drums, 0.15f), new Part(IndustrialAssets.Crates, 0.12f),
+            new Part(IndustrialAssets.Trash, 0.15f), new Part(IndustrialAssets.Drums, 0.2f), new Part(IndustrialAssets.Crates, 0.12f),
             new Part(IndustrialAssets.Pallets, 0.12f), new Part(IndustrialAssets.Boxes, 0.1f), new Part(IndustrialAssets.WoodRubble, 0.1f),
             new Part(IndustrialAssets.Car, 0.06f),
         };

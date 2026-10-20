@@ -63,17 +63,18 @@ namespace Placemaker.Core.Layers.Types.Yards
             // The loop round the middle.
             if (s.Inner.Area > 6000f && uSpan > 70f)
             {
-                var c = s.W((s.UMin + s.UMax) * 0.5f, (front + s.VMax) * 0.5f + 4f);
+                // Off the middle and lumpy: it went round whatever was there, it is not a racetrack.
+                var c = s.W((s.UMin + s.UMax) * 0.5f + (Hashing.Unit(Hashing.Mix(salt, 290u)) - 0.5f) * uSpan * 0.15f, (front + s.VMax) * 0.5f + 4f);
                 float ru = uSpan * 0.3f, rv = (s.VMax - front) * 0.28f;
                 var loop = new List<float2>();
-                for (int i = 0; i < 12; i++)
+                for (int i = 0; i < 9; i++)
                 {
-                    float a = i / 12f * 6.283f;
-                    float j = 0.85f + 0.3f * Hashing.Unit(Hashing.Mix(salt, 300u + (uint)i));
+                    float a = (i + (Hashing.Unit(Hashing.Mix(salt, 310u + (uint)i)) - 0.5f) * 0.5f) / 9f * 6.283f;
+                    float j = 0.7f + 0.55f * Hashing.Unit(Hashing.Mix(salt, 300u + (uint)i));
                     var p = c + s.U * math.cos(a) * ru * j + s.V * math.sin(a) * rv * j;
                     if (s.Inner.ContainsDisc(p, hw + 2f)) loop.Add(p);
                 }
-                if (loop.Count >= 8) { loop.Add(loop[0]); lines.Add(Smooth(loop, 2)); }
+                if (loop.Count >= 7) { loop.Add(loop[0]); lines.Add(Smooth(loop, 2)); }
             }
             // Spurs to the fence (one a side on a wide yard).
             foreach (int side in new[] { -1, 1 })
@@ -178,10 +179,21 @@ namespace Placemaker.Core.Layers.Types.Yards
         {
             var ctx = s.Ctx;
             int made = 0;
-            uint zn = Hashing.Mix(salt, 0x2011u), dn = Hashing.Mix(salt, 0x2012u);
-            var cands = YardKit.Shuffled(Scatter.Candidates(s.Inner, 2.1f, Hashing.Mix(salt, 1u), 20000, ctx.Cancel), Hashing.Mix(salt, 2u));
+            uint zn = Hashing.Mix(salt, 0x2011u);
+            var cands = YardKit.Shuffled(Scatter.Candidates(s.Inner, 1.7f, Hashing.Mix(salt, 1u), 30000, ctx.Cancel), Hashing.Mix(salt, 2u));
             float frontZone = s.Spec.FrontZone + 2f, front = s.Spec.Front;
-            float clearing = 0.12f + 0.4f * (1f - math.saturate(fill));
+            // Piles (the game showed evenly spread scrap read as confetti): the scrap is heaped in piles of 5–10 m with trodden
+            // ground between them, crossed by the odd lone wreck or drum. A pile may lap up to its track.
+            var piles = new List<(float2 c, float r)>();
+            foreach (var p in YardKit.Shuffled(Scatter.Candidates(s.Inner, 12f + 6f * (1f - math.saturate(fill)), Hashing.Mix(salt, 7u), 600, ctx.Cancel), Hashing.Mix(salt, 8u)))
+            {
+                var f = s.F(p);
+                if (f.y < front + 4f && math.abs(f.x) < frontZone + 2f) continue;
+                float r = 5f + 5f * Hashing.Unit(Hashing.Mix(salt, 900u + (uint)piles.Count));
+                foreach (var (q0, q1) in s.Aisles) r = math.min(r, math.sqrt(SegmentIndex.DistSq(p, q0, q1)) - TrackWidth * 0.5f + 1.5f);
+                r = math.min(r, s.Inner.BoundaryDistance(p, 12f) + 2f);
+                if (r >= 3.5f) piles.Add((p, r));
+            }
             var swells = new List<(float2 p, float score)>();
             for (int pass = 0; pass < 2; pass++)
             {
@@ -191,10 +203,12 @@ namespace Placemaker.Core.Layers.Types.Yards
                     i++;
                     var f = s.F(p);
                     if (f.y < front + 2f && math.abs(f.x) < frontZone) continue;
-                    float dens = ValueNoise.Clumps(p, 16f, dn);
-                    if (dens < clearing) continue;
+                    float t = 9f;
+                    foreach (var (pc, pr) in piles) t = math.min(t, math.distance(p, pc) / pr);
                     var zone = zones[math.min(zones.Length - 1, (int)(ValueNoise.Clumps(p, 30f, zn) * zones.Length))];
-                    if (Hashing.Unit(Hashing.Mix(salt, (uint)i * 7u + (uint)pass)) > zone.Density) continue;
+                    // In a pile: packed, denser in its middle; between piles: one thing in a dozen spots.
+                    float dens = t < 1f ? zone.Density * (1f - 0.25f * t) : 0.07f;
+                    if (Hashing.Unit(Hashing.Mix(salt, (uint)i * 7u + (uint)pass)) > dens) continue;
                     uint v = Hashing.Mix(salt, (uint)i * 31u + (uint)pass);
                     var item = PickFrom(zone.Mix, Hashing.Unit(Hashing.Mix(v, 1u)), pass == 0);
                     if (item.Options == null) continue;
@@ -204,7 +218,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                     int n;
                     if (item.Category == AssetCategories.ScrapWreck)
                     {
-                        var m = YardFill.Mess.Wrecks(zone.Stack);
+                        var m = YardFill.Mess.Wrecks(t < 1f ? math.min(0.9f, zone.Stack + 0.3f * (1f - t)) : 0.05f);
                         m.Pos = 0f; m.Yaw = 0f; m.Flip = 0.14f; m.Side = 0.07f;
                         n = YardFill.PlaceOne(s, item, item.Pick(v), p, dir, v, m);
                         if (n > 0) s.Wrecks += n;
@@ -216,23 +230,23 @@ namespace Placemaker.Core.Layers.Types.Yards
                     }
                     else n = 0;
                     made += n;
-                    if (n > 0 && pass == 0 && item.X >= 6f) swells.Add((p, dens));
                 }
             }
+            foreach (var (pc, pr) in piles) if (pr >= 6f) swells.Add((pc, pr));
             // Swells under the densest heaps: a few, well apart.
             swells.Sort((x, y) => y.score.CompareTo(x.score));
             var picked = new List<float2>();
             foreach (var (p, _) in swells)
             {
-                if (picked.Count >= math.max(2, (int)(s.Inner.Area / 4000f))) break;
+                if (picked.Count >= math.max(3, (int)(s.Inner.Area / 2500f))) break;
                 bool near = false;
-                foreach (var q in picked) if (math.distance(p, q) < 30f) { near = true; break; }
+                foreach (var q in picked) if (math.distance(p, q) < 18f) { near = true; break; }
                 if (near) continue;
-                float r = math.min(14f, s.Inner.BoundaryDistance(p, 16f) - 1f);
+                float r = math.min(12f, s.Inner.BoundaryDistance(p, 16f) - 1f);
                 foreach (var (q0, q1) in s.Aisles) r = math.min(r, math.sqrt(SegmentIndex.DistSq(p, q0, q1)) - TrackWidth * 0.5f - 1f);
-                if (r < 6f) continue;
+                if (r < 5f) continue;
                 picked.Add(p);
-                s.Mounds.Add(new Mound { Center = p, Radius = r, Height = math.min(3.2f, r * 0.28f), Flat = 0.2f });
+                s.Mounds.Add(new Mound { Center = p, Radius = r, Height = math.min(2.6f, r * 0.25f), Flat = 0.25f });
                 s.Anchors.Add((p, r));
                 s.Heaps++;
             }

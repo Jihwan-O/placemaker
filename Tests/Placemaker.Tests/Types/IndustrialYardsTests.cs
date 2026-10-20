@@ -1,0 +1,268 @@
+// Industrial category (2026-10-19): the handcrafted yards (container yard, car yard, junk yard, industrial works). Every style
+// plans soundly on a 1.5 ha rectangle, a 6 ha L and a painted blob, is deterministic, keeps clear of Reserved, is fast, and
+// is laid out the way the user asked ("like someone handcrafted it"): every prop square to the yard's frame (wrecks a few
+// degrees off at most), no two solid props overlapping at their real footprints, nothing standing on an aisle, the office
+// and parking at the gate. The shelf shows the Industrial category with these types first and the old industrial types.
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text.Json.Nodes;
+using Placemaker.Core;
+using Placemaker.Core.Geometry;
+using Placemaker.Core.Layers.Common;
+using Placemaker.Core.Tool;
+using Unity.Mathematics;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Placemaker.Tests.Types
+{
+    [Collection(Placemaker.Tests.TimingCollection.Name)]
+    public class IndustrialYardsTests
+    {
+        private readonly ITestOutputHelper _out;
+        public IndustrialYardsTests(ITestOutputHelper output) { _out = output; }
+
+        public static readonly string[] Types = { "containerYard", "carYard", "junkYard", "industrialWorks" };
+        private const float Slope = 45f;
+        private static readonly float3[] Site15 = TestKit.Rect(140, 108);
+
+        public static IEnumerable<object[]> All() =>
+            Types.SelectMany(t => TestKit.Gen(t).Presets.Select(p => new object[] { t, p.Id }));
+
+        [Theory]
+        [MemberData(nameof(All))]
+        public void PlansSoundlyOnOneAndAHalfHectares(string type, string preset)
+        {
+            var plan = YardTestKit.PlanPreset(type, preset, Site15, TestKit.RoadAlongBottom(140));
+            YardTestKit.AssertSound(plan, Site15, Slope);
+            int solid = plan.Objects.Count(o => o.Role != ObjectRole.Decal);
+            _out.WriteLine($"{type}/{preset}: {solid} objects, facts " + string.Join(", ", plan.Facts.Select(f => f.Key + "=" + f.Value)));
+            Assert.True(solid > 60, $"{type}/{preset} placed only {solid} objects on 1.5 ha");
+            Assert.True(plan.Facts["blocksUsed"] >= 3, $"{type}/{preset} used only {plan.Facts["blocksUsed"]} blocks");
+            Assert.True(plan.Facts["offices"] >= 1, $"{type}/{preset} has no office at the gate");
+            Assert.True(plan.Facts["parked"] >= 2, $"{type}/{preset} parked {plan.Facts["parked"]} cars at the office");
+        }
+
+        [Theory]
+        [MemberData(nameof(All))]
+        public void PlansSoundlyOnSixHectareL(string type, string preset)
+        {
+            var plan = YardTestKit.PlanPreset(type, preset, YardTestKit.SixHaL, TestKit.RoadAlongBottom(293));
+            YardTestKit.AssertSound(plan, YardTestKit.SixHaL, Slope);
+            Assert.True(plan.Objects.Count(o => o.Role != ObjectRole.Decal) > 250, $"{type}/{preset} is sparse on 6 ha");
+        }
+
+        [Theory]
+        [MemberData(nameof(All))]
+        public void PlansOnAPaintedBlob(string type, string preset)
+        {
+            var ring = TestKit.Blob(85, 40, 5);
+            var plan = YardTestKit.PlanPreset(type, preset, ring, new SiteContext());
+            YardTestKit.AssertSound(plan, ring, Slope);
+            Assert.True(plan.Facts["blocksUsed"] >= 2, $"{type}/{preset} used {plan.Facts["blocksUsed"]} blocks on a blob");
+        }
+
+        [Theory]
+        [MemberData(nameof(All))]
+        public void IsDeterministicAndClearOfReserved(string type, string preset)
+        {
+            var a = YardTestKit.PlanPreset(type, preset, YardTestKit.SixHaL);
+            var b = YardTestKit.PlanPreset(type, preset, YardTestKit.SixHaL);
+            Assert.Equal(TestKit.Fingerprint(a), TestKit.Fingerprint(b));
+            var reserved = YardTestKit.Reserved(140, 108);
+            var r = YardTestKit.PlanPreset(type, preset, Site15, null, reserved);
+            Assert.False(r.HasErrors);
+            TestKit.AssertClearOfReserved(r, reserved);
+        }
+
+        [Theory]
+        [MemberData(nameof(All))]
+        public void IsFastOnFiveHectares(string type, string preset)
+        {
+            YardTestKit.PlanPreset(type, preset, YardTestKit.FiveHa);
+            var sw = Stopwatch.StartNew();
+            YardTestKit.PlanPreset(type, preset, YardTestKit.FiveHa);
+            sw.Stop();
+            _out.WriteLine($"{type}/{preset}: {sw.ElapsedMilliseconds} ms");
+            Assert.True(sw.ElapsedMilliseconds < TimingBudget.Ms(400), $"{type}/{preset} took {sw.ElapsedMilliseconds} ms for 5 ha");
+        }
+
+        /// <summary>
+        /// Handcrafted, part 1: on a rectangle with the street along the bottom every prop stands square to the street (a
+        /// multiple of 90°); only wrecks may be a few degrees off (and the spoil mounds' dead wood and the wear decals).
+        /// </summary>
+        [Theory]
+        [MemberData(nameof(All))]
+        public void EveryPropIsSquareToTheYard(string type, string preset)
+        {
+            var plan = YardTestKit.PlanPreset(type, preset, Site15, TestKit.RoadAlongBottom(140));
+            foreach (var o in plan.Objects)
+            {
+                // Nature on the spoil mounds (dead trees, bushes, a fallen log) and wear decals lie as they fell.
+                if (o.Role == ObjectRole.Tree || o.Role == ObjectRole.Bush || o.Role == ObjectRole.Decal || o.Category == AssetCategories.Rock) continue;
+                float q = math.PI * 0.5f;
+                float m = o.Yaw - q * math.round(o.Yaw / q);
+                float tol = o.Category == AssetCategories.ScrapWreck ? 0.08f : 0.01f;
+                Assert.True(math.abs(m) <= tol, $"{type}/{preset}: {o.Asset.Id} ({o.Category}) at {o.Position.xz} is {math.degrees(m):0.0}° off the yard's frame");
+            }
+        }
+
+        /// <summary>
+        /// Handcrafted, part 2: no two solid props overlap at their real footprints (catalog bounds of the vanilla prop the
+        /// build would take in a clean game), except the car under a carport.
+        /// </summary>
+        [Theory]
+        [MemberData(nameof(All))]
+        public void NoTwoPropsOverlap(string type, string preset)
+        {
+            var plan = YardTestKit.PlanPreset(type, preset, Site15, TestKit.RoadAlongBottom(140));
+            var boxes = new List<(PlannedObject o, float2[] ring)>();
+            foreach (var o in plan.Objects)
+            {
+                if (o.Role == ObjectRole.Decal || o.Role == ObjectRole.Tree || o.Role == ObjectRole.Bush) continue;
+                if (!Footprint(o, out var ring)) continue;
+                boxes.Add((o, ring));
+            }
+            int clashes = 0;
+            var report = new List<string>();
+            for (int i = 0; i < boxes.Count; i++)
+                for (int j = i + 1; j < boxes.Count; j++)
+                {
+                    var a = boxes[i]; var b = boxes[j];
+                    if (math.distance(a.o.Position.xz, b.o.Position.xz) > 80f) continue;
+                    if (IsCarport(a.o) || IsCarport(b.o)) continue;
+                    if (a.o.Category == AssetCategories.ScrapBarrier && b.o.Category == AssetCategories.ScrapBarrier) continue;   // block walls touch on purpose
+                    if (!Overlap(a.ring, b.ring)) continue;
+                    clashes++;
+                    if (report.Count < 8) report.Add($"{Id(a.o)} at {a.o.Position.xz} × {Id(b.o)} at {b.o.Position.xz}");
+                }
+            Assert.True(clashes == 0, $"{type}/{preset}: {clashes} overlapping props: " + string.Join("; ", report));
+        }
+
+        /// <summary>Handcrafted, part 3: nothing solid stands on the yard's own aisles (their asphalt strips).</summary>
+        [Theory]
+        [MemberData(nameof(All))]
+        public void NothingStandsOnTheAisles(string type, string preset)
+        {
+            var plan = YardTestKit.PlanPreset(type, preset, Site15, TestKit.RoadAlongBottom(140));
+            var aisles = plan.Surfaces.Where(s => s.Role == SurfaceRole.Asphalt && s.Category == AssetCategories.SurfaceAsphalt).Select(s => Poly.To2D(s.Ring)).ToList();
+            Assert.NotEmpty(aisles);
+            foreach (var o in plan.Objects)
+            {
+                if (o.Role == ObjectRole.Decal || o.Category == AssetCategories.FloodLight || o.Category == AssetCategories.ScrapBarrier) continue;
+                // The parking pad is asphalt too: parked cars are on it on purpose.
+                if (o.Category == AssetCategories.ScrapWreck || o.Category == AssetCategories.Bin || o.Category == AssetCategories.MemorialFlag) continue;
+                foreach (var ring in aisles)
+                    if (Poly.Contains(ring, o.Position.xz) && Poly.DistanceToBoundary(ring, o.Position.xz) > 1.5f)
+                        Assert.Fail($"{type}/{preset}: {o.Asset.Id} ({o.Category}) stands on an aisle at {o.Position.xz}");
+            }
+        }
+
+        [Fact]
+        public void TheStylesOfATypeAreVisiblyDifferent()
+        {
+            foreach (var type in Types)
+            {
+                var mixes = new List<string>();
+                foreach (var p in TestKit.Gen(type).Presets)
+                {
+                    var plan = YardTestKit.PlanPreset(type, p.Id, Site15, TestKit.RoadAlongBottom(140));
+                    var top = plan.Objects.Where(o => o.Role != ObjectRole.Decal).GroupBy(o => o.Asset.Id).OrderByDescending(g => g.Count()).Take(3).Select(g => g.Key);
+                    mixes.Add(string.Join(",", top));
+                }
+                Assert.Equal(mixes.Count, mixes.Distinct().Count());
+            }
+        }
+
+        [Fact]
+        public void KeysRecipesAndSchema()
+        {
+            foreach (var type in Types)
+            {
+                YardTestKit.AssertKeys(type, new[] { "Industrial" });
+                var g = TestKit.Gen(type);
+                Assert.Equal("industrial", GeneratorGroups.Of(g));
+                Assert.Equal(LayerKind.Fill, g.Kind);
+                Assert.Equal(ControlTier.Essential, g.Controls[0].Tier);
+                Assert.Equal(g.Presets.Count, g.Presets.Select(p => p.Values.S("style", "")).Distinct().Count());
+                var recipe = TestKit.LoadRecipe(type + ".json");
+                Assert.Equal(type, recipe.Root.Layer);
+                Assert.True(TestKit.Lang().ContainsKey(recipe.NameKey));
+            }
+        }
+
+        [Fact]
+        public void TheShelfShowsTheIndustrialCategory()
+        {
+            var dir = Path.Combine(TestKit.RepoRoot(), "Recipes", Shelf.FolderName);
+            var shelf = Shelf.Parse(Directory.GetFiles(dir, "*.json").OrderBy(f => f).Select(f => new KeyValuePair<string, string>(Path.GetFileName(f), File.ReadAllText(f))));
+            Assert.Empty(shelf.Warnings);
+            Assert.False(shelf.Category("industry").Hidden);
+            Assert.Equal("Industrial", shelf.Category("industry").Name);
+            foreach (var t in Types.Concat(new[] { "scrapyard", "logisticsYard", "landfill", "quarry", "constructionSite", "abandonedLot" }))
+            {
+                Assert.Equal("industry", shelf.CategoryOf(t, "industrial"));
+                Assert.False(shelf.IsTypeShelved(t, "industrial"), t + " is hidden");
+            }
+            // The new types come first in the category (lowest order).
+            int Pos(string id) => GeneratorRegistry.All.ToList().FindIndex(g => g.Id == id);
+            int newest = Types.Max(Pos);
+            foreach (var old in new[] { "scrapyard", "logisticsYard", "landfill", "quarry", "constructionSite", "abandonedLot" })
+                Assert.True(Pos(old) > newest, old + " sorts before the new yards");
+        }
+
+        // ───────────── footprints ─────────────
+
+        private static JsonObject _items;
+        private static JsonObject Items => _items ??= (JsonObject)JsonNode.Parse(File.ReadAllText(Path.Combine(TestKit.RepoRoot(), "Tests", "Placemaker.Tests", "Fixtures", "catalog-bounds.json")))!["items"]!;
+
+        private static bool IsCarport(PlannedObject o) => o.Category == AssetCategories.LogisticsShed;
+        private static string Id(PlannedObject o) => Resolve(o.Asset) ?? o.Asset.Id;
+
+        /// <summary>The id a clean game would build: the first of id/fallbacks the catalog knows (Placemaker's own props excluded).</summary>
+        private static string Resolve(AssetRef a)
+        {
+            foreach (var id in new[] { a.Id }.Concat(a.Fallbacks ?? Array.Empty<string>()))
+                if (!string.IsNullOrEmpty(id) && Items.ContainsKey(id)) return id;
+            return null;
+        }
+
+        private static bool Footprint(PlannedObject o, out float2[] ring)
+        {
+            ring = null;
+            var id = Resolve(o.Asset);
+            if (id == null) return false;
+            var b = Items[id]!["b"]!.AsArray();
+            float x0 = (float)b[0]!, z0 = (float)b[1]!, x1 = (float)b[2]!, z1 = (float)b[3]!;
+            // 5 cm of slack: props that stand side by side touch.
+            x0 += 0.05f; z0 += 0.05f; x1 -= 0.05f; z1 -= 0.05f;
+            float s = o.Scale;
+            var fwd = new float2(math.sin(o.Yaw), math.cos(o.Yaw));
+            var right = new float2(fwd.y, -fwd.x);
+            var c = o.Position.xz;
+            float2 P(float x, float z) => c + right * (x * s) + fwd * (z * s);
+            ring = new[] { P(x0, z0), P(x1, z0), P(x1, z1), P(x0, z1) };
+            return true;
+        }
+
+        /// <summary>Separating-axis test of two convex quads.</summary>
+        private static bool Overlap(float2[] a, float2[] b)
+        {
+            foreach (var poly in new[] { a, b })
+                for (int i = 0; i < 4; i++)
+                {
+                    var e = poly[(i + 1) % 4] - poly[i];
+                    var n = new float2(-e.y, e.x);
+                    float amin = float.MaxValue, amax = float.MinValue, bmin = float.MaxValue, bmax = float.MinValue;
+                    foreach (var p in a) { float d = math.dot(p, n); amin = math.min(amin, d); amax = math.max(amax, d); }
+                    foreach (var p in b) { float d = math.dot(p, n); bmin = math.min(bmin, d); bmax = math.max(bmax, d); }
+                    if (amax <= bmin || bmax <= amin) return false;
+                }
+            return true;
+        }
+    }
+}

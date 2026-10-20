@@ -1,0 +1,213 @@
+// Industrial category (2026-10-19): the base of the handcrafted yards (container yard, car yard, junk yard, industrial
+// works). The plan is always the same five steps, and only the middle one belongs to the type:
+//
+//   1. level the yard (blended back to the ground at the outline) and lay the ground: one surface for the yard, asphalt for
+//      the aisles, concrete pads under whatever stands on them;
+//   2. the layout (IndustrialSite): frame square to the street, front yard, spine and aisles, storage blocks;
+//   3. the type decides what each block is (Assign) and fills it (Fill) with YardFill's exact rows, stacks and bays;
+//   4. the front yard (gate, office row, parking), the tidy edge (trees / block wall / container wall), floodlight masts and
+//      the fence with its gate gap;
+//   5. stats.
+//
+// No grime scatter, no strays, no "random junk by the fence": the user asked for yards that look designed.
+
+using System.Collections.Generic;
+using Placemaker.Core.Layers.Common;
+using Placemaker.Core.Layers.Leisure;
+using Placemaker.Core.Layers.Types.Scrapyard;
+using Unity.Mathematics;
+
+namespace Placemaker.Core.Layers.Types.Yards
+{
+    public abstract class IndustrialYardLayer : LeisureLayer
+    {
+        /// <summary>A vehicle site: plain entrances, never blocks Build.</summary>
+        protected override bool TypedEntrances => false;
+        protected override bool HostsStreetShops => false;
+        public override string[] Emits => new[] { RegionTags.Core };
+        public override float MinArea => 1200f;
+        protected override int WantedEntrances(LayerRegion region) => 1;
+
+        /// <summary>The type's styles (preset ids double as the style choice).</summary>
+        protected abstract string[] Styles { get; }
+
+        protected override List<FeatureInfo> BuildFeatures() => new List<FeatureInfo>
+        {
+            Feature("decals", ("theme", "dirt"), ("density", 0.6), ("ground", "paved")),
+        };
+
+        protected override string[] DefaultFeatures => System.Array.Empty<string>();
+        public static bool DebugBlocks;
+
+        protected override void DefineControls(ControlSet c)
+        {
+            c.Choice("style", Styles[0], ControlTier.Essential, "yard", Styles).Tip();
+            c.Slider("fill", 85, 30, 100, 5, "%", ControlTier.Essential, "yard").Tip();
+            c.Slider("aisle", 9, 6, 14, 0.5, "m", ControlTier.Essential, "yard").Tip();
+
+            c.Toggle("office", true, ControlTier.More, "front").Tip();
+            c.Toggle("parking", true, ControlTier.More, "front").Tip();
+            c.Toggle("weighbridge", false, ControlTier.More, "front").Tip();
+            c.Toggle("floodlights", true, ControlTier.More, "front");
+
+            c.Choice("edge", "blocks", ControlTier.More, "edge", "trees", "blocks", "containers", "plain").Tip();
+            c.Choice("fence", "fence", ControlTier.More, "edge", "none", "fence").Tip();
+            c.Asset("fenceAsset", AssetCategories.Fence, ControlTier.More, "edge").When("fence=fence");
+            c.AssetMulti("treeSpecies", AssetCategories.Tree, ControlTier.More, "edge").When("edge=trees");
+
+            c.Choice("ground", "gravel", ControlTier.More, "ground", "gravel", "concrete", "dirt").Tip();
+            c.Toggle("paint", true, ControlTier.More, "ground").Tip();
+            c.Toggle("spoil", true, ControlTier.More, "ground").Tip();
+            c.Toggle("level", true, ControlTier.More, "ground").Tip();
+            EntranceMarkers(c);
+
+            c.RandomRange("fill", 60, 100);
+            c.Fixed("level");
+        }
+
+        /// <summary>Layout numbers for a style.</summary>
+        protected abstract SiteSpec Spec(LayerContext ctx, string style);
+        /// <summary>What stands in the front yard for a style.</summary>
+        protected abstract YardFill.FrontSpec Front(LayerContext ctx, string style);
+        /// <summary>Decides each block's use (YardBlock.Use) and fills it.</summary>
+        protected abstract void Fill(IndustrialSite s, string style);
+
+        protected override void PlanCore(LayerContext ctx)
+        {
+            var region = ctx.LayerRegion;
+            var gates = Gates(ctx);
+            string style = ctx.S("style");
+            if (System.Array.IndexOf(Styles, style) < 0) style = Styles[0];
+
+
+            var front = Front(ctx, style);
+            front.Offices = ctx.B("office") ? front.Offices : 0;
+            front.Booth = front.Booth && ctx.B("office");
+            front.Parking = front.Parking && ctx.B("parking") && front.ParkedCar.Options != null;
+            front.Weighbridge = ctx.B("weighbridge");
+
+            var spec = Spec(ctx, style);
+            spec.Aisle = math.max(6f, ctx.F("aisle"));
+            // The office row or the parking row, whichever reaches further from the spine, plus a walkway.
+            float officeZone = front.Offices > 0 ? 3.2f + front.Office.Z + 0.6f : front.Booth ? 4f : 0f;
+            float parkingZone = front.Parking ? 6.8f : 0f;
+            spec.FrontZone = spec.Aisle * 0.5f + math.max(officeZone, parkingZone) + 2.5f;
+            var s = IndustrialSite.Plan(ctx, gates, spec);
+            ctx.Check();
+
+            Ground(s);
+            if (ctx.S("fence") != "none")
+                YardKit.Fence(ctx, gates, "fence", AssetMix.One(ctx.S("fenceAsset")), s.Salt(0xFE7Cu));
+
+            // Masts first: the edge walls leave them their gap.
+            if (ctx.B("floodlights")) YardFill.Lights(s, s.Salt(0x11A5u));
+            YardFill.FrontYard(s, front, s.Salt(0xF407u));
+            ctx.Check();
+
+            Fill(s, style);
+            ctx.Check();
+
+            YardFill.Edge(s, ctx.S("edge"), ctx.L("treeSpecies"), s.Salt(0xED6Eu));
+            ctx.Check();
+
+            // The ground art (YardGround): spoil mounds in the leftover corners, the painted ground, the wear decals.
+            var mounds = new List<Mound>(s.Mounds);
+            if (ctx.B("spoil")) mounds.AddRange(YardGround.Spoil(s, math.clamp((int)(region.Area / 6000f), 1, 6), s.Salt(0x5B0Au)));
+            if (ctx.B("paint")) YardGround.Paint(s, ctx.S("ground"), s.Salt(0x9A17u));
+            int decals = YardGround.Decals(s, s.Salt(0xDECAu));
+            ctx.Check();
+
+            // Whatever is still automatic (pads, aisles, the fence, decals) gets the curated industrial look.
+            GritAssets.Apply(ctx.Plan, ctx.Seed);
+            GritAssets.CapDecals(ctx.Plan, region.Area, 110f);
+            var terrain = Shape(ctx, region, mounds);
+            YardKit.Settle(ctx, terrain);
+            EmitGreenRegions(ctx, s.Occ, 200f);
+
+            ctx.Stat(Keys.StatArea, System.Math.Round(region.Area), Keys.UnitM2);
+            ctx.Stat("Placemaker.Stat.Containers", s.Containers, Keys.UnitCount);
+            ctx.Stat("Placemaker.Stat.Wrecks", s.Wrecks, Keys.UnitCount);
+            ctx.Stat("Placemaker.Stat.Heaps", s.Heaps, Keys.UnitCount);
+            ctx.Stat("Placemaker.Stat.Bays", s.Bays, Keys.UnitCount);
+            ctx.Stat("Placemaker.Stat.Machines", s.Machines, Keys.UnitCount);
+            ctx.Stat(Keys.StatLamps, s.Lights, Keys.UnitCount);
+            int used = 0;
+            foreach (var b in s.Blocks) if (b.Use.Length > 0) used++;
+            ctx.Plan.Facts["blocks"] = s.Blocks.Count;
+            ctx.Plan.Facts["blocksUsed"] = used;
+            ctx.Plan.Facts["aisles"] = s.Aisles.Count;
+            ctx.Plan.Facts["offices"] = s.Offices;
+            ctx.Plan.Facts["parked"] = s.Parked;
+            ctx.Plan.Facts["items"] = s.Items;
+            ctx.Plan.Facts["mounds"] = mounds.Count;
+            ctx.Plan.Facts["decals"] = decals;
+            ctx.Plan.Facts["paints"] = ctx.Plan.Paint.Count;
+            if (DebugBlocks) { ctx.Plan.Facts["dbg.Ox"] = s.O.x; ctx.Plan.Facts["dbg.Oy"] = s.O.y; ctx.Plan.Facts["dbg.Vx"] = s.V.x; ctx.Plan.Facts["dbg.Vy"] = s.V.y; ctx.Plan.Facts["dbg.umin"] = s.UMin; ctx.Plan.Facts["dbg.umax"] = s.UMax; ctx.Plan.Facts["dbg.vmin"] = s.VMin; ctx.Plan.Facts["dbg.vmax"] = s.VMax; ctx.Plan.Facts["dbg.front"] = s.Spec.Front; ctx.Plan.Facts["dbg.gates"] = s.Gates.Count; }
+            if (DebugBlocks) foreach (var b in s.Blocks) { ctx.Plan.Facts[$"blk{b.Index}.band"] = b.Band; ctx.Plan.Facts[$"blk{b.Index}.u0"] = b.U0; ctx.Plan.Facts[$"blk{b.Index}.u1"] = b.U1; ctx.Plan.Facts[$"blk{b.Index}.v0"] = b.V0; ctx.Plan.Facts[$"blk{b.Index}.v1"] = b.V1; }
+        }
+
+        // ───────────── ground ─────────────
+
+        private static readonly AssetRef Gravel = new AssetRef("Terrain Surfaces Pack Rock gaga TTP - Smaller Pebbles grey M Surface", "Sand Surface 02", "Sand Surface 01");
+        private static readonly AssetRef Dirt = new AssetRef("EAI - Surface Pack Ground Mud Surface", "Terrain Surfaces Pack Ground gaga TTP - Soil M Surface", "Oil Surface 01");
+        private static readonly AssetRef Concrete = new AssetRef("Concrete Surface 01", "Pavement Surface 02", "Concrete Surface 02");
+
+        /// <summary>The yard surface, then the aisles on top (asphalt, so the lanes read from above).</summary>
+        private static void Ground(IndustrialSite s)
+        {
+            var ctx = s.Ctx;
+            // Concrete: one slab over the yard inside the edge band. Gravel and dirt are painted into the terrain itself
+            // (YardGround.Paint); without paint they fall back to a surface so the yard is never bare grass.
+            switch (ctx.S("ground"))
+            {
+                case "concrete": ctx.Surface(s.Inner.Ring, SurfaceRole.Paving, Concrete, AssetCategories.SurfacePaving); break;
+                case "dirt": if (!ctx.B("paint")) ctx.Surface(s.Inner.Ring, SurfaceRole.Ground, Dirt, AssetCategories.SurfaceDirt); break;
+                default: if (!ctx.B("paint")) ctx.Surface(s.Inner.Ring, SurfaceRole.Ground, Gravel, AssetCategories.SurfaceNatural); break;
+            }
+            float hw = s.Spec.Aisle * 0.5f;
+            foreach (var (a, b) in s.Aisles)
+                YardKit.Strip(ctx, a, b, hw, SurfaceRole.Asphalt, AssetMix.One(""), AssetCategories.SurfaceAsphalt);
+        }
+
+        /// <summary>The yard levelled to one pad (blended to the ground at the outline) with the mounds on it: one sculpt.</summary>
+        private static TerrainResult Shape(LayerContext ctx, LayerRegion region, List<Mound> mounds)
+        {
+            bool level = ctx.B("level");
+            if (!level && mounds.Count == 0) return new TerrainResult { HeightAfter = ctx.H };
+            float mean = level ? TerrainShaper.MeanHeight(ctx, region) : 0f;
+            return YardKit.Sculpt(ctx, region, (p, h0) =>
+            {
+                float o = level ? mean - h0 : 0f;
+                float m = 0f;
+                for (int i = 0; i < mounds.Count; i++) m = math.max(m, mounds[i].Offset(p));
+                return o + m;
+            }, 45f, 12f, 5f);
+        }
+
+        // ───────────── shared helpers for the types ─────────────
+
+        /// <summary>Blocks ordered from the spine and the street outward (the order a yard fills up).</summary>
+        protected static List<YardBlock> Ordered(IndustrialSite s)
+        {
+            var list = new List<YardBlock>(s.Blocks);
+            list.Sort((a, b) => a.Band != b.Band ? a.Band.CompareTo(b.Band) : a.Near.CompareTo(b.Near));
+            return list;
+        }
+
+        /// <summary>The biggest block (by area) — the one that gets the yard's centrepiece.</summary>
+        protected static YardBlock Biggest(IndustrialSite s, System.Func<YardBlock, bool> ok = null)
+        {
+            YardBlock best = null;
+            foreach (var b in s.Blocks)
+                if ((ok == null || ok(b)) && (best == null || b.Length * b.Depth > best.Length * best.Depth)) best = b;
+            return best;
+        }
+
+        protected static int LastBand(IndustrialSite s)
+        {
+            int n = -1;
+            foreach (var b in s.Blocks) n = math.max(n, b.Band);
+            return n;
+        }
+    }
+}

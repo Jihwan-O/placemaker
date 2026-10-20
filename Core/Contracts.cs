@@ -704,6 +704,14 @@ namespace Placemaker.Core
         public string Category;
     }
 
+    /// <summary>Tree growth stages for PlannedObject.Age (the build maps them to ObjectDefinition.m_Age, ObjectUtils.InitializeTreeState).</summary>
+    public static class PlannedAge
+    {
+        public const int Young = 0, Teen = 1, Adult = 2, Old = 3;
+        /// <summary>A dead tree (m_Age ≥ 0.95: TreeState.Dead, bare branches).</summary>
+        public const int Dead = 4;
+    }
+
     public enum AreaRole { PedestrianArea = 0, Hangaround = 1, Lot = 2 }
 
     /// <summary>Non-surface areas (navigation/space/lot polygons).</summary>

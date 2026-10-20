@@ -378,7 +378,7 @@ namespace Placemaker.Game.Build
             NoteUsed(prefab);
         }
 
-        private static readonly float[] AgeStages = { 0f, 0.17500001f, 0.425f, 0.77500004f };   // ToolUtils.GetRandomAge
+        private static readonly float[] AgeStages = { 0f, 0.17500001f, 0.425f, 0.77500004f, 0.97f };   // ToolUtils.GetRandomAge; [4] = dead (ObjectUtils.InitializeTreeState: age ≥ 0.95)
 
         private void EmitObjectDefinition(Entity prefab, float3 position, float yaw, float scale, int age, uint variation, long key, bool snapToGround, int? randomSeed = null, float elevation = 0f, bool optional = true)
         {

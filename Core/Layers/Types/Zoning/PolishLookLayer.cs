@@ -261,6 +261,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
         {
             var site = ctx.Input.Site;
             var ring = ctx.LayerRegion.Ring;
+            var clock = new PlanClock(ctx.Plan.Timings);
             var zones = new List<LotZone>();
             foreach (var slot in SlotNames)
             {
@@ -306,6 +307,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
             int tooSteep = 0;
             Poly.Bounds(ring, out var rmin, out var rmax);
             var open = ZoneGuard.CellOpener(site.NearbyNets, rmin - 40f, rmax + 40f);
+            clock.Lap("roads");
             var count = new Dictionary<string, (int Cells, string Stat)>();
             var done = new HashSet<long>();
             int lotIndex = 0;
@@ -418,10 +420,13 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     lotIndex++;
                 }
             }
+            clock.Lap("lots");
             if (levelLots)
             {
                 var opt = new LotLevel.Options { MaxEarth = maxEarth, BankSlope = ctx.F("levelBank") / 100f, Walls = ctx.B("levelWalls"), Seed = ctx.Input.Seed == 0 ? 1u : ctx.Input.Seed };
-                var after = LotLevel.Build(ctx, lots, roads3, opt, ctx.Cancel);
+                var levelTimes = new List<KeyValuePair<string, double>>();
+                var after = LotLevel.Build(ctx, lots, roads3, opt, ctx.Cancel, levelTimes);
+                clock.Lap("level", levelTimes);
                 if (after != null) ctx.Plan.HeightAfter = after;
                 var h = after ?? site.HeightAt;
                 foreach (var lot in lots)
@@ -435,6 +440,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     }
                 }
                 ctx.Plan.Facts["polishLevelTooSteep"] = tooSteep;
+                clock.Lap("zone levelled lots");
             }
             int cells = count.Values.Sum(vv => vv.Cells);
             ctx.Plan.Stats.Add(new PlanStat(StatCells, cells, "count"));

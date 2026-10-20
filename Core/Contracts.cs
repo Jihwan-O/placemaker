@@ -893,6 +893,9 @@ namespace Placemaker.Core
         /// </summary>
         public Func<float2, float> HeightAfter;
 
+        /// <summary>(zoning speed) Where this layer's planning time went: ms per step, in order (PlanClock). For the log; not persisted.</summary>
+        public List<KeyValuePair<string, double>> Timings = new List<KeyValuePair<string, double>>();
+
         public bool HasErrors
         {
             get { foreach (var i in Issues) if (i.Severity == IssueSeverity.Error) return true; return false; }

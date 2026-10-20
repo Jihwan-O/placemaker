@@ -187,8 +187,23 @@ namespace Placemaker.Game.Tool
             _planRevision = r.Revision;
             _planMs = r.Milliseconds;
             _affordRevision = -1;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             ResolveAssets();
+            // (zoning speed) Where the plan's time went: the worker's steps (Core PlanClock), the site capture before it and the
+            // assets after it (main thread). Every plan but those of a running drag (unless slow).
+            if (_gesture == Gesture.None || r.Milliseconds >= 100)
+                Mod.Log.Info($"Placemaker: plan {_recipe?.Root?.Layer} r{r.Revision}: {r.Milliseconds:0} ms on the worker (site capture {_captureMs:0} ms, assets {sw.Elapsed.TotalMilliseconds:0} ms), "
+                    + $"{CountZoning(_plan)} zone cells: {PlanTimings.Describe(_plan)}");
             Touch();
+        }
+
+        private double _captureMs;
+
+        private static int CountZoning(ComposedPlan plan)
+        {
+            int n = 0;
+            if (plan != null) foreach (var l in plan.Layers) n += l.Zoning.Count;
+            return n;
         }
 
         private void UpdatePlanning()
@@ -221,7 +236,9 @@ namespace Placemaker.Game.Tool
             if (debounce < 0f) return;   // Simple detail: re-plan when the drag ends
             if (debounce > 0f && UnityEngine.Time.realtimeSinceStartup - _lastInputChange < debounce) return;
 
+            var capture = System.Diagnostics.Stopwatch.StartNew();
             var site = SiteFor(_shape);
+            _captureMs = capture.Elapsed.TotalMilliseconds;
             _requestedRevision = _inputRevision;
             _planStartedAt = UnityEngine.Time.realtimeSinceStartup;
             _worker.Request(_inputRevision, _recipe.Clone(), _shape, site);

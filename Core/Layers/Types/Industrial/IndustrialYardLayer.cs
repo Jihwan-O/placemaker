@@ -88,6 +88,18 @@ namespace Placemaker.Core.Layers.Types.Yards
 
             var spec = Spec(ctx, style);
             spec.Aisle = math.max(6f, ctx.F("aisle"));
+            // A small plot (the user: "What about really tiny areas?") gets a compact yard: a thin edge, a short front with one
+            // office, no parking under 2000 m², short blocks, a narrower aisle.
+            if (region.Area < 4000f)
+            {
+                float k = math.saturate((region.Area - 1000f) / 3000f);
+                spec.Edge = math.min(spec.Edge, math.lerp(1.2f, spec.Edge, k));
+                spec.Front = math.min(spec.Front, math.lerp(11f, spec.Front, k));
+                spec.MinBlock = math.min(spec.MinBlock, math.lerp(6f, spec.MinBlock, k));
+                spec.Aisle = math.min(spec.Aisle, math.lerp(6f, spec.Aisle, k));
+                front.Offices = math.min(front.Offices, 1);
+                if (region.Area < 2000f) front.Parking = false;
+            }
             // The office row or the parking row, whichever reaches further from the spine, plus a walkway.
             float officeZone = front.Offices > 0 ? 3.2f + front.Office.Z + 0.6f : front.Booth ? 4f : 0f;
             float parkingZone = front.Parking ? 6.8f : 0f;

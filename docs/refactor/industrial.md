@@ -53,3 +53,19 @@ crack decals placed on purpose (asset packs only).
 - **Plant**: `IndustrialManufacturingDecoration0x_*` (the industrial buildings' machinery), `OilTankSmall*`,
   `IndustrialChimney{Small,Medium,Large}01 Agriculture`, `OreConveyorBelt01`, `Carport02` (dismantling bays).
 - **Nature**: dead trees (any tree at age 4 = dead, `PlannedAge.Dead`), `FlowerBushWildDead02`, `Log02/05/08`.
+
+## After the first game run (2026-10-19, the user: "a little too perfect ... like a mathematician ... it should look like a photograph of a cool yard")
+
+- **Mess with a reason** (`YardFill.Mess`): rows stay rows, but each prop wanders a little and turns a little, gaps come in
+  clumps (value noise), wrecks pile two and three high (more towards the back) and some lie on their roof or side
+  (`PlannedObject.Elevation`, `Roll`; the build raises and tilts them, Declutter checks their real height). Containers
+  stack in exact columns with an uneven skyline. The game hides one of two props whose boxes meet, so the wander is
+  always smaller than the gap the row leaves (`IndustrialSite.Fits` probes the corners too).
+- **Less white**: dirt and gravel yards drive on their own trodden ground (paint), no concrete under bays; concrete stays
+  for the terminal, self storage and the tip; aisles there are the dark vanilla pavement.
+- **The vanilla `Pile*` props (PileOreSmall01 …) render empty on their own** (seen in the game): the mountain is tipped from
+  ore truck loads on a terrain mound; sand, dirt and spoil heaps are terraformed cones painted their material; rock piles
+  are boulders with stones at their feet (`YardFill.Stockpiles`).
+- **Tiny plots** (< 4000 m²) get a compact yard; 20 ha plans in under a second (up to ~11 000 props for a car yard).
+- The runner waited 4 minutes per build for a plan while no type was chosen (since d4467e3); `SuiteSteps.PlanReady` no
+  longer waits then.

@@ -81,6 +81,8 @@ namespace Placemaker.Core.Layers.Types.Yards
                         // the street (two high at the front, three, four at the back) and down at each block's outer end.
                         int tiers = b.Band < 0 ? 2 : b.Band == last && last > 0 ? 4 : math.clamp(b.Band + 2, 2, 4);
                         int n = YardFill.RowsAlong(s, b, IndustrialAssets.Box40, 0.6f, 0.35f, fill, salt, YardFill.Mess.Containers, 99, true, tiers);
+                        // A block too short for a 40 ft box takes 20 ft ones.
+                        if (n == 0) n = YardFill.RowsAlong(s, b, IndustrialAssets.Box20, 0.5f, 0.35f, fill, salt, YardFill.Mess.Containers, 99, true, tiers);
                         if (n > 0) { b.Use = "stacks"; s.Containers += n; s.Anchors.Add((s.W(b.UMid, b.VMid), b.Length * 0.25f)); }
                         break;
                     }

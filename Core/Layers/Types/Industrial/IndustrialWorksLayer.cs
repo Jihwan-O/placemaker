@@ -21,7 +21,6 @@ namespace Placemaker.Core.Layers.Types.Yards
         protected override string Area => "IndustrialWorks";
         public override string Id => LayerId;
         public override string Icon => "Media/Game/Icons/ZoneIndustrialManufacturing.svg";
-        public override float MinArea => 3000f;
         protected override string[] Styles => StyleIds;
 
         protected override void DefinePresets()

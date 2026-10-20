@@ -173,6 +173,31 @@ namespace Placemaker.Tests.Types
             }
         }
 
+        /// <summary>
+        /// The user (2026-10-19): "What about really tiny areas also? What about massive areas?" A plot of 40 × 32 m still makes
+        /// a little yard (gate, office, a block or two) and a 20 ha one fills with blocks and stays quick.
+        /// </summary>
+        [Theory]
+        [MemberData(nameof(All))]
+        public void TinyAndMassiveSites(string type, string preset)
+        {
+            var tiny = TestKit.Rect(40, 32);
+            var t = YardTestKit.PlanPreset(type, preset, tiny, TestKit.RoadAlongBottom(40));
+            YardTestKit.AssertSound(t, tiny, Slope);
+            _out.WriteLine($"{type}/{preset} tiny: {t.Objects.Count} objects, blocks {Fact(t, "blocks")}, used {Fact(t, "blocksUsed")}, issues {string.Join(",", t.Issues.Select(i => i.Key))}");
+            var huge = TestKit.Rect(500, 400);
+            YardTestKit.PlanPreset(type, preset, TestKit.Rect(100, 80), TestKit.RoadAlongBottom(100));   // JIT
+            var sw = Stopwatch.StartNew();
+            var h = YardTestKit.PlanPreset(type, preset, huge, TestKit.RoadAlongBottom(500));
+            sw.Stop();
+            YardTestKit.AssertSound(h, huge, Slope);
+            _out.WriteLine($"{type}/{preset} 20 ha: {h.Objects.Count} objects, blocks {Fact(h, "blocks")}, used {Fact(h, "blocksUsed")}, {sw.ElapsedMilliseconds} ms");
+            Assert.True(Fact(h, "blocksUsed") >= 20, $"{type}/{preset}: only {Fact(h, "blocksUsed")} blocks on 20 ha");
+            Assert.True(sw.ElapsedMilliseconds < TimingBudget.Ms(2500), $"{type}/{preset} took {sw.ElapsedMilliseconds} ms on 20 ha");
+        }
+
+        private static double Fact(AreaPlan p, string k) => p.Facts.TryGetValue(k, out var v) ? v : -1;
+
         [Fact]
         public void TheStylesOfATypeAreVisiblyDifferent()
         {

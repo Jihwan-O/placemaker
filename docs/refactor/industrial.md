@@ -69,3 +69,17 @@ crack decals placed on purpose (asset packs only).
 - **Tiny plots** (< 4000 m²) get a compact yard; 20 ha plans in under a second (up to ~11 000 props for a car yard).
 - The runner waited 4 minutes per build for a plan while no type was chosen (since d4467e3); `SuiteSteps.PlanReady` no
   longer waits then.
+
+## The organic scrapyards (2026-10-19, after "perfectly laid out scrap piles in a grid ... F")
+
+`OrganicYard`: the car yards (all three styles) and the scrap-metal junk yard are no longer blocks. Same frame, edge and
+front yard; then dirt roads that wander from the gate to the back (a lumpy off-centre loop on a bigger yard, a spur or two
+to the fence), painted compacted gravel, no surface strip; a work pad kept clear (loader, skips, the crusher's plant and
+conveyor); wrecks nose to the roads both sides, the second row piled higher; then the scrap field: piles of 5–10 m (wrecks
+piled two and three high, some on their roofs or sides, metal and rubble, trash, drums, crates, by drifting zones) with
+trodden ground between them and the odd lone wreck; a terrain swell under every big pile; rubbish and rusty ground in
+ragged blobs (kept off the roads); junk spilling onto the roads now and then. The user: "Very good" (then: spill onto the
+road, dirt roads, both done). The container yards, the reclamation yard, the tip and the works keep their blocks.
+
+In the game: stacked cars rest 1.3 m up (cars are 1.4–2.0 m tall); tipped props keep their tilt (`Roll`); the build hides
+one of two props whose boxes meet, so piles touch but never overlap. 20 ha organic yards plan in about 1.5 s (11 000 props).

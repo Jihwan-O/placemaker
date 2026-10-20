@@ -110,8 +110,14 @@ Sinking works: a prop lowered into the ground (PlannedObject.Elevation < 0, emit
 stays where it is put.
 
 `YardEarth`: a bund of boulders inside the fence (edge "boulders", laid before the fill: a 5 m boulder reaches past the edge
-band; the band is 6.4 m deep for it), dirt banks (terraformed banks along the back and side fence with dirt heaps on the
-crest, stones and a dead bush at the foot; option "Dirt banks"), stones at the foot of everything (round the heaps and the
+band; the band is 6.4 m deep for it), dirt banks (terraformed banks along the back and side fence, spoil worked into the crest: sunk
+mixed and concrete rubble, boulders, rarely the clay-orange heap, since a row of them read as rugs in the game; stones
+and a dead bush at the foot; option "Dirt banks"), stones at the foot of everything (round the heaps and the
 pad, along the dirt roads and wherever free ground lies within a few metres of something, in drifting patches; slider
-"Stones", a third on a concrete yard), crushed concrete heaps by the work pad, a burn barrel with pallets to sit on by the
-office. The junk yard's sorted style and the works style have the boulder bund.
+"Stones", a third on a concrete yard), rubble worked into the ground (sunk concrete, mixed and plank rubble in drifting patches; slider "Ground rubble";
+none on concrete, half in a block yard), crushed concrete heaps by the work pad, a burn barrel with pallets to sit on by
+the office. No stones on a block yard's pads.
+
+Sunk pieces get the game's negative Elevation: ObjectUtils.GetCollisionMask then gives them the Underground mask only, so
+they hide nothing standing on them (seen in the game runner, `lab-ground3`: a car on sunk rubble, barrels in it, all drawn;
+sunk without it, the game hid one of each pair). Declutter leaves them out. The junk yard's sorted style and the works style have the boulder bund.

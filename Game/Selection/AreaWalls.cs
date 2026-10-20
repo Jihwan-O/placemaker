@@ -33,6 +33,7 @@ namespace Placemaker.Game.Selection
         private readonly RoadNetwork _roads;
         private readonly BlockObstacles _obstacles;
         private readonly List<Entity> _scratch = new List<Entity>();
+        private readonly List<(float2[] Ring, bool Round)> _pieces = new List<(float2[], bool)>();
 
         private float2 _min, _max;
         private float _at = -100f;
@@ -120,14 +121,10 @@ namespace Placemaker.Game.Selection
                     default: continue;
                 }
                 if (ignoreGroup != 0 && InGroup(e, ignoreGroup)) continue;
-                var g = _em.GetComponentData<EdgeGeometry>(e);
-                pieces += Strip(g.m_Start.m_Left, g.m_Start.m_Right, k, into);
-                pieces += Strip(g.m_End.m_Left, g.m_End.m_Right, k, into);
-                var comp = _em.HasComponent<Composition>(e) ? _em.GetComponentData<Composition>(e) : default;
-                if (_em.HasComponent<StartNodeGeometry>(e) && GroundNode(comp.m_StartNode))
-                    pieces += NodePiece(_em.GetComponentData<StartNodeGeometry>(e).m_Geometry, k, into);
-                if (_em.HasComponent<EndNodeGeometry>(e) && GroundNode(comp.m_EndNode))
-                    pieces += NodePiece(_em.GetComponentData<EndNodeGeometry>(e).m_Geometry, k, into);
+                _pieces.Clear();
+                RoadSurfaces.Pieces(_em, e, _pieces);
+                foreach (var (ring, _) in _pieces) into.Add(new BrushObstacle(k, ring));
+                pieces += _pieces.Count;
             }
             return pieces;
         }
@@ -136,51 +133,6 @@ namespace Placemaker.Game.Selection
         {
             try { return Services.Groups != null && Services.Groups.GroupOf(e) == group; }
             catch (Exception) { return false; }
-        }
-
-        /// <summary>A junction end that is not a tunnel or a bridge (its own composition says so).</summary>
-        private bool GroundNode(Entity composition)
-        {
-            if (composition == Entity.Null || !_em.HasComponent<NetCompositionData>(composition)) return true;
-            var flags = _em.GetComponentData<NetCompositionData>(composition).m_Flags.m_General;
-            return (flags & (CompositionFlags.General.Elevated | CompositionFlags.General.Tunnel)) == 0;
-        }
-
-        /// <summary>One junction end, cut like CellBlockJobs: round ends (turning circles, roundabouts) in three strips.</summary>
-        private static int NodePiece(EdgeNodeGeometry n, BrushObstacleKind k, List<BrushObstacle> into)
-        {
-            if (n.m_MiddleRadius > 0f)
-            {
-                var mid = MathUtils.Lerp(n.m_Right.m_Left, n.m_Right.m_Right, 0.5f);
-                mid.d = n.m_Middle.d;
-                return Strip(n.m_Left.m_Left, n.m_Left.m_Right, k, into) + Strip(n.m_Right.m_Left, mid, k, into) + Strip(mid, n.m_Right.m_Right, k, into);
-            }
-            return Strip(n.m_Left.m_Left, n.m_Middle, k, into) + Strip(n.m_Middle, n.m_Right.m_Right, k, into);
-        }
-
-        /// <summary>The surface between two side curves (left forward, right back) as one polygon.</summary>
-        private static int Strip(Bezier4x3 left, Bezier4x3 right, BrushObstacleKind k, List<BrushObstacle> into)
-        {
-            var pts = new List<float2>(20);
-            Sample(left, true, pts);
-            Sample(right, false, pts);
-            var ring = Poly.Clean(pts, 0.02f);
-            if (ring.Length < 3 || Poly.Area(ring) < 0.05f) return 0;
-            foreach (var p in ring) if (!Poly.IsFinite(p)) return 0;
-            into.Add(new BrushObstacle(k, Poly.EnsureCcw(ring)));
-            return 1;
-        }
-
-        private static void Sample(Bezier4x3 c, bool forward, List<float2> into)
-        {
-            float chord = math.distance(c.a.xz, c.d.xz);
-            float hull = math.distance(c.a.xz, c.b.xz) + math.distance(c.b.xz, c.c.xz) + math.distance(c.c.xz, c.d.xz);
-            int n = hull - chord < 0.03f ? 1 : math.clamp((int)math.ceil(hull / 3f), 4, 12);
-            for (int i = 0; i <= n; i++)
-            {
-                float t = forward ? (float)i / n : 1f - (float)i / n;
-                into.Add(MathUtils.Position(c, t).xz);
-            }
         }
     }
 }

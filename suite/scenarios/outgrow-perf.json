@@ -1,0 +1,29 @@
+{
+  "_about": "Outgrow speed: nine square blocks of houses (about 450) grown with Outgrow off, then all of them outgrown at once; every pass's input is written to <run>/passes for the offline benchmark (Tests OutgrowBench), polishIdle reports how long until every house was looked at, the frame cost meanwhile and Outgrow's own times (gather, plan on the worker, write). Send with: powershell -File tools/suite/Send-Suite.ps1 -File suite/scenarios/outgrow-perf.json -Who outgrow-perf",
+  "scenarios": [
+    {
+      "id": "outgrow-perf-town",
+      "land": { "shape": "rect", "size": [ 760, 760 ], "ground": "flat", "roads": "none" },
+      "steps": [
+        { "do": "setting", "name": "NeighbourhoodPolish", "value": false },
+        { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ -220, -220 ] },
+        { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ -220, 0 ] },
+        { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ -220, 220 ] },
+        { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ 0, -220 ] },
+        { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ 0, 0 ] },
+        { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ 0, 220 ] },
+        { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ 220, -220 ] },
+        { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ 220, 0 ] },
+        { "do": "lab", "op": "street", "shape": "block", "length": 130, "at": [ 220, 220 ] },
+        { "do": "grow", "seconds": 180 },
+        { "do": "lab", "op": "polishPassDump", "max": 40 },
+        { "do": "setting", "name": "NeighbourhoodPolish", "value": true },
+        { "do": "lab", "op": "polishStamp", "yes": true },
+        { "do": "lab", "op": "polishIdle", "seconds": 400 },
+        { "do": "lab", "op": "polishStats" },
+        { "do": "lab", "op": "outgrowQuiet", "seconds": 15 },
+        { "do": "shot", "name": "after-45", "camera": { "target": "point", "at": [ 0, 0 ], "view": "oblique", "pitch": 50, "distance": 140 }, "shotMode": "render" }
+      ]
+    }
+  ]
+}

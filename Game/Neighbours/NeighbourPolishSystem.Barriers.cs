@@ -1,7 +1,8 @@
 // Placemaker neighbourhood polish — what gardens never cross and like to meet (GPL-3.0).
 //
 // For each pass the planner gets the barriers around its patch of town (StitchSettings.Barriers): the ground surfaces of
-// roads, paths and tracks (each edge's curve as a strip of its full width, sidewalks included; elevated and tunnelled
+// roads, paths and tracks (each edge's surface as the game draws it, sidewalks, junction corners, turning circles and
+// roundabouts included (Selection/RoadSurfaces); elevated and tunnelled
 // pieces left out), the lots of buildings that are not houses (service buildings, Placemaker builds' buildings, houses still
 // being built: a building site is no house to plan yet), lot
 // areas and every Placemaker build's outline (as the area brush's "Lots" and "My builds": a park in the middle of a block
@@ -27,7 +28,21 @@ namespace Placemaker.Game.Neighbours
     {
         private global::Game.Net.SearchSystem _netSearch;
         private global::Game.Objects.SearchSystem _objectSearch;
-        private const int MaxBarriers = 800;
+        // a road comes as several surfaces (its halves, its ends at the junctions): room for a big patch of town
+        private const int MaxBarriers = 4000;
+
+        private struct BuildingIterator : INativeQuadTreeIterator<Entity, QuadTreeBoundsXZ>
+        {
+            public Bounds2 Bounds;
+            public NativeList<Entity> Results;
+            [Unity.Collections.ReadOnly] public ComponentLookup<global::Game.Buildings.Building> Buildings;
+            [Unity.Collections.ReadOnly] public ComponentLookup<global::Game.Buildings.Extension> Extensions;
+            public bool Intersect(QuadTreeBoundsXZ bounds) => MathUtils.Intersect(bounds.m_Bounds.xz, Bounds);
+            public void Iterate(QuadTreeBoundsXZ bounds, Entity e)
+            {
+                if (MathUtils.Intersect(bounds.m_Bounds.xz, Bounds) && (Buildings.HasComponent(e) || Extensions.HasComponent(e))) Results.Add(e);
+            }
+        }
 
         private struct BoundsIterator : INativeQuadTreeIterator<Entity, QuadTreeBoundsXZ>
         {
@@ -41,19 +56,70 @@ namespace Placemaker.Game.Neighbours
         }
 
         /// <summary>Roads, paths and tracks on the ground and the lots of buildings that are not houses, in a box.</summary>
-        private List<float2[]> BarriersIn(float2 min, float2 max) => BarriersIn(min, max, null);
+        private List<float2[]> BarriersIn(float2 min, float2 max) => BarriersIn(min, max, null, null);
 
         private BlockObstacles _obstacles;
-        private const float WaterStep = 4f;
+        private readonly List<(float2[] Ring, bool Round)> _roadPieces = new List<(float2[], bool)>();
 
-        /// <summary>The barriers in a box and what each is (0 a road, path or track, 1 a building's lot, a lot area or a
-        /// Placemaker build, 2 water).</summary>
-        private List<float2[]> BarriersIn(float2 min, float2 max, List<int> kinds)
+        /// <summary>A road piece's surfaces as last read, with the geometry they were read from.</summary>
+        private sealed class RoadShape
+        {
+            public EdgeGeometry Edge;
+            public EdgeNodeGeometry Start, End;
+            public bool HasStart, HasEnd;
+            public Entity StartComp, EndComp;
+            public List<float2[]> Rings;
+        }
+
+        // every road piece's surfaces, read again only when its geometry changed (the patches of a growing town overlap: the
+        // same roads were read for every pass)
+        private readonly Dictionary<Entity, RoadShape> _roadShapes = new Dictionary<Entity, RoadShape>();
+
+        /// <summary>The road piece's surfaces (RoadSurfaces; a strip along its curve when it has no geometry yet).</summary>
+        private List<float2[]> RoadRings(Entity e, float width)
+        {
+            var g = EntityManager.GetComponentData<EdgeGeometry>(e);
+            bool hs = EntityManager.HasComponent<StartNodeGeometry>(e), he = EntityManager.HasComponent<EndNodeGeometry>(e);
+            var sg = hs ? EntityManager.GetComponentData<StartNodeGeometry>(e).m_Geometry : default;
+            var eg = he ? EntityManager.GetComponentData<EndNodeGeometry>(e).m_Geometry : default;
+            var comp = EntityManager.HasComponent<Composition>(e) ? EntityManager.GetComponentData<Composition>(e) : default;
+            if (_roadShapes.TryGetValue(e, out var c) && c.HasStart == hs && c.HasEnd == he && c.StartComp == comp.m_StartNode && c.EndComp == comp.m_EndNode
+                && Exact(c.Edge.m_Start, g.m_Start) && Exact(c.Edge.m_End, g.m_End) && (!hs || Exact(c.Start, sg)) && (!he || Exact(c.End, eg)))
+                return c.Rings;
+            _roadPieces.Clear();
+            RoadSurfaces.Pieces(EntityManager, e, _roadPieces);
+            var rings = new List<float2[]>(_roadPieces.Count);
+            foreach (var (ring, _) in _roadPieces) rings.Add(ring);
+            if (rings.Count == 0)
+            {
+                var strip = Strip(EntityManager.GetComponentData<Curve>(e), width * 0.5f);
+                if (strip != null) rings.Add(strip);
+            }
+            if (_roadShapes.Count > 50000) _roadShapes.Clear();
+            _roadShapes[e] = new RoadShape { Edge = g, Start = sg, End = eg, HasStart = hs, HasEnd = he, StartComp = comp.m_StartNode, EndComp = comp.m_EndNode, Rings = rings };
+            return rings;
+        }
+
+        private static bool Exact(Bezier4x3 x, Bezier4x3 y) => x.a.Equals(y.a) && x.b.Equals(y.b) && x.c.Equals(y.c) && x.d.Equals(y.d);
+        private static bool Exact(Segment x, Segment y) => Exact(x.m_Left, y.m_Left) && Exact(x.m_Right, y.m_Right);
+        private static bool Exact(EdgeNodeGeometry x, EdgeNodeGeometry y) => Exact(x.m_Left, y.m_Left) && Exact(x.m_Right, y.m_Right) && Exact(x.m_Middle, y.m_Middle) && x.m_MiddleRadius == y.m_MiddleRadius;
+
+        /// <summary>The barriers in a box, what each is (0 a road, path or track, 1 a building's lot, a lot area or a
+        /// Placemaker build, 2 water) and which belong together (a road piece's surfaces: the edge's entity).</summary>
+        private List<float2[]> BarriersIn(float2 min, float2 max, List<int> kinds, List<long> groups)
         {
             var list = new List<float2[]>();
+            long single = long.MinValue;   // groups of one (lots, water): numbers no entity has
+            void Add(float2[] ring, int kind, long group)
+            {
+                list.Add(ring);
+                kinds?.Add(kind);
+                groups?.Add(group);
+            }
             _netSearch ??= World.GetExistingSystemManaged<global::Game.Net.SearchSystem>();
             _objectSearch ??= World.GetExistingSystemManaged<global::Game.Objects.SearchSystem>();
             var results = new NativeList<Entity>(64, Allocator.Temp);
+            var partClock = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 if (_netSearch != null)
@@ -77,16 +143,24 @@ namespace Placemaker.Game.Neighbours
                         bool ground = EntityManager.HasComponent<Road>(e) || EntityManager.HasComponent<PathwayData>(prefab)
                             || EntityManager.HasComponent<TrainTrack>(e) || EntityManager.HasComponent<TramTrack>(e);
                         if (!ground) continue;
-                        var strip = Strip(EntityManager.GetComponentData<Curve>(e), data.m_Width * 0.5f);
-                        if (strip != null) { list.Add(strip); kinds?.Add(0); }
+                        // its ground as the game draws it: both halves and its ends at the junctions, so a turning circle
+                        // or a roundabout is a barrier too (a strip along the curve ends square at the node's centre:
+                        // gardens grew into them, "they think they can encroach")
+                        foreach (var ring in RoadRings(e, data.m_Width)) Add(ring, 0, Id(e));
                     }
                 }
                 results.Clear();
+                BarrierPartMs[0] += partClock.Elapsed.TotalMilliseconds; partClock.Restart();
                 if (_objectSearch != null)
                 {
                     var tree = _objectSearch.GetStaticSearchTree(true, out var deps);
                     deps.Complete();
-                    var it = new BoundsIterator { Bounds = new Bounds2(min, max), Results = results };
+                    // only buildings (and extensions): the trees, props, bushes and fence pieces around a patch number thousands
+                    var it = new BuildingIterator
+                    {
+                        Bounds = new Bounds2(min, max), Results = results,
+                        Buildings = GetComponentLookup<global::Game.Buildings.Building>(true), Extensions = GetComponentLookup<global::Game.Buildings.Extension>(true),
+                    };
                     tree.Iterate(ref it);
                     var seen = new HashSet<Entity>();
                     for (int i = 0; i < results.Length && list.Count < MaxBarriers; i++)
@@ -97,11 +171,12 @@ namespace Placemaker.Game.Neighbours
                         // houses are the plan's own; a house still being built is not (it is no house to plan yet): its lot is kept clear
                         if (IsGrowable(e) && !EntityManager.HasComponent<global::Game.Objects.UnderConstruction>(e)) continue;
                         BuildingFootprints.Of(EntityManager, e, out var lot, out _);
-                        if (lot != null && lot.Length >= 3) { list.Add(lot); kinds?.Add(1); }
+                        if (lot != null && lot.Length >= 3) Add(lot, 1, single++);
                     }
                 }
             }
             finally { results.Dispose(); }
+            BarrierPartMs[1] += partClock.Elapsed.TotalMilliseconds; partClock.Restart();
             // lot areas and Placemaker builds (their saved outlines)
             try
             {
@@ -110,50 +185,25 @@ namespace Placemaker.Game.Neighbours
                 {
                     if (list.Count >= MaxBarriers) break;
                     if (o.Ring == null || o.Ring.Length < 3) continue;
-                    list.Add(o.Ring);
-                    kinds?.Add(1);
+                    Add(o.Ring, 1, single++);
                 }
-                // water: wet cells merged into a few outlines
-                var wet = _obstacles.Water(min, max, WaterStep);
-                if (wet != null)
-                {
-                    var rects = new List<IReadOnlyList<float2>>();
-                    int nx = (int)math.ceil((max.x - min.x) / WaterStep), nz = (int)math.ceil((max.y - min.y) / WaterStep);
-                    for (int j = 0; j < nz; j++)
-                    {
-                        int run = -1;
-                        for (int i = 0; i <= nx; i++)
-                        {
-                            bool w = i < nx && wet(min + new float2((i + 0.5f) * WaterStep, (j + 0.5f) * WaterStep));
-                            if (w && run < 0) run = i;
-                            if (!w && run >= 0)
-                            {
-                                float x0 = min.x + run * WaterStep, x1 = min.x + i * WaterStep, z0 = min.y + j * WaterStep, z1 = z0 + WaterStep;
-                                rects.Add(new[] { new float2(x0, z0), new float2(x1, z0), new float2(x1, z1), new float2(x0, z1) });
-                                run = -1;
-                            }
-                        }
-                    }
-                    if (rects.Count > 0)
-                        foreach (var r in Placemaker.Core.Geometry.Poly.UnionAll(rects))
-                        {
-                            if (list.Count >= MaxBarriers) break;
-                            if (r.Outer == null || r.Outer.Length < 3 || r.Area < 8f) continue;
-                            list.Add(r.Outer);
-                            kinds?.Add(2);
-                        }
-                }
+                BarrierPartMs[2] += partClock.Elapsed.TotalMilliseconds; partClock.Restart();
+                // water: sampled by a job (Sampling) and added on the plan's worker
             }
             catch (System.Exception e) { if (_errors++ < 5) Mod.Log.Warn("Placemaker neighbourhood polish: could not read lots, builds or water: " + e.Message); }
+            BarrierPartMs[3] += partClock.Elapsed.TotalMilliseconds;
             return list;
         }
 
         // ───────────── something new built near gardens ─────────────
 
-        private EntityQuery _newNearby;
+        private EntityQuery _newNearby, _goneNearby;
         /// <summary>Each polished house's garden as last written (this session): fixed for the passes that do not edit it.</summary>
         private readonly Dictionary<Entity, float2[]> _gardenOf = new Dictionary<Entity, float2[]>();
         private static int s_logPasses;
+
+        /// <summary>Game runner (lab op "outgrowCheck"): each polished house's garden as last written this session.</summary>
+        public IReadOnlyDictionary<Entity, float2[]> Gardens => _gardenOf;
 
         private void CreateNearbyQuery()
         {
@@ -164,17 +214,28 @@ namespace Placemaker.Game.Neighbours
                 Any = new[] { ComponentType.ReadOnly<Edge>(), ComponentType.ReadOnly<global::Game.Areas.Lot>(), ComponentType.ReadOnly<global::Game.Areas.Surface>(), ComponentType.ReadOnly<global::Game.Buildings.Building>() },
                 None = new[] { ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<Deleted>(), ComponentType.ReadOnly<PolishPiece>() },
             });
+            // the same, bulldozed this frame: the player removed it, the gardens around may take the land (first too)
+            _goneNearby = GetEntityQuery(new EntityQueryDesc
+            {
+                All = new[] { ComponentType.ReadOnly<Deleted>() },
+                Any = new[] { ComponentType.ReadOnly<Edge>(), ComponentType.ReadOnly<global::Game.Areas.Lot>(), ComponentType.ReadOnly<global::Game.Areas.Surface>(), ComponentType.ReadOnly<global::Game.Buildings.Building>() },
+                None = new[] { ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<PolishPiece>() },
+            });
         }
 
         /// <summary>
         /// Something built near polished gardens (a road, a path, a Placemaker build, a park, a service building): the gardens
-        /// within reach of it are planned again, so they give that land back (they never grow into a build).
+        /// within reach of it are planned again, so they give that land back (they never grow into a build). Something
+        /// bulldozed there likewise: they may take the land it leaves. Both are the player's own work: planned first.
         /// </summary>
         private void CollectNewNearby()
         {
-            if (_newNearby.IsEmptyIgnoreFilter) return;
+            if (_newNearby.IsEmptyIgnoreFilter && _goneNearby.IsEmptyIgnoreFilter) return;
             var boxes = new List<(float2 Min, float2 Max)>();
-            using (var all = _newNearby.ToEntityArray(Allocator.Temp))
+            foreach (var query in new[] { _newNearby, _goneNearby })
+            {
+                if (query.IsEmptyIgnoreFilter) continue;
+                using (var all = query.ToEntityArray(Allocator.Temp))
                 foreach (var e in all)
                 {
                     if (boxes.Count > 2000) break;
@@ -206,6 +267,7 @@ namespace Placemaker.Game.Neighbours
                         boxes.Add((lo, hi));
                     }
                 }
+            }
             if (boxes.Count == 0) return;
             EnsureGrid();
             float reach = ReachInUse + 30f;
@@ -222,13 +284,18 @@ namespace Placemaker.Game.Neighbours
                                 var h = _gridHouses[j];
                                 var p = h.T.m_Position.xz;
                                 if (p.x < lo.x || p.y < lo.y || p.x > hi.x || p.y > hi.y || !EntityManager.Exists(h.E) || !IsYes(h.E)) continue;
-                                if (_dirty.Add(h.E)) marked++;
+                                if (_dirty.Add(h.E)) { marked++; DirtyBy[2]++; }
                                 _first.Add(h.E);   // the player's build: the gardens it changes go first
                             }
             }
             if (marked > 0)
             {
-                Mod.Log.Info($"Placemaker neighbourhood polish: something new built nearby: {marked} gardens planned again");
+                var what = new List<string>();
+                foreach (var (query, verb) in new[] { (_newNearby, "built"), (_goneNearby, "bulldozed") })
+                    using (var all = query.ToEntityArray(Allocator.Temp))
+                        for (int k = 0; k < all.Length && what.Count < 4; k++)
+                            if (EntityManager.HasComponent<PrefabRef>(all[k])) what.Add(verb + " " + NameOf(EntityManager.GetComponentData<PrefabRef>(all[k]).m_Prefab));
+                Mod.Log.Info($"Placemaker neighbourhood polish: something built or bulldozed nearby ({string.Join(", ", what)}): {marked} gardens planned again first");
                 s_logPasses = 4;
             }
         }

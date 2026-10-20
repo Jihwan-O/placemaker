@@ -799,5 +799,72 @@ namespace Placemaker.Tests
             Assert.True(back >= -43f && back <= -36f, $"the back stops about 40 m behind the house: {back:0.0}");
             Assert.True(pa.Min(p => p.x) < -8f - 55f && pa.Max(p => p.x) > 8f + 55f, "the level sides grow their full reach");
         }
+
+        // a's garden was written by an earlier pass (to the middle line at x = 20); b has no hedge of its own on that side
+        private static (StitchHouse A, StitchHouse B) PlannedEarlierNextTo()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            var b = House(2, new float2(40f, 0f), new float2(0f, 1f));
+            b.Lines.RemoveAll(l => l.Id == 22);
+            a.Edit = false;
+            a.Garden = new[] { new float2(-8f, 24f), new float2(20f, 24f), new float2(20f, -24f), new float2(-8f, -24f) };
+            return (a, b);
+        }
+
+        [Fact]
+        public void A_shared_edge_is_closed_against_the_neighbours_fence_where_it_really_stands()
+        {
+            // the neighbour planned earlier left its right fence on its own lot edge (x = 8), not on the middle line: this plan
+            // never moves it, so b closes the middle line itself (it used to count a's fence as moved there: a gap)
+            var (a, b) = PlannedEarlierNextTo();
+            a.Standing = new List<(float2 A, float2 B)> { (new float2(8f, 24f), new float2(8f, -24f)), (new float2(8f, -24f), new float2(-8f, -24f)) };
+            var plan = YardStitch.Plan(new[] { a, b }, MiddleLine());
+            Assert.True(plan.Plots.TryGetValue(2, out var pb) && pb.Min(p => p.x) < 20.5f, "b reaches the middle line");
+            Assert.Contains(plan.FencePieces, p => p.House == 2 && math.abs(p.Position.x - 20f) < 1f && p.Position.y < 20f);
+        }
+
+        [Fact]
+        public void A_shared_edge_already_fenced_by_the_neighbour_gets_no_second_fence()
+        {
+            // the neighbour planned earlier put its fence on the middle line: b adds nothing along it, and its own line there
+            // (were it moved onto it) gives way
+            var (a, b) = PlannedEarlierNextTo();
+            a.Standing = new List<(float2 A, float2 B)> { (new float2(20f, 24f), new float2(20f, -24f)), (new float2(20f, -24f), new float2(-8f, -24f)) };
+            var plan = YardStitch.Plan(new[] { a, b }, MiddleLine());
+            Assert.DoesNotContain(plan.FencePieces, p => p.House == 2 && math.abs(p.Position.x - 20f) < 1f);
+            foreach (var kv in plan.MoveLines.Where(m => m.Key / 10 == 2))
+                Assert.False(math.abs(kv.Value.A.x - 20f) < 0.6f && math.abs(kv.Value.B.x - 20f) < 0.6f, $"b's line {kv.Key} doubles a's fence on the middle line");
+        }
+
+        [Fact]
+        public void A_lawn_reaches_the_fence_of_a_big_garden_by_default()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 60f, ["paintedGardens"] = 0f };
+            var plan = YardStitch.Plan(new[] { a }, MiddleLine());
+            Assert.True(plan.Plots.TryGetValue(1, out var pa), "the garden grows");
+            var lawns = plan.Lawns.Values.Concat(plan.NewLawns.Where(l => l.House == 1).Select(l => l.Ring)).ToList();
+            Assert.NotEmpty(lawns);
+            float lawnArea = lawns.Sum(r => Poly.Area(r));
+            float land = Poly.Area(pa);
+            // the whole garden but the house's own lot corners it keeps (the lawn there is the house's own)
+            Assert.True(lawnArea > land * 0.85f, $"lawn {lawnArea:F0} m² of a {land:F0} m² garden");
+            Assert.True(lawns.Max(r => r.Max(p => p.x)) > pa.Max(p => p.x) - 1f, "the lawn reaches the side fence");
+            Assert.True(lawns.Min(r => r.Min(p => p.y)) < pa.Min(p => p.y) + 1f, "the lawn reaches the back fence");
+        }
+
+        [Fact]
+        public void A_shops_paving_fills_its_ground_up_to_the_fence_whatever_its_lawn_reach()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            a.MainSurface = "Concrete Surface 01";
+            a.Zone = "shop";
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 40f, ["lawnReach"] = 10f };
+            var plan = YardStitch.Plan(new[] { a }, MiddleLine());
+            Assert.True(plan.Plots.TryGetValue(1, out var pa), "the yard grows at the back");
+            var paving = plan.Paths.Where(p => p.House == 1 && p.Surface == "Concrete Surface 01").ToList();
+            Assert.NotEmpty(paving);
+            Assert.True(paving.Min(p => p.Ring.Min(q => q.y)) < pa.Min(p => p.y) + 1f, $"the paving reaches the back fence ({paving.Min(p => p.Ring.Min(q => q.y)):F1} vs {pa.Min(p => p.y):F1})");
+        }
     }
 }

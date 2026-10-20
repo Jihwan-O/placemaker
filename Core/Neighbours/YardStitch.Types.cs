@@ -42,6 +42,11 @@ namespace Placemaker.Core.Neighbours
         /// <summary>A house this plan does not edit (Edit false): its garden as another pass last wrote it. Fixed: the edited
         /// gardens never take its land (their own lots excepted: StitchPlan.GardenClashes). Null: unknown (worked out).</summary>
         public float2[] Garden;
+        /// <summary>A house this plan does not edit (Edit false): its fence and hedge lines and the closing pieces it has, as
+        /// they stand now (another pass placed them). The gardens this plan edits close their edges against these, not
+        /// against where this plan would have put that house's lines (it never writes them). Null: unknown (its planned
+        /// lines count).</summary>
+        public List<(float2 A, float2 B)> Standing;
         /// <summary>The lot's saved flag (the player's painter, "Polish new houses"). False: the lot stays exactly as the game
         /// made it (none of its lines, lawns or pieces change, nothing is planted on it); a polished neighbour takes the whole
         /// gap up to its lot edge and leans on its fence there. Two unpolished neighbours: nothing happens between them.</summary>
@@ -91,14 +96,19 @@ namespace Placemaker.Core.Neighbours
         public List<float2[]> Barriers;
         /// <summary>What each barrier is: 0 a road, path or track, 1 a building's lot (null: all roads).</summary>
         public List<int> BarrierKinds;
+        /// <summary>Which barriers are one thing (a road piece comes as several surfaces: its two halves and its ends at the
+        /// junctions, a turning circle or a roundabout among them): barriers with the same number belong together (null:
+        /// each its own).</summary>
+        public List<long> BarrierGroups;
         /// <summary>The ground height (set per plan by the game; null: gardens grow regardless of the slope).</summary>
         public Func<float2, float> Ground;
         /// <summary>A copy of these settings for one plan, with the barriers around its houses.</summary>
-        public StitchSettings WithBarriers(List<float2[]> barriers, List<int> kinds = null)
+        public StitchSettings WithBarriers(List<float2[]> barriers, List<int> kinds = null, List<long> groups = null)
         {
             var c = (StitchSettings)MemberwiseClone();
             c.Barriers = barriers;
             c.BarrierKinds = kinds;
+            c.BarrierGroups = groups;
             return c;
         }
     }
@@ -111,12 +121,27 @@ namespace Placemaker.Core.Neighbours
         public readonly int Nx, Ny;
         public readonly float[] H;
 
+        /// <summary>A raster as recorded (the game runner's pass dumps, replayed offline).</summary>
+        public HeightRaster(float2 min, float cell, int nx, int ny, float[] h)
+        {
+            Min = min;
+            Cell = cell;
+            Nx = nx;
+            Ny = ny;
+            H = h;
+        }
+
+        /// <summary>How a raster over [min, max] with this cell size is laid out (the game samples it with jobs).</summary>
+        public static (int Nx, int Ny, float Cell) Layout(float2 min, float2 max, float cell)
+        {
+            float c = math.max(0.5f, cell);
+            return (math.max(2, (int)math.ceil((max.x - min.x) / c) + 1), math.max(2, (int)math.ceil((max.y - min.y) / c) + 1), c);
+        }
+
         public HeightRaster(float2 min, float2 max, float cell, Func<float2, float> sample)
         {
-            Cell = math.max(0.5f, cell);
+            (Nx, Ny, Cell) = Layout(min, max, cell);
             Min = min;
-            Nx = math.max(2, (int)math.ceil((max.x - min.x) / Cell) + 1);
-            Ny = math.max(2, (int)math.ceil((max.y - min.y) / Cell) + 1);
             H = new float[Nx * Ny];
             for (int j = 0; j < Ny; j++)
                 for (int i = 0; i < Nx; i++)

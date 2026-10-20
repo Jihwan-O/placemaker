@@ -10,6 +10,7 @@
 //     (a Zoning type's "Zone this area"); buildings that grow in it get the look and its changes.
 //   * PolishLawnOriginal on one of the house's own lawns the polish reshaped: its nodes as the game made them, so Unpolish
 //     (and a later plan) gives the lawn back exactly, also after a load.
+//   * PolishGarden on a polished house: its garden's outline as its last plan wrote it (neighbours planned later keep to it).
 
 using Colossal.Serialization.Entities;
 using Unity.Entities;
@@ -154,6 +155,18 @@ namespace Placemaker.Game.Neighbours
     public struct PolishLawnOriginal : IBufferElementData, ISerializable
     {
         public float3 Position;
+
+        public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter => writer.Write(Position);
+        public void Deserialize<TReader>(TReader reader) where TReader : IReader => reader.Read(out Position);
+    }
+
+    /// <summary>A polished house's garden as its last plan wrote it (the outline its fences and lawn follow). The plans of
+    /// its neighbours keep off it and meet it on its real edges, also after a load (kept only in memory, a city loaded
+    /// again had its gardens planned through each other: hedges crossing, strips nobody fenced).</summary>
+    [InternalBufferCapacity(0)]
+    public struct PolishGarden : IBufferElementData, ISerializable
+    {
+        public float2 Position;
 
         public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter => writer.Write(Position);
         public void Deserialize<TReader>(TReader reader) where TReader : IReader => reader.Read(out Position);

@@ -40,6 +40,10 @@ namespace Placemaker.Core.Neighbours
 
         public static readonly string[] Themes = { "garden", "natural", "tidy", "yard" };
 
+        /// <summary>The offline benchmark's allocation counter (GC.GetAllocatedBytesForCurrentThread): each stage's allocations in
+        /// the plan's notes. Null in the game.</summary>
+        public static Func<long> AllocatedBytes;
+
         public static string ThemeOf(StitchHouse h) =>
             !string.IsNullOrEmpty(h.Theme) && Array.IndexOf(Themes, h.Theme) >= 0 ? h.Theme : h.Zone == "industry" ? "yard" : "garden";
 
@@ -97,6 +101,19 @@ namespace Placemaker.Core.Neighbours
             var plan = new StitchPlan();
             Feature.Clear();
             SetBarriers(s);
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var stages = new List<string>();
+            var allocs = new List<string>();
+            long allocAt = AllocatedBytes?.Invoke() ?? 0;
+            void Stage(string name)
+            {
+                stages.Add($"{name} {clock.Elapsed.TotalMilliseconds:F0}");
+                clock.Restart();
+                if (AllocatedBytes == null) return;
+                long now = AllocatedBytes();
+                allocs.Add($"{name} {(now - allocAt) / 1048576.0:F2}");
+                allocAt = now;
+            }
             int n = houses.Count;
 
             // ── 1. neighbours: side pairs (i's right side next to j's left side) and back to back ──
@@ -285,9 +302,6 @@ namespace Placemaker.Core.Neighbours
                     rowDeepen[m] = 0f;
                 }
 
-            var clock = System.Diagnostics.Stopwatch.StartNew();
-            var stages = new List<string>();
-            void Stage(string name) { stages.Add($"{name} {clock.Elapsed.TotalMilliseconds:F0}"); clock.Restart(); }
             Stage("pairs");
             // ── 2. plots ──
             var cuts = new List<Cut>[n];
@@ -547,6 +561,8 @@ namespace Placemaker.Core.Neighbours
                 for (int i = 0; i < n; i++)
                 {
                     if (!touched[i] || plots[i] == null) continue;
+                    // a garden another pass wrote is its garden (FixedGardens): what this plan would have made of it is never used
+                    if (IsFixed(houses[i])) continue;
                     var clear = ClearOfBarriers(plots[i], Lot(houses[i]), houses[i].Position, s.Knob("barrierMargin", 0.8f));
                     if (clear == null) continue;
                     plots[i] = clear;
@@ -554,8 +570,11 @@ namespace Placemaker.Core.Neighbours
                 }
                 if (clipped > 0) plan.Notes.Add($"{clipped} gardens cut back clear of roads, paths and buildings");
             }
+            Stage("clear");
             FillGaps(houses, plots, touched, raw, kept, s, plan);
+            Stage("gaps");
             FixedGardens(houses, plots, touched, plan);
+            Stage("fixed");
 
             // ── 3. fences on plot edges ──
             var moved = new Dictionary<long, (float2 A, float2 B)>();
@@ -774,7 +793,9 @@ namespace Placemaker.Core.Neighbours
                     moved[l.Id] = (math.lerp(a, b, best.x), math.lerp(a, b, best.y));
                 }
             }
+            Stage("lines");
             Dedupe(houses, touched, plan, moved, s);
+            Stage("dedupe");
 
             // a garden open at the back (no line of anyone's along its back edge) closes with a line of its own that the
             // stitching freed (a duplicate side line it hid, its own or a side neighbour's): every garden ends in a fence or hedge
@@ -782,8 +803,7 @@ namespace Placemaker.Core.Neighbours
                 {
                     if (!touched[i] || K(houses[i], s, "closeBacks", 1f) < 0.5f || !BackEdge(houses[i], plots[i], out var e0, out var e1) || math.distance(e0, e1) < 3f) continue;
                     var h = houses[i];
-                    var drawn = houses.SelectMany(o => o.Lines).Where(l => !plan.HideLines.Contains(l.Id)).Select(l => moved.TryGetValue(l.Id, out var m) ? m : (l.A, l.B));
-                    if (Covered(e0, e1, drawn) >= 0.6f * math.distance(e0, e1)) continue;
+                    if (Covered(e0, e1, DrawnLines(houses, plan, moved)) >= 0.6f * math.distance(e0, e1)) continue;
                     // its own first, else one its side neighbours freed (the duplicate on their shared side)
                     var spare = new[] { i, left[i], right[i] }.Where(k => k >= 0 && Pol(k)).SelectMany(k => houses[k].Lines.Where(l => plan.HideLines.Contains(l.Id)).OrderByDescending(l => Score(l.Name)).ThenByDescending(l => math.distance(l.A, l.B))).FirstOrDefault();
                     if (spare == null) continue;
@@ -796,6 +816,9 @@ namespace Placemaker.Core.Neighbours
             // a moved line never runs through a house, a shed, a pool or a deck, nor across a driveway: it stops there
             Stage("fences");
             TrimAtObstacles(houses, plan, moved, s);
+            LinesOnEdges(houses, plots, touched, plan, moved, s);
+            // no two lines on one another before the open edges are closed: a line taken away after that left a gap
+            Dedupe(houses, touched, plan, moved, s);
             CloseGardens(houses, plots, touched, plan, moved, s);
             Stage("trim");
 
@@ -810,7 +833,7 @@ namespace Placemaker.Core.Neighbours
                 var built = new Obstacle(houses);
                 foreach (var (hi, a, b, inward) in stepBeds) if (houses[hi].Edit && K(houses[hi], s, "plant", 1f) > 0.5f) StepRow(houses[hi], plots[hi], a, b, inward, plan, beds[hi], built, s);
                 Plant(houses, plots, touched, plan, moved, beds, built, s);
-                var fenceLines = houses.SelectMany(o => o.Lines).Where(l => !plan.HideLines.Contains(l.Id)).Select(l => moved.TryGetValue(l.Id, out var m) ? m : (l.A, l.B))
+                var fenceLines = DrawnLines(houses, plan, moved)
                     .Concat(plan.FencePieces.Select(p => { var d = new float2(math.sin(p.Yaw), math.cos(p.Yaw)) * 2.1f; return (p.Position - d, p.Position + d); })).ToList();
                 Features(houses, plots, touched, plan, beds, reserved, built, s, fenceLines);
                 Paths(houses, plots, touched, left, right, plan, beds, built, s);
@@ -822,12 +845,14 @@ namespace Placemaker.Core.Neighbours
             // a small pocket no plot takes (where four corners meet) joins the nearest plot's lawn
             var lawnLand = new List<Region>[n];
             for (int i = 0; i < n; i++) lawnLand[i] = Poly.Normalize(Ccw(plots[i]));
-            // a big garden: mowed lawn near the house, the land further out painted (its look's meadow ground)
+            // a big garden whose look asks for it ("Lawn reach" under 400 m): mowed lawn near the house, the land further out
+            // painted (its look's meadow ground). Not by default: a lawn reaches the fence (the user: "it should always line
+            // up with the fence"). Never a shop's, office's or works' paving: it always fills its whole ground.
             for (int i = 0; i < n; i++)
             {
                 var h = houses[i];
                 float lawnReach = K(h, s, "lawnReach", 1000f);
-                if (!touched[i] || !h.Edit || !h.Polished || plots[i] == null || lawnReach >= 400f) continue;
+                if (!touched[i] || !h.Edit || !h.Polished || plots[i] == null || lawnReach >= 400f || !string.IsNullOrEmpty(h.MainSurface)) continue;
                 var near = Poly.Offset(Ccw(Lot(h)), -math.max(0f, lawnReach), OffsetJoin.Round, 4f, 0.5f);
                 if (near.Count == 0) continue;
                 var beyond = Poly.Boolean(lawnLand[i], near, BoolOp.Difference);
@@ -1005,13 +1030,13 @@ namespace Placemaker.Core.Neighbours
                 }
 
             GroundPatches(houses, plots, touched, plan, s);
-            Dedupe(houses, touched, plan, moved, s);
             foreach (var kv in moved) if (!plan.HideLines.Contains(kv.Key)) plan.MoveLines[kv.Key] = kv.Value;
             KeepUnpolished(houses, plan);
             plan.Notes.Add($"{touched.Count(t => t)} plots: {borders.Count} shared sides, {rearPairs.Count} back to back, {plan.MoveLines.Count} lines moved, {plan.HideLines.Count} hidden, {plan.Lawns.Count} lawns fitted, {plan.NewLawns.Count} new lawns, {plan.Beds.Count} beds, {plan.Bushes.Count} bushes and rocks, {plan.Paths.Count} paths");
             if (plan.Paints.Count > 0 || s.Knob("paint", 1f) > 0.5f) PlanPaint(plan, s, houses.Where(h => !h.Polished).Select(h => new Region(Ccw(Lot(h)))).ToList());
             Stage("rest");
             plan.Notes.Add("time (ms): " + string.Join(", ", stages));
+            if (allocs.Count > 0) plan.Notes.Add("alloc (MB): " + string.Join(", ", allocs));
             return plan;
         }
 
@@ -1044,13 +1069,25 @@ namespace Placemaker.Core.Neighbours
         private static void Dedupe(IReadOnlyList<StitchHouse> houses, bool[] touched, StitchPlan plan, Dictionary<long, (float2 A, float2 B)> moved, StitchSettings s)
         {
             var lines = new List<(int House, StitchLine L)>();
-            // an unpolished lot's lines take part as they are: they always stay, a polished line lying on one gives way
+            // what never changes here: an unpolished lot's lines (as they are), and a polished garden this plan does not edit
+            // whose lines and closing pieces another pass placed (as they stand). A line of an edited garden along or through
+            // one gives way.
+            bool Fixed(int k) => !houses[k].Polished || (!houses[k].Edit && houses[k].Standing != null);
+            long standingId = -1;
             for (int i = 0; i < houses.Count; i++)
+            {
+                if (houses[i].Polished && !houses[i].Edit && houses[i].Standing != null)
+                {
+                    foreach (var (a, b) in houses[i].Standing) lines.Add((i, new StitchLine { Id = standingId--, Name = "", A = a, B = b }));
+                    continue;
+                }
                 if (touched[i] || !houses[i].Polished) foreach (var l in houses[i].Lines) if (!plan.HideLines.Contains(l.Id)) lines.Add((i, l));
+            }
             (float2 A, float2 B) At(StitchLine l) => moved.TryGetValue(l.Id, out var m) ? m : (l.A, l.B);
-            // an unpolished lot's lines come first: they never change, a polished line along or through one gives way
-            var order = lines.OrderByDescending(x => houses[x.House].Polished ? 0 : 1).ThenByDescending(x => Score(x.L.Name)).ThenByDescending(x => { var p = At(x.L); return math.distance(p.A, p.B); }).ToList();
+            var order = lines.OrderByDescending(x => Fixed(x.House) ? 1 : 0).ThenByDescending(x => Score(x.L.Name)).ThenByDescending(x => { var p = At(x.L); return math.distance(p.A, p.B); }).ToList();
             float minLine = s.Knob("minLine", 2f);
+            // one buffer for every pair (steps is at most 240)
+            var near = new bool[241];
             for (int k = 0; k < order.Count; k++)
             {
                 var keep = order[k];
@@ -1066,7 +1103,7 @@ namespace Placemaker.Core.Neighbours
                 for (int m = k + 1; m < order.Count; m++)
                 {
                     var other = order[m];
-                    if (other.L.Id == keep.L.Id || plan.HideLines.Contains(other.L.Id) || !houses[other.House].Polished) continue;
+                    if (other.L.Id == keep.L.Id || plan.HideLines.Contains(other.L.Id) || Fixed(other.House)) continue;
                     var (oa, ob) = At(other.L);
                     if (math.max(oa.x, ob.x) < lo.x || math.min(oa.x, ob.x) > hi.x || math.max(oa.y, ob.y) < lo.y || math.min(oa.y, ob.y) > hi.y) continue;
                     float olen = math.distance(oa, ob);
@@ -1075,7 +1112,6 @@ namespace Placemaker.Core.Neighbours
                     bool parallel = sin < math.sin(math.radians(25f));
                     // which stretches of the other line come too close to the kept one
                     int steps = math.clamp((int)(olen / 0.4f), 4, 240);
-                    var near = new bool[steps + 1];
                     bool any = false;
                     for (int t = 0; t <= steps; t++)
                     {
@@ -1089,9 +1125,16 @@ namespace Placemaker.Core.Neighbours
                     // a line ending on the kept one at an angle is a corner or a T: fine
                     if (!parallel)
                     {
-                        int first = Array.IndexOf(near, true), last = Array.LastIndexOf(near, true);
-                        bool onlyAtStart = first == 0 && Enumerable.Range(0, steps + 1).Where(t => near[t]).All(t => t * olen / steps <= tol / math.max(sin, 0.2f) + 0.5f);
-                        bool onlyAtEnd = last == steps && Enumerable.Range(0, steps + 1).Where(t => near[t]).All(t => (steps - t) * olen / steps <= tol / math.max(sin, 0.2f) + 0.5f);
+                        int first = -1, last = -1;
+                        for (int t = 0; t <= steps; t++) if (near[t]) { if (first < 0) first = t; last = t; }
+                        float reach = tol / math.max(sin, 0.2f) + 0.5f;
+                        bool onlyAtStart = first == 0, onlyAtEnd = last == steps;
+                        for (int t = 0; t <= steps && (onlyAtStart || onlyAtEnd); t++)
+                        {
+                            if (!near[t]) continue;
+                            if (!(t * olen / steps <= reach)) onlyAtStart = false;
+                            if (!((steps - t) * olen / steps <= reach)) onlyAtEnd = false;
+                        }
                         if (onlyAtStart || onlyAtEnd) continue;
                         // a corner of the kept line resting on the other one (the kept line ends there) is a T too
                         if (DistanceToSegment(ka, oa, ob) < tol || DistanceToSegment(kb, oa, ob) < tol)
@@ -1161,8 +1204,12 @@ namespace Placemaker.Core.Neighbours
         private static void Plant(IReadOnlyList<StitchHouse> houses, float2[][] plots, bool[] touched, StitchPlan plan,
             Dictionary<long, (float2 A, float2 B)> moved, List<Region>[] beds, Obstacle built, StitchSettings s)
         {
-            var drawn = houses.SelectMany(h => h.Lines).Where(l => !plan.HideLines.Contains(l.Id))
-                .Select(l => (l.Id, P: moved.TryGetValue(l.Id, out var m) ? m : (l.A, l.B))).OrderBy(x => x.Id).ToList();
+            // the lines as they will stand (a neighbour another pass planned: as it stands, known by where it is)
+            var drawn = houses.Where(h => !(h.Polished && !h.Edit && h.Standing != null)).SelectMany(h => h.Lines).Where(l => !plan.HideLines.Contains(l.Id))
+                .Select(l => (l.Id, P: moved.TryGetValue(l.Id, out var m) ? m : (l.A, l.B)))
+                .Concat(houses.Where(h => h.Polished && !h.Edit && h.Standing != null).SelectMany(h => h.Standing)
+                    .Select(p => ((long)Hash((ulong)(long)math.round(p.A.x * 4f) * 73856093UL ^ (ulong)(long)math.round(p.A.y * 4f) * 19349663UL ^ (ulong)(long)math.round(p.B.x * 4f) * 83492791UL), P: p)))
+                .OrderBy(x => x.Item1).ToList();
             for (int i = 0; i < houses.Count; i++)
             {
                 if (!touched[i] || !houses[i].Edit || !string.IsNullOrEmpty(houses[i].MainSurface) || K(houses[i], s, "plant", 1f) < 0.5f) continue;
@@ -1601,6 +1648,39 @@ namespace Placemaker.Core.Neighbours
             return Poly.Simplify(main.Outer, 0.05f);
         }
 
+        /// <summary>Segments filed by grid cell (each in every cell its bounds, grown by a margin, touch): a point's cell holds every
+        /// segment within the margin of it, in the order they were added.</summary>
+        private sealed class LineGrid
+        {
+            private readonly float _cell, _margin;
+            private readonly Dictionary<long, List<(float2 A, float2 B)>> _cells = new Dictionary<long, List<(float2, float2)>>();
+            private static readonly List<(float2 A, float2 B)> None = new List<(float2, float2)>();
+            /// <summary>Lines too big to file by cell: every point looks at them too.</summary>
+            public readonly List<(float2 A, float2 B)> Big = new List<(float2, float2)>();
+
+            public LineGrid(float cell, float margin) { _cell = cell; _margin = margin; }
+
+            private static long Key(int x, int y) => ((long)x << 32) ^ (uint)y;
+
+            public void Add(float2 a, float2 b)
+            {
+                var lo = math.min(a, b) - _margin;
+                var hi = math.max(a, b) + _margin;
+                int x0 = (int)math.floor(lo.x / _cell), x1 = (int)math.floor(hi.x / _cell), y0 = (int)math.floor(lo.y / _cell), y1 = (int)math.floor(hi.y / _cell);
+                // a very long slanted line: looked at from everywhere (cheaper than hundreds of cells)
+                if ((long)(x1 - x0 + 1) * (y1 - y0 + 1) > 4096) { Big.Add((a, b)); return; }
+                for (int x = x0; x <= x1; x++)
+                    for (int y = y0; y <= y1; y++)
+                    {
+                        long k = Key(x, y);
+                        if (!_cells.TryGetValue(k, out var l)) _cells[k] = l = new List<(float2, float2)>();
+                        l.Add((a, b));
+                    }
+            }
+
+            public List<(float2 A, float2 B)> At(float2 p) => _cells.TryGetValue(Key((int)math.floor(p.x / _cell), (int)math.floor(p.y / _cell)), out var l) ? l : None;
+        }
+
         private static float DistanceToSegment(float2 p, float2 a, float2 b)
         {
             var ab = b - a;
@@ -1755,18 +1835,34 @@ namespace Placemaker.Core.Neighbours
                 if (h.Footprint != null && h.Footprint.Length >= 3) list.Add(Ccw(h.Footprint));
                 foreach (var r in h.Props.Concat(h.Hard))
                 {
-                    if (r == null || r.Length < 3 || Poly.Area(r) < 1f) continue;
-                    var inset = Poly.Offset(Ccw(r), 0.3f).OrderByDescending(x => Poly.Area(x)).FirstOrDefault();
-                    if (inset != null && inset.Length >= 3) list.Add(Ccw(inset));
+                    if (r == null || r.Length < 3) continue;
+                    var inset = Inset(r);
+                    if (inset != null) list.Add(inset);
                 }
             }
             return list;
         }
 
+        private sealed class InsetBox { public float2[] Ring; }
+        // a house's paving and sheds 30 cm in, kept with the ring itself: the game hands every plan the same rings for a house
+        // until it changes, so each is worked out once (thread-safe: plans run on several workers at once)
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<float2[], InsetBox> s_insets = new System.Runtime.CompilerServices.ConditionalWeakTable<float2[], InsetBox>();
+
+        /// <summary>A paving or shed ring 30 cm in (counter-clockwise), or null when it is too small for that.</summary>
+        private static float2[] Inset(float2[] r) => s_insets.GetValue(r, ring =>
+        {
+            if (Poly.Area(ring) < 1f) return new InsetBox();
+            var inset = Poly.Offset(Ccw(ring), 0.3f).OrderByDescending(x => Poly.Area(x)).FirstOrDefault();
+            return new InsetBox { Ring = inset != null && inset.Length >= 3 ? Ccw(inset) : null };
+        }).Ring;
+
         private static void TrimAtObstacles(IReadOnlyList<StitchHouse> houses, StitchPlan plan, Dictionary<long, (float2 A, float2 B)> moved, StitchSettings s)
         {
             var footprints = Obstacles(houses);
             foreach (var (_, _, ring) in s_barriers) footprints.Add(ring);
+            var fpLo = new float2[footprints.Count];
+            var fpHi = new float2[footprints.Count];
+            for (int f = 0; f < footprints.Count; f++) Poly.Bounds(footprints[f], out fpLo[f], out fpHi[f]);
             int trimmed = 0, dropped = 0;
             foreach (var id in moved.Keys.ToList())
             {
@@ -1775,7 +1871,13 @@ namespace Placemaker.Core.Neighbours
                 float len = math.distance(m.A, m.B);
                 if (len < 0.5f) continue;
                 var inside = new List<float2>();
-                foreach (var fp in footprints) inside.AddRange(Poly.ClipSegmentIntervals(fp, m.A, m.B));
+                var mlo = math.min(m.A, m.B);
+                var mhi = math.max(m.A, m.B);
+                for (int f = 0; f < footprints.Count; f++)
+                {
+                    if (fpHi[f].x < mlo.x || fpLo[f].x > mhi.x || fpHi[f].y < mlo.y || fpLo[f].y > mhi.y) continue;
+                    inside.AddRange(Poly.ClipSegmentIntervals(footprints[f], m.A, m.B));
+                }
                 if (inside.Sum(iv => iv.y - iv.x) * len < 0.3f) continue;
                 // the clear stretches between the houses' intervals; keep the longest
                 inside.Sort((p, q) => p.x.CompareTo(q.x));
@@ -2041,15 +2143,15 @@ namespace Placemaker.Core.Neighbours
         }
 
         /// <summary>
-        /// Every open edge of a polished garden (not its street front) closed: pieces of the house's own fence or hedge kind (or
-        /// the look's) along it, following its bends; an edge two gardens share gets them once. A line moved into the middle of
-        /// a garden (not on its edge) goes first.
+        /// Moved lines: only the stretch that lies on a garden's edge stays (a line carried past where its garden now ends, or
+        /// into a strip a garden took, would stand in the middle of a garden); none of it on an edge: it goes.
         /// </summary>
-        private static void CloseGardens(IReadOnlyList<StitchHouse> houses, float2[][] plots, bool[] touched, StitchPlan plan, Dictionary<long, (float2 A, float2 B)> moved, StitchSettings s)
+        private static void LinesOnEdges(IReadOnlyList<StitchHouse> houses, float2[][] plots, bool[] touched, StitchPlan plan, Dictionary<long, (float2 A, float2 B)> moved, StitchSettings s)
         {
             int n = houses.Count;
-            // moved lines: only the stretch that lies on a garden's edge stays (a line carried past where its garden now ends, or
-            // into a strip a garden took, would stand in the middle of a garden); none of it on an edge: it goes
+            var plotLo = new float2[n];
+            var plotHi = new float2[n];
+            for (int j = 0; j < n; j++) if (plots[j] != null) Poly.Bounds(plots[j], out plotLo[j], out plotHi[j]);
             for (int i = 0; i < n; i++)
             {
                 if (!touched[i] || plots[i] == null) continue;
@@ -2064,7 +2166,8 @@ namespace Placemaker.Core.Neighbours
                     {
                         var p = math.lerp(m.A, m.B, (float)k / steps);
                         bool onEdge = false;
-                        for (int j = 0; j < n && !onEdge; j++) if (plots[j] != null && DistanceToRing(plots[j], p) < 1.0f) onEdge = true;
+                        for (int j = 0; j < n && !onEdge; j++)
+                            if (plots[j] != null && p.x >= plotLo[j].x - 1f && p.y >= plotLo[j].y - 1f && p.x <= plotHi[j].x + 1f && p.y <= plotHi[j].y + 1f && DistanceToRing(plots[j], p) < 1.0f) onEdge = true;
                         if (onEdge && run0 < 0) run0 = k;
                         if ((!onEdge || k == steps) && run0 >= 0)
                         {
@@ -2078,27 +2181,42 @@ namespace Placemaker.Core.Neighbours
                     if (kept0 > 0.001f || kept1 < 0.999f) moved[l.Id] = (math.lerp(m.A, m.B, kept0), math.lerp(m.A, m.B, kept1));
                 }
             }
-            for (int i = 0; i < 0; i++)
+        }
+
+        /// <summary>The fence and hedge lines as they will stand once this plan is written: the edited houses' where it puts
+        /// them, a polished house it does not edit as it stands now (its lines and closing pieces: another pass placed them,
+        /// this plan never moves them), an unpolished lot's where the game put them.</summary>
+        private static List<(float2 A, float2 B)> DrawnLines(IReadOnlyList<StitchHouse> houses, StitchPlan plan, Dictionary<long, (float2 A, float2 B)> moved)
+        {
+            var list = new List<(float2 A, float2 B)>();
+            foreach (var h in houses)
             {
-                foreach (var l in houses[i].Lines)
-                {
-                    if (plan.HideLines.Contains(l.Id) || !moved.TryGetValue(l.Id, out var m)) continue;
-                    // on the edge of a garden (its own or another's: a shared border, the split behind a shallow lot)
-                    int on = 0;
-                    for (int k = 0; k <= 4; k++)
-                    {
-                        var p = math.lerp(m.A, m.B, k / 4f);
-                        for (int j = 0; j < n; j++) if (plots[j] != null && DistanceToRing(plots[j], p) < 1.2f) { on++; break; }
-                    }
-                    if (on < 3) { plan.HideLines.Add(l.Id); plan.Notes.Add($"{houses[i].Id}: a line inside its garden goes"); }
-                }
+                if (h.Polished && !h.Edit && h.Standing != null) { list.AddRange(h.Standing); continue; }
+                foreach (var l in h.Lines)
+                    if (!plan.HideLines.Contains(l.Id)) list.Add(h.Polished && moved.TryGetValue(l.Id, out var m) ? m : (l.A, l.B));
             }
-            var drawn = houses.SelectMany(o => o.Lines).Where(l => !plan.HideLines.Contains(l.Id)).Select(l => moved.TryGetValue(l.Id, out var m) ? m : (l.A, l.B)).ToList();
-            var claimed = new List<(float2 A, float2 B)>();
+            return list;
+        }
+
+        /// <summary>
+        /// Every open edge of a polished garden (not its street front) closed: pieces of the house's own fence or hedge kind (or
+        /// the look's) along it, following its bends; an edge two gardens share gets them once. Open: no line runs along it as
+        /// the lines will stand (DrawnLines: a neighbour another pass planned counts as it really stands).
+        /// </summary>
+        private static void CloseGardens(IReadOnlyList<StitchHouse> houses, float2[][] plots, bool[] touched, StitchPlan plan, Dictionary<long, (float2 A, float2 B)> moved, StitchSettings s)
+        {
+            int n = houses.Count;
+            var drawn = DrawnLines(houses, plan, moved);
             var walls = Obstacles(houses);
+            var wallLo = new float2[walls.Count];
+            var wallHi = new float2[walls.Count];
+            for (int w = 0; w < walls.Count; w++) Poly.Bounds(walls[w], out wallLo[w], out wallHi[w]);
+            // the lines (drawn, and the pieces placed so far) by 4 m cell: a point only looks at the lines in its own cell
+            var near = new LineGrid(4f, 1f);
+            foreach (var l in drawn) near.Add(l.A, l.B);
             bool Covered(float2 p, float2 dir)
             {
-                foreach (var (a, b) in drawn.Concat(claimed))
+                foreach (var (a, b) in near.Big.Count == 0 ? near.At(p) : near.At(p).Concat(near.Big))
                 {
                     var e = b - a;
                     float len2 = math.dot(e, e);
@@ -2108,6 +2226,12 @@ namespace Placemaker.Core.Neighbours
                     if (math.distance(p, a + e * math.saturate(t)) > 0.9f) continue;
                     if (math.abs(math.dot(math.normalize(e), dir)) > 0.85f) return true;
                 }
+                return false;
+            }
+            bool InWall(float2 at)
+            {
+                for (int w = 0; w < walls.Count; w++)
+                    if (at.x >= wallLo[w].x && at.y >= wallLo[w].y && at.x <= wallHi[w].x && at.y <= wallHi[w].y && Poly.Contains(walls[w], at)) return true;
                 return false;
             }
             int pieces = 0, gardens = 0;
@@ -2150,10 +2274,10 @@ namespace Placemaker.Core.Neighbours
                         {
                             var at = math.lerp(p0, p1, (c + 0.5f) / count);
                             // never through a house, shed, driveway, road or another building
-                            if (walls.Any(w => Poly.Contains(w, at)) || s_barriers.Any(bb => Poly.Contains(bb.Ring, at))) continue;
+                            if (InWall(at) || OnBarrier(at)) continue;
                             plan.FencePieces.Add((h.Id, at, yaw, piece));
                         }
-                        claimed.Add((p0, p1));
+                        near.Add(p0, p1);
                     }
                 }
                 if (plan.FencePieces.Count > before) { gardens++; pieces += plan.FencePieces.Count - before; }
@@ -2171,14 +2295,33 @@ namespace Placemaker.Core.Neighbours
             var want = Enumerable.Range(0, n).Where(i => touched[i] && houses[i].Edit && houses[i].Polished && raw[i] != null && raw[i].Count >= 3 && plots[i] != null).ToList();
             if (want.Count < 2) return;
             var reached = Poly.UnionAll(want.Select(i => (IReadOnlyList<float2>)Ccw(raw[i].ToArray())));
+            // what the reached land is cut by: only shapes within its bounds can cut it (the rest kept out of the boolean, in the
+            // same order, so it cuts the same; with every road piece around the patch it was most of a plan's time)
+            float2 rlo = new float2(float.MaxValue), rhi = new float2(float.MinValue);
+            foreach (var r in reached) foreach (var p in r.Outer) { rlo = math.min(rlo, p); rhi = math.max(rhi, p); }
+            bool Meets(IReadOnlyList<float2> ring)
+            {
+                Poly.Bounds(ring, out var lo, out var hi);
+                return !(hi.x < rlo.x || lo.x > rhi.x || hi.y < rlo.y || lo.y > rhi.y);
+            }
             var taken = new List<IReadOnlyList<float2>>();
             for (int i = 0; i < n; i++)
             {
-                if (plots[i] != null) taken.Add(Ccw(plots[i]));
-                if (kept[i] != null) taken.Add(Ccw(kept[i]));
+                // a garden another pass wrote takes its real land, not what this plan would have given it (that left strips
+                // nobody took and nobody fenced between gardens planned at different times)
+                var own = IsFixed(houses[i]) ? houses[i].Garden : plots[i];
+                if (own != null) { var c = Ccw(own); if (Meets(c)) taken.Add(c); }
+                if (kept[i] != null) { var c = Ccw(kept[i]); if (Meets(c)) taken.Add(c); }
             }
             float margin = s.Knob("barrierMargin", 0.8f);
-            if (s_barriers != null) foreach (var (_, _, ring) in s_barriers) foreach (var g in Poly.Offset(ring, -margin)) taken.Add(Ccw(g));
+            if (s_barriers != null)
+                foreach (var (blo, bhi, ring) in s_barriers)
+                {
+                    // grown by the margin (a sharp corner's miter reaches out up to four times it)
+                    float grow = margin * 4f + 0.5f;
+                    if (bhi.x + grow < rlo.x || blo.x - grow > rhi.x || bhi.y + grow < rlo.y || blo.y - grow > rhi.y) continue;
+                    foreach (var g in Grown(ring, margin)) { var c = Ccw(g); if (Meets(c)) taken.Add(c); }
+                }
             var gaps = Poly.Boolean(RingsOf(reached), taken, BoolOp.Difference, FillRule.NonZero);
             int filled = 0;
             float area = 0f;
@@ -2249,6 +2392,9 @@ namespace Placemaker.Core.Neighbours
             if (cut > 0) plan.Notes.Add($"{cut} gardens kept off their neighbours' gardens");
             if (plan.GardenClashes.Count > 0) plan.Notes.Add($"{plan.GardenClashes.Count} neighbours' gardens lie over a lot here: they are planned again");
         }
+
+        /// <summary>A polished garden this plan does not edit and whose garden another pass wrote (StitchHouse.Garden): fixed.</summary>
+        private static bool IsFixed(StitchHouse h) => !h.Edit && h.Polished && h.Garden != null && h.Garden.Length >= 3;
 
         private static float OverlapArea(IReadOnlyList<float2> a, IReadOnlyList<float2> b) =>
             Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(a.ToArray()) }, new[] { (IReadOnlyList<float2>)Ccw(b.ToArray()) }, BoolOp.Intersection, FillRule.NonZero).Sum(r => r.Area);
@@ -2417,11 +2563,104 @@ namespace Placemaker.Core.Neighbours
         // the plan's barriers (StitchSettings.Barriers) with their bounds; per plan, on its thread
         [ThreadStatic] private static List<(float2 Min, float2 Max, float2[] Ring)> s_barriers;
         [ThreadStatic] private static List<int> s_barrierKind;
+        [ThreadStatic] private static List<long> s_barrierGroup;
+        // each barrier grown by the margin, worked out once per plan (by the ring itself)
+        [ThreadStatic] private static Dictionary<float2[], (float Margin, List<float2[]> Rings)> s_grown;
+
+        private sealed class SameRing : IEqualityComparer<float2[]>
+        {
+            public static readonly SameRing Instance = new SameRing();
+            public bool Equals(float2[] a, float2[] b) => ReferenceEquals(a, b);
+            public int GetHashCode(float2[] r) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(r);
+        }
+
+        /// <summary>A barrier grown by <paramref name="margin"/> (Poly.Offset outward), once per plan, and once for a road piece
+        /// the game hands every pass again (by its numbers: the same piece grows the same).</summary>
+        private static List<float2[]> Grown(float2[] ring, float margin)
+        {
+            s_grown ??= new Dictionary<float2[], (float, List<float2[]>)>(SameRing.Instance);
+            if (s_grown.TryGetValue(ring, out var g) && g.Margin == margin) return g.Rings;
+            var key = new RingKey(ring, margin);
+            if (!s_grownShared.TryGetValue(key, out var rings))
+            {
+                rings = Poly.Offset(ring, -margin);
+                if (s_grownShared.Count > 60000) s_grownShared.Clear();
+                s_grownShared[key] = rings;
+            }
+            s_grown[ring] = (margin, rings);
+            return rings;
+        }
+
+        // grown barriers by their numbers, shared by every plan (they run on several workers at once); never changed once in
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<RingKey, List<float2[]>> s_grownShared = new System.Collections.Concurrent.ConcurrentDictionary<RingKey, List<float2[]>>();
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)]
+        private struct FloatBits { [System.Runtime.InteropServices.FieldOffset(0)] public float F; [System.Runtime.InteropServices.FieldOffset(0)] public int I; }
+        private static int Bits(float f) => new FloatBits { F = f }.I;
+
+        /// <summary>A ring's exact numbers (and the margin) as a dictionary key.</summary>
+        private readonly struct RingKey : IEquatable<RingKey>
+        {
+            private readonly float2[] _ring;
+            private readonly float _margin;
+            private readonly int _hash;
+
+            public RingKey(float2[] ring, float margin)
+            {
+                _ring = ring;
+                _margin = margin;
+                uint h = 2166136261u ^ (uint)ring.Length;
+                foreach (var p in ring) { h = (h ^ (uint)Bits(p.x)) * 16777619u; h = (h ^ (uint)Bits(p.y)) * 16777619u; }
+                _hash = (int)(h ^ (uint)Bits(margin));
+            }
+
+            public bool Equals(RingKey o)
+            {
+                if (_hash != o._hash || _margin != o._margin || _ring.Length != o._ring.Length) return false;
+                for (int i = 0; i < _ring.Length; i++)
+                    if (Bits(_ring[i].x) != Bits(o._ring[i].x) || Bits(_ring[i].y) != Bits(o._ring[i].y)) return false;
+                return true;
+            }
+
+            public override bool Equals(object obj) => obj is RingKey o && Equals(o);
+            public override int GetHashCode() => _hash;
+        }
+
+        /// <summary>Two rings' outlines come within <paramref name="d"/> of each other (or cross).</summary>
+        private static bool Within(IReadOnlyList<float2> a, IReadOnlyList<float2> b, float d)
+        {
+            Poly.Bounds(a, out var alo, out var ahi);
+            Poly.Bounds(b, out var blo, out var bhi);
+            if (ahi.x + d < blo.x || alo.x - d > bhi.x || ahi.y + d < blo.y || alo.y - d > bhi.y) return false;
+            float d2 = d * d;
+            for (int i = 0; i < a.Count; i++)
+            {
+                var p = a[i];
+                var q = a[(i + 1) % a.Count];
+                for (int j = 0; j < b.Count; j++)
+                    if (SegmentDistanceSq(p, q, b[j], b[(j + 1) % b.Count]) <= d2) return true;
+            }
+            return false;
+        }
+
+        private static float SegmentDistanceSq(float2 p, float2 q, float2 r, float2 s)
+        {
+            if (SegmentsCross(p, q, r, s)) return 0f;
+            float PointSeg(float2 x, float2 a, float2 b)
+            {
+                var ab = b - a;
+                float t = math.saturate(math.dot(x - a, ab) / math.max(1e-12f, math.dot(ab, ab)));
+                return math.distancesq(x, a + ab * t);
+            }
+            return math.min(math.min(PointSeg(p, r, s), PointSeg(q, r, s)), math.min(PointSeg(r, p, q), PointSeg(s, p, q)));
+        }
 
         private static void SetBarriers(StitchSettings s)
         {
             s_barriers = new List<(float2, float2, float2[])>();
             s_barrierKind = new List<int>();
+            s_barrierGroup = new List<long>();
+            s_grown = new Dictionary<float2[], (float, List<float2[]>)>(SameRing.Instance);
             if (s.Barriers == null) return;
             for (int k = 0; k < s.Barriers.Count; k++)
             {
@@ -2430,7 +2669,60 @@ namespace Placemaker.Core.Neighbours
                 var ring = Ccw(r);
                 s_barriers.Add((ring.Aggregate(new float2(float.MaxValue), math.min), ring.Aggregate(new float2(float.MinValue), math.max), ring));
                 s_barrierKind.Add(s.BarrierKinds != null && k < s.BarrierKinds.Count ? s.BarrierKinds[k] : 0);
+                // a barrier with no group is one of its own (a negative number no group uses)
+                s_barrierGroup.Add(s.BarrierGroups != null && k < s.BarrierGroups.Count ? s.BarrierGroups[k] : -1L - k);
             }
+            // filed by grid cell, so a question about one spot never looks at every road piece of the patch
+            s_barrierCells = new Dictionary<long, List<int>>();
+            s_barrierSeen = new int[s_barriers.Count];
+            s_barrierQuery = 0;
+            for (int k = 0; k < s_barriers.Count; k++)
+            {
+                var (mn, mx, _) = s_barriers[k];
+                int x0 = (int)math.floor(mn.x / BarrierCell), x1 = (int)math.floor(mx.x / BarrierCell), y0 = (int)math.floor(mn.y / BarrierCell), y1 = (int)math.floor(mx.y / BarrierCell);
+                for (int x = x0; x <= x1; x++)
+                    for (int y = y0; y <= y1; y++)
+                    {
+                        long key = ((long)x << 32) ^ (uint)y;
+                        if (!s_barrierCells.TryGetValue(key, out var l)) s_barrierCells[key] = l = new List<int>();
+                        l.Add(k);
+                    }
+            }
+        }
+
+        private const float BarrierCell = 24f;
+        [ThreadStatic] private static Dictionary<long, List<int>> s_barrierCells;
+        [ThreadStatic] private static int[] s_barrierSeen;
+        [ThreadStatic] private static int s_barrierQuery;
+
+        /// <summary>The barriers whose bounds meet [lo, hi], in the order they were given (as a scan of all of them finds them).</summary>
+        private static List<int> BarriersIn(float2 lo, float2 hi)
+        {
+            var found = new List<int>();
+            if (s_barrierCells == null || s_barriers.Count == 0) return found;
+            int stamp = ++s_barrierQuery;
+            int x0 = (int)math.floor(lo.x / BarrierCell), x1 = (int)math.floor(hi.x / BarrierCell), y0 = (int)math.floor(lo.y / BarrierCell), y1 = (int)math.floor(hi.y / BarrierCell);
+            for (int x = x0; x <= x1; x++)
+                for (int y = y0; y <= y1; y++)
+                {
+                    if (!s_barrierCells.TryGetValue(((long)x << 32) ^ (uint)y, out var l)) continue;
+                    foreach (int k in l)
+                    {
+                        if (s_barrierSeen[k] == stamp) continue;
+                        s_barrierSeen[k] = stamp;
+                        var (mn, mx, _) = s_barriers[k];
+                        if (mn.x <= hi.x && mx.x >= lo.x && mn.y <= hi.y && mx.y >= lo.y) found.Add(k);
+                    }
+                }
+            found.Sort();
+            return found;
+        }
+
+        /// <summary>A barrier holds the point.</summary>
+        private static bool OnBarrier(float2 p)
+        {
+            foreach (int k in BarriersIn(p, p)) if (Poly.Contains(s_barriers[k].Ring, p)) return true;
+            return false;
         }
 
         /// <summary>The barriers whose bounds meet these points' bounds grown by <paramref name="grow"/>.</summary>
@@ -2440,8 +2732,7 @@ namespace Placemaker.Core.Neighbours
             if (s_barriers == null || pts == null || pts.Count == 0) return list;
             var lo = pts.Aggregate(new float2(float.MaxValue), math.min) - grow;
             var hi = pts.Aggregate(new float2(float.MinValue), math.max) + grow;
-            foreach (var (mn, mx, ring) in s_barriers)
-                if (mn.x <= hi.x && mx.x >= lo.x && mn.y <= hi.y && mx.y >= lo.y) list.Add(ring);
+            foreach (int k in BarriersIn(lo, hi)) list.Add(s_barriers[k].Ring);
             return list;
         }
 
@@ -2450,6 +2741,8 @@ namespace Placemaker.Core.Neighbours
         private static bool Blocked(IReadOnlyList<float2> region)
         {
             if (s_barriers == null || s_barriers.Count == 0 || region == null || region.Count < 3) return false;
+            Poly.Bounds(region, out var rlo, out var rhi);
+            if (BarriersIn(rlo, rhi).Count == 0) return false;
             var ring = Ccw(region.ToArray());
             var inner = Math.Abs(Poly.Area(ring)) > 4f ? Poly.Offset(ring, 0.5f).OrderByDescending(r => Poly.Area(r)).FirstOrDefault() : null;
             var test = inner != null && inner.Length >= 3 ? inner : ring;
@@ -2479,9 +2772,10 @@ namespace Placemaker.Core.Neighbours
             var to = from + dir * maxT;
             var lo = math.min(from, to);
             var hi = math.max(from, to);
-            foreach (var (mn, mx, ring) in s_barriers)
+            foreach (int bi in BarriersIn(lo, hi))
             {
-                if (mn.x > hi.x || mx.x < lo.x || mn.y > hi.y || mx.y < lo.y || (skip != null && skip.Contains(ring))) continue;
+                var ring = s_barriers[bi].Ring;
+                if (skip != null && skip.Contains(ring)) continue;
                 if (Poly.Contains(ring, from)) { t = 0f; return true; }
                 for (int k = 0; k < ring.Length; k++)
                 {
@@ -2511,10 +2805,13 @@ namespace Placemaker.Core.Neighbours
             var h = houses[i];
             float maxReach = s.Knob("hugReach", 80f), margin = s.Knob("barrierMargin", 0.8f);
             var (e0, e1, nrm) = Edge(h, e);
-            // its own street (just in front of its lot) is never hugged from a side: the street it faces
+            // its own street (just in front of its lot) is never hugged from a side: the street it faces, every piece of it
+            // (its halves and its ends at the junctions: a cul-de-sac's turning circle is still its own street)
             var skip = new HashSet<float2[]>();
+            var own = new HashSet<long>();
             foreach (var p in new[] { h.Position + h.Forward * (h.HalfLot.y + 1.5f), h.Position + h.Forward * (h.HalfLot.y + 3f) })
-                foreach (var (_, _, ring) in s_barriers) if (Poly.Contains(ring, p)) skip.Add(ring);
+                foreach (int k in BarriersIn(p, p)) if (Poly.Contains(s_barriers[k].Ring, p)) own.Add(s_barrierGroup[k]);
+            for (int k = 0; k < s_barriers.Count; k++) if (own.Contains(s_barrierGroup[k])) skip.Add(s_barriers[k].Ring);
             var hits = new List<float2>();
             float far = 0f;
             const int samples = 7;
@@ -2556,9 +2853,11 @@ namespace Placemaker.Core.Neighbours
         /// </summary>
         private static float2[] ClearOfBarriers(float2[] plot, float2[] lot, float2 house, float margin)
         {
-            var near = BarriersNear(plot, margin + 0.5f).Where(b => Overlaps(plot, b) || Poly.Offset(b, -margin).Any(g => Overlaps(plot, g))).ToList();
+            // (grown by the margin a barrier reaches at most four margins out, a miter's limit: one further away is never grown)
+            float reach = margin * 4f + 0.01f;
+            var near = BarriersNear(plot, margin + 0.5f).Where(b => Overlaps(plot, b) || (Within(plot, b, reach) && Grown(b, margin).Any(g => Overlaps(plot, g)))).ToList();
             if (near.Count == 0) return null;
-            var grown = near.SelectMany(b => Poly.Offset(b, -margin)).Select(g => (IReadOnlyList<float2>)Ccw(g)).ToList();
+            var grown = near.SelectMany(b => Grown(b, margin)).Select(g => (IReadOnlyList<float2>)Ccw(g)).ToList();
             var left = Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(plot) }, grown, BoolOp.Difference, FillRule.NonZero);
             var withLot = Poly.Boolean(left.Select(r => r).ToList(), new List<Region> { new Region(Ccw(lot)) }, BoolOp.Union);
             var keep = withLot.OrderByDescending(r => Poly.Contains(r.Outer, house) ? 1 : 0).ThenByDescending(r => r.Area).FirstOrDefault();
@@ -2569,6 +2868,9 @@ namespace Placemaker.Core.Neighbours
 
         private static bool Overlaps(IReadOnlyList<float2> a, IReadOnlyList<float2> b)
         {
+            Poly.Bounds(a, out var alo, out var ahi);
+            Poly.Bounds(b, out var blo, out var bhi);
+            if (ahi.x < blo.x || alo.x > bhi.x || ahi.y < blo.y || alo.y > bhi.y) return false;
             foreach (var p in a) if (Poly.Contains(b, p)) return true;
             foreach (var p in b) if (Poly.Contains(a, p)) return true;
             for (int i = 0; i < a.Count; i++)

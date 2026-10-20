@@ -4,8 +4,9 @@
 // planner reads per house (what the land past the lot becomes, reach, joining, how far from water, lawns, paint, planting,
 // features, paths). Any look goes on any building: a look whose land is a car park gives a house or a tower a car park,
 // one whose land is a garden gives a shop a garden. The built-in looks ship with the mod (the themed ones, and one for each
-// zone type of the game: what every zone gets until the player picks another); the player's own looks (New / Save / Rename / Delete in the polish tool) are kept in one file for every city. A
-// polished building keeps a look by its id (its hash on the lot) and, when it was polished with changes not saved to the
+// zone type of the game: what every zone gets until the player picks another); the player's own looks (New / Save /
+// Rename / Delete) are kept in one file for every city, and so are the player's changes to a built-in look (what a Garden
+// is: Save on a built-in look; Back to default drops them). A polished building keeps a look by its id (its hash on the lot) and, when it was polished with changes not saved to the
 // look, those changes too; a building whose look was deleted falls back to its base theme's built-in look.
 
 using System;
@@ -21,6 +22,8 @@ namespace Placemaker.Core.Neighbours
         /// <summary>A built-in look: its localisation key; the player's own: its name.</summary>
         public string Name = "";
         public bool Custom;
+        /// <summary>A built-in look the player changed (its changes are kept in the looks file; Back to default drops them).</summary>
+        public bool Edited;
         /// <summary>garden, natural, tidy or yard.</summary>
         public string Theme = "garden";
         /// <summary>Every knob that differs from <see cref="PolishLooks.Defaults"/>.</summary>
@@ -237,16 +240,45 @@ namespace Placemaker.Core.Neighbours
             return list;
         }
 
-        public static string Write(IEnumerable<PolishLook> looks)
+        /// <summary>The player's changes to built-in looks from the same file ({"edits":[{id,theme,knobs:{…}}]}): each a look with
+        /// the built-in one's id and name, Edited.</summary>
+        public static List<PolishLook> ReadEdits(string json)
         {
-            var arr = JsonValue.Arr();
-            foreach (var l in looks.Where(l => l.Custom))
+            var list = new List<PolishLook>();
+            if (string.IsNullOrWhiteSpace(json)) return list;
+            JsonValue doc;
+            try { doc = JsonValue.Parse(json); }
+            catch (Exception) { return list; }
+            foreach (var o in doc["edits"].Items)
+            {
+                var id = o["id"].AsString();
+                var builtIn = BuiltIn.FirstOrDefault(b => b.Id == id);
+                if (builtIn == null || list.Any(l => l.Id == id)) continue;
+                var look = new PolishLook { Id = id, Name = builtIn.Name, Edited = true, Theme = Array.IndexOf(Themes, o["theme"].AsString()) >= 0 ? o["theme"].AsString() : builtIn.Theme };
+                foreach (var kv in o["knobs"].Properties)
+                    if (Defaults.ContainsKey(kv.Key) && kv.Value.Kind == JsonKind.Number) look.Knobs[kv.Key] = (float)kv.Value.AsNumber();
+                list.Add(look);
+            }
+            return list;
+        }
+
+        public static string Write(IEnumerable<PolishLook> looks, IEnumerable<PolishLook> edits = null)
+        {
+            JsonValue Entry(PolishLook l, bool named)
             {
                 var knobs = JsonValue.Obj();
                 foreach (var kv in l.Knobs.OrderBy(k => k.Key)) knobs.Set(kv.Key, kv.Value);
-                arr.Add(JsonValue.Obj().Set("id", l.Id).Set("name", l.Name).Set("theme", l.Theme).Set("knobs", knobs));
+                var o = JsonValue.Obj().Set("id", l.Id);
+                if (named) o.Set("name", l.Name);
+                return o.Set("theme", l.Theme).Set("knobs", knobs);
             }
-            return JsonValue.Obj().Set("looks", arr).Write(true);
+            var arr = JsonValue.Arr();
+            foreach (var l in looks.Where(l => l.Custom)) arr.Add(Entry(l, true));
+            var doc = JsonValue.Obj().Set("looks", arr);
+            var ed = JsonValue.Arr();
+            foreach (var l in (edits ?? Enumerable.Empty<PolishLook>()).Where(l => l.Edited)) ed.Add(Entry(l, false));
+            if (ed.Items.Any()) doc.Set("edits", ed);
+            return doc.Write(true);
         }
 
         /// <summary>Only the knobs that differ from the defaults (a look keeps what makes it itself).</summary>

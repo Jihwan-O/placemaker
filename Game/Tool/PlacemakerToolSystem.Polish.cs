@@ -68,7 +68,7 @@ namespace Placemaker.Game.Tool
         /// <summary>The values the type's Outgrow rows have (its look's for any row not set).</summary>
         private Dictionary<string, float> PolishValues(PolishLookLayer layer)
         {
-            var values = (PolishLooks.BuiltIn.FirstOrDefault(l => l.Id == layer.LookId) ?? PolishLooks.BuiltIn[0]).Values();
+            var values = (NeighbourPolishSystem.LookById(layer.LookId) ?? PolishLooks.BuiltIn[0]).Values();
             var bag = _recipe.Root.Settings;
             foreach (var k in PolishLooks.Knobs)
                 if (bag.Values.TryGetValue(k.Id, out var v) && v != null) values[k.Id] = AsFloat(v);
@@ -90,10 +90,11 @@ namespace Placemaker.Game.Tool
             return list;
         }
 
-        /// <summary>Each zone type's own Outgrow (zoneOutgrow): its switch and its changes over the type's settings.</summary>
-        private Dictionary<string, (bool On, Dictionary<string, float> Values)> ZoneOutgrow(PolishLookLayer layer)
+        /// <summary>Each zone type's own Outgrow (zoneOutgrow): its switch, the look it takes (null: the type's) and its changes
+        /// over that look (the type's settings when it takes the type's).</summary>
+        private Dictionary<string, (bool On, string Look, Dictionary<string, float> Values)> ZoneOutgrow(PolishLookLayer layer)
         {
-            var map = new Dictionary<string, (bool, Dictionary<string, float>)>();
+            var map = new Dictionary<string, (bool, string, Dictionary<string, float>)>();
             if (!(PolishSetting(layer, "zoneOutgrow") is string json) || string.IsNullOrWhiteSpace(json)) return map;
             try
             {
@@ -103,7 +104,7 @@ namespace Placemaker.Game.Tool
                     bool on = o["on"] == null || (bool)o["on"];
                     var v = new Dictionary<string, float>();
                     if (o["v"] is JObject vo) foreach (var q in vo.Properties()) v[q.Name] = AsFloat(q.Value.Type == JTokenType.Boolean ? (object)(bool)q.Value : (q.Value.Type == JTokenType.String ? (object)(string)q.Value : (double)q.Value));
-                    map[p.Name] = (on, v);
+                    map[p.Name] = (on, o["look"]?.Type == JTokenType.String ? (string)o["look"] : null, v);
                 }
             }
             catch (Exception e) { Mod.Log.Warn("Placemaker zoning: the zones' Outgrow settings could not be read: " + e.Message); }
@@ -119,20 +120,25 @@ namespace Placemaker.Game.Tool
             if (layer == null) return false;
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
             if (polish == null || _shape == null) return true;
-            var look = (PolishLooks.BuiltIn.FirstOrDefault(l => l.Id == layer.LookId) ?? PolishLooks.BuiltIn[0]).Values();
+            var look = (NeighbourPolishSystem.LookById(layer.LookId) ?? PolishLooks.BuiltIn[0]).Values();
             var baseValues = PolishValues(layer);
             var outgrow = ZoneOutgrow(layer);
-            (bool On, Dictionary<string, float> Changes) Of(string zoneKey)
+            // a zone type's look (its own pick, else the type's) and its changes over that look
+            (bool On, string Look, Dictionary<string, float> Changes) Of(string zoneKey)
             {
                 var values = new Dictionary<string, float>(baseValues);
+                var lookId = layer.LookId;
+                var lookValues = look;
                 bool on = true;
                 if (zoneKey != "" && outgrow.TryGetValue(zoneKey, out var z))
                 {
                     on = z.On;
+                    var picked = string.IsNullOrEmpty(z.Look) ? null : NeighbourPolishSystem.LookById(z.Look);
+                    if (picked != null) { lookId = picked.Id; lookValues = picked.Values(); values = new Dictionary<string, float>(lookValues); }
                     foreach (var kv in z.Values) values[kv.Key] = kv.Value;
                 }
                 if (on) NeighbourPolishSystem.NoteReach(values);
-                return (on, PolishLooks.Diff(values, look));
+                return (on, lookId, PolishLooks.Diff(values, lookValues));
             }
             bool zoning = _plan != null && _plan.Layers.Any(l => l.Zoning.Count > 0);
             var lots = PainterLots(polish);
@@ -148,11 +154,11 @@ namespace Placemaker.Game.Tool
             var parts = new List<string>();
             foreach (var kv in byKey)
             {
-                var (on, ch) = Of(kv.Key);
+                var (on, lookId, ch) = Of(kv.Key);
                 if (!on) { parts.Add($"{kv.Value.Count} {(kv.Key == "" ? "unzoned" : kv.Key)} left as they are"); continue; }
-                NeighbourPolishSystem.Stamp(kv.Value, true, layer.LookId, ch.Count > 0 ? ch : null);
+                NeighbourPolishSystem.Stamp(kv.Value, true, lookId, ch.Count > 0 ? ch : null);
                 stamped += kv.Value.Count;
-                parts.Add($"{kv.Value.Count} {(kv.Key == "" ? "unzoned" : kv.Key)}{(ch.Count > 0 ? $" ({ch.Count} changes)" : "")}");
+                parts.Add($"{kv.Value.Count} {(kv.Key == "" ? "unzoned" : kv.Key)} as {lookId}{(ch.Count > 0 ? $" ({ch.Count} changes)" : "")}");
             }
             if (stamped == 0 && !zoning)
             {
@@ -167,10 +173,10 @@ namespace Placemaker.Game.Tool
                 var ring = _shape.Ring2D();
                 foreach (var (_, zone) in PolishZones(layer))
                 {
-                    var (on, ch) = Of(NeighbourPolishSystem.ZoneKey(zone));
-                    NeighbourPolishSystem.AddLookArea(ring, on ? layer.LookId : NeighbourPolishSystem.LookOff, on && ch.Count > 0 ? ch : null, zone, batch);
+                    var (on, lookId, ch) = Of(NeighbourPolishSystem.ZoneKey(zone));
+                    NeighbourPolishSystem.AddLookArea(ring, on ? lookId : NeighbourPolishSystem.LookOff, on && ch.Count > 0 ? ch : null, zone, batch);
                 }
-                var (_, baseCh) = Of("");
+                var (_, _, baseCh) = Of("");
                 NeighbourPolishSystem.AddLookArea(ring, layer.LookId, baseCh.Count > 0 ? baseCh : null, "", batch);
                 int cells = _plan.Layers.Sum(l => l.Zoning.Count);
                 Mod.Log.Info($"Placemaker zoning: {cells} zone cells to zone with {layer.LookId}; buildings now: {(perZone == "" ? "none" : perZone)} ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");

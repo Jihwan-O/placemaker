@@ -162,15 +162,19 @@ export interface PainterState {
   lookSavedTheme: string;
   /** The rows changed the look (not saved). */
   modified: boolean;
-  /** The old polish painter tool; false: a Zoning type in Placemaker's panel (only the City window). */
+  /** The old polish painter tool; false: anything else in Placemaker's panel (the Global outgrow window is always there). */
   tool?: boolean;
   /** Live polish: the selection polished again a moment after every change (the switch beside Polish). */
   live?: boolean;
   /** Every setting of the look as the rows have it, and as the look has it (reset). */
   values?: Record<string, number>;
   lookValues?: Record<string, number>;
-  /** Every look: the built-in ones (name is a key) and the player's own. */
-  looks?: { id: string; name: string; custom: boolean; theme: string }[];
+  /** Every look: the built-in ones (name is a key; edited: the player changed it) and the player's own, each with the
+   *  settings that differ from `defaults` (a look's values: defaults, then knobs). */
+  looks?: { id: string; name: string; custom: boolean; theme: string; edited?: boolean; knobs?: Record<string, number> }[];
+  defaults?: Record<string, number>;
+  /** A Zoning type picked: the look its zones take unless one picks its own. */
+  typeLook?: string;
   /** Every zone type of the game: its look ("off": not polished) and whether it has its own (else its kind's). */
   zones?: PolishZone[];
   /** The zone types of the buildings in the selection: key (the zone's name without EU / NA, lower case), a zone prefab of

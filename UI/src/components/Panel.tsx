@@ -28,7 +28,7 @@ import { ManageStage } from "../stages/ManageStage";
 import { Btn, Check, Icon, Keys, Segmented, Switch } from "./common";
 import { layoutFor, MAX_SHARE, MIN_REM, NARROW_REM, PanelLayoutContext, WIDE_DEFAULT_REM, WIDE_SCREEN_PX } from "../lib/layout";
 import { AssetPickerCard, PickerContext, PickerRequest } from "./picker";
-import { PolishCityCard, PolishDesign } from "./PainterCard";
+import { PolishCityCard, PolishDesign, useLookEditorRequests } from "./PainterCard";
 import s from "./panel.module.scss";
 
 const STAGES: { id: Stage; key: string; en: string }[] = [
@@ -713,8 +713,9 @@ export const PlacemakerPanel = () => {
     // Each open is a fresh card (its hover preview ends when it is replaced).
     const pickerSerial = useRef(0);
     const [ack, setAck] = useState(false);
-    // the polish tool's City window (beside the panel)
+    // Outgrow's Global outgrow window (beside the panel; a look to edit asked for elsewhere opens it)
     const [cityOpen, setCityOpen] = useState(false);
+    useLookEditorRequests(useCallback(() => setCityOpen(true), []));
     const permKey = useMemo(() => JSON.stringify(summary.permanent), [summary.permanent]);
     const position = usePanelPosition();
     const layout = useMemo(() => layoutFor(position.width), [position.width]);
@@ -849,7 +850,7 @@ export const PlacemakerPanel = () => {
                         label={t("Placemaker.UI.Polish.GlobalButton", "Global outgrow")}
                         selected={cityOpen}
                         title={t("Placemaker.UI.Polish.Global", "Global outgrow")}
-                        description={t("Placemaker.UI.Polish.GlobalTip", "Outgrow for the whole city: new buildings on or off, a look for each zone type, outgrow or put back every building.")}
+                        description={t("Placemaker.UI.Polish.GlobalTip", "Outgrow for the whole city: new buildings on or off, a look for each zone type, every look and its settings, outgrow or put back every building.")}
                         onClick={() => setCityOpen(!cityOpen)}
                         testId="polish-city-open"
                     />

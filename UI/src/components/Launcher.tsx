@@ -32,7 +32,7 @@ const LauncherInner = () => {
 const PolishLauncherInner = () => {
     const { t } = useT();
     const state = useToolState();
-    const on = state.open && !!state.painter;
+    const on = state.open && !!state.painter?.tool;
     return (
         <Tip
             direction="down"

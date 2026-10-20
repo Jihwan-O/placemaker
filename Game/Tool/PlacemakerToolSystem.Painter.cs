@@ -121,17 +121,21 @@ namespace Placemaker.Game.Tool
             Touch();
         }
 
-        /// <summary>The look's buttons: "save" (over the player's own look), "saveAs" (a new look named <paramref name="arg"/>),
-        /// "rename" (the picked look to <paramref name="arg"/>), "delete" (the picked look), "revert" (back to its saved values).</summary>
+        /// <summary>The look's buttons: "save" (over the look: the player's own, or a built-in one, which then is what that look
+        /// is everywhere), "saveAs" (a new look named <paramref name="arg"/>), "rename" (the player's look to <paramref name="arg"/>),
+        /// "delete" (the player's look), "revert" (back to its saved values), "reset" (a changed built-in look back as it ships).</summary>
         public void PolishLookAction(string what, string arg)
         {
             var look = CurrentLook;
             switch (what)
             {
                 case "save":
-                    if (look == null || !look.Custom) return;
-                    NeighbourPolishSystem.SaveLook(look.Id, look.Name, _lookTheme, _lookValues);
+                    if (look == null) return;
+                    NeighbourPolishSystem.SaveLook(look.Id, look.Custom ? look.Name : null, _lookTheme, _lookValues);
                     SelectLook(look.Id);
+                    break;
+                case "reset":
+                    if (look != null && look.Edited && NeighbourPolishSystem.ResetLook(look.Id)) SelectLook(look.Id);
                     break;
                 case "saveAs":
                     var id = NeighbourPolishSystem.SaveLook(null, string.IsNullOrWhiteSpace(arg) ? "My look" : arg, _lookTheme, _lookValues);
@@ -372,9 +376,10 @@ namespace Placemaker.Game.Tool
             }
         }
 
+        /// <summary>Outgrow as the panel shows it: always (the Global outgrow window and the looks are there whatever is picked);
+        /// the area's counts only for the Outgrow tool and the Zoning types.</summary>
         private PainterView PainterState()
         {
-            if (!_painter && !_wasPolishType) return null;
             var (lots, yes) = PainterCount;
             var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
             var v = new PainterView
@@ -391,7 +396,9 @@ namespace Placemaker.Game.Tool
             v.Values = new Dictionary<string, float>(_lookValues);
             v.LookValues = current != null ? current.Values() : new Dictionary<string, float>(PolishLooks.Defaults);
             v.LookSavedTheme = current?.Theme ?? "garden";
-            foreach (var l in NeighbourPolishSystem.Looks) v.Looks.Add((l.Id, l.Name, l.Custom, l.Theme));
+            foreach (var l in NeighbourPolishSystem.Looks) v.Looks.Add((l.Id, l.Name, l.Custom, l.Theme, l.Edited, l.Knobs));
+            v.Defaults = new Dictionary<string, float>(PolishLooks.Defaults);
+            v.TypeLook = _recipe != null ? Placemaker.Core.Layers.Types.Zoning.PolishLookLayer.Of(_recipe.Root.Layer)?.LookId : null;
             v.AreaZones.AddRange(_areaZones);
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
             if (polish != null)

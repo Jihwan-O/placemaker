@@ -1,7 +1,8 @@
 // Placemaker neighbourhood polish — looks and zone looks in the game (GPL-3.0).
 //
 // The looks (Core/Neighbours/PolishLooks): the built-in ones and the player's own, kept in ModsData/Placemaker/
-// polish-looks.json for every city. A polished lot keeps its look by id (PolishedLot.Look, a hash) and the changes it was
+// polish-looks.json for every city, with the player's changes to built-in looks (Save on a built-in look changes what that
+// look is everywhere it is used; Back to default drops the changes). A polished lot keeps its look by id (PolishedLot.Look, a hash) and the changes it was
 // polished with that the look does not have (PolishLookOverride); the planner gets every knob per house. Zone looks: each
 // zone type of the game (mods' zones too) gets a look or Off for new buildings and Polish the whole city; a zone without
 // its own pick follows its kind (homes, shops, offices, industry) when the kind has a look picked, else gets its own
@@ -26,6 +27,8 @@ namespace Placemaker.Game.Neighbours
         // ───────────── the looks ─────────────
 
         private static List<PolishLook> s_custom;
+        /// <summary>The player's changes to built-in looks, by id.</summary>
+        private static Dictionary<string, PolishLook> s_edits;
         private static Dictionary<int, PolishLook> s_byHash;
         /// <summary>Bumped when a look is saved, renamed or deleted (the panel redraws).</summary>
         public static int LooksVersion { get; private set; }
@@ -36,18 +39,24 @@ namespace Placemaker.Game.Neighbours
         private static void EnsureLooks()
         {
             if (s_custom != null) return;
-            try { s_custom = File.Exists(LooksPath) ? PolishLooks.Read(File.ReadAllText(LooksPath)) : new List<PolishLook>(); }
+            s_edits = new Dictionary<string, PolishLook>();
+            try
+            {
+                string json = File.Exists(LooksPath) ? File.ReadAllText(LooksPath) : "";
+                s_custom = PolishLooks.Read(json);
+                foreach (var e in PolishLooks.ReadEdits(json)) s_edits[e.Id] = e;
+            }
             catch (Exception e) { Mod.Log.Warn("Placemaker polish: looks not read: " + e.Message); s_custom = new List<PolishLook>(); }
             s_byHash = null;
         }
 
-        /// <summary>Every look: the built-in ones, then the player's own.</summary>
+        /// <summary>Every look: the built-in ones (as the player changed them), then the player's own.</summary>
         public static List<PolishLook> Looks
         {
             get
             {
                 EnsureLooks();
-                return PolishLooks.BuiltIn.Concat(s_custom).ToList();
+                return PolishLooks.BuiltIn.Select(b => s_edits.TryGetValue(b.Id, out var e) ? e : b).Concat(s_custom).ToList();
             }
         }
 
@@ -65,7 +74,7 @@ namespace Placemaker.Game.Neighbours
 
         private static void PersistLooks()
         {
-            try { File.WriteAllText(LooksPath, PolishLooks.Write(s_custom)); }
+            try { File.WriteAllText(LooksPath, PolishLooks.Write(s_custom, s_edits.Values)); }
             catch (Exception e) { Mod.Log.Warn("Placemaker polish: looks not saved: " + e.Message); }
             s_byHash = null;
             LooksVersion++;
@@ -75,6 +84,18 @@ namespace Placemaker.Game.Neighbours
         public static string SaveLook(string id, string name, string theme, IReadOnlyDictionary<string, float> values)
         {
             EnsureLooks();
+            var builtIn = id == null ? null : PolishLooks.BuiltIn.FirstOrDefault(l => l.Id == id);
+            if (builtIn != null)
+            {
+                // a built-in look changed: what that look is from now on, wherever it is used (the same as the built-in: no edit)
+                var edit = new PolishLook { Id = id, Name = builtIn.Name, Edited = true, Theme = Array.IndexOf(PolishLooks.Themes, theme) >= 0 ? theme : builtIn.Theme, Knobs = PolishLooks.Diff(values, PolishLooks.Defaults) };
+                bool same = edit.Theme == builtIn.Theme && PolishLooks.Diff(edit.Values(), builtIn.Values()).Count == 0;
+                if (same) s_edits.Remove(id); else s_edits[id] = edit;
+                SettingsChanged = true;
+                PersistLooks();
+                Mod.Log.Info($"Placemaker polish: built-in look {id} {(same ? "back as it ships" : $"changed ({PolishLooks.Diff(edit.Values(), builtIn.Values()).Count} settings)")}");
+                return id;
+            }
             var look = id == null ? null : s_custom.FirstOrDefault(l => l.Id == id);
             if (look == null)
             {
@@ -87,9 +108,21 @@ namespace Placemaker.Game.Neighbours
             if (!string.IsNullOrWhiteSpace(name)) look.Name = name.Trim();
             look.Theme = Array.IndexOf(PolishLooks.Themes, theme) >= 0 ? theme : "garden";
             look.Knobs = PolishLooks.Diff(values, PolishLooks.Defaults);
+            SettingsChanged = true;
             PersistLooks();
             Mod.Log.Info($"Placemaker polish: look '{look.Name}' ({look.Id}) saved, {look.Knobs.Count} settings of its own");
             return look.Id;
+        }
+
+        /// <summary>A built-in look back as it ships (the player's changes to it dropped).</summary>
+        public static bool ResetLook(string id)
+        {
+            EnsureLooks();
+            if (!s_edits.Remove(id)) return false;
+            SettingsChanged = true;
+            PersistLooks();
+            Mod.Log.Info($"Placemaker polish: built-in look {id} back as it ships");
+            return true;
         }
 
         public static bool RenameLook(string id, string name)

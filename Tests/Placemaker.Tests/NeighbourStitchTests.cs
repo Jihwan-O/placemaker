@@ -1023,6 +1023,29 @@ namespace Placemaker.Tests
         }
 
         [Fact]
+        public void A_built_in_look_the_player_changed_is_kept_beside_their_own_looks()
+        {
+            var mine = new PolishLook { Id = "my-big", Name = "Big", Custom = true, Theme = "tidy", Knobs = { ["sideReach"] = 200f } };
+            var garden = new PolishLook { Id = "garden", Name = "Placemaker.UI.Painter.Theme.garden", Edited = true, Theme = "natural", Knobs = { ["fill"] = PolishLooks.FillCarPark, ["waterGap"] = 60f } };
+            var json = PolishLooks.Write(new[] { mine }, new[] { garden });
+            var own = PolishLooks.Read(json);
+            Assert.Single(own);
+            Assert.Equal("my-big", own[0].Id);
+            var edits = PolishLooks.ReadEdits(json);
+            Assert.Single(edits);
+            Assert.True(edits[0].Edited && !edits[0].Custom);
+            Assert.Equal("garden", edits[0].Id);
+            Assert.Equal("Placemaker.UI.Painter.Theme.garden", edits[0].Name);
+            Assert.Equal("natural", edits[0].Theme);
+            Assert.Equal(PolishLooks.FillCarPark, edits[0].Values()["fill"]);
+            Assert.Equal(60f, edits[0].Values()["waterGap"]);
+            // an edit of a look that is not built in is never read
+            Assert.Empty(PolishLooks.ReadEdits("{\"edits\":[{\"id\":\"my-big\",\"theme\":\"tidy\",\"knobs\":{}}]}"));
+            // a file without edits (older) reads as before
+            Assert.Empty(PolishLooks.ReadEdits(PolishLooks.Write(new[] { mine })));
+        }
+
+        [Fact]
         public void Every_zone_type_gets_a_look_of_its_own()
         {
             Assert.Equal("houses", PolishLooks.DefaultZoneLook("residential low", "home"));

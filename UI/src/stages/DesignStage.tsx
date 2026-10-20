@@ -27,6 +27,7 @@ import { ValueSinkContext } from "../controls/Controls";
 import { SettingValue } from "../contract";
 import { ControlEx, valueOf } from "../lib/schema";
 import { useAssetName } from "../components/picker";
+import { lookName, lookValuesOf, ZoneLookRow } from "../components/PainterCard";
 import { BarMode, PresetBar, Tile, TypeBrowser } from "./PresetBrowser";
 import s from "./design.module.scss";
 
@@ -477,10 +478,11 @@ const MisfitChip = ({ step, catalog }: { step: StepView; catalog: Catalog }) => 
 
 /**
  * A Zoning type: one section. Zone the empty land or only edit the buildings there (ZoneMix), and each zone type's own
- * Outgrow: its switch and its settings (the type's Outgrow rows, shown with that zone type's changes over them and writing
- * into them), kept in zoneOutgrow as {"<zone key>": {"on": bool, "v": {row: value}}}.
+ * Outgrow: its switch, its look (the type's unless it picks one: any look, edited in Global outgrow) and its settings (the
+ * look's rows, shown with that zone type's changes over them and writing into them), kept in zoneOutgrow as
+ * {"<zone key>": {"on": bool, "look": id, "v": {row: value}}}.
  */
-type OutgrowMap = Record<string, { on?: boolean; v?: Record<string, SettingValue> }>;
+type OutgrowMap = Record<string, { on?: boolean; look?: string; v?: Record<string, SettingValue> }>;
 
 const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: LayerType; state: ToolState; scope: string }) => {
     const { t } = useT();
@@ -498,26 +500,44 @@ const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: Lay
         setOn: (key, on) => write({ ...map, [key]: { ...(map[key] ?? {}), on } }),
         summary: () => "",
         body: (key) => {
-            // the type's rows, showing this zone type's changes over them; a row set writes into its changes
+            // the rows of its look (the type's, or the one it picked), showing this zone type's changes over them; a row set
+            // writes into its changes
             const own = map[key]?.v ?? {};
-            const view: StepView = { ...step, values: { ...step.values, ...own }, locked: [] };
+            const picked = map[key]?.look ?? "";
+            const p = state.painter;
+            const lookVals = picked && p ? lookValuesOf(p, picked) : {};
+            const view: StepView = { ...step, values: { ...step.values, ...lookVals, ...own }, locked: [] };
             const sink = { set: (id: string, v: SettingValue) => write({ ...map, [key]: { ...(map[key] ?? {}), v: { ...own, [id]: v } } }) };
             return (
-                <ValueSinkContext.Provider value={sink}>
-                    <ControlList step={view} layer={layer} state={state} scope={scope + ":zone:" + key} exclude={new Set([...featureOptionIds(step), ...zoningIds])} />
-                </ValueSinkContext.Provider>
+                <>
+                    {p ? (
+                        <ZoneLookRow
+                            p={p}
+                            value={picked}
+                            typeLook={p.typeLook || ""}
+                            testId={"zonemix-look-" + key.replace(/\s+/g, "-")}
+                            onPick={(id) => write({ ...map, [key]: { on: map[key]?.on, look: id || undefined, v: {} } })}
+                        />
+                    ) : null}
+                    <ValueSinkContext.Provider value={sink}>
+                        <ControlList step={view} layer={layer} state={state} scope={scope + ":zone:" + key} exclude={new Set([...featureOptionIds(step), ...zoningIds])} />
+                    </ValueSinkContext.Provider>
+                </>
             );
         },
     };
     outgrow.summary = (key) => {
-        const v = { ...step.values, ...(map[key]?.v ?? {}) };
+        const picked = map[key]?.look ?? "";
+        const p = state.painter;
+        const v = { ...step.values, ...(picked && p ? lookValuesOf(p, picked) : {}), ...(map[key]?.v ?? {}) };
         const num = (id: string) => {
             const c = (layer.controls as ControlEx[]).find((x) => x.id === id);
             const val = id in v ? v[id] : c?.default;
             return Math.round(Number(val) || 0);
         };
         const own = Object.keys(map[key]?.v ?? {}).length;
-        return t("Placemaker.UI.ZoneMix.OutgrowSummary", "reach {0} m · lawn {1} m", [num("sideReach"), num("lawnReach")]) + (own > 0 ? " · " + t("Placemaker.UI.ZoneMix.OwnChanges", "{0} own", [own]) : "");
+        const lookPart = p && (picked || p.typeLook) ? lookName(t, p, picked || p.typeLook || "") + " · " : "";
+        return lookPart + t("Placemaker.UI.ZoneMix.OutgrowSummary", "reach {0} m · lawn {1} m", [num("sideReach"), num("lawnReach")]) + (own > 0 ? " · " + t("Placemaker.UI.ZoneMix.OwnChanges", "{0} own", [own]) : "");
     };
     return (
         <div className={s.shape} data-testid="zoning">

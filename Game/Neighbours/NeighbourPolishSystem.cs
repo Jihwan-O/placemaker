@@ -94,7 +94,7 @@ namespace Placemaker.Game.Neighbours
         }
 
         /// <summary>A setting changed since the polished buildings were last fitted (the status line says so).</summary>
-        public static bool SettingsChanged { get; private set; }
+        public static bool SettingsChanged { get; internal set; }
 
         /// <summary>The theme byte for a building: its zone's look's base theme (Off: its zone type's built-in look's).</summary>
         private byte ThemeByte(Entity prefab)

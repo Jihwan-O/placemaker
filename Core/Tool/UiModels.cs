@@ -95,8 +95,13 @@ namespace Placemaker.Core.Tool
         /// <summary>Live polish: the selection polished again after every change.</summary>
         public bool Live;
         public Dictionary<string, float> Values = new Dictionary<string, float>(), LookValues = new Dictionary<string, float>();
-        /// <summary>Every look: id, name (a key for the built-in ones), the player's own, base theme.</summary>
-        public List<(string Id, string Name, bool Custom, string Theme)> Looks = new List<(string, string, bool, string)>();
+        /// <summary>Every look: id, name (a key for the built-in ones), the player's own, base theme, a built-in one the player
+        /// changed, its settings that differ from Defaults.</summary>
+        public List<(string Id, string Name, bool Custom, string Theme, bool Edited, Dictionary<string, float> Knobs)> Looks = new List<(string, string, bool, string, bool, Dictionary<string, float>)>();
+        /// <summary>Every look setting's default (a look's values: these, then its Knobs).</summary>
+        public Dictionary<string, float> Defaults = new Dictionary<string, float>();
+        /// <summary>A Zoning type picked: the look its zones take unless one picks its own (null: none picked).</summary>
+        public string TypeLook;
         /// <summary>Every zone type: prefab name, kind (home, shop, office, industry), its look ("off"), set for it (not its kind's),
         /// its icon, its own built-in look (what it gets with no pick of its own nor of its kind).</summary>
         public List<(string Id, string Kind, string Look, bool Own, string Icon, string Default)> Zones = new List<(string, string, string, bool, string, string)>();
@@ -243,7 +248,8 @@ namespace Placemaker.Core.Tool
                         .Set("polished", p.CityPolished).Set("total", p.CityTotal).Set("waiting", p.Waiting).Set("restoring", p.Restoring))
                     .Set("lookTheme", p.LookTheme ?? "garden").Set("lookSavedTheme", p.LookSavedTheme ?? "garden").Set("modified", p.Modified).Set("tool", p.Tool).Set("live", p.Live)
                     .Set("values", Knobs(p.Values)).Set("lookValues", Knobs(p.LookValues))
-                    .Set("looks", Arr(p.Looks.Select(l => JsonValue.Obj().Set("id", l.Id).Set("name", l.Name).Set("custom", l.Custom).Set("theme", l.Theme))))
+                    .Set("looks", Arr(p.Looks.Select(l => JsonValue.Obj().Set("id", l.Id).Set("name", l.Name).Set("custom", l.Custom).Set("theme", l.Theme).Set("edited", l.Edited).Set("knobs", Knobs(l.Knobs ?? new Dictionary<string, float>())))))
+                    .Set("defaults", Knobs(p.Defaults)).Set("typeLook", p.TypeLook ?? "")
                     .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own).Set("icon", z.Icon ?? "").Set("def", z.Default ?? ""))))
                     .Set("areaZones", Arr(p.AreaZones.Select(z => JsonValue.Obj().Set("key", z.Key).Set("zone", z.Zone).Set("icon", z.Icon ?? "").Set("count", z.Count)))));
             }

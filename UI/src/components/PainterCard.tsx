@@ -3,10 +3,13 @@
 // ones, the player's own: like Placemaker's Style row), the look's buttons (Save, Save as new, Rename, Delete, Revert) and
 // every setting of the look as rows (label left, control right, reset to the look's value), grouped and folded: first what
 // the land past the lot becomes (a garden, a car park yard, paving: any look on any building) and how far it keeps from
-// water. Polish and Unpolish are the footer's buttons. The City window (PolishCityCard, beside the panel, its header
-// button): new buildings, a look for each zone type (each starts with its own: Houses, Towers, Shops…) and each kind ("By
-// zone type", or one look for all its zones), Polish / Unpolish the whole city (asking first, a few buildings a frame).
-import React, { ReactNode, useState } from "react";
+// water; Save on a built-in look changes what that look is everywhere (Back to default undoes it). Outgrow and Remove
+// outgrow are the footer's buttons. The Global outgrow window (PolishCityCard, beside the panel, its header button, there
+// whatever is picked): new buildings; Zones (a look for each zone type, each starting with its own: Houses, Towers,
+// Shops…, and for each kind: "By zone type" or one look for all its zones) and Looks (the same look editor); Outgrow all
+// / Remove all outgrow (asking first, a few buildings a frame). A Zoning type's zone picks its look with ZoneLookRow, and
+// "Edit" there opens Global outgrow's Looks on it (openLookEditor).
+import React, { ReactNode, useCallback, useEffect, useState } from "react";
 import classNames from "classnames";
 import { PainterState, PolishZone, ToolState } from "../contract";
 import { humanize, TFunc, useT } from "../lib/l10n";
@@ -62,8 +65,8 @@ const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Kno
         id: "land", en: "What the land becomes", icon: "layers", open: true,
         knobs: [
             {
-                id: "fill", en: "Land past the lot", tip: "What a building's land past its own lot becomes, whatever the building is: a garden (lawn, fences, beds), a car park yard (green edges, bins, marked bays with parked cars), or paving. By building: homes get gardens, shops and offices car park yards, industry its paving.", kind: "choice",
-                options: [{ value: 0, en: "By building" }, { value: 1, en: "Garden" }, { value: 2, en: "Car park" }, { value: 3, en: "Paved" }],
+                id: "fill", en: "Land past the lot", tip: "What a building's land past its own lot becomes, whatever the building is: a garden (lawn, fences, beds), a car park yard (green edges, bins, marked bays with parked cars), or paving. Auto: by the building, homes get gardens, shops and offices car park yards, industry its paving.", kind: "choice",
+                options: [{ value: 0, en: "Auto" }, { value: 1, en: "Garden" }, { value: 2, en: "Car park" }, { value: 3, en: "Paved" }],
             },
             { id: "waterGap", en: "Water gap", tip: "How far the land keeps from water: gardens, yards and car parks stop this far from the shore, along a smooth line. The building's own lot is never cut.", kind: "slider", min: 0, max: 200, step: 1, unit: "m" },
         ],
@@ -215,7 +218,31 @@ const KnobRow = ({ k, p }: { k: Knob; p: PainterState }) => {
     );
 };
 
-/** The look's buttons: Save (the player's own), Save as new, Rename, Delete, Revert. A name field when one is asked for. */
+/** A look's every value: the defaults, then its own settings (as the panel was sent them). */
+export const lookValuesOf = (p: PainterState, id: string): Record<string, number> => {
+    const l = p.looks?.find((x) => x.id === id);
+    return { ...(p.defaults ?? {}), ...(l?.knobs ?? {}) };
+};
+
+// Opening the look editor from anywhere (a zone's Outgrow settings, a zone row): the panel opens Global outgrow, which
+// shows its Looks tab with that look picked (a request made before the window is open waits for it).
+const lookEditorListeners = new Set<() => void>();
+let pendingLook: string | null = null;
+export const openLookEditor = (id: string) => {
+    pendingLook = id;
+    lookEditorListeners.forEach((l) => l());
+};
+export const useLookEditorRequests = (onRequest: () => void) => {
+    useEffect(() => {
+        lookEditorListeners.add(onRequest);
+        return () => {
+            lookEditorListeners.delete(onRequest);
+        };
+    }, [onRequest]);
+};
+
+/** The look's buttons: Save (over the look: the player's own, or a built-in one, which then is what that look is everywhere),
+ *  Save as new, Back to the saved look, Back to how a built-in look ships, Rename, Delete. A name field when one is asked for. */
 const LookBar = ({ p }: { p: PainterState }) => {
     const { t } = useT();
     const [naming, setNaming] = useState<"saveAs" | "rename" | null>(null);
@@ -247,22 +274,40 @@ const LookBar = ({ p }: { p: PainterState }) => {
                 <Btn label={t("Placemaker.UI.Cancel", "Cancel")} onClick={() => setNaming(null)} testId="polish-look-name-cancel" />
             </div>
         );
+    const display = lookName(t, p, look.id);
     return (
         <div className={s.lookBar} data-testid="polish-look-bar">
-            {p.modified ? <div className={s.modified}>{t("Placemaker.UI.Polish.Changed", "Changed")}</div> : null}
+            {p.modified ? (
+                <div className={s.modified}>{t("Placemaker.UI.Polish.Changed", "Changed")}</div>
+            ) : look.edited ? (
+                <div className={s.modified}>{t("Placemaker.UI.Polish.Edited", "Your version")}</div>
+            ) : null}
             <div className={s.flex} />
-            {look.custom && p.modified ? <Btn variant="accent" icon="save" iconSize={12} label={t("Placemaker.UI.Polish.Save", "Save")} onClick={() => act.polishLook("save")} testId="polish-look-save" /> : null}
+            {p.modified ? (
+                <Btn
+                    variant="accent"
+                    icon="save"
+                    iconSize={12}
+                    label={t("Placemaker.UI.Polish.Save", "Save")}
+                    title={look.custom ? t("Placemaker.UI.Polish.Save", "Save") : t("Placemaker.UI.Polish.SaveBuiltIn", "Save: this is what {0} is from now on, everywhere it is used", [display])}
+                    onClick={() => act.polishLook("save")}
+                    testId="polish-look-save"
+                />
+            ) : null}
             <Btn
                 icon="plus"
                 iconSize={12}
                 label={t("Placemaker.UI.Polish.SaveAs", "Save as new")}
                 onClick={() => {
-                    setName(look.custom ? look.name + " 2" : "");
+                    setName(display + " 2");
                     setNaming("saveAs");
                 }}
                 testId="polish-look-saveas"
             />
             {p.modified ? <Btn icon="undo" iconSize={12} title={t("Placemaker.UI.Polish.Revert", "Back to the saved look")} onClick={() => act.polishLook("revert")} testId="polish-look-revert" /> : null}
+            {!p.modified && look.edited ? (
+                <Btn icon="reset" iconSize={12} title={t("Placemaker.UI.Polish.ResetBuiltIn", "Back to {0} as it ships", [display])} onClick={() => act.polishLook("reset")} testId="polish-look-reset" />
+            ) : null}
             {look.custom ? (
                 <Btn
                     icon="edit"
@@ -293,16 +338,52 @@ const LookBar = ({ p }: { p: PainterState }) => {
     );
 };
 
-/** Step 2 of the polish tool: what the area holds, the look picker and every setting of the look. */
-export const PolishDesign = ({ state }: { state: ToolState }) => {
+/** The look picked (p.theme) and every setting of it: its buttons, its base style, the settings as rows, grouped and folded. */
+const LookEditor = ({ p }: { p: PainterState }) => {
     const { t } = useT();
-    const p = state.painter;
-    if (!p) return null;
+    return (
+        <div className={d.options} data-testid="options">
+            <LookBar p={p} />
+            <Row
+                id="theme"
+                label={t("Placemaker.UI.Polish.BaseStyle", "Base style")}
+                tip={t("Placemaker.UI.Polish.BaseStyleTip", "What kind of planting and features the look has.")}
+                changed={p.lookTheme !== p.lookSavedTheme}
+                onReset={() => act.polishKnob("theme", THEMES.indexOf(p.lookSavedTheme))}
+            >
+                <Segmented
+                    testId="polish-base"
+                    iconOnly
+                    value={p.lookTheme}
+                    onChange={(v) => act.polishKnob("theme", THEMES.indexOf(v))}
+                    options={THEMES.map((th) => ({ value: th, icon: THEME_ICON[th], title: lookName(t, p, th), description: t("Placemaker.UI.Painter.ThemeTip." + th, "") }))}
+                />
+            </Row>
+            {GROUPS.map((g) => (
+                <Collapsible
+                    key={g.id}
+                    id={"polish:" + g.id}
+                    title={t("Placemaker.UI.Polish.Group." + g.id, g.en)}
+                    icon={g.icon}
+                    defaultOpen={!!g.open}
+                    testId={"polish-group-" + g.id}
+                    summary={changedIn(g.knobs, p) > 0 ? t("Placemaker.UI.Polish.GroupChanged", "{0} changed", [changedIn(g.knobs, p)]) : undefined}
+                >
+                    {g.knobs.map((k) => (
+                        <KnobRow key={k.id} k={k} p={p} />
+                    ))}
+                </Collapsible>
+            ))}
+        </div>
+    );
+};
+
+/** The looks as chip rows, like Placemaker's Style row: the ones made for zone types (with "By zone" first when given), the
+ *  themed ones, the player's own. A click picks the look (its settings below). */
+const LookRows = ({ p, zoneChip }: { p: PainterState; zoneChip?: ReactNode }) => {
+    const { t } = useT();
     const color = categoryColor("neighbourhood");
-    const hasArea = state.area.closed && state.area.areaM2 > 0;
     const looks = p.looks ?? [];
-    const byZone = p.theme === "zone";
-    // the picker's rows: the looks made for zone types, the themed ones, the player's own
     const zoneLooks = ZONE_LOOKS.map((id) => looks.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l);
     const themed = looks.filter((l) => !l.custom && !ZONE_LOOKS.includes(l.id));
     const own = looks.filter((l) => l.custom);
@@ -316,10 +397,45 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
             name={lookName(t, p, l.id)}
             on={p.theme === l.id}
             description={l.custom ? t("Placemaker.UI.Polish.YourLook", "Your look, based on {0}", [lookName(t, p, l.theme)]) : t("Placemaker.UI.Painter.ThemeTip." + l.id, "")}
-            badge={p.theme === l.id && p.modified ? <div className={b.dot} /> : null}
+            badge={(p.theme === l.id && p.modified) || l.edited ? <div className={b.dot} /> : null}
             onClick={() => act.polishTheme(l.id)}
         />
     );
+    return (
+        <div className={b.browser}>
+            <div className={b.row}>
+                <RowLabel n={1} label={t("Placemaker.UI.Polish.ZoneLooks", "For zones")} />
+                <div className={b.chips} data-testid="polish-themes">
+                    {zoneChip}
+                    {zoneLooks.map(lookChip)}
+                </div>
+            </div>
+            <div className={b.row}>
+                <RowLabel n={2} label={t("Placemaker.UI.Polish.Themes", "Themes")} />
+                <div className={b.chips} data-testid="polish-themes-themed">
+                    {themed.map(lookChip)}
+                </div>
+            </div>
+            {own.length > 0 ? (
+                <div className={b.row}>
+                    <RowLabel n={3} label={t("Placemaker.UI.Polish.Yours", "Yours")} />
+                    <div className={b.chips} data-testid="polish-themes-own">
+                        {own.map(lookChip)}
+                    </div>
+                </div>
+            ) : null}
+        </div>
+    );
+};
+
+/** Step 2 of the polish tool: what the area holds, the look picker and every setting of the look. */
+export const PolishDesign = ({ state }: { state: ToolState }) => {
+    const { t } = useT();
+    const p = state.painter;
+    if (!p) return null;
+    const color = categoryColor("neighbourhood");
+    const hasArea = state.area.closed && state.area.areaM2 > 0;
+    const byZone = p.theme === "zone";
     return (
         <div className={d.stage} data-testid="polish-design" data-theme={p.theme}>
             <div className={s.count} data-testid="painter-count" data-lots={p.lots} data-polished={p.polished}>
@@ -338,38 +454,21 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
                     </div>
                     <div className={b.flex} />
                 </div>
-                <div className={b.browser}>
-                    <div className={b.row}>
-                        <RowLabel n={1} label={t("Placemaker.UI.Polish.ZoneLooks", "For zones")} />
-                        <div className={b.chips} data-testid="polish-themes">
-                            <Chip
-                                testId="polish-theme-zone"
-                                nav="preset"
-                                icon="zone"
-                                color={color}
-                                name={lookName(t, p, "zone")}
-                                on={byZone}
-                                description={t("Placemaker.UI.Painter.ThemeTip.zone", "Each building gets its zone's look (City)")}
-                                onClick={() => act.polishTheme("zone")}
-                            />
-                            {zoneLooks.map(lookChip)}
-                        </div>
-                    </div>
-                    <div className={b.row}>
-                        <RowLabel n={2} label={t("Placemaker.UI.Polish.Themes", "Themes")} />
-                        <div className={b.chips} data-testid="polish-themes-themed">
-                            {themed.map(lookChip)}
-                        </div>
-                    </div>
-                    {own.length > 0 ? (
-                        <div className={b.row}>
-                            <RowLabel n={3} label={t("Placemaker.UI.Polish.Yours", "Yours")} />
-                            <div className={b.chips} data-testid="polish-themes-own">
-                                {own.map(lookChip)}
-                            </div>
-                        </div>
-                    ) : null}
-                </div>
+                <LookRows
+                    p={p}
+                    zoneChip={
+                        <Chip
+                            testId="polish-theme-zone"
+                            nav="preset"
+                            icon="zone"
+                            color={color}
+                            name={lookName(t, p, "zone")}
+                            on={byZone}
+                            description={t("Placemaker.UI.Painter.ThemeTip.zone", "Each building gets its zone's look (City)")}
+                            onClick={() => act.polishTheme("zone")}
+                        />
+                    }
+                />
             </div>
             {byZone ? (
                 <div className={s.off} data-testid="polish-byzone-note">
@@ -379,39 +478,7 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
                     </div>
                 </div>
             ) : (
-                <div className={d.options} data-testid="options">
-                    <LookBar p={p} />
-                    <Row
-                        id="theme"
-                        label={t("Placemaker.UI.Polish.BaseStyle", "Base style")}
-                        tip={t("Placemaker.UI.Polish.BaseStyleTip", "What kind of planting and features the look has.")}
-                        changed={p.lookTheme !== p.lookSavedTheme}
-                        onReset={() => act.polishKnob("theme", THEMES.indexOf(p.lookSavedTheme))}
-                    >
-                        <Segmented
-                            testId="polish-base"
-                            iconOnly
-                            value={p.lookTheme}
-                            onChange={(v) => act.polishKnob("theme", THEMES.indexOf(v))}
-                            options={THEMES.map((th) => ({ value: th, icon: THEME_ICON[th], title: lookName(t, p, th), description: t("Placemaker.UI.Painter.ThemeTip." + th, "") }))}
-                        />
-                    </Row>
-                    {GROUPS.map((g) => (
-                        <Collapsible
-                            key={g.id}
-                            id={"polish:" + g.id}
-                            title={t("Placemaker.UI.Polish.Group." + g.id, g.en)}
-                            icon={g.icon}
-                            defaultOpen={!!g.open}
-                            testId={"polish-group-" + g.id}
-                            summary={changedIn(g.knobs, p) > 0 ? t("Placemaker.UI.Polish.GroupChanged", "{0} changed", [changedIn(g.knobs, p)]) : undefined}
-                        >
-                            {g.knobs.map((k) => (
-                                <KnobRow key={k.id} k={k} p={p} />
-                            ))}
-                        </Collapsible>
-                    ))}
-                </div>
+                <LookEditor p={p} />
             )}
         </div>
     );
@@ -419,10 +486,10 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
 
 /** The looks to pick from (a short list of chips): "by zone type" (a kind), the looks made for zone types, the themed ones,
  *  the player's own, Off; and back to its default for a zone with its own (<paramref name="inherit"/>: what that gives). */
-const LookChips = ({ p, value, testId, onPick, inherit, auto }: { p: PainterState; value: string; testId: string; onPick: (v: string) => void; inherit?: string; auto?: boolean }) => {
+const LookChips = ({ p, value, testId, onPick, inherit, auto, off = true }: { p: PainterState; value: string; testId: string; onPick: (v: string) => void; inherit?: string; auto?: boolean; off?: boolean }) => {
     const { t } = useT();
     const all = (p.looks ?? []).map((l) => l.id);
-    const options = [...(auto ? [KIND_AUTO] : []), ...ZONE_LOOKS.filter((id) => all.includes(id)), ...all.filter((id) => !ZONE_LOOKS.includes(id)), "off"];
+    const options = [...(auto ? [KIND_AUTO] : []), ...ZONE_LOOKS.filter((id) => all.includes(id)), ...all.filter((id) => !ZONE_LOOKS.includes(id)), ...(off ? ["off"] : [])];
     return (
         <div className={s.choiceList} data-testid={testId}>
             {inherit ? (
@@ -454,6 +521,58 @@ const lookIcon = (p: PainterState, id: string) => {
     if (id === KIND_AUTO) return "zone";
     const l = (p.looks ?? []).find((x) => x.id === id);
     return !l ? "eyeOff" : l.custom ? "star" : LOOK_ICON[l.id] ?? THEME_ICON[l.theme] ?? "flower";
+};
+
+/** A look that has settings to edit (not Off, not "by zone type"). */
+const editable = (p: PainterState, id: string) => !!id && id !== "off" && id !== KIND_AUTO && !!p.looks?.some((l) => l.id === id);
+
+/**
+ * A Zoning type's zone type: which look its buildings get (the type's unless one is picked) and a way to change that look
+ * (Global outgrow's look editor opens on it). Its own changes are the rows under it.
+ */
+export const ZoneLookRow = ({ p, value, typeLook, onPick, testId }: { p: PainterState; value: string; typeLook: string; onPick: (id: string) => void; testId: string }) => {
+    const { t } = useT();
+    const [open, setOpen] = useState(false);
+    const current = value || typeLook;
+    return (
+        <div className={s.zoneLookPick} data-testid={testId}>
+            <div className={s.zoneLookHead}>
+                <div className={s.zoneLookLabel}>{t("Placemaker.UI.Polish.Look", "Look")}</div>
+                <button
+                    type="button"
+                    className={classNames(s.kindLook, { [s.kindLookOn]: open })}
+                    data-testid={testId + "-open"}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setOpen(!open);
+                    }}
+                >
+                    <Icon name={lookIcon(p, current)} size={10} tint="light" />
+                    <div className={s.choiceText}>{value ? lookName(t, p, value) : t("Placemaker.UI.Polish.TypeLook", "The type's ({0})", [lookName(t, p, typeLook)])}</div>
+                    <Icon name="chevronDown" size={9} tint="dim" />
+                </button>
+                <div className={s.flex} />
+                {editable(p, current) ? (
+                    <Btn icon="edit" iconSize={11} label={t("Placemaker.UI.Polish.EditLook", "Edit {0}", [lookName(t, p, current)])} onClick={() => openLookEditor(current)} testId={testId + "-edit"} />
+                ) : null}
+            </div>
+            {open ? (
+                <div className={s.pickBox}>
+                    <LookChips
+                        p={p}
+                        value={value}
+                        off={false}
+                        inherit={value ? typeLook : undefined}
+                        testId={testId + "-pick"}
+                        onPick={(v) => {
+                            onPick(v);
+                            setOpen(false);
+                        }}
+                    />
+                </div>
+            ) : null}
+        </div>
+    );
 };
 
 const KINDS: { id: "home" | "shop" | "office" | "industry"; city: "homes" | "shops" | "offices" | "industry"; en: string; icon: string }[] = [
@@ -521,11 +640,23 @@ const ZoneRow = ({ p, r, on, onClick }: { p: PainterState; r: ZoneRowData; on: b
 
 type Ask = "polishAll" | "unpolishAll" | null;
 
-/** The City window beside the panel (Placemaker's frame): new buildings, a look per zone type, the whole city. */
+/** The Global outgrow window beside the panel (Placemaker's frame): new buildings; Zones (a look per zone type and per kind)
+ *  and Looks (every look, and every setting of the one picked: what a Garden is, saved for every use of it); the whole city. */
 export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: () => void }) => {
     const { t } = useT();
     const [ask, setAsk] = useState<Ask>(null);
     const [picking, setPicking] = useState<string | null>(null);   // a zone id, or "kind:<kind>"
+    const [tab, setTab] = useState<"zones" | "looks">(() => (pendingLook != null ? "looks" : "zones"));
+    // a look to edit asked for elsewhere (a zone's Outgrow settings): the Looks tab, that look picked
+    const takeRequest = useCallback(() => {
+        if (pendingLook == null) return;
+        const id = pendingLook;
+        pendingLook = null;
+        setTab("looks");
+        if (id && id !== "off" && id !== KIND_AUTO) act.polishTheme(id);
+    }, []);
+    useEffect(() => takeRequest(), [takeRequest]);
+    useLookEditorRequests(takeRequest);
     const p = state.painter;
     if (!p || !p.city) return null;
     const city = p.city;
@@ -534,6 +665,11 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
         t("Placemaker.UI.Polish.Count", "{0} of {1} buildings outgrown", [city.polished, city.total]) +
         (city.restoring > 0 ? " · " + t("Placemaker.UI.Polish.Restoring", "putting {0} back", [city.restoring]) : city.waiting > 0 ? " · " + t("Placemaker.UI.Polish.Working", "working through {0}", [city.waiting]) : "");
     const zones: PolishZone[] = p.zones ?? [];
+    const editLook = (id: string) => {
+        setTab("looks");
+        setPicking(null);
+        act.polishTheme(id);
+    };
     return (
         <div className={classNames(pn.panel, s.cityPanel)} data-testid="polish-city" onMouseDown={(e) => e.stopPropagation()}>
             <div className={pn.panelTint}>
@@ -547,7 +683,7 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                 </div>
                 <div className={pn.bodyWrap}>
                     <div className={classNames(pn.body, s.cityBody)}>
-                        <Row id="newHouses" label={L("NewHouses", "Polish new buildings")} tip={L("NewHouses.Tip3", "Buildings that grow from now on get their zone's look. Each zone type starts with a look of its own (Houses, Towers, Shops…); pick any look for any zone below: a look decides what the land becomes (a garden, a car park, paving). Buildings already standing stay as they are until you outgrow them.")} toggle>
+                        <Row id="newHouses" label={L("NewHouses2", "Outgrow new buildings")} tip={L("NewHouses.Tip3", "Buildings that grow from now on get their zone's look. Each zone type starts with a look of its own (Houses, Towers, Shops…); pick any look for any zone below: a look decides what the land becomes (a garden, a car park, paving). Buildings already standing stay as they are until you outgrow them.")} toggle>
                             <div className={c.toggleCell}>
                                 <Switch testId="polish-newHouses" on={p.newHouses} onChange={(v) => act.polishCity("newHouses", v ? "true" : "false")} />
                             </div>
@@ -556,87 +692,120 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                             <div className={s.swatch} />
                             <div className={s.statusText}>{status}</div>
                         </div>
-                        {KINDS.map((k) => {
-                            const list = zones.filter((z) => z.kind === k.id);
-                            if (!list.length) return null;
-                            const kindLook = String(city[k.city]);
-                            const kindKey = "kind:" + k.id;
-                            return (
-                                <Collapsible
-                                    key={k.id}
-                                    id={"polish:zones:" + k.id}
-                                    title={t("Placemaker.UI.Polish.Kind." + k.city, k.en)}
-                                    icon={k.icon}
-                                    defaultOpen={k.id === "home"}
-                                    testId={"polish-zones-" + k.id}
-                                    summary={lookName(t, p, kindLook)}
-                                    right={
-                                        <button
-                                            type="button"
-                                            className={classNames(s.kindLook, { [s.kindLookOn]: picking === kindKey })}
-                                            data-testid={"polish-kind-" + k.city}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setPicking(picking === kindKey ? null : kindKey);
-                                            }}
-                                        >
-                                            <Icon name={kindLook === "off" ? "eyeOff" : lookIcon(p, kindLook)} size={10} tint="light" />
-                                            <div className={s.choiceText}>{lookName(t, p, kindLook)}</div>
-                                            <Icon name="chevronDown" size={9} tint="dim" />
-                                        </button>
-                                    }
-                                >
-                                    {picking === kindKey ? (
-                                        <div className={s.pickBox}>
-                                            <div className={s.pickTitle}>{t("Placemaker.UI.Polish.KindPick2", "Every {0} zone without its own pick: by zone type (each its own look), or one look for all", [t("Placemaker.UI.Polish.Kind." + k.city, k.en).toLowerCase()])}</div>
-                                            <LookChips p={p} value={kindLook} auto testId={"polish-kind-" + k.city + "-pick"} onPick={(v) => { if (v) act.polishCity(k.city, v); setPicking(null); }} />
-                                        </div>
-                                    ) : null}
-                                    <div className={s.zoneList}>
-                                        {zoneRows(t, list).map((r) => {
-                                            const on = picking === r.key;
-                                            const looks = [...new Set(r.zones.map((z) => z.look))];
-                                            return (
-                                                <React.Fragment key={r.key}>
-                                                    <ZoneRow p={p} r={r} on={on} onClick={() => setPicking(on ? null : r.key)} />
-                                                    {on ? (
-                                                        <div className={s.pickBox}>
-                                                            <LookChips
-                                                                p={p}
-                                                                value={looks.length === 1 ? looks[0] : ""}
-                                                                inherit={r.zones.some((z) => z.own) ? (kindLook !== KIND_AUTO ? kindLook : r.zones[0].def || KIND_AUTO) : undefined}
-                                                                testId={"polish-zone-" + r.key + "-pick"}
-                                                                onPick={(v) => {
-                                                                    for (const z of r.zones) act.polishZone(z.id, v);
-                                                                    setPicking(null);
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    ) : null}
-                                                </React.Fragment>
-                                            );
-                                        })}
+                        <div className={s.cityTabs}>
+                            <Segmented
+                                testId="polish-city-tab"
+                                stretch
+                                value={tab}
+                                onChange={(v) => setTab(v as "zones" | "looks")}
+                                options={[
+                                    { value: "zones", icon: "zone", label: L("TabZones", "Zones"), description: L("TabZonesTip", "Which look each zone type gets") },
+                                    { value: "looks", icon: "layers", label: L("TabLooks", "Looks"), description: L("TabLooksTip", "Every look and its settings: change what a look is, or make your own") },
+                                ]}
+                            />
+                        </div>
+                        {tab === "zones"
+                            ? KINDS.map((k) => {
+                                  const list = zones.filter((z) => z.kind === k.id);
+                                  if (!list.length) return null;
+                                  const kindLook = String(city[k.city]);
+                                  const kindKey = "kind:" + k.id;
+                                  return (
+                                      <Collapsible
+                                          key={k.id}
+                                          id={"polish:zones2:" + k.id}
+                                          title={t("Placemaker.UI.Polish.Kind." + k.city, k.en)}
+                                          icon={k.icon}
+                                          defaultOpen={false}
+                                          testId={"polish-zones-" + k.id}
+                                          right={
+                                              <button
+                                                  type="button"
+                                                  className={classNames(s.kindLook, { [s.kindLookOn]: picking === kindKey })}
+                                                  data-testid={"polish-kind-" + k.city}
+                                                  onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setPicking(picking === kindKey ? null : kindKey);
+                                                  }}
+                                              >
+                                                  <Icon name={kindLook === "off" ? "eyeOff" : lookIcon(p, kindLook)} size={10} tint="light" />
+                                                  <div className={s.choiceText}>{lookName(t, p, kindLook)}</div>
+                                                  <Icon name="chevronDown" size={9} tint="dim" />
+                                              </button>
+                                          }
+                                      >
+                                          {picking === kindKey ? (
+                                              <div className={s.pickBox}>
+                                                  <div className={s.pickTitle}>{t("Placemaker.UI.Polish.KindPick2", "Every {0} zone without its own pick: by zone type (each its own look), or one look for all", [t("Placemaker.UI.Polish.Kind." + k.city, k.en).toLowerCase()])}</div>
+                                                  <LookChips p={p} value={kindLook} auto testId={"polish-kind-" + k.city + "-pick"} onPick={(v) => { if (v) act.polishCity(k.city, v); setPicking(null); }} />
+                                              </div>
+                                          ) : null}
+                                          <div className={s.zoneList}>
+                                              {zoneRows(t, list).map((r) => {
+                                                  const on = picking === r.key;
+                                                  const looks = [...new Set(r.zones.map((z) => z.look))];
+                                                  const look = looks.length === 1 ? looks[0] : "";
+                                                  return (
+                                                      <React.Fragment key={r.key}>
+                                                          <ZoneRow p={p} r={r} on={on} onClick={() => setPicking(on ? null : r.key)} />
+                                                          {on ? (
+                                                              <div className={s.pickBox}>
+                                                                  <LookChips
+                                                                      p={p}
+                                                                      value={look}
+                                                                      inherit={r.zones.some((z) => z.own) ? (kindLook !== KIND_AUTO ? kindLook : r.zones[0].def || KIND_AUTO) : undefined}
+                                                                      testId={"polish-zone-" + r.key + "-pick"}
+                                                                      onPick={(v) => {
+                                                                          for (const z of r.zones) act.polishZone(z.id, v);
+                                                                          setPicking(null);
+                                                                      }}
+                                                                  />
+                                                                  {editable(p, look) ? (
+                                                                      <div className={s.pickFoot}>
+                                                                          <Btn icon="edit" iconSize={11} label={t("Placemaker.UI.Polish.EditLook", "Edit {0}", [lookName(t, p, look)])} onClick={() => editLook(look)} testId={"polish-zone-" + r.key + "-edit"} />
+                                                                      </div>
+                                                                  ) : null}
+                                                              </div>
+                                                          ) : null}
+                                                      </React.Fragment>
+                                                  );
+                                              })}
+                                          </div>
+                                      </Collapsible>
+                                  );
+                              })
+                            : (
+                                <div data-testid="polish-city-looks">
+                                    <div className={b.picker} data-open="true">
+                                        <LookRows p={p} />
                                     </div>
-                                </Collapsible>
-                            );
-                        })}
+                                    {editable(p, p.theme) ? (
+                                        <LookEditor p={p} />
+                                    ) : (
+                                        <div className={s.off}>
+                                            <Icon name="info" size={12} tint="dim" />
+                                            <div className={s.offText}>{L("PickToEdit", "Pick a look to see and change its settings. Saving a built-in look changes it everywhere it is used; Save as new makes your own.")}</div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                     </div>
                 </div>
                 <div className={s.cityFoot}>
-                    <Btn variant="solid" icon="sparkle" iconSize={12} label={L("PolishAllShort", "Polish all")} title={L("PolishAll", "Polish the whole city")} testId="polish-all" onClick={() => setAsk("polishAll")} />
+                    <Btn variant="solid" icon="sparkle" iconSize={12} label={L("OutgrowAllShort", "Outgrow all")} title={L("OutgrowAll", "Outgrow every building in the city")} testId="polish-all" onClick={() => setAsk("polishAll")} />
                     <div className={s.flex} />
-                    <Btn variant="ghost" icon="reset" iconSize={12} label={L("UnpolishAllShort", "Unpolish all")} title={L("UnpolishAll", "Unpolish the whole city")} testId="polish-none" disabled={city.polished === 0} onClick={() => setAsk("unpolishAll")} />
+                    <Btn variant="ghost" icon="reset" iconSize={12} label={L("RemoveAllShort", "Remove all outgrow")} title={L("RemoveAll", "Put every outgrown building in the city back as the game made it")} testId="polish-none" disabled={city.polished === 0} onClick={() => setAsk("unpolishAll")} />
                 </div>
             </div>
             {ask ? (
                 <Confirm
-                    title={ask === "polishAll" ? L("PolishAll.Title", "Polish the whole city?") : L("UnpolishAll.Title", "Unpolish the whole city?")}
+                    title={ask === "polishAll" ? L("OutgrowAll.Title", "Outgrow the whole city?") : L("RemoveAll.Title", "Remove all outgrow?")}
                     message={
                         ask === "polishAll"
                             ? t("Placemaker.UI.Polish.PolishAll.ByZone", "All {0} buildings get their zone's look (zones set to Off are left out). It runs in the background a few buildings at a time, so the game keeps running smoothly; in a big city it takes a few minutes.", [city.total])
                             : t("Placemaker.UI.Polish.UnpolishAll.Message", "All {0} outgrown gardens go back to how the game made them: fences, hedges and lawns back, the beds, paths, bushes and paving taken away (ground paint stays). It runs in the background a few hundred at a time.", [city.polished])
                     }
-                    confirm={ask === "polishAll" ? L("PolishAll.Ok", "Polish all") : L("UnpolishAll.Ok", "Unpolish all")}
+                    confirm={ask === "polishAll" ? L("OutgrowAll.Ok", "Outgrow all") : L("RemoveAll.Ok", "Remove all")}
                     danger={ask === "unpolishAll"}
                     onConfirm={() => {
                         act.polishCity(ask);

@@ -234,6 +234,87 @@ namespace Placemaker.Core.Layers.Roads
         }
 
         /// <summary>
+        /// (Smarter roads) New streets meeting an EXISTING road at less than 65° (a grid crossing a diagonal or winding road):
+        /// the street's end turns to meet the road square (a smooth curve leaving the road at 90° and arriving at its far
+        /// junction as before) when it is long enough and the bent curve stays clear; a street that cannot bend and meets
+        /// the road under 45° is cut back from it (a turning circle) when the network stays in one piece. The existing road
+        /// never moves. Returns (bent, cut).
+        /// </summary>
+        public static (int bent, int cut) SquareAtExisting(RoadNetwork net, List<ExistingRoad> existing, RoadObstacles obstacles, Func<NetRole, float> halfWidth)
+        {
+            if (existing == null || existing.Count == 0) return (0, 0);
+            int bent = 0, cut = 0;
+            var inc = RoadGraph.Incidence(net, RoadGraph.Car);
+            var index = new RoadGraph.EdgeIndex(net, RoadGraph.Any);
+            var toCut = new List<(int edge, int node)>();
+            for (int n = 0; n < net.Nodes.Count; n++)
+            {
+                var node = net.Nodes[n];
+                if (node.Attach < 0 || inc[n].Count == 0) continue;
+                // the existing road's directions here
+                var road = new List<float2>();
+                foreach (var r in existing)
+                {
+                    float d = r.Curve.DistanceXZ(node.Position.xz, out float t);
+                    if (d > 1f) continue;
+                    if (t <= 0.001f) road.Add(r.Curve.TangentXZ(0f));
+                    else if (t >= 0.999f) road.Add(-r.Curve.TangentXZ(1f));
+                    else { var tan = r.Curve.TangentXZ(t); road.Add(tan); road.Add(-tan); }
+                }
+                if (road.Count == 0) continue;
+                foreach (int ei in inc[n])
+                {
+                    var e = net.Edges[ei];
+                    if (e.Role == NetRole.Roundabout || e.Connector) continue;
+                    float2 leave = RoadGraph.Leaving(e, n);
+                    float worst = 180f;
+                    float2 nearest = road[0];
+                    foreach (var rd in road)
+                    {
+                        float a = RoadGraph.Angle(leave, rd);
+                        if (a < worst) { worst = a; nearest = rd; }
+                    }
+                    if (worst >= 65f) continue;
+                    // a dead end continued straight is fine (the road goes on)
+                    if (road.Count == 1 && RoadGraph.Angle(leave, -road[0]) < 20f) continue;
+                    // square to the road, on the street's side
+                    float2 nrm = new float2(-nearest.y, nearest.x);
+                    if (math.dot(nrm, leave) < 0f) nrm = -nrm;
+                    float len = RoadGraph.Length(e);
+                    bool atStart = e.N0 == n;
+                    var old = e.Curve;
+                    if (len >= 36f)
+                    {
+                        float2 farDir = atStart ? e.Curve.TangentXZ(1f) : -e.Curve.TangentXZ(0f);   // direction of travel at the far end, away from n
+                        var fitted = RoadCurve.Fit(node.Position, new float3(nrm.x, 0f, nrm.y), new float3(farDir.x, 0f, farDir.y),
+                            atStart ? e.Curve.D : e.Curve.A);
+                        e.Curve = atStart ? fitted : fitted.Reversed();
+                        var line = RoadGraph.Sample(e.Curve, 3f);
+                        var ignore = new HashSet<int>(inc[e.N0]);
+                        foreach (int k in inc[e.N1]) ignore.Add(k);
+                        bool ok = !index.Crosses(line, 2f, ignore) && !SelfFolds(e.Curve)
+                            && (obstacles == null || !obstacles.Blocked(e.Curve, (halfWidth != null ? halfWidth(e.Role) : 8f) + 1f))
+                            && !RoadConnections.CrossesAny(line, existing, 2f);
+                        if (ok) { bent++; continue; }
+                        e.Curve = old;
+                    }
+                    if (worst < 45f) toCut.Add((ei, n));
+                }
+            }
+            foreach (var (ei, n) in toCut)
+            {
+                var e = net.Edges[ei];
+                if (!e.Alive) continue;
+                RoadGraph.Components(net, RoadGraph.Car, out int before);
+                e.Removed = true;
+                RoadGraph.Components(net, RoadGraph.Car, out int after);
+                if (after > before) { e.Removed = false; continue; }
+                cut++;
+            }
+            return (bent, cut);
+        }
+
+        /// <summary>
         /// A road that doubles back at a plain node (turning more than <paramref name="minTurn"/>°: a perimeter cut short by
         /// an existing road hooking into a street) loses its shorter side when the network stays in one piece — the
         /// dead-end pass then joins the free end to the city or ends it properly. Returns how many.

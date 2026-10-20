@@ -20,6 +20,8 @@ namespace Placemaker.Core.Layers.Roads
         {
             public float2[] Boundary = Array.Empty<float2>();
             public List<ExistingRoad> Existing = new List<ExistingRoad>();
+            /// <summary>Existing roads the plan never joins nor crosses (highways, ramps, roads the player keeps free).</summary>
+            public List<ExistingRoad> Barriers = new List<ExistingRoad>();
             public RoadObstacles Obstacles;
             public Func<float2, float> Height;
             public Func<NetRole, float> HalfWidth = r => 8f;
@@ -45,11 +47,15 @@ namespace Placemaker.Core.Layers.Roads
         public sealed class Report
         {
             public int MergedJunctions, AccessCuts, Fillets, Squared, Lanes, GravelTips, SteepRemoved;
+            /// <summary>(Smarter roads) Streets turned to meet an existing road square; streets cut back from one.</summary>
+            public int SquaredAtExisting, CutAtExisting;
             /// <summary>(s61) Perimeter ring closure: joins made, free ends left.</summary>
             public RoadPerimeter.Result PerimeterClose = new RoadPerimeter.Result();
             /// <summary>(s61) Where side streets were cut back from a main road (junction spacing), for the issue markers.</summary>
             public List<float3> AccessCutAt = new List<float3>();
             public RoadConnectivity.Result Connectivity = new RoadConnectivity.Result();
+            /// <summary>(Smarter roads) The designed joins to the city (RoadCityLinks).</summary>
+            public RoadCityLinks.Result CityLinks = new RoadCityLinks.Result();
             public RoadWalkways.Result Walkways = new RoadWalkways.Result();
             /// <summary>Car road runs steeper than the design grade: worst grade and where.</summary>
             public List<(float grade, float3 at)> Steep = new List<(float, float3)>();
@@ -68,15 +74,28 @@ namespace Placemaker.Core.Layers.Roads
 
             var co = new RoadConnectivity.Options
             {
-                Boundary = c.Boundary, Existing = c.Existing, Obstacles = c.Obstacles, Height = c.Height, HalfWidth = c.HalfWidth,
+                Boundary = c.Boundary, Existing = c.Existing, Barriers = c.Barriers, Obstacles = c.Obstacles, Height = c.Height, HalfWidth = c.HalfWidth,
                 MaxGrade = c.MaxGrade, Perimeter = c.Perimeter, CanJoin = RoadAccess.JoinRule(net, c.JunctionSpacing),
                 LinkRole = (a, b) => LinkRole(a, b, c.LinkRole), CityLinks = CityLinksFor(c.Boundary), CityLinkSpacing = 180f,
             };
             var trial = new RoadConnectivity.Options
             {
-                Boundary = co.Boundary, Existing = co.Existing, Obstacles = co.Obstacles, Height = co.Height, HalfWidth = co.HalfWidth,
+                Boundary = co.Boundary, Existing = co.Existing, Barriers = co.Barriers, Obstacles = co.Obstacles, Height = co.Height, HalfWidth = co.HalfWidth,
                 MaxGrade = co.MaxGrade, Perimeter = co.Perimeter, CanJoin = co.CanJoin, LinkRole = co.LinkRole, Drop = false,
             };
+
+            // (Smarter roads) The joins to the city, placed by design: in line with the streets inside, onto existing
+            // junctions, square, clear of other junctions, never onto a highway. The connectivity pass only fills gaps.
+            if (c.Existing.Count > 0)
+            {
+                r.CityLinks = RoadCityLinks.Plan(net, new RoadCityLinks.Options
+                {
+                    Boundary = c.Boundary, Existing = c.Existing, Barriers = c.Barriers, Obstacles = c.Obstacles, Height = c.Height,
+                    HalfWidth = c.HalfWidth, MaxGrade = c.MaxGrade, JunctionSpacing = c.JunctionSpacing,
+                });
+                if (r.CityLinks.Links > 0) co.CityLinks = 1;
+                cancel.ThrowIfCancellationRequested();
+            }
 
             float capR = CapRadius(2f * c.HalfWidth(NetRole.Street));
             float setback = c.HalfWidth(NetRole.Avenue) + capR + 12f;
@@ -102,6 +121,11 @@ namespace Placemaker.Core.Layers.Roads
             cancel.ThrowIfCancellationRequested();
 
             r.Squared = RoadTopology.SquareJunctions(net, c.Obstacles, c.HalfWidth);
+            // (Smarter roads) ... and where they meet the existing roads (which never move)
+            var sq = RoadTopology.SquareAtExisting(net, c.Existing, c.Obstacles, c.HalfWidth);
+            r.SquaredAtExisting = sq.bent;
+            r.CutAtExisting = sq.cut;
+            if (sq.cut > 0) RoadConnectivity.CleanDeadEnds(net, co, r.Connectivity);
             r.Fillets = RoadTopology.FilletBends(net, c.HalfWidth, c.PerimeterCorner);
             // Crumbs of road (a trimmed bend next to a junction, a generator sliver) merge into their neighbours.
             net.CollapseShortEdges(8f);
@@ -115,6 +139,10 @@ namespace Placemaker.Core.Layers.Roads
                 Obstacles = c.Obstacles, HalfWidth = c.HalfWidth, MaxGrade = math.min(RoadWalkways.MaxWalkGrade, c.MaxGrade),
                 CapRadius = CapRadius, AccessCuts = cuts,
             });
+            // nothing the passes added may cross a barrier (a walk over a highway, a lane over a ramp)
+            if (RoadConnections.DropBarrierCrossings(net, c.Barriers) > 0) RoadConnectivity.Ensure(net, co, r.Connectivity);
+            // (Smarter roads) a back lane or a walkway never crosses an existing road (it would make a junction on it)
+            RoadConnections.DropBarrierCrossings(net, c.Existing, e => e.Walk || e.Role == NetRole.Alley || e.Role == NetRole.Pathway);
             RoadConnectivity.PruneLoosePaths(net);
             cancel.ThrowIfCancellationRequested();
 
@@ -124,7 +152,7 @@ namespace Placemaker.Core.Layers.Roads
 
         private static void CloseRing(RoadNetwork net, Context c, Report r)
         {
-            var res = RoadPerimeter.Close(net, c.Obstacles, c.Boundary, c.HalfWidth, c.Existing);
+            var res = RoadPerimeter.Close(net, c.Obstacles, c.Boundary, c.HalfWidth, c.Existing, c.Barriers);
             r.PerimeterClose.Closed += res.Closed;
             r.PerimeterClose.Joined += res.Joined;
             r.PerimeterClose.OpenAt.Clear();

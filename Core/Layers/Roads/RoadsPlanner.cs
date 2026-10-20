@@ -33,6 +33,12 @@ namespace Placemaker.Core.Layers.Roads
         public const string FactJunctions = "roads.junctions";
         public const string FactConnections = "roads.connections";
         public const string FactRemoved = "roads.removedByObstacles";
+        /// <summary>(Smarter roads) The grid's frame: 0 = the outline, 1 = the terrain, 2 = a spine road through the area.</summary>
+        public const string FactLayoutFrame = "roads.layoutFrame";
+        /// <summary>(Smarter roads) Designed joins to the city; those continuing a street inside; those onto an existing junction.</summary>
+        public const string FactCityLinks = "roads.cityLinks", FactLinksContinued = "roads.linksContinued", FactLinksOnJunction = "roads.linksOnJunction";
+        /// <summary>(Smarter roads) Existing streets the grid's streets line up with.</summary>
+        public const string FactStubsAligned = "roads.stubsAligned";
 
         private const float MinFragmentLength = 30f;
 
@@ -87,40 +93,122 @@ namespace Placemaker.Core.Layers.Roads
 
         private const float RingClipMargin = 1.5f;
 
+        /// <summary>
+        /// (Smarter roads) A whole layout the planner may try: its settings (a terrain fit the player left on Automatic) and,
+        /// for the grid, the frame and phase RoadLayoutSearch picked for it (HasGrid false: decided inside).
+        /// </summary>
+        internal sealed class PlanVariant
+        {
+            public string Name = "base";
+            public SettingsBag Settings;
+            public bool HasGrid;
+            public GridParameters Grid;
+            public string Frame = "outline";
+            public int StubsAligned;
+            public RoadRank SpineRank;
+        }
+
+        public const string FactRating = "roads.rating";
+        public const string FactVariants = "roads.variants";
+        /// <summary>Which candidate layout won: 0 = the outline grid, 1 = the grid on the spine road, 2 = along the contours.</summary>
+        public const string FactVariant = "roads.variant";
+
+        /// <summary>
+        /// (Smarter roads) Plans the area. When there is more than one sensible layout (a grid on the outline or on a spine
+        /// road through the area; on sloped land left on Automatic, a layout along the contours too) each is planned in full
+        /// and rated (RoadsRating), and the best rated wins. Otherwise one plan, as before.
+        /// </summary>
         public static AreaPlan Plan(AreaInput input, IReadOnlyList<ControlSchema> controls, CancellationToken cancel)
         {
-            var plan = new AreaPlan();
+            if (input?.Shape?.Ring == null || CleanRing(input.Shape.Ring).Length < 3) return PlanCore(input, controls, cancel, null);
+            var variants = Variants(input, controls, cancel);
+            if (variants.Count <= 1) return PlanCore(input, controls, cancel, variants.Count == 1 ? variants[0] : null);
+            AreaPlan best = null;
+            float bestScore = float.MinValue;
+            int bestIndex = 0;
+            for (int i = 0; i < variants.Count; i++)
+            {
+                cancel.ThrowIfCancellationRequested();
+                var p = PlanCore(input, controls, cancel, variants[i]);
+                float score = Rate(p, input, variants[i].Settings, controls).Total;
+                // an avenue or a big road through the area leads the layout (the user: use it as the spine)
+                if (variants[i].Frame == "spine" && variants[i].SpineRank >= RoadRank.Medium) score += 2f;
+                // a later candidate must be clearly better (the first is the plain layout)
+                if (best == null || score > bestScore + 1f) { best = p; bestScore = score; bestIndex = i; }
+            }
+            best.Facts[FactRating] = bestScore;
+            best.Facts[FactVariants] = variants.Count;
+            var w = variants[bestIndex];
+            best.Facts[FactVariant] = w.Name == "follow" ? 2 : w.Frame == "spine" ? 1 : 0;
+            return best;
+        }
+
+        /// <summary>The rating of a roads plan for its area and settings (the planner's own judge; the road lab uses it too).</summary>
+        public static RoadsRating Rate(AreaPlan plan, AreaInput input, SettingsBag settings, IReadOnlyList<ControlSchema> controls)
+        {
+            settings = settings ?? input.Settings ?? new SettingsBag();
+            var site = input.Site ?? new SiteContext();
+            var pattern = RoadsSchema.ParsePattern(settings.S(RoadsIds.Pattern, "grid"));
+            bool perimeter = pattern == RoadPattern.Terraces ? settings.S(RoadsIds.PerimeterRoad, "auto") == "on" : PerimeterWanted(settings.S(RoadsIds.PerimeterRoad, "auto"), input.Shape.Source);
+            var o = new RoadsRating.Options
+            {
+                MaxGrade = RoadsSchema.Num(settings, controls, RoadsIds.MaxGrade) / 100f,
+                JunctionSpacing = RoadsSchema.Num(settings, controls, RoadsIds.JunctionSpacing),
+                Perimeter = perimeter,
+                Height = plan.HeightAfter ?? SafeHeight(site.HeightAt),
+            };
+            return RoadsRating.Measure(plan, CleanRing(input.Shape.Ring), site, o);
+        }
+
+        /// <summary>The candidate layouts worth planning in full (see <see cref="Plan"/>).</summary>
+        internal static List<PlanVariant> Variants(AreaInput input, IReadOnlyList<ControlSchema> controls, CancellationToken cancel)
+        {
+            var list = new List<PlanVariant>();
             var site = input.Site ?? new SiteContext();
             var settings = input.Settings ?? new SettingsBag();
             Func<float2, float> heightAt = SafeHeight(site.HeightAt);
-
-            float2[] ring2 = CleanRing(input.Shape?.Ring);
-            if (ring2.Length < 3)
-            {
-                plan.Issues.Add(new PlanIssue { Severity = IssueSeverity.Error, Key = IssueBadArea });
-                return plan;
-            }
-            float meanY = 0f;
-            foreach (var p in ring2) meanY += heightAt(p);
-            meanY /= ring2.Length;
-
             GridParameters gp = RoadsSchema.ToGridParameters(settings, controls, out RoadPattern pattern);
             gp.HeightAt = heightAt;
             gp.Cancel = cancel;
-            AreaSource source = input.Shape.Source;
-            // (s52) Hillside terraces lay their own streets along the contours: a perimeter road would climb straight up the
-            // hill, so "auto" means none there.
-            bool terraces = pattern == RoadPattern.Terraces;
-            bool perimeter = terraces ? settings.S(RoadsIds.PerimeterRoad, "auto") == "on" : PerimeterWanted(settings.S(RoadsIds.PerimeterRoad, "auto"), source);
-            bool connect = settings.B(RoadsIds.ConnectExisting, true);
-            bool avoid = settings.B(RoadsIds.AvoidObstacles, true);
-            bool follow = settings.B(RoadsIds.FollowTerrain, true) || pattern == RoadPattern.Contour;
-            bool loopFamily = RoadsSchema.IsLoopFamily(pattern);
+            bool follow = settings.B(RoadsIds.FollowTerrain, true);
+            bool frameFree = math.abs(gp.AngleOffsetDegrees) < 0.01f && !gp.AlignToTerrain;
+            float2[] ring2 = CleanRing(input.Shape.Ring);
+            var genRing = GenRing(input, settings, controls, ring2, heightAt, out _);
+            if (pattern == RoadPattern.Grid)
+            {
+                Func<NetRole, float> hw = HalfWidths(settings, site);
+                var allRoads = RoadConnections.Collect(site);
+                RoadConnections.Partition(allRoads, settings.B(RoadsIds.ConnectExisting, true), settings.S(RoadsIds.ConnectTo, ConnectTo.Streets), out var existing, out _);
+                float maxGrade = RoadsSchema.Num(settings, controls, RoadsIds.MaxGrade) / 100f;
+                foreach (var f in RoadLayoutSearch.Frames(genRing, gp, existing, allRoads, follow ? heightAt : null, maxGrade, frameFree, hw, cancel))
+                    list.Add(new PlanVariant { Name = f.Frame, Settings = settings, HasGrid = true, Grid = f.Params, Frame = f.Frame, StubsAligned = f.StubsAligned, SpineRank = f.SpineRank });
+            }
+            else list.Add(new PlanVariant { Settings = settings });
+            // On sloped land the terrain fit left on Automatic may follow the contours instead (the rating decides).
+            bool sloped = GridGenerator.TryContourDirection(new List<float2>(ring2), heightAt, out _, out _, out float meanSlope) && meanSlope >= 0.04f;
+            bool fits = pattern == RoadPattern.Grid || pattern == RoadPattern.Superblock || pattern == RoadPattern.Organic || pattern == RoadPattern.Tree;
+            if (sloped && follow && fits && frameFree && settings.S(RoadsIds.TerrainFit, "auto") == "auto")
+            {
+                var s2 = settings.Clone();
+                s2.Values[RoadsIds.TerrainFit] = "follow";
+                list.Add(new PlanVariant { Name = "follow", Settings = s2, Frame = "terrain" });
+            }
+            return list;
+        }
 
-            // Drawn/painted outlines get rounded corners when a perimeter road follows them (GRG free area).
+        /// <summary>The generators' outline: the selection, its corners rounded when a perimeter road follows a drawn/painted one.</summary>
+        private static List<float3> GenRing(AreaInput input, SettingsBag settings, IReadOnlyList<ControlSchema> controls, float2[] ring2,
+            Func<float2, float> heightAt, out float meanY)
+        {
+            meanY = 0f;
+            foreach (var p in ring2) meanY += heightAt(p);
+            meanY /= math.max(1, ring2.Length);
+            var pattern = RoadsSchema.ParsePattern(settings.S(RoadsIds.Pattern, "grid"));
+            var source = input.Shape.Source;
+            bool perimeter = pattern == RoadPattern.Terraces ? settings.S(RoadsIds.PerimeterRoad, "auto") == "on" : PerimeterWanted(settings.S(RoadsIds.PerimeterRoad, "auto"), source);
             var genRing = new List<float3>(ring2.Length);
             foreach (var p in ring2) genRing.Add(new float3(p.x, meanY, p.y));
-            float corner = RoadsSchema.Num(settings, controls, RoadsIds.PerimeterCornerRadius);
+            float corner = PerimeterCorner(settings, controls, input.Site ?? new SiteContext());
             if (perimeter && corner > 0.5f && (source == AreaSource.Drawn || source == AreaSource.Painted))
             {
                 var smooth = FreeAreaPerimeter.Smooth(genRing, corner);
@@ -131,6 +219,53 @@ namespace Placemaker.Core.Layers.Roads
                     foreach (var p in cleaned) genRing.Add(new float3(p.x, meanY, p.y));
                 }
             }
+            return genRing;
+        }
+
+        /// <summary>The perimeter's corner radius: the setting, but never tighter than the road turns cleanly (half width + 6 m).</summary>
+        private static float PerimeterCorner(SettingsBag settings, IReadOnlyList<ControlSchema> controls, SiteContext site)
+        {
+            float corner = RoadsSchema.Num(settings, controls, RoadsIds.PerimeterCornerRadius);
+            if (corner > 0.5f) corner = math.max(corner, HalfWidths(settings, site)(NetRole.PerimeterRoad) + 6f);
+            return corner;
+        }
+
+        internal static AreaPlan PlanCore(AreaInput input, IReadOnlyList<ControlSchema> controls, CancellationToken cancel, PlanVariant variant)
+        {
+            var plan = new AreaPlan();
+            var site = input.Site ?? new SiteContext();
+            var settings = variant?.Settings ?? input.Settings ?? new SettingsBag();
+            Func<float2, float> heightAt = SafeHeight(site.HeightAt);
+
+            float2[] ring2 = CleanRing(input.Shape?.Ring);
+            if (ring2.Length < 3)
+            {
+                plan.Issues.Add(new PlanIssue { Severity = IssueSeverity.Error, Key = IssueBadArea });
+                return plan;
+            }
+            GridParameters gp = RoadsSchema.ToGridParameters(settings, controls, out RoadPattern pattern);
+            gp.HeightAt = heightAt;
+            gp.Cancel = cancel;
+            AreaSource source = input.Shape.Source;
+            // (s52) Hillside terraces lay their own streets along the contours: a perimeter road would climb straight up the
+            // hill, so "auto" means none there.
+            bool terraces = pattern == RoadPattern.Terraces;
+            bool perimeter = terraces ? settings.S(RoadsIds.PerimeterRoad, "auto") == "on" : PerimeterWanted(settings.S(RoadsIds.PerimeterRoad, "auto"), source);
+            bool connect = settings.B(RoadsIds.ConnectExisting, true);
+            string connectTo = settings.S(RoadsIds.ConnectTo, ConnectTo.Streets);
+            bool avoid = settings.B(RoadsIds.AvoidObstacles, true);
+            bool follow = settings.B(RoadsIds.FollowTerrain, true) || pattern == RoadPattern.Contour;
+            bool loopFamily = RoadsSchema.IsLoopFamily(pattern);
+            Func<NetRole, float> hw = HalfWidths(settings, site);
+            // Smarter roads: the existing roads split into those the plan may join (Connect to: every road but highways and
+            // their ramps by default) and barriers it never joins nor crosses.
+            var allRoads = RoadConnections.Collect(site);
+            RoadConnections.Partition(allRoads, connect, connectTo, out var existing, out var barriers);
+            float maxGrade = RoadsSchema.Num(settings, controls, RoadsIds.MaxGrade) / 100f;
+
+            // Drawn/painted outlines get rounded corners when a perimeter road follows them (GRG free area).
+            var genRing = GenRing(input, settings, controls, ring2, heightAt, out float meanY);
+            float corner = PerimeterCorner(settings, controls, site);
             float2[] boundary = new float2[genRing.Count];
             for (int i = 0; i < boundary.Length; i++) boundary[i] = genRing[i].xz;
 
@@ -139,6 +274,32 @@ namespace Placemaker.Core.Layers.Roads
             {
                 plan.Issues.Add(new PlanIssue { Severity = IssueSeverity.Warning, Key = IssueFlat });
                 return plan;
+            }
+            // Smarter roads: the grid's frame and phase fit the network that is there (a spine, the streets it continues) and
+            // the land; the player's angle / terrain alignment keep the frame, only the phase moves.
+            if (pattern == RoadPattern.Grid)
+            {
+                string frame;
+                int aligned;
+                if (variant != null && variant.HasGrid)
+                {
+                    var g = variant.Grid;
+                    g.HeightAt = heightAt;
+                    g.Cancel = cancel;
+                    gp = g;
+                    frame = variant.Frame;
+                    aligned = variant.StubsAligned;
+                }
+                else
+                {
+                    bool frameFree = math.abs(gp.AngleOffsetDegrees) < 0.01f && !gp.AlignToTerrain;
+                    var layout = RoadLayoutSearch.ForGrid(genRing, gp, existing, allRoads, follow ? heightAt : null, maxGrade, frameFree, hw, cancel);
+                    gp = layout.Params;
+                    frame = layout.Frame;
+                    aligned = layout.StubsAligned;
+                }
+                plan.Facts[FactLayoutFrame] = frame == "spine" ? 2 : frame == "terrain" ? 1 : 0;
+                plan.Facts[FactStubsAligned] = aligned;
             }
             List<RoadSegmentDef> segments;
             RoundaboutInfo roundabout = default;
@@ -192,16 +353,19 @@ namespace Placemaker.Core.Layers.Roads
                 RoadContourWarp.Apply(net, heightAt, axis, pitch, boundary);
             }
 
-            var existing = connect ? RoadConnections.Collect(site) : new List<ExistingRoad>();
             var attachments = connect ? input.Shape.Attachments : null;
-            Func<NetRole, float> hw = HalfWidths(settings, site);
 
             // ── 2. Existing roads crossing the new streets ──────────────
+            if (barriers.Count > 0 && RoadConnections.CutAtBarriers(net, barriers, hw) > 0) net.Weld();
             if (existing.Count > 0)
             {
                 RoadConnections.SplitAtExisting(net, existing);
                 net.Weld();
+                // a street laid on an existing road for part of its way ends on it
+                if (RoadConnections.TrimOverlaps(net, existing, hw) > 0) net.Weld();
             }
+            // streets hugging an existing road go (the road fronts that land already)
+            if (allRoads.Count > 0 && RoadConnections.RemoveAlongside(net, allRoads, hw) > 0) net.Weld();
             cancel.ThrowIfCancellationRequested();
 
             // ── 3. Obstacles (interior) ─────────────────────────────────
@@ -237,6 +401,7 @@ namespace Placemaker.Core.Layers.Roads
                     net.Edges.Add(new RoadEdge(curve, NetRole.PerimeterRoad));
                 }
                 net.Weld();
+                if (barriers.Count > 0 && RoadConnections.CutAtBarriers(net, barriers, hw, e => e.Role == NetRole.PerimeterRoad) > 0) net.Weld();
                 if (obstacles != null)
                 {
                     var det1 = RoadDetour.Run(net, obstacles, e => e.Role == NetRole.PerimeterRoad, e => hw(e.Role) + 1f, boundary);
@@ -247,7 +412,7 @@ namespace Placemaker.Core.Layers.Roads
             cancel.ThrowIfCancellationRequested();
 
             // ── 5. Connect to existing roads, drop duplicates of them ───
-            if (existing.Count > 0) RoadConnections.RemoveOverlapping(net, existing, hw);
+            if (allRoads.Count > 0) RoadConnections.RemoveOverlapping(net, allRoads, hw);
             int attachedCount = 0;
             if (connect && (existing.Count > 0 || HasNodeAttachments(attachments)))
             {
@@ -263,7 +428,7 @@ namespace Placemaker.Core.Layers.Roads
             // ── 5b. (s34) Network design: access, connectivity, dead ends, lanes, junctions, walkways, grades ──
             var ctx = new RoadDesign.Context
             {
-                Boundary = boundary, Existing = existing, Obstacles = obstacles, Height = follow ? heightAt : null, HalfWidth = hw,
+                Boundary = boundary, Existing = existing, Barriers = barriers, Obstacles = obstacles, Height = follow ? heightAt : null, HalfWidth = hw,
                 Perimeter = perimeter, PerimeterCorner = perimeter ? corner : -1f, JunctionSpacing = RoadsSchema.Num(settings, controls, RoadsIds.JunctionSpacing),
                 MaxGrade = RoadsSchema.Num(settings, controls, RoadsIds.MaxGrade) / 100f,
                 Walkways = RoadsSchema.Num(settings, controls, RoadsIds.Walkways) / 100f,
@@ -290,7 +455,7 @@ namespace Placemaker.Core.Layers.Roads
             Terraces.TerraceGround terraceGround = null;
             Func<float2, float> ground = heightAt;
             int bankWalks = 0;
-            bool landTerrace = settings.S(RoadsIds.LandShape, "terrace") == "terrace";
+            bool landTerrace = settings.S(RoadsIds.LandShape, "natural") == "terrace";
             // Terraced blocks (every other pattern): each zoning street's frontage level across, banks between the levels.
             Terraces.TerraceOptions blockOpt = null;
             Terraces.BlockField.Survey blockSurvey = null;
@@ -305,7 +470,7 @@ namespace Placemaker.Core.Layers.Roads
                 {
                     plan.Facts["blocks.walksDropped"] = Terraces.BlockField.DropClimbingWalks(net, blockSurvey);
                     var lctx = new Common.LayerContext { Input = input, Plan = plan, Settings = settings, Cancel = cancel, Seed = blockOpt.Seed };
-                    terraceGround = Terraces.BlockField.Build(lctx, boundary, blockSurvey, net, blockOpt, hw, obstacles, connect ? existing : new List<ExistingRoad>(), cancel);
+                    terraceGround = Terraces.BlockField.Build(lctx, boundary, blockSurvey, net, blockOpt, hw, obstacles, allRoads, cancel);
                     ground = terraceGround.HeightAfter ?? heightAt;
                     if (terraceGround.Cells > 0) plan.HeightAfter = ground;
                 }
@@ -315,7 +480,7 @@ namespace Placemaker.Core.Layers.Roads
             {
                 bankWalks = Terraces.TerraceNetwork.AddWalks(net, terraceLayout, hw, terraceOpt.BankSlope);
                 var lctx = new Common.LayerContext { Input = input, Plan = plan, Settings = settings, Cancel = cancel, Seed = terraceOpt.Seed };
-                terraceGround = Terraces.TerraceField.Build(lctx, terraceLayout, net, terraceOpt, hw, obstacles, connect ? existing : new List<ExistingRoad>(), cancel);
+                terraceGround = Terraces.TerraceField.Build(lctx, terraceLayout, net, terraceOpt, hw, obstacles, allRoads, cancel);
                 ground = terraceGround.HeightAfter ?? heightAt;
                 if (terraceGround.Cells > 0) plan.HeightAfter = ground;
                 cancel.ThrowIfCancellationRequested();
@@ -548,7 +713,7 @@ namespace Placemaker.Core.Layers.Roads
                     frontWidths.Add(w);
                     for (int i = 0; i + 1 < l.Count; i++) frontIndex.Add(l[i], l[i + 1], frontWidths.Count - 1);
                 }
-                foreach (var r in existing) AddClipped(lines, r, boundary);
+                foreach (var r in allRoads) AddClipped(lines, r, boundary);
                 var along = input.Shape.Attachments;
                 blocks = RoadBlocks.Compute(boundary, lines, caps, along, cancel);
                 RoadBlocks.Order(blocks, RoadBlocks.PrincipalAxis(ring2));
@@ -575,6 +740,9 @@ namespace Placemaker.Core.Layers.Roads
             if (walkLength > 0f) plan.Stats.Add(new PlanStat(StatWalkways, Math.Round(walkLength), "m"));
             if (follow && design.SteepestGrade > 0.005f) plan.Stats.Add(new PlanStat(StatSteepest, Math.Round(design.SteepestGrade * 100f), "%"));
             plan.Facts[FactWalkways] = walkLength;
+            plan.Facts[FactCityLinks] = design.CityLinks.Links;
+            plan.Facts[FactLinksContinued] = design.CityLinks.Continued;
+            plan.Facts[FactLinksOnJunction] = design.CityLinks.OnJunction;
             plan.Facts[FactLinks] = conn.Links + conn.CityLinks;
             plan.Facts[FactIslandsDropped] = conn.Dropped;
             plan.Facts[FactAccessCuts] = design.AccessCuts;

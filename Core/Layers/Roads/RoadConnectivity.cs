@@ -20,6 +20,8 @@ namespace Placemaker.Core.Layers.Roads
         {
             public float2[] Boundary = Array.Empty<float2>();
             public List<ExistingRoad> Existing = new List<ExistingRoad>();
+            /// <summary>Existing roads no link may cross (highways, ramps, roads the player keeps free).</summary>
+            public List<ExistingRoad> Barriers = new List<ExistingRoad>();
             public RoadObstacles Obstacles;
             public Func<float2, float> Height;
             public Func<NetRole, float> HalfWidth = r => 8f;
@@ -296,7 +298,7 @@ namespace Placemaker.Core.Layers.Roads
             if (o.Boundary != null && o.Boundary.Length >= 3)
                 foreach (var p in line)
                     if (!Poly.Contains(o.Boundary, p) && Poly.DistanceToBoundary(o.Boundary, p) > 3f) return float.MaxValue;
-            if (CrossesExisting(line, o.Existing, -1)) return float.MaxValue;
+            if (CrossesExisting(line, o.Existing, -1) || RoadConnections.CrossesAny(line, o.Barriers)) return float.MaxValue;
             float grade = RoadGraph.MaxGrade(curve, o.Height);
             if (grade > o.GradeCap) return float.MaxValue;
             float score = dist;
@@ -380,7 +382,7 @@ namespace Placemaker.Core.Layers.Roads
                     var curve = RoadCurve.Straight(nu.Position, q);
                     var line = RoadGraph.Sample(curve, 4f);
                     if (all.Crosses(line, 1.5f, ignore)) continue;
-                    if (CrossesExisting(line, o.Existing, r)) continue;
+                    if (CrossesExisting(line, o.Existing, r) || RoadConnections.CrossesAny(line, o.Barriers)) continue;
                     float hw = o.HalfWidth(NetRole.Street);
                     if (all.Clearance(line, hw + 12f, hw * 2f + 4f, ignore) < hw * 2f + (o.Relaxed ? -2f : 2f)) continue;
                     if (o.Obstacles != null && o.Obstacles.Blocked(curve, o.HalfWidth(NetRole.Street) + 1f)) continue;

@@ -268,6 +268,21 @@ namespace Placemaker.Core.Layers.Roads.Generators
         public float MaxGrade;
         /// <summary>(s34) Organic: smallest distance (m) between side junctions on the main street; 0 = the original 45 m.</summary>
         public float MainJunctionSpacing;
+        /// <summary>
+        /// (Smarter roads) Grid frame chosen by the planner (RoadLayoutSearch): origin and u axis in world XZ. When set it
+        /// replaces the longest-edge / terrain frame and AngleOffsetDegrees (the search folds the player's angle in).
+        /// </summary>
+        public bool UseFrame;
+        public float2 FrameOrigin;
+        public float2 FrameU;
+        /// <summary>(Smarter roads) Fixed spacing: a column (u line) passes through local u = AnchorU (an existing street it continues).</summary>
+        public bool AnchoredU;
+        public float AnchorU;
+        /// <summary>(Smarter roads) Fixed spacing: a row (v line) passes through local v = AnchorV (a spine, an existing street).</summary>
+        public bool AnchoredV;
+        public float AnchorV;
+        /// <summary>(Smarter roads) Spacing of the columns / rows (m), 0 = SpacingMeters (the search may stretch it a little).</summary>
+        public float SpacingU, SpacingV;
         public static GridParameters Default => new GridParameters
         {
             Mode = SpacingMode.FitToArea,
@@ -475,33 +490,7 @@ namespace Placemaker.Core.Layers.Roads.Generators
                 return GenerateContour(polygon, y, parameters);
             }
 
-            // Local frame aligned with the longest edge, plus the adjustable angle.
-            (float2 origin, float2 uDir, float2 vDir) = BuildLocalFrame(polygon, parameters.AngleOffsetDegrees,
-                parameters.AlignToTerrain ? parameters.HeightAt : null);
-
-            // Polygon in local coordinates + local bounding box.
-            var local = new List<float2>(polygon.Count);
-            float2 lmin = new float2(float.MaxValue), lmax = new float2(float.MinValue);
-            foreach (var p in polygon)
-            {
-                var lp = new float2(math.dot(p - origin, uDir), math.dot(p - origin, vDir));
-                local.Add(lp);
-                lmin = math.min(lmin, lp);
-                lmax = math.max(lmax, lp);
-            }
-
-            // Grid line positions in the local frame.
-            List<float> uPositions, vPositions;
-            if (parameters.Mode == SpacingMode.FitToArea)
-            {
-                uPositions = DistributeEvenly(lmin.x, lmax.x, parameters.Columns);
-                vPositions = DistributeEvenly(lmin.y, lmax.y, parameters.Rows);
-            }
-            else
-            {
-                uPositions = DistributeFixed(lmin.x, lmax.x, parameters.SpacingMeters);
-                vPositions = DistributeFixed(lmin.y, lmax.y, parameters.SpacingMeters);
-            }
+            LinePositions(polygon, parameters, out float2 origin, out float2 uDir, out float2 vDir, out var local, out var uPositions, out var vPositions);
 
             // Clip each line to the polygon (interior intervals).
             var uLines = new List<GridLine>(uPositions.Count);
@@ -614,6 +603,75 @@ namespace Placemaker.Core.Layers.Roads.Generators
             }
 
             return segments;
+        }
+
+        /// <summary>
+        /// The grid's frame and line positions for a polygon (world XZ, consecutive duplicates removed): the planner's frame
+        /// (UseFrame) or the longest edge / terrain one with the angle offset; columns and rows evenly spread, or (fixed
+        /// spacing with an anchor) through the anchor at the column / row spacing. Shared with RoadLayoutSearch.
+        /// </summary>
+        internal static void LinePositions(List<float2> polygon, GridParameters parameters, out float2 origin, out float2 uDir, out float2 vDir,
+            out List<float2> local, out List<float> uPositions, out List<float> vPositions)
+        {
+            if (parameters.UseFrame && math.lengthsq(parameters.FrameU) > 1e-6f)
+            {
+                origin = parameters.FrameOrigin;
+                uDir = math.normalize(parameters.FrameU);
+                vDir = new float2(-uDir.y, uDir.x);
+            }
+            else
+            {
+                // Local frame aligned with the longest edge, plus the adjustable angle.
+                (origin, uDir, vDir) = BuildLocalFrame(polygon, parameters.AngleOffsetDegrees, parameters.AlignToTerrain ? parameters.HeightAt : null);
+            }
+            // Polygon in local coordinates + local bounding box.
+            local = new List<float2>(polygon.Count);
+            float2 lmin = new float2(float.MaxValue), lmax = new float2(float.MinValue);
+            foreach (var p in polygon)
+            {
+                var lp = new float2(math.dot(p - origin, uDir), math.dot(p - origin, vDir));
+                local.Add(lp);
+                lmin = math.min(lmin, lp);
+                lmax = math.max(lmax, lp);
+            }
+            // Grid line positions in the local frame.
+            if (parameters.Mode == SpacingMode.FitToArea)
+            {
+                uPositions = DistributeEvenly(lmin.x, lmax.x, parameters.Columns);
+                vPositions = DistributeEvenly(lmin.y, lmax.y, parameters.Rows);
+            }
+            else
+            {
+                float su = parameters.SpacingU > 0.5f ? parameters.SpacingU : parameters.SpacingMeters;
+                float sv = parameters.SpacingV > 0.5f ? parameters.SpacingV : parameters.SpacingMeters;
+                uPositions = parameters.AnchoredU ? DistributeAnchored(lmin.x, lmax.x, su, parameters.AnchorU) : DistributeFixed(lmin.x, lmax.x, su);
+                vPositions = parameters.AnchoredV ? DistributeAnchored(lmin.y, lmax.y, sv, parameters.AnchorV) : DistributeFixed(lmin.y, lmax.y, sv);
+            }
+        }
+
+        /// <summary>The default frame (longest edge or terrain, with the angle offset) of a world ring: origin and u axis.</summary>
+        internal static (float2 origin, float2 u) DefaultFrame(IReadOnlyList<float3> ring, GridParameters parameters)
+        {
+            var pts = new List<float2>(ring.Count);
+            foreach (var p in ring) pts.Add(p.xz);
+            var polygon = RemoveConsecutiveDuplicates(pts);
+            if (polygon.Count < 3) return (float2.zero, new float2(1f, 0f));
+            var f = BuildLocalFrame(polygon, parameters.AngleOffsetDegrees, parameters.AlignToTerrain ? parameters.HeightAt : null);
+            return (f.origin, f.uDir);
+        }
+
+        /// <summary>
+        /// (Smarter roads) Lines through <paramref name="anchor"/> every <paramref name="spacing"/> m, those at least 0.4 spacing
+        /// inside [min, max] (a thinner edge block would be a sliver).
+        /// </summary>
+        internal static List<float> DistributeAnchored(float min, float max, float spacing, float anchor)
+        {
+            var result = new List<float>();
+            if (spacing <= 0.5f || !math.isfinite(anchor)) return result;
+            float lo = min + 0.4f * spacing, hi = max - 0.4f * spacing;
+            float k0 = math.ceil((lo - anchor) / spacing);
+            for (float k = k0; anchor + k * spacing <= hi && result.Count < 4096; k++) result.Add(anchor + k * spacing);
+            return result;
         }
 
         /// <summary>True if t lies in one of the intervals (JoinTolerance at the ends).</summary>

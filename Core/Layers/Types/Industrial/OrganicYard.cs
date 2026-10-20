@@ -180,7 +180,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             var ctx = s.Ctx;
             int made = 0;
             uint zn = Hashing.Mix(salt, 0x2011u);
-            var cands = YardKit.Shuffled(Scatter.Candidates(s.Inner, 1.7f, Hashing.Mix(salt, 1u), 30000, ctx.Cancel), Hashing.Mix(salt, 2u));
+            var cands = YardKit.Shuffled(Scatter.Candidates(s.Inner, 1.7f, Hashing.Mix(salt, 1u), 90000, ctx.Cancel), Hashing.Mix(salt, 2u));
             float frontZone = s.Spec.FrontZone + 2f, front = s.Spec.Front;
             // Piles (the game showed evenly spread scrap read as confetti): the scrap is heaped in piles of 5–10 m with trodden
             // ground between them, crossed by the odd lone wreck or drum. A pile may lap up to its track.
@@ -194,6 +194,19 @@ namespace Placemaker.Core.Layers.Types.Yards
                 r = math.min(r, s.Inner.BoundaryDistance(p, 12f) + 2f);
                 if (r >= 3.5f) piles.Add((p, r));
             }
+            // Piles by 12 m bucket (a candidate only looks at the piles round it).
+            var buckets = new Dictionary<long, List<int>>();
+            long Key(int bx, int by) => ((long)bx << 32) ^ (uint)by;
+            for (int pi = 0; pi < piles.Count; pi++)
+            {
+                var (pc, pr) = piles[pi];
+                for (int bx = (int)math.floor((pc.x - pr) / 12f); bx <= (int)math.floor((pc.x + pr) / 12f); bx++)
+                    for (int by = (int)math.floor((pc.y - pr) / 12f); by <= (int)math.floor((pc.y + pr) / 12f); by++)
+                    {
+                        if (!buckets.TryGetValue(Key(bx, by), out var l)) buckets[Key(bx, by)] = l = new List<int>();
+                        l.Add(pi);
+                    }
+            }
             var swells = new List<(float2 p, float score)>();
             for (int pass = 0; pass < 2; pass++)
             {
@@ -204,7 +217,8 @@ namespace Placemaker.Core.Layers.Types.Yards
                     var f = s.F(p);
                     if (f.y < front + 2f && math.abs(f.x) < frontZone) continue;
                     float t = 9f;
-                    foreach (var (pc, pr) in piles) t = math.min(t, math.distance(p, pc) / pr);
+                    if (buckets.TryGetValue(Key((int)math.floor(p.x / 12f), (int)math.floor(p.y / 12f)), out var near))
+                        foreach (var pi in near) t = math.min(t, math.distance(p, piles[pi].c) / piles[pi].r);
                     var zone = zones[math.min(zones.Length - 1, (int)(ValueNoise.Clumps(p, 30f, zn) * zones.Length))];
                     // In a pile: packed, denser in its middle; between piles: one thing in a dozen spots.
                     float dens = t < 1f ? zone.Density * (1f - 0.25f * t) : 0.07f;
@@ -316,12 +330,91 @@ namespace Placemaker.Core.Layers.Types.Yards
 
         // ───────────── ground ─────────────
 
-        /// <summary>The tracks' surface: worn dark pavement down their middle (the dirt paint and the mud show at their sides).</summary>
+        /// <summary>
+        /// The tracks are dirt roads (the user, 2026-10-19: "maybe the road should be a dirt road so it doesn't look as perfect"):
+        /// no surface strip, the earth itself painted the grey-beige of compacted gravel, ragged at the edges, over the yard's
+        /// browner earth (which is painted a little weaker so the road shows).
+        /// </summary>
         public static void TrackSurfaces(IndustrialSite s)
         {
             float hw = TrackWidth * 0.5f;
+            int k = 0;
             foreach (var (a, b) in s.Aisles)
-                YardKit.Strip(s.Ctx, a, b, hw - 0.6f, SurfaceRole.Asphalt, YardGround.Hard.Pavement, AssetCategories.SurfaceAsphalt);
+            {
+                float len = math.distance(a, b);
+                if (len < 0.3f) continue;
+                var dir = (b - a) / len;
+                var ring = LayerRegion.Rect((a + b) * 0.5f, dir, len * 0.5f + hw * 0.6f, hw);
+                TerrainPaint.Field(s.Ctx, ring, YardGround.Gravel, 1f, 1.2f, 1.4f, null, 0f, 0f, 0f, Hashing.Mix(s.Ctx.Seed, 0x7ACu + (uint)k++));
+            }
+        }
+
+        // ───────────── spill ─────────────
+
+        private static readonly YardItem[] SpillItems = { IndustrialAssets.Drums, IndustrialAssets.Drums, IndustrialAssets.Crates, IndustrialAssets.Gas, IndustrialAssets.Tyres, IndustrialAssets.Pallets, IndustrialAssets.Trash };
+
+        /// <summary>
+        /// Junk spilling onto the roads (the user: "sometimes the cars and the whatever junk should spill onto the road"): every
+        /// so often along a track a drum or two, a crate, a tyre load or a pallet lies on its edge, and now and then a wreck
+        /// stands half on it, left where the forklift dropped it. Never more than the outer 1.8 m of the road, so it stays
+        /// drivable, never on another prop.
+        /// </summary>
+        public static int Spill(IndustrialSite s, float fill, uint salt)
+        {
+            var ctx = s.Ctx;
+            float hw = TrackWidth * 0.5f;
+            // What is already there (cars and props), as discs: the track itself is not in this index.
+            var placed = new DiscIndex(6f);
+            foreach (var o in ctx.Plan.Objects)
+                if (o.Role != ObjectRole.Decal) placed.Add(o.Position.xz, o.Category == AssetCategories.ScrapWreck ? 2.6f : 1.2f, 0);
+            int n = 0, k = 0;
+            foreach (var line in s.Tracks)
+            {
+                float next = 8f + Hashing.Unit(Hashing.Mix(salt, (uint)line.Count)) * 10f, at = 0f;
+                for (int i = 0; i + 1 < line.Count; i++)
+                {
+                    var a = line[i]; var b = line[i + 1];
+                    float len = math.distance(a, b);
+                    if (len < 0.1f) continue;
+                    var dir = (b - a) / len;
+                    var nrm = new float2(-dir.y, dir.x);
+                    for (; next <= at + len; next += 9f + Hashing.Unit(Hashing.Mix(salt, (uint)k * 3u + 1u)) * 16f, k++)
+                    {
+                        uint v = Hashing.Mix(salt, (uint)k);
+                        if (Hashing.Unit(v) > 0.45f + 0.35f * math.saturate(fill)) continue;
+                        var p0 = a + dir * (next - at);
+                        if (s.F(p0).y < s.Spec.Front + 4f) continue;
+                        float side = (v & 1u) == 0 ? 1f : -1f;
+                        bool car = Hashing.Unit(Hashing.Mix(v, 1u)) < 0.18f;
+                        var item = car ? IndustrialAssets.Car : SpillItems[(int)(Hashing.Mix(v, 2u) % (uint)SpillItems.Length)];
+                        // How far onto the road: a car stands half on it (its near side 1.8 m in), small things 0.3-1.5 m in.
+                        float into = car ? 1.8f : 0.3f + 1.2f * Hashing.Unit(Hashing.Mix(v, 3u));
+                        float rr = car ? item.X * 0.5f : item.Radius;
+                        var p = p0 + nrm * side * (hw - into + rr);
+                        float yaw = car ? LeisureKit.Yaw(p, p + dir) + (Hashing.Unit(Hashing.Mix(v, 4u)) - 0.5f) * 0.8f : Hashing.Unit(Hashing.Mix(v, 4u)) * 6.283f;
+                        float cr = car ? 2.7f : item.Radius;
+                        if (!s.Region.ContainsDisc(p, cr) || placed.Overlaps(p, cr, 0.1f) || !s.ReservedOnly.Free(p, cr, 0f, 0.2f)) continue;
+                        var o = ctx.Object(p, yaw, ObjectRole.Furniture, item.Pick(v), v, -1, item.Category);
+                        if (car && Hashing.Unit(Hashing.Mix(v, 5u)) < 0.25f) { o.Roll = math.PI * 0.5f * side; o.Elevation = item.X * 0.5f; }
+                        placed.Add(p, cr, 0);
+                        n++;
+                        // A second drum or crate beside the first.
+                        if (!car && Hashing.Unit(Hashing.Mix(v, 6u)) < 0.5f)
+                        {
+                            var q = p + dir * (item.Radius * 2.1f);
+                            if (s.Region.ContainsDisc(q, cr) && !placed.Overlaps(q, cr, 0.1f) && s.ReservedOnly.Free(q, cr, 0f, 0.2f))
+                            {
+                                ctx.Object(q, Hashing.Unit(Hashing.Mix(v, 7u)) * 6.283f, ObjectRole.Furniture, item.Pick(Hashing.Mix(v, 8u)), Hashing.Mix(v, 9u), -1, item.Category);
+                                placed.Add(q, cr, 0);
+                                n++;
+                            }
+                        }
+                    }
+                    at += len;
+                }
+            }
+            s.Items += n;
+            return n;
         }
 
         /// <summary>Rubbish and rusty ground under the field in big ragged blobs (it was a tip before it was a yard).</summary>
@@ -340,7 +433,11 @@ namespace Placemaker.Core.Layers.Types.Yards
                 uint v = Hashing.Mix(salt, (uint)i);
                 var asset = (v % 3u) == 0 ? YardGround.Hard.Ore : YardGround.Hard.Rubbish;
                 // Blobs never overlap (two ground surfaces on one spot flicker): at most 0.45 of their spacing.
-                var blob = LeisureKit.Blob(p, rad * 0.9f * (0.36f + 0.08f * Hashing.Unit(v)), Hashing.Mix(v, 1u), 16, 0.3f);
+                float br = rad * 0.9f * (0.36f + 0.08f * Hashing.Unit(v));
+                // Off the dirt roads (a surface would cover the road's paint).
+                foreach (var (q0, q1) in s.Aisles) br = math.min(br, math.sqrt(SegmentIndex.DistSq(p, q0, q1)) - TrackWidth * 0.5f - 0.5f);
+                if (br < 4f) continue;
+                var blob = LeisureKit.Blob(p, br, Hashing.Mix(v, 1u), 16, 0.3f);
                 try
                 {
                     var pieces = Poly.Intersection(blob, s.Inner.Ring);

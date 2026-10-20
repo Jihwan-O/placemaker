@@ -80,6 +80,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                         ? new[] { new OrganicYard.Zone(YardFill.PartsMix, 0.8f, 0.3f), new OrganicYard.Zone(YardFill.CarsMix, 0.8f, 0.35f) }
                         : new[] { new OrganicYard.Zone(YardFill.CarsMix, 0.9f, 0.4f), new OrganicYard.Zone(YardFill.PartsMix, 0.85f, 0.5f), new OrganicYard.Zone(YardFill.CarsMix, 0.9f, 0.65f) };
                 OrganicYard.Field(s, zones, fill, s.Salt(0xF1E1u));
+                OrganicYard.Spill(s, fill, s.Salt(0x5911u));
                 return;
             }
             int last = LastBand(s);

@@ -83,6 +83,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                     new OrganicYard.Zone(YardFill.MetalMix, 0.9f, 0.5f), new OrganicYard.Zone(YardFill.ScrapMix, 0.9f, 0.5f),
                     new OrganicYard.Zone(YardFill.RubbleMix, 0.85f, 0f), new OrganicYard.Zone(YardFill.TrashMix, 0.75f, 0.3f),
                 }, fill, s.Salt(0xF1E2u));
+                OrganicYard.Spill(s, fill, s.Salt(0x5912u));
                 return;
             }
             // The mountain in the biggest block that is not against the back fence (the back is for the bays).

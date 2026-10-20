@@ -38,9 +38,9 @@ namespace Placemaker.Core.Layers.Types.Yards
             var ctx = s.Ctx;
             float a = s.Spec.Aisle;
             // Earth right up to the fence (no grass inside a yard: the user, 2026-10-19).
-            TerrainPaint.Field(ctx, s.Region.Ring, Dirt, 1f, 1f, 1f, null, 0f, 0f, 0f, Hashing.Mix(salt, 1u));
+            TerrainPaint.Field(ctx, s.Region.Ring, Dirt, s.Organic ? 0.85f : 1f, 1f, 1f, null, 0f, 0f, 0f, Hashing.Mix(salt, 1u));
             int baseLayer = ground == "gravel" ? Gravel : Dirt;
-            TerrainPaint.Field(ctx, s.Inner.Ring, baseLayer, 1f, 4f, 2f, null, 0f, 0f, 0f, Hashing.Mix(salt, 2u));
+            TerrainPaint.Field(ctx, s.Inner.Ring, baseLayer, s.Organic ? 0.85f : 1f, 4f, 2f, null, 0f, 0f, 0f, Hashing.Mix(salt, 2u));
             int k = 0;
             if (ground == "gravel")
             {

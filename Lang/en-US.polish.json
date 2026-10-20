@@ -9,7 +9,7 @@
   "Placemaker.Group.reach": "Reach and joining",
   "Placemaker.Group.fences": "Fences",
   "Placemaker.Group.lawns": "Lawns and paint",
-  "Placemaker.Group.paths": "Paths and shops",
+  "Placemaker.Group.paths": "Paths",
   "Placemaker.Polish.Built": "{0} buildings outgrown",
   "Placemaker.Polish.sideReach": "Side reach",
   "Placemaker.Polish.sideReach.Tooltip": "How far a garden reaches sideways to meet the neighbour beside it. Very large values make outgrow slower in big cities.",
@@ -336,5 +336,15 @@
   "Placemaker.Polish.roadMaxC": "Roads to",
   "Placemaker.Polish.roadMaxC.Tooltip": "The widest road this zone goes on (m; 48: any).",
   "Placemaker.Polish.zoneOutgrow": "Zone outgrow",
-  "Placemaker.Polish.zoneOutgrow.Tooltip": "Each zone type's own Outgrow switch and settings (set in the panel)."
+  "Placemaker.Polish.zoneOutgrow.Tooltip": "Each zone type's own Outgrow switch and settings (set in the panel).",
+  "Placemaker.Group.land": "What the land becomes",
+  "Placemaker.UI.Group.land": "Land",
+  "Placemaker.Polish.fill": "Land past the lot",
+  "Placemaker.Polish.fill.Tooltip": "What a building's land past its own lot becomes, whatever the building is: a garden (lawn, fences, beds), a car park yard (green edges, bins, marked bays with parked cars), or paving. By building: homes get gardens, shops and offices car park yards, industry its paving.",
+  "Placemaker.Polish.fill.0": "By building",
+  "Placemaker.Polish.fill.1": "Garden",
+  "Placemaker.Polish.fill.2": "Car park",
+  "Placemaker.Polish.fill.3": "Paved",
+  "Placemaker.Polish.waterGap": "Water gap",
+  "Placemaker.Polish.waterGap.Tooltip": "How far the land keeps from water: gardens, yards and car parks stop this far from the shore, along a smooth line. The building's own lot is never cut."
 }

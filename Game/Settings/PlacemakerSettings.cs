@@ -378,7 +378,8 @@ namespace Placemaker.Game.Settings
         [SettingsUIHidden] public bool NeighbourhoodPolish { get; set; }
         /// <summary>Buildings that grow are polished, each with its kind's theme and the look below.</summary>
         [SettingsUIHidden] public bool PolishNewHouses { get; set; }
-        /// <summary>The theme for each kind of building: garden, natural, tidy, yard, or off (new ones of that kind not polished).</summary>
+        /// <summary>The look for each kind of building: "auto" (each zone type its own look), a look id, or off (new ones of that
+        /// kind not polished).</summary>
         [SettingsUIHidden] public string PolishThemeHomes { get; set; }
         [SettingsUIHidden] public string PolishThemeShops { get; set; }
         [SettingsUIHidden] public string PolishThemeOffices { get; set; }
@@ -393,7 +394,26 @@ namespace Placemaker.Game.Settings
         [SettingsUIHidden] public bool PolishRocks { get; set; }
         [SettingsUIHidden] public bool PolishGroundPaint { get; set; }
 
-        public static readonly string[] PolishThemeValues = { "garden", "natural", "tidy", "yard", "off" };
+        public static readonly string[] PolishThemeValues = { "auto", "garden", "natural", "tidy", "yard", "off" };
+        /// <summary>The kinds' looks as saved: 0 older than the zone types' own looks (MigratePolishLooks).</summary>
+        [SettingsUIHidden] public int PolishLooksVersion { get; set; }
+        public const int CurrentPolishLooksVersion = 1;
+
+        /// <summary>
+        /// Once per settings file older than the zone types' own looks: a kind still at its old default (homes garden, shops and
+        /// offices tidy, industry yard) becomes "auto", so every zone type gets its own look; a look the player picked stays.
+        /// True when something changed.
+        /// </summary>
+        public bool MigratePolishLooks()
+        {
+            if (PolishLooksVersion >= CurrentPolishLooksVersion) return false;
+            if (PolishThemeHomes == "garden") PolishThemeHomes = "auto";
+            if (PolishThemeShops == "tidy") PolishThemeShops = "auto";
+            if (PolishThemeOffices == "tidy") PolishThemeOffices = "auto";
+            if (PolishThemeIndustry == "yard") PolishThemeIndustry = "auto";
+            PolishLooksVersion = CurrentPolishLooksVersion;
+            return true;
+        }
         /// <summary>Each zone type's look for new buildings and Polish the whole city (JSON: zone prefab → look id or "off").</summary>
         [SettingsUIHidden] public string PolishZoneLooks { get; set; }
         /// <summary>The look the polish tool had picked last ("zone": each building its zone's look).</summary>
@@ -509,10 +529,11 @@ namespace Placemaker.Game.Settings
             DecalsNeverCollide = true;
             NeighbourhoodPolish = true;
             PolishNewHouses = true;
-            PolishThemeHomes = "garden";
-            PolishThemeShops = "tidy";
-            PolishThemeOffices = "tidy";
-            PolishThemeIndustry = "yard";
+            PolishThemeHomes = "auto";
+            PolishThemeShops = "auto";
+            PolishThemeOffices = "auto";
+            PolishThemeIndustry = "auto";
+            PolishLooksVersion = 0;   // a file without it has the old kind looks (MigratePolishLooks)
             PolishLawns = true;
             PolishPaintedGardens = 33;
             PolishPlanting = true;

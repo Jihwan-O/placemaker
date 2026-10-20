@@ -84,7 +84,7 @@ namespace Placemaker.Core.Tool
         public bool Lawns = true, Planting = true, Features = true, Paths = true, Rocks = true, GroundPaint = true, ShopPaving = true;
         /// <summary>The whole city: each kind's theme for new buildings ("off": not polished), polished and growable lots,
         /// lots waiting to be fitted, lots being put back.</summary>
-        public string Homes = "garden", Shops = "tidy", Offices = "tidy", Industry = "yard";
+        public string Homes = "auto", Shops = "auto", Offices = "auto", Industry = "auto";
         public int CityPolished, CityTotal, Waiting, Restoring;
         /// <summary>The look picked (Theme holds its id): its base theme as the rows have it, whether the rows changed it,
         /// every knob's value in the rows and in the saved look.</summary>
@@ -97,8 +97,9 @@ namespace Placemaker.Core.Tool
         public Dictionary<string, float> Values = new Dictionary<string, float>(), LookValues = new Dictionary<string, float>();
         /// <summary>Every look: id, name (a key for the built-in ones), the player's own, base theme.</summary>
         public List<(string Id, string Name, bool Custom, string Theme)> Looks = new List<(string, string, bool, string)>();
-        /// <summary>Every zone type: prefab name, kind (home, shop, office, industry), its look ("off"), set for it (not its kind's).</summary>
-        public List<(string Id, string Kind, string Look, bool Own, string Icon)> Zones = new List<(string, string, string, bool, string)>();
+        /// <summary>Every zone type: prefab name, kind (home, shop, office, industry), its look ("off"), set for it (not its kind's),
+        /// its icon, its own built-in look (what it gets with no pick of its own nor of its kind).</summary>
+        public List<(string Id, string Kind, string Look, bool Own, string Icon, string Default)> Zones = new List<(string, string, string, bool, string, string)>();
         /// <summary>The zone types of the buildings in the selection (a Zoning type's Only edit existing): key (the zone's name
         /// without EU / NA, lower case), a zone prefab of it, its icon, how many buildings.</summary>
         public List<(string Key, string Zone, string Icon, int Count)> AreaZones = new List<(string, string, string, int)>();
@@ -243,7 +244,7 @@ namespace Placemaker.Core.Tool
                     .Set("lookTheme", p.LookTheme ?? "garden").Set("lookSavedTheme", p.LookSavedTheme ?? "garden").Set("modified", p.Modified).Set("tool", p.Tool).Set("live", p.Live)
                     .Set("values", Knobs(p.Values)).Set("lookValues", Knobs(p.LookValues))
                     .Set("looks", Arr(p.Looks.Select(l => JsonValue.Obj().Set("id", l.Id).Set("name", l.Name).Set("custom", l.Custom).Set("theme", l.Theme))))
-                    .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own).Set("icon", z.Icon ?? ""))))
+                    .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own).Set("icon", z.Icon ?? "").Set("def", z.Default ?? ""))))
                     .Set("areaZones", Arr(p.AreaZones.Select(z => JsonValue.Obj().Set("key", z.Key).Set("zone", z.Zone).Set("icon", z.Icon ?? "").Set("count", z.Count)))));
             }
             return o;

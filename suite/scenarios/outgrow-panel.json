@@ -1,0 +1,14 @@
+{
+  "_about": "Outgrow's panel: the look picker (looks for zones, themes, yours), the look's first rows (what the land becomes, the water gap) and the Global outgrow window (each zone type with its own look, kinds by zone type). Pictures with the panel. Send with: powershell -File tools/suite/Send-Suite.ps1 -File suite/scenarios/outgrow-panel.json -Who outgrow-panel",
+  "scenarios": [
+    {
+      "id": "outgrow-panel",
+      "land": { "shape": "rect", "size": [ 200, 160 ], "ground": "flat", "roads": "none" },
+      "steps": [
+        { "do": "polish", "theme": "towers", "shot": "look-towers", "shotMode": "ui" },
+        { "do": "polish", "knob": "fill", "value": 2, "shot": "look-towers-carpark", "shotMode": "ui" },
+        { "do": "polish", "open": "city", "shot": "global-outgrow", "shotMode": "ui" }
+      ]
+    }
+  ]
+}

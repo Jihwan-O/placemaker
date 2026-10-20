@@ -263,8 +263,8 @@ namespace Placemaker.Game.Tool
         }
 
         /// <summary>
-        /// The panel's Whole city rows: "on" / "newHouses" (value "true" / "false"), a kind's theme for new buildings ("homes",
-        /// "shops", "offices", "industry": garden, natural, tidy, yard, off), "polishAll" (every building with the Style picked
+        /// The panel's Whole city rows: "on" / "newHouses" (value "true" / "false"), a kind's look for new buildings ("homes",
+        /// "shops", "offices", "industry": "auto" each zone type its own, a look id, off), "polishAll" (every building with the Style picked
         /// and the look; By kind leaves out the kinds set to Off), "unpolishAll" (every garden back as the game made it). The
         /// city-wide two run in the background, a few buildings a frame; the panel asks first.
         /// </summary>
@@ -278,7 +278,7 @@ namespace Placemaker.Game.Tool
                 case "on": s.NeighbourhoodPolish = on; break;
                 case "newHouses": s.PolishNewHouses = on; break;
                 case "homes": case "shops": case "offices": case "industry":
-                    if (value != "off" && NeighbourPolishSystem.LookById(value) == null) return;
+                    if (value != "off" && value != NeighbourPolishSystem.KindAuto && NeighbourPolishSystem.LookById(value) == null) return;
                     if (what == "homes") s.PolishThemeHomes = value;
                     else if (what == "shops") s.PolishThemeShops = value;
                     else if (what == "offices") s.PolishThemeOffices = value;
@@ -396,7 +396,7 @@ namespace Placemaker.Game.Tool
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
             if (polish != null)
                 foreach (var (zone, kind, icon) in polish.Zones())
-                    v.Zones.Add((zone, kind, NeighbourPolishSystem.ZoneLook(zone, kind), NeighbourPolishSystem.ZoneHasOwnLook(zone), icon));
+                    v.Zones.Add((zone, kind, NeighbourPolishSystem.ZoneLook(zone, kind), NeighbourPolishSystem.ZoneHasOwnLook(zone), icon, NeighbourPolishSystem.DefaultZoneLook(zone, kind)));
             if (s != null)
             {
                 v.Painted = s.PolishPaintedGardens;

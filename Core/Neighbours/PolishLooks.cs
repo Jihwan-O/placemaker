@@ -1,8 +1,10 @@
 // Placemaker neighbourhood polish — looks: named sets of every polish setting, like Placemaker's styles (GPL-3.0).
 //
 // A look is a base theme (garden, natural, tidy, yard: what kind of planting and features) and a value for every knob the
-// planner reads per house (reach, joining, lawns, paint, planting, features, paths, shops). The built-in looks ship with the
-// mod; the player's own looks (New / Save / Rename / Delete in the polish tool) are kept in one file for every city. A
+// planner reads per house (what the land past the lot becomes, reach, joining, how far from water, lawns, paint, planting,
+// features, paths). Any look goes on any building: a look whose land is a car park gives a house or a tower a car park,
+// one whose land is a garden gives a shop a garden. The built-in looks ship with the mod (the themed ones, and one for each
+// zone type of the game: what every zone gets until the player picks another); the player's own looks (New / Save / Rename / Delete in the polish tool) are kept in one file for every city. A
 // polished building keeps a look by its id (its hash on the lot) and, when it was polished with changes not saved to the
 // look, those changes too; a building whose look was deleted falls back to its base theme's built-in look.
 
@@ -38,6 +40,9 @@ namespace Placemaker.Core.Neighbours
         /// <summary>Every knob a look sets, with the planner's own default (YardStitch reads them per house with K()).</summary>
         public static readonly IReadOnlyDictionary<string, float> Defaults = new Dictionary<string, float>
         {
+            // what the land past the lot becomes: 0 by the building (a home a garden, a shop or office a car park yard, a works
+            // its paving: Core/Neighbours/YardStitch.FillOf), 1 a garden, 2 a car park yard, 3 paving
+            ["fill"] = 0f,
             // reach and joining
             ["sideReach"] = 100f, ["maxFrontGap"] = 100f, ["maxBackGap"] = 150f, ["maxRearGap"] = 60f, ["maxFacingGap"] = 50f,
             ["maxDeepen"] = 60f, ["hug"] = 1f, ["hugReach"] = 80f, ["openReach"] = 20f, ["wrap"] = 1f, ["closeBacks"] = 1f,
@@ -45,6 +50,8 @@ namespace Placemaker.Core.Neighbours
             // the land a garden grows onto: no steeper than this (%), no further above or below the house (m); 0: no limit.
             // Forgiving by default ("they basically just avoid going up a mega cliff"): only cliffs stop a garden.
             ["maxSlope"] = 80f, ["maxRise"] = 0f,
+            // never nearer the water than this (m; from the waterline, along a smooth line)
+            ["waterGap"] = 30f,
             // lawns and ground paint
             ["lawns"] = 1f, ["paintedGardens"] = 33f, ["paint"] = 1f, ["blendWidth"] = 20f, ["blendFar"] = 40f,
             ["blendStrength"] = 0.6f, ["gardenPaint"] = 0.85f,
@@ -68,6 +75,9 @@ namespace Placemaker.Core.Neighbours
         /// <summary>The knobs that say how far a garden reaches: the plan looks this far around its houses.</summary>
         public static readonly string[] ReachKnobs = { "sideReach", "maxFrontGap", "maxBackGap", "maxRearGap", "maxFacingGap", "maxDeepen", "hugReach", "openReach" };
 
+        /// <summary>What the land past the lot becomes (knob "fill").</summary>
+        public const int FillAuto = 0, FillGarden = 1, FillCarPark = 2, FillPaved = 3;
+
         public enum KnobKind { Toggle, Slider, Choice }
 
         /// <summary>One setting of a look as the Zoning types' option rows show it (Core/Layers/Types/Zoning/PolishLookLayer).</summary>
@@ -85,10 +95,13 @@ namespace Placemaker.Core.Neighbours
             }
         }
 
-        /// <summary>Every setting of a look, in the order the rows show them (groups: reach, fences, lawns, ground, planting, paths).
-        /// Choices of ground: 0 none, 1 dry grass, 2 lush, 3 dirt, 4 sand; fenceKind: 0 own, 1 low hedge, 2 tall hedge, 3 low fence, 4 tall fence.</summary>
+        /// <summary>Every setting of a look, in the order the rows show them (groups: land, reach, fences, lawns, ground, planting,
+        /// paths). Choices of ground: 0 none, 1 dry grass, 2 lush, 3 dirt, 4 sand; fenceKind: 0 own, 1 low hedge, 2 tall hedge, 3 low
+        /// fence, 4 tall fence; fill: FillAuto…FillPaved. ("pavedFill", "Shops keep paving", is only read by fill 0: no row.)</summary>
         public static readonly IReadOnlyList<Knob> Knobs = new[]
         {
+            new Knob("fill", "land", KnobKind.Choice, ControlTier.Essential, options: new[] { "0", "1", "2", "3" }),
+            new Knob("waterGap", "land", KnobKind.Slider, ControlTier.Essential, 0, 200, 1, "m"),
             new Knob("sideReach", "reach", KnobKind.Slider, ControlTier.Essential, 0, 500, 1, "m"),
             new Knob("maxFrontGap", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
             new Knob("maxBackGap", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
@@ -139,12 +152,12 @@ namespace Placemaker.Core.Neighbours
             new Knob("pathChance", "paths", KnobKind.Slider, ControlTier.More, 0, 100, 5, "%"),
             new Knob("alleys", "paths", KnobKind.Toggle, ControlTier.More),
             new Knob("alleyChance", "paths", KnobKind.Slider, ControlTier.More, 0, 100, 5, "%"),
-            new Knob("pavedFill", "paths", KnobKind.Toggle, ControlTier.Essential),
         };
 
         public static readonly string[] Themes = { "garden", "natural", "tidy", "yard" };
 
-        /// <summary>The looks that ship with the mod (one per theme).</summary>
+        /// <summary>The looks that ship with the mod: one per theme and more mixes of ground (the Zoning types use them), then one
+        /// for each zone type (ZoneLookIds: what a zone gets by default).</summary>
         public static readonly IReadOnlyList<PolishLook> BuiltIn = new[]
         {
             new PolishLook { Id = "garden", Name = "Placemaker.UI.Painter.Theme.garden", Theme = "garden" },
@@ -156,7 +169,42 @@ namespace Placemaker.Core.Neighbours
             new PolishLook { Id = "rustic", Name = "Placemaker.UI.Painter.Theme.rustic", Theme = "garden", Knobs = { ["paintedGardens"] = 50f, ["gardenLayer"] = 1f, ["meadowLayer"] = 1f, ["edgeLayer"] = 3f, ["edgeWidth"] = 3.5f, ["edgeStrength"] = 0.6f, ["patchChance"] = 70f, ["patchLayer"] = 3f, ["rockChance"] = 30f, ["roadLayer"] = 3f, ["roadWidth"] = 3f, ["roadStrength"] = 0.45f } },
             new PolishLook { Id = "coastal", Name = "Placemaker.UI.Painter.Theme.coastal", Theme = "natural", Knobs = { ["paintedGardens"] = 60f, ["gardenLayer"] = 4f, ["meadowLayer"] = 1f, ["blendLayer"] = 4f, ["blendFarLayer"] = 1f, ["roadLayer"] = 4f, ["roadWidth"] = 5f, ["roadStrength"] = 0.6f, ["rockLayer"] = 4f, ["rockGround"] = 4f, ["patchLayer"] = 4f, ["patchChance"] = 40f, ["rockChance"] = 30f } },
             new PolishLook { Id = "manicured", Name = "Placemaker.UI.Painter.Theme.manicured", Theme = "tidy", Knobs = { ["paintedGardens"] = 0f, ["lawnReach"] = 500f, ["blendLayer"] = 2f, ["blendFarLayer"] = 0f, ["edgeLayer"] = 0f, ["patchChance"] = 0f, ["rockChance"] = 0f, ["bedChance"] = 95f } },
+            // one per zone type: what its buildings get until the player picks another look for that zone
+            new PolishLook { Id = "houses", Name = "Placemaker.UI.Painter.Theme.houses", Theme = "garden", Knobs = { ["fill"] = FillGarden } },
+            new PolishLook { Id = "rows", Name = "Placemaker.UI.Painter.Theme.rows", Theme = "tidy", Knobs = { ["fill"] = FillGarden, ["bedChance"] = 90f, ["rockChance"] = 0f, ["sideReach"] = 30f, ["maxDeepen"] = 16f, ["hugReach"] = 16f, ["openReach"] = 0f } },
+            new PolishLook { Id = "apartments", Name = "Placemaker.UI.Painter.Theme.apartments", Theme = "tidy", Knobs = { ["fill"] = FillGarden, ["paintedGardens"] = 0f, ["bedChance"] = 70f, ["rockChance"] = 0f, ["pathChance"] = 70f } },
+            new PolishLook { Id = "towers", Name = "Placemaker.UI.Painter.Theme.towers", Theme = "tidy", Knobs = { ["fill"] = FillGarden, ["paintedGardens"] = 0f, ["bedChance"] = 95f, ["rockChance"] = 0f, ["pathChance"] = 80f, ["patchChance"] = 0f, ["edgeLayer"] = 0f, ["blendFarLayer"] = 0f } },
+            new PolishLook { Id = "mixed", Name = "Placemaker.UI.Painter.Theme.mixed", Theme = "tidy", Knobs = { ["fill"] = FillGarden, ["paintedGardens"] = 0f, ["bedChance"] = 90f, ["rockChance"] = 0f, ["sideReach"] = 30f, ["openReach"] = 0f } },
+            new PolishLook { Id = "shops", Name = "Placemaker.UI.Painter.Theme.shops", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["bedChance"] = 90f, ["rockChance"] = 0f } },
+            new PolishLook { Id = "bigShops", Name = "Placemaker.UI.Painter.Theme.bigShops", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["bedChance"] = 95f, ["rockChance"] = 0f, ["patchChance"] = 0f } },
+            new PolishLook { Id = "offices", Name = "Placemaker.UI.Painter.Theme.offices", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["bedChance"] = 95f, ["rockChance"] = 0f, ["patchChance"] = 0f, ["paintedGardens"] = 0f } },
+            new PolishLook { Id = "officeTowers", Name = "Placemaker.UI.Painter.Theme.officeTowers", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["bedChance"] = 95f, ["rockChance"] = 0f, ["patchChance"] = 0f, ["paintedGardens"] = 0f } },
+            new PolishLook { Id = "industry", Name = "Placemaker.UI.Painter.Theme.industry", Theme = "yard", Knobs = { ["fill"] = FillPaved, ["bedChance"] = 0f, ["rockChance"] = 0f, ["gardenLayer"] = 3f, ["meadowLayer"] = 3f, ["blendLayer"] = 3f, ["patchChance"] = 60f } },
         };
+
+        /// <summary>The built-in looks made for zone types, in the order the panel lists them.</summary>
+        public static readonly string[] ZoneLookIds = { "houses", "rows", "apartments", "towers", "mixed", "shops", "bigShops", "offices", "officeTowers", "industry" };
+
+        /// <summary>
+        /// The look a zone type gets until the player picks one: by its name (its key: the prefab name without EU / NA, lower
+        /// case; mods' zones by the words in it), else by its kind (home, shop, office, industry).
+        /// </summary>
+        public static string DefaultZoneLook(string zoneKey, string kind)
+        {
+            var k = zoneKey ?? "";
+            bool high = k.Contains("high"), row = k.Contains("row"), medium = k.Contains("medium") || k.Contains("lowrent") || k.Contains("low rent");
+            switch (kind)
+            {
+                case "shop": return high ? "bigShops" : "shops";
+                case "office": return high ? "officeTowers" : "offices";
+                case "industry": return "industry";
+                default:
+                    if (k.Contains("mixed")) return "mixed";
+                    if (high) return "towers";
+                    if (row) return "rows";
+                    return medium ? "apartments" : "houses";
+            }
+        }
 
         /// <summary>A look id's number on a lot (FNV-1a, never 0: 0 is "no look", a lot polished before looks).</summary>
         public static int Hash(string id)

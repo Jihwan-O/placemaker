@@ -113,7 +113,7 @@ namespace Placemaker.Game.Tool
                 _mode = (SelectionMode)math.clamp(_settings.LastAreaMode, 0, 4);
                 // Area overhaul: Road nodes is part of Points now (points snap to road nodes).
                 if (_mode == SelectionMode.Perimeter) _mode = SelectionMode.Draw;
-                if (_settings.MigrateAreaRules()) _settings.ApplyAndSave();
+                if (_settings.MigrateAreaRules() | _settings.MigratePolishLooks()) _settings.ApplyAndSave();
                 _panelCollapsed = _settings.PanelCollapsed;
             }
         }

@@ -67,13 +67,17 @@ namespace Placemaker.Game.Neighbours
         /// <summary>The lot's theme byte as a name (PolishedLot.Theme; 0 = by the zone).</summary>
         public static readonly string[] ThemeNames = { "zone", "garden", "natural", "tidy", "yard" };
 
-        /// <summary>Settings: the theme each kind of building gets ("off": new ones of that kind are not polished).</summary>
+        /// <summary>A kind's setting "by zone type": each zone type its own built-in look (PolishLooks.DefaultZoneLook).</summary>
+        public const string KindAuto = "auto";
+
+        /// <summary>Settings: the look each kind of building gets: KindAuto (each zone type its own), a look id (every zone of the
+        /// kind without a pick of its own) or "off" (new ones of that kind are not polished).</summary>
         private static readonly Dictionary<string, string> s_zoneTheme = new Dictionary<string, string>
         {
-            ["home"] = "garden", ["shop"] = "tidy", ["office"] = "tidy", ["industry"] = "yard",
+            ["home"] = KindAuto, ["shop"] = KindAuto, ["office"] = KindAuto, ["industry"] = KindAuto,
         };
 
-        public static string ZoneTheme(string zone) => s_zoneTheme.TryGetValue(zone ?? "home", out var t) ? t : "garden";
+        public static string ZoneTheme(string zone) => s_zoneTheme.TryGetValue(zone ?? "home", out var t) ? t : KindAuto;
 
         /// <summary>
         /// Settings: the theme for each kind of building. Given to buildings polished from now on (each lot keeps the theme it
@@ -92,13 +96,12 @@ namespace Placemaker.Game.Neighbours
         /// <summary>A setting changed since the polished buildings were last fitted (the status line says so).</summary>
         public static bool SettingsChanged { get; private set; }
 
-        /// <summary>The theme byte for a building of this kind (its kind's setting; Off: the kind's usual theme).</summary>
+        /// <summary>The theme byte for a building: its zone's look's base theme (Off: its zone type's built-in look's).</summary>
         private byte ThemeByte(Entity prefab)
         {
-            var kind = ZoneKind(prefab);
-            var name = ZoneTheme(kind);
-            if (name == "off") name = kind == "home" ? "garden" : kind == "industry" ? "yard" : "tidy";
-            return (byte)Math.Max(1, Array.IndexOf(ThemeNames, name));
+            var id = LookOfZone(prefab);
+            if (id == "off") id = PolishLooks.DefaultZoneLook(ZoneKey(ZoneName(prefab)), ZoneKind(prefab));
+            return (byte)Math.Max(1, Array.IndexOf(ThemeNames, LookById(id)?.Theme ?? "garden"));
         }
 
         /// <summary>What a building prefab is: home, shop, office or industry.</summary>
@@ -117,7 +120,8 @@ namespace Placemaker.Game.Neighbours
             byte t = ThemeOfLot(lot);
             if (t > 0 && t < ThemeNames.Length) return ThemeNames[t];
             var z = ZoneTheme(zone);
-            return z == "off" ? null : z;
+            if (z == "off") return null;
+            return LookById(z == KindAuto ? PolishLooks.DefaultZoneLook("", zone) : z)?.Theme ?? "garden";
         }
         /// <summary>Game runner: which parts are edited (both by default).</summary>
         public static bool EditLines = true, EditLawns = true;
@@ -598,6 +602,9 @@ namespace Placemaker.Game.Neighbours
                 lo = math.min(lo, h.Position - r);
                 hi = math.max(hi, h.Position + r);
             }
+            // the water is looked for a water gap further out (the widest of the looks here): a garden keeps that far off it
+            float wetGap = Settings.Knob("waterGap", PolishLooks.Defaults["waterGap"]);
+            foreach (var h in stitch) if (h.Options != null && h.Options.TryGetValue("waterGap", out var w)) wetGap = math.max(wetGap, w);
             var kinds = new List<int>();
             var groups = new List<long>();
             var settings = Settings.WithBarriers(stitch.Count > 0 ? BarriersIn(lo, hi, kinds, groups) : null, kinds, groups);
@@ -608,7 +615,7 @@ namespace Placemaker.Game.Neighbours
             {
                 Stitch = stitch, LanesOf = lanesOf, LawnsOf = lawnsOf, OwnerOf = ownerOf, CoreIds = coreIds, HouseOf = new Dictionary<long, Entity>(_houseOf),
                 LawnPrefabOf = new Dictionary<long, Entity>(_lawnPrefabOf), Asked = done.Count, Cluster = cluster.Count, Clock = sw, First = first, Seed = seedAt,
-                Settings = settings, Planner = planner, Samples = StartSampling(lo, hi),
+                Settings = settings, Planner = planner, Samples = StartSampling(lo, hi, math.clamp(wetGap, 0f, 300f) + 4f),
             };
             PassPart(5, sw);
             _inFlight.Add(pend);
@@ -637,7 +644,7 @@ namespace Placemaker.Game.Neighbours
                 pend.Task = Task.Run(() =>
                 {
                     var planClock = Stopwatch.StartNew();
-                    var (raster, water) = Sampled(smp.Min, smp.Max, smp.Nx, smp.Ny, smp.Cell, heights, wet, smp.WetNx, smp.WetNz);
+                    var (raster, water) = Sampled(smp.Min, smp.Nx, smp.Ny, smp.Cell, heights, wet, smp.WetMin, smp.WetMax, smp.WetNx, smp.WetNz);
                     settings.Ground = raster.Sample;
                     // water last, as BarriersIn added it (one group each)
                     if (settings.Barriers != null)

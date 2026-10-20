@@ -185,6 +185,8 @@ export interface PolishZone {
   own: boolean;
   /** The game's own zone icon (UIObject.m_Icon, "Media/…"), or "". */
   icon: string;
+  /** The zone type's own built-in look (what it gets with no pick of its own nor of its kind). */
+  def?: string;
 }
 
 export interface PolishLook {
@@ -200,7 +202,7 @@ export interface PolishLook {
 }
 
 export interface PolishCity {
-  /** Each kind's theme for new buildings: "garden" | "natural" | "tidy" | "yard" | "off". */
+  /** Each kind's look for new buildings: "auto" (each zone type its own look), a look id, or "off". */
   homes: string;
   shops: string;
   offices: string;

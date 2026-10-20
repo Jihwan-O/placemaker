@@ -1,9 +1,11 @@
 // (PROTOCOL 25) The neighbourhood-polish tool's panel (its own button next to Placemaker's; Placemaker's panel and area tools).
-// Step 2 "Polish" (PolishDesign): what the area holds, the look picker (By zone, the built-in looks, the player's own: like
-// Placemaker's Style row), the look's buttons (Save, Save as new, Rename, Delete, Revert) and every setting of the look as
-// rows (label left, control right, reset to the look's value), grouped and folded. Polish and Unpolish are the footer's
-// buttons. The City window (PolishCityCard, beside the panel, its header button): the polish on or off, new buildings, a look
-// for each zone type (and each kind), Polish / Unpolish the whole city (asking first, a few buildings a frame).
+// Step 2 "Polish" (PolishDesign): what the area holds, the look picker (By zone; the looks made for zone types, the themed
+// ones, the player's own: like Placemaker's Style row), the look's buttons (Save, Save as new, Rename, Delete, Revert) and
+// every setting of the look as rows (label left, control right, reset to the look's value), grouped and folded: first what
+// the land past the lot becomes (a garden, a car park yard, paving: any look on any building) and how far it keeps from
+// water. Polish and Unpolish are the footer's buttons. The City window (PolishCityCard, beside the panel, its header
+// button): new buildings, a look for each zone type (each starts with its own: Houses, Towers, Shops…) and each kind ("By
+// zone type", or one look for all its zones), Polish / Unpolish the whole city (asking first, a few buildings a frame).
 import React, { ReactNode, useState } from "react";
 import classNames from "classnames";
 import { PainterState, PolishZone, ToolState } from "../contract";
@@ -28,6 +30,7 @@ const THEMES = ["garden", "natural", "tidy", "yard"];
 export const lookName = (t: TFunc, p: PainterState | undefined, id: string) => {
     if (id === "zone") return t("Placemaker.UI.Painter.Theme.zone", "By zone");
     if (id === "off") return t("Placemaker.UI.Polish.KindOff", "Off");
+    if (id === KIND_AUTO) return t("Placemaker.UI.Polish.KindAuto", "By zone type");
     const l = p?.looks?.find((x) => x.id === id);
     if (!l) return humanize(id);
     return l.custom ? l.name : t(l.name, humanize(l.id));
@@ -44,9 +47,27 @@ const GROUNDS = [
     { value: 4, en: "Sand" },
 ];
 
+/** A kind's look "by zone type": each zone type its own (NeighbourPolishSystem.KindAuto). */
+const KIND_AUTO = "auto";
+/** The built-in looks made for zone types (Core/Neighbours/PolishLooks.ZoneLookIds), in order. */
+const ZONE_LOOKS = ["houses", "rows", "apartments", "towers", "mixed", "shops", "bigShops", "offices", "officeTowers", "industry"];
 /** Built-in looks with an icon of their own (else their base theme's). */
-const LOOK_ICON: Record<string, string> = { meadow: "leaf", rustic: "pickaxe", coastal: "waves", manicured: "topiary" };
+const LOOK_ICON: Record<string, string> = {
+    meadow: "leaf", rustic: "pickaxe", coastal: "waves", manicured: "topiary",
+    houses: "people", rows: "block", apartments: "building", towers: "column", mixed: "awning",
+    shops: "shop", bigShops: "bag", offices: "board", officeTowers: "obelisk", industry: "factory",
+};
 const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Knob[] }[] = [
+    {
+        id: "land", en: "What the land becomes", icon: "layers", open: true,
+        knobs: [
+            {
+                id: "fill", en: "Land past the lot", tip: "What a building's land past its own lot becomes, whatever the building is: a garden (lawn, fences, beds), a car park yard (green edges, bins, marked bays with parked cars), or paving. By building: homes get gardens, shops and offices car park yards, industry its paving.", kind: "choice",
+                options: [{ value: 0, en: "By building" }, { value: 1, en: "Garden" }, { value: 2, en: "Car park" }, { value: 3, en: "Paved" }],
+            },
+            { id: "waterGap", en: "Water gap", tip: "How far the land keeps from water: gardens, yards and car parks stop this far from the shore, along a smooth line. The building's own lot is never cut.", kind: "slider", min: 0, max: 200, step: 1, unit: "m" },
+        ],
+    },
     {
         id: "reach", en: "Reach and joining", icon: "ruler", open: true,
         knobs: [
@@ -121,12 +142,11 @@ const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Kno
         ],
     },
     {
-        id: "paths", en: "Paths and shops", icon: "footpath",
+        id: "paths", en: "Paths", icon: "footpath",
         knobs: [
             { id: "pathChance", en: "Garden paths", tip: "How many big gardens get a paved path from the house to the back.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
             { id: "alleys", en: "Walkways between houses", tip: "A narrow even gap between two houses becomes a paved walkway.", kind: "toggle" },
             { id: "alleyChance", en: "Walkways", tip: "How often a narrow gap becomes a walkway.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },
-            { id: "pavedFill", en: "Shops keep their paving", tip: "Shops, offices and works fill the land between them with the surface most of their ground already is, not lawn.", kind: "toggle" },
         ],
     },
 ];
@@ -282,6 +302,24 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
     const hasArea = state.area.closed && state.area.areaM2 > 0;
     const looks = p.looks ?? [];
     const byZone = p.theme === "zone";
+    // the picker's rows: the looks made for zone types, the themed ones, the player's own
+    const zoneLooks = ZONE_LOOKS.map((id) => looks.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l);
+    const themed = looks.filter((l) => !l.custom && !ZONE_LOOKS.includes(l.id));
+    const own = looks.filter((l) => l.custom);
+    const lookChip = (l: (typeof looks)[number]) => (
+        <Chip
+            key={l.id}
+            testId={"polish-theme-" + l.id}
+            nav="preset"
+            icon={l.custom ? "star" : LOOK_ICON[l.id] ?? THEME_ICON[l.theme] ?? "flower"}
+            color={l.custom ? CUSTOM_COLOR : color}
+            name={lookName(t, p, l.id)}
+            on={p.theme === l.id}
+            description={l.custom ? t("Placemaker.UI.Polish.YourLook", "Your look, based on {0}", [lookName(t, p, l.theme)]) : t("Placemaker.UI.Painter.ThemeTip." + l.id, "")}
+            badge={p.theme === l.id && p.modified ? <div className={b.dot} /> : null}
+            onClick={() => act.polishTheme(l.id)}
+        />
+    );
     return (
         <div className={d.stage} data-testid="polish-design" data-theme={p.theme}>
             <div className={s.count} data-testid="painter-count" data-lots={p.lots} data-polished={p.polished}>
@@ -302,7 +340,7 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
                 </div>
                 <div className={b.browser}>
                     <div className={b.row}>
-                        <RowLabel n={1} label={t("Placemaker.UI.Polish.Look", "Look")} />
+                        <RowLabel n={1} label={t("Placemaker.UI.Polish.ZoneLooks", "For zones")} />
                         <div className={b.chips} data-testid="polish-themes">
                             <Chip
                                 testId="polish-theme-zone"
@@ -314,29 +352,30 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
                                 description={t("Placemaker.UI.Painter.ThemeTip.zone", "Each building gets its zone's look (City)")}
                                 onClick={() => act.polishTheme("zone")}
                             />
-                            {looks.map((l) => (
-                                <Chip
-                                    key={l.id}
-                                    testId={"polish-theme-" + l.id}
-                                    nav="preset"
-                                    icon={l.custom ? "star" : LOOK_ICON[l.id] ?? THEME_ICON[l.theme] ?? "flower"}
-                                    color={l.custom ? CUSTOM_COLOR : color}
-                                    name={lookName(t, p, l.id)}
-                                    on={p.theme === l.id}
-                                    description={l.custom ? t("Placemaker.UI.Polish.YourLook", "Your look, based on {0}", [lookName(t, p, l.theme)]) : t("Placemaker.UI.Painter.ThemeTip." + l.id, "")}
-                                    badge={p.theme === l.id && p.modified ? <div className={b.dot} /> : null}
-                                    onClick={() => act.polishTheme(l.id)}
-                                />
-                            ))}
+                            {zoneLooks.map(lookChip)}
                         </div>
                     </div>
+                    <div className={b.row}>
+                        <RowLabel n={2} label={t("Placemaker.UI.Polish.Themes", "Themes")} />
+                        <div className={b.chips} data-testid="polish-themes-themed">
+                            {themed.map(lookChip)}
+                        </div>
+                    </div>
+                    {own.length > 0 ? (
+                        <div className={b.row}>
+                            <RowLabel n={3} label={t("Placemaker.UI.Polish.Yours", "Yours")} />
+                            <div className={b.chips} data-testid="polish-themes-own">
+                                {own.map(lookChip)}
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             </div>
             {byZone ? (
                 <div className={s.off} data-testid="polish-byzone-note">
                     <Icon name="info" size={12} tint="dim" />
                     <div className={s.offText}>
-                        {t("Placemaker.UI.Polish.ByZoneNote", "Each building gets the look its zone has. Set them in City (the button at the top), or pick a look here to outgrow the area with it.")}
+                        {t("Placemaker.UI.Polish.ByZoneNote2", "Each building gets the look its zone has (every zone type starts with its own: Houses, Towers, Shops…). Change them in Global outgrow (the button at the top), or pick any look here to outgrow the area with it: a look decides whether the land becomes a garden, a car park or paving, whatever the building is.")}
                     </div>
                 </div>
             ) : (
@@ -378,16 +417,18 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
     );
 };
 
-/** The looks to pick from (a short list of chips): Off, every look, and "as its kind" for a zone with its own. */
-const LookChips = ({ p, value, testId, onPick, inherit }: { p: PainterState; value: string; testId: string; onPick: (v: string) => void; inherit?: boolean }) => {
+/** The looks to pick from (a short list of chips): "by zone type" (a kind), the looks made for zone types, the themed ones,
+ *  the player's own, Off; and back to its default for a zone with its own (<paramref name="inherit"/>: what that gives). */
+const LookChips = ({ p, value, testId, onPick, inherit, auto }: { p: PainterState; value: string; testId: string; onPick: (v: string) => void; inherit?: string; auto?: boolean }) => {
     const { t } = useT();
-    const options = [...(p.looks ?? []).map((l) => l.id), "off"];
+    const all = (p.looks ?? []).map((l) => l.id);
+    const options = [...(auto ? [KIND_AUTO] : []), ...ZONE_LOOKS.filter((id) => all.includes(id)), ...all.filter((id) => !ZONE_LOOKS.includes(id)), "off"];
     return (
         <div className={s.choiceList} data-testid={testId}>
             {inherit ? (
                 <button type="button" className={s.choiceItem} data-testid={testId + "-inherit"} onClick={(e) => { e.stopPropagation(); onPick(""); }}>
                     <Icon name="undo" size={10} tint="dim" />
-                    <div className={s.choiceText}>{t("Placemaker.UI.Polish.AsKind", "As its kind")}</div>
+                    <div className={s.choiceText}>{t("Placemaker.UI.Polish.BackToDefault", "Back to {0}", [lookName(t, p, inherit)])}</div>
                 </button>
             ) : null}
             {options.map((o) => (
@@ -401,7 +442,7 @@ const LookChips = ({ p, value, testId, onPick, inherit }: { p: PainterState; val
                         onPick(o);
                     }}
                 >
-                    <Icon name={o === "off" ? "eyeOff" : lookIcon(p, o)} size={10} tint={o === value ? "light" : "dim"} />
+                    <Icon name={o === "off" ? "eyeOff" : o === KIND_AUTO ? "zone" : lookIcon(p, o)} size={10} tint={o === value ? "light" : "dim"} />
                     <div className={s.choiceText}>{lookName(t, p, o)}</div>
                 </button>
             ))}
@@ -410,6 +451,7 @@ const LookChips = ({ p, value, testId, onPick, inherit }: { p: PainterState; val
 };
 
 const lookIcon = (p: PainterState, id: string) => {
+    if (id === KIND_AUTO) return "zone";
     const l = (p.looks ?? []).find((x) => x.id === id);
     return !l ? "eyeOff" : l.custom ? "star" : LOOK_ICON[l.id] ?? THEME_ICON[l.theme] ?? "flower";
 };
@@ -505,7 +547,7 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                 </div>
                 <div className={pn.bodyWrap}>
                     <div className={classNames(pn.body, s.cityBody)}>
-                        <Row id="newHouses" label={L("NewHouses", "Polish new buildings")} tip={L("NewHouses.Tip2", "Buildings that grow from now on get their zone's look. Buildings already standing stay as they are until you polish them.")} toggle>
+                        <Row id="newHouses" label={L("NewHouses", "Polish new buildings")} tip={L("NewHouses.Tip3", "Buildings that grow from now on get their zone's look. Each zone type starts with a look of its own (Houses, Towers, Shops…); pick any look for any zone below: a look decides what the land becomes (a garden, a car park, paving). Buildings already standing stay as they are until you outgrow them.")} toggle>
                             <div className={c.toggleCell}>
                                 <Switch testId="polish-newHouses" on={p.newHouses} onChange={(v) => act.polishCity("newHouses", v ? "true" : "false")} />
                             </div>
@@ -546,8 +588,8 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                                 >
                                     {picking === kindKey ? (
                                         <div className={s.pickBox}>
-                                            <div className={s.pickTitle}>{t("Placemaker.UI.Polish.KindPick", "Every {0} zone without its own look", [t("Placemaker.UI.Polish.Kind." + k.city, k.en).toLowerCase()])}</div>
-                                            <LookChips p={p} value={kindLook} testId={"polish-kind-" + k.city + "-pick"} onPick={(v) => { if (v) act.polishCity(k.city, v); setPicking(null); }} />
+                                            <div className={s.pickTitle}>{t("Placemaker.UI.Polish.KindPick2", "Every {0} zone without its own pick: by zone type (each its own look), or one look for all", [t("Placemaker.UI.Polish.Kind." + k.city, k.en).toLowerCase()])}</div>
+                                            <LookChips p={p} value={kindLook} auto testId={"polish-kind-" + k.city + "-pick"} onPick={(v) => { if (v) act.polishCity(k.city, v); setPicking(null); }} />
                                         </div>
                                     ) : null}
                                     <div className={s.zoneList}>
@@ -562,7 +604,7 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                                                             <LookChips
                                                                 p={p}
                                                                 value={looks.length === 1 ? looks[0] : ""}
-                                                                inherit={r.zones.some((z) => z.own)}
+                                                                inherit={r.zones.some((z) => z.own) ? (kindLook !== KIND_AUTO ? kindLook : r.zones[0].def || KIND_AUTO) : undefined}
                                                                 testId={"polish-zone-" + r.key + "-pick"}
                                                                 onPick={(v) => {
                                                                     for (const z of r.zones) act.polishZone(z.id, v);

@@ -5,7 +5,7 @@
 //   {"do":"polish","theme":"natural"}            a Style chip (the themes) of the polish tool, clicked
 //   {"do":"polish","option":"rocks","value":0}   a Look row of the polish tool (toggles 1/0, "painted" 0-100), clicked
 //   {"do":"polish","city":"homes","value":"natural"}  a Whole city row (on, newHouses: "true"/"false"; homes, shops,
-//                                   offices, industry: a theme or "off"), clicked
+//                                   offices, industry: "auto" (each zone type its own look), a look or "off"), clicked
 //   {"do":"polish","open":"city"}  a section of the card opened ("look", "city"; "close" to fold it)
 //   {"do":"polish","click":"polish-all"}  any element of the panel clicked by its data-testid (a confirm dialog opens)
 //   {"do":"polish","clickText":"Polish all"}  the element showing exactly this text clicked (the confirm dialog's button)

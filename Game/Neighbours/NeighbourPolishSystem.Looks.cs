@@ -4,7 +4,9 @@
 // polish-looks.json for every city. A polished lot keeps its look by id (PolishedLot.Look, a hash) and the changes it was
 // polished with that the look does not have (PolishLookOverride); the planner gets every knob per house. Zone looks: each
 // zone type of the game (mods' zones too) gets a look or Off for new buildings and Polish the whole city; a zone without
-// its own pick follows its kind (homes, shops, offices, industry).
+// its own pick follows its kind (homes, shops, offices, industry) when the kind has a look picked, else gets its own
+// built-in look (low houses Houses, towers Towers, shops Shops…: PolishLooks.DefaultZoneLook). Any look on any zone: the
+// look decides what the land becomes (a garden, a car park yard, paving), not the building.
 
 using System;
 using System.Collections.Generic;
@@ -168,13 +170,18 @@ namespace Placemaker.Game.Neighbours
             return o.ToString();
         }
 
-        /// <summary>A zone's look: the player's pick, else its kind's (homes garden, shops and offices tidy, industry yard).</summary>
+        /// <summary>A zone's look: the player's pick, else its kind's (a look picked for every zone of the kind, or Off), else the
+        /// zone type's own built-in look.</summary>
         public static string ZoneLook(string zone, string kind)
         {
             if (zone != null && s_zoneLooks.TryGetValue(zone, out var look) && (look == "off" || LookById(look) != null)) return look;
             var k = ZoneTheme(kind);
-            return k == "off" || LookById(k) != null ? k : "garden";
+            if (k == "off" || k != KindAuto && LookById(k) != null) return k;
+            return DefaultZoneLook(zone, kind);
         }
+
+        /// <summary>The zone type's own built-in look (what it gets with no pick of its own nor of its kind).</summary>
+        public static string DefaultZoneLook(string zone, string kind) => PolishLooks.DefaultZoneLook(ZoneKey(zone), kind);
 
         public static bool ZoneHasOwnLook(string zone) => zone != null && s_zoneLooks.ContainsKey(zone);
 

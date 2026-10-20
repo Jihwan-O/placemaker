@@ -1,6 +1,6 @@
 {
   "generatedBy": "the in-game suite from GeneratorRegistry",
-  "assembly": "0.1.1+4ac5ac4",
+  "assembly": "0.1.1+296c26d-dirty",
   "categories": [
     {
       "id": "zoning",
@@ -442,6 +442,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -575,7 +595,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -882,11 +902,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ]
     },
@@ -1221,6 +1236,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -1354,7 +1389,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -1661,11 +1696,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ]
     },
@@ -2000,6 +2030,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -2133,7 +2183,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -2440,11 +2490,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ]
     },
@@ -2779,6 +2824,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -2912,7 +2977,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -3219,11 +3284,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ]
     },
@@ -3558,6 +3618,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -3998,11 +4078,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ]
     },
@@ -4337,6 +4412,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -4777,11 +4872,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ]
     },
@@ -5116,6 +5206,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -5556,11 +5666,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ]
     },
@@ -5895,6 +6000,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -6028,7 +6153,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -6335,11 +6460,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ]
     },
@@ -6674,6 +6794,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -6807,7 +6947,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -7114,11 +7254,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ]
     },
@@ -7453,6 +7588,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -7586,7 +7741,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -7893,11 +8048,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ],
       "shelved": true
@@ -8150,15 +8300,6 @@
           "default": 10.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -8191,33 +8332,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -8555,6 +8669,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -8688,7 +8822,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -8995,11 +9129,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ],
       "shelved": true
@@ -9335,6 +9464,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -9468,7 +9617,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -9775,11 +9924,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ],
       "shelved": true
@@ -10115,6 +10259,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -10248,7 +10412,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -10555,11 +10719,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ],
       "shelved": true
@@ -10895,6 +11054,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -11028,7 +11207,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 12.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -11335,11 +11514,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ],
       "shelved": true
@@ -11675,6 +11849,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -11808,7 +12002,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -12115,11 +12309,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ],
       "shelved": true
@@ -12349,15 +12538,6 @@
           "default": 2.5
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -12390,60 +12570,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -12785,6 +12911,26 @@
           "default": true
         },
         {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
+        },
+        {
           "id": "sideReach",
           "kind": "Slider",
           "min": 0.0,
@@ -12918,7 +13064,7 @@
           "max": 500.0,
           "step": 1.0,
           "unit": "m",
-          "default": 25.0
+          "default": 500.0
         },
         {
           "id": "paintedGardens",
@@ -13225,11 +13371,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ],
       "shelved": true
@@ -13363,15 +13504,6 @@
           "default": false
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -13404,42 +13536,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -13773,6 +13869,26 @@
           "id": "shapeLots",
           "kind": "Toggle",
           "default": true
+        },
+        {
+          "id": "fill",
+          "kind": "Choice",
+          "options": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "0"
+        },
+        {
+          "id": "waterGap",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 200.0,
+          "step": 1.0,
+          "unit": "m",
+          "default": 30.0
         },
         {
           "id": "sideReach",
@@ -14215,11 +14331,6 @@
           "step": 5.0,
           "unit": "%",
           "default": 45.0
-        },
-        {
-          "id": "pavedFill",
-          "kind": "Toggle",
-          "default": true
         }
       ],
       "shelved": true
@@ -14380,15 +14491,6 @@
           "default": false
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -14421,42 +14523,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true,
@@ -14586,15 +14652,6 @@
           "default": true
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -14627,51 +14684,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -15531,15 +15543,6 @@
           "default": "centre"
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -15572,51 +15575,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true,
@@ -16937,15 +16895,6 @@
           "default": true
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -16992,78 +16941,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressSports",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -17230,15 +17107,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -17271,51 +17139,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -17490,15 +17313,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -17545,51 +17359,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -17938,15 +17707,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -17993,60 +17753,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressSports",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -18183,15 +17889,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -18238,42 +17935,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -18407,15 +18068,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -18462,51 +18114,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -18640,15 +18247,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -18681,42 +18279,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -18860,15 +18422,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -18915,51 +18468,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -19086,15 +18594,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -19141,42 +18640,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -19403,15 +18866,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -19444,42 +18898,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true,
@@ -19584,15 +19002,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -19639,33 +19048,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -19760,15 +19142,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -19815,51 +19188,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -20731,15 +20059,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -20786,42 +20105,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressWorks",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -21227,15 +20510,6 @@
           "default": true
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -21268,60 +20542,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -21617,15 +20837,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -21672,51 +20883,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressWorks",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -22083,15 +21249,6 @@
           "default": 3.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -22124,42 +21281,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -22395,15 +21516,6 @@
           "kind": "Markers"
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -22436,33 +21548,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressWorks",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ]
     },
@@ -22722,15 +21807,6 @@
           "kind": "Markers"
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -22763,24 +21839,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressWorks",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ]
     },
@@ -23157,15 +22215,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -23212,51 +22261,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressWorks",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true,
@@ -23589,15 +22593,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -23644,42 +22639,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -23952,15 +22911,6 @@
           "kind": "Markers"
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -23993,51 +22943,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -24326,15 +23231,6 @@
           "kind": "Markers"
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -24367,42 +23263,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -24713,15 +23573,6 @@
           "kind": "Markers"
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -24754,51 +23605,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressWorks",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -25032,15 +23838,6 @@
           ]
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -25087,42 +23884,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelved": true
@@ -25416,15 +24177,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -25457,42 +24209,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ]
     },
@@ -25773,15 +24489,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -25814,33 +24521,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -26122,15 +24802,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -26177,42 +24848,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPlay",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -26531,15 +25166,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -26586,42 +25212,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -26873,15 +25463,6 @@
           "kind": "Markers"
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -26914,33 +25495,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressWorks",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressParking",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ]
     },
@@ -27205,15 +25759,6 @@
           ]
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -27246,42 +25791,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -27538,15 +26047,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -27579,33 +26079,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressWorks",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressRuins",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ]
     },
@@ -27856,15 +26329,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -27897,51 +26361,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressRuins",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressWorks",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ]
     },
@@ -28253,15 +26672,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -28294,51 +26704,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressRuins",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaved",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [
@@ -28611,15 +26976,6 @@
           "default": 24.0
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -28652,33 +27008,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressWorks",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressRuins",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ]
     },
@@ -28760,6 +27089,16 @@
           "step": 1.0,
           "unit": "deg",
           "default": 0.0
+        },
+        {
+          "id": "gridCharacter",
+          "kind": "Choice",
+          "options": [
+            "strict",
+            "auto",
+            "lively"
+          ],
+          "default": "auto"
         },
         {
           "id": "treeBranchSpacing",
@@ -29144,12 +27483,32 @@
           "max": 80.0,
           "step": 5.0,
           "unit": "m",
-          "default": 40.0
+          "default": 15.0
         },
         {
           "id": "connectExisting",
           "kind": "Toggle",
           "default": true
+        },
+        {
+          "id": "connectTo",
+          "kind": "Choice",
+          "options": [
+            "streets",
+            "small",
+            "any"
+          ],
+          "default": "streets"
+        },
+        {
+          "id": "roadWear",
+          "kind": "Choice",
+          "options": [
+            "off",
+            "subtle",
+            "lived"
+          ],
+          "default": "subtle"
         },
         {
           "id": "avoidObstacles",
@@ -29297,7 +27656,7 @@
             "terrace",
             "natural"
           ],
-          "default": "terrace"
+          "default": "natural"
         },
         {
           "id": "maxGrade",
@@ -29665,15 +28024,6 @@
           ]
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -29706,42 +28056,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressShore",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressGround",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ]
     },
@@ -30034,15 +28348,6 @@
           ]
         },
         {
-          "id": "dressAmount",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
           "id": "dressStyle",
           "kind": "Choice",
           "options": [
@@ -30075,33 +28380,6 @@
           "id": "dressPaintClear",
           "kind": "Toggle",
           "default": false
-        },
-        {
-          "id": "dressGarden",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressPaths",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
-        },
-        {
-          "id": "dressTrees",
-          "kind": "Slider",
-          "min": 0.0,
-          "max": 300.0,
-          "step": 10.0,
-          "unit": "%",
-          "default": 100.0
         }
       ],
       "shelvedStyles": [

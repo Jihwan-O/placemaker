@@ -1,6 +1,7 @@
 // Placemaker neighbourhood polish — what a shop's or an office's outgrown land holds (GPL-3.0).
 //
-// A shop's extra land used to be one concrete slab out to its fence ("it's just kind of an empty field, it's weird"). Now,
+// Any building whose look makes its land a car park yard gets one (a shop or an office by default; a house or a tower when
+// the player gives it such a look: its service corner is only bins). A shop's extra land used to be one concrete slab out to its fence ("it's just kind of an empty field, it's weird"). Now,
 // as the land behind real shops looks:
 //   * a grass strip inside the fence (not along the street) with a few slim trees and bushes between them;
 //   * near the shop: paved, a service corner behind one of the building's back corners (dumpsters, a gas cage; pallets,
@@ -114,7 +115,7 @@ namespace Placemaker.Core.Neighbours
             foreach (var r in near)
             {
                 var ring = Prepared(r.HasHoles ? Poly.CutHoles(r, 0f).First() : r.Outer);
-                if (ring != null) { plan.Paths.Add((h.Id, ring, h.MainSurface)); paved++; }
+                if (ring != null) { plan.Paths.Add((h.Id, ring, PavingOf(h))); paved++; }
             }
             foreach (var r in greenLand)
             {
@@ -220,13 +221,15 @@ namespace Placemaker.Core.Neighbours
                     if (LineCross(e1.A, d1, edges[i2].A, d2, out var cross) && math.distance(cross, best) < 8f) { legs.Add((edges[i2].A, d2)); corner = cross; }
                 }
 
-                var bins = new List<int> { GasCage, Dumpster3, Dumpster2 };
-                var stock = new List<int> { 17 + (int)(seed % 2), CratePile3, Cardboard3 };
-                if (area >= 400f) stock.Add(Skip);
-                if (area >= 700f) stock.Add(h.Zone == "office" ? Generator : (seed >> 8) % 2 == 0 ? ShedBig : Container);
+                // homes: their bins only (no stock, no gas cage)
+                bool homeBins = h.Zone == null || h.Zone == "home";
+                var bins = homeBins ? new List<int> { Dumpster3, Dumpster2 } : new List<int> { GasCage, Dumpster3, Dumpster2 };
+                var stock = homeBins ? new List<int>() : new List<int> { 17 + (int)(seed % 2), CratePile3, Cardboard3 };
+                if (!homeBins && area >= 400f) stock.Add(Skip);
+                if (!homeBins && area >= 700f) stock.Add(h.Zone == "office" ? Generator : (seed >> 8) % 2 == 0 ? ShedBig : Container);
                 var placed = new List<(float2 At, float Yaw, int Kind, float2[] Fp)>();
-                var groups = legs.Count == 2 ? new[] { bins, stock } : new[] { bins.Concat(stock).ToList() };
-                float[] caps = legs.Count == 2 ? new[] { 9f, area >= 700f ? 16f : 11f } : new[] { area >= 700f ? 18f : 13f };
+                var groups = legs.Count == 2 && stock.Count > 0 ? new[] { bins, stock } : new[] { bins.Concat(stock).ToList() };
+                float[] caps = groups.Length == 2 ? new[] { 9f, area >= 700f ? 16f : 11f } : new[] { area >= 700f ? 18f : 13f };
                 for (int g = 0; g < groups.Length; g++)
                 {
                     var (edge0, dir) = legs[g];
@@ -255,7 +258,7 @@ namespace Placemaker.Core.Neighbours
                         }
                     }
                 }
-                if (placed.Count < 3) continue;
+                if (placed.Count < (homeBins ? 2 : 3)) continue;
                 foreach (var (at, yaw, kind, _) in placed)
                 {
                     plan.Bushes.Add((h.Id, at, yaw, kind));

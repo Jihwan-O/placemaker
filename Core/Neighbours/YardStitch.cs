@@ -78,6 +78,26 @@ namespace Placemaker.Core.Neighbours
         private static float K(StitchHouse h, StitchSettings s, string name, float fallback) =>
             h?.Options != null && h.Options.TryGetValue(name, out var v) ? v : s.Knob(name, fallback);
 
+        /// <summary>What a house's land past its lot becomes (its look's "fill": PolishLooks.FillGarden, FillCarPark, FillPaved),
+        /// whatever the building is. By the building (FillAuto): a home a garden; a shop or office a car park yard and a works its
+        /// paving, as most of its ground already is ("Shops keep paving" off, or no paving of its own: a garden).</summary>
+        private static int FillOf(StitchHouse h, StitchSettings s)
+        {
+            int f = (int)math.round(K(h, s, "fill", 0f));
+            if (f >= PolishLooks.FillGarden && f <= PolishLooks.FillPaved) return f;
+            if (string.IsNullOrEmpty(h.MainSurface) || K(h, s, "pavedFill", 1f) < 0.5f) return PolishLooks.FillGarden;
+            return h.Zone != "industry" && K(h, s, "shopYard", 1f) > 0.5f ? PolishLooks.FillCarPark : PolishLooks.FillPaved;
+        }
+
+        /// <summary>Its land past the lot is hard ground (a car park yard or paving), not a garden.</summary>
+        private static bool HardLand(StitchHouse h, StitchSettings s) => FillOf(h, s) != PolishLooks.FillGarden;
+
+        /// <summary>The paving its land is laid in: the surface most of its ground already is, else (a home) plain paving.</summary>
+        private static string PavingOf(StitchHouse h) => string.IsNullOrEmpty(h.MainSurface) ? "Pavement Surface 01" : h.MainSurface;
+
+        /// <summary>How far its land keeps from water (m, from the waterline).</summary>
+        private static float WaterGap(StitchHouse h, StitchSettings s) => math.max(0f, K(h, s, "waterGap", 30f));
+
         /// <summary>
         /// A painted garden (no drawn lawn) or the house's own lawns: a mix along every street. The setting "Painted gardens"
         /// (share p) is a Garden house's chance; a Natural or Yard house is painted more often (1 - (1 - p)², 33% → 55%), a
@@ -227,8 +247,8 @@ namespace Placemaker.Core.Neighbours
                         continue;
                     }
                 }
-                // (never a shop, office or works: a paved slab behind a short shop reads as an empty car park)
-                foreach (int k in row) rowDeepen[k] = !string.IsNullOrEmpty(houses[k].MainSurface) ? 0f : ring ? 2f * (depth - houses[k].HalfLot.y) : math.min(2f * (depth - houses[k].HalfLot.y), K(houses[k], s, "maxDeepen", 60f));
+                // (never paved land: a paved slab behind a short shop reads as an empty car park)
+                foreach (int k in row) rowDeepen[k] = HardLand(houses[k], s) ? 0f : ring ? 2f * (depth - houses[k].HalfLot.y) : math.min(2f * (depth - houses[k].HalfLot.y), K(houses[k], s, "maxDeepen", 60f));
             }
 
             float maxRear = n > 0 ? houses.Max(h => K(h, s, "maxRearGap", 60f)) : 24f;
@@ -307,7 +327,7 @@ namespace Placemaker.Core.Neighbours
                 for (int m = 0; m < n; m++)
                 {
                     int l = left[m], r = right[m];
-                    if (l < 0 || r < 0 || K(houses[m], s, "wrap", 1f) < 0.5f || ringCut[m] != null || !string.IsNullOrEmpty(houses[m].MainSurface)) continue;
+                    if (l < 0 || r < 0 || K(houses[m], s, "wrap", 1f) < 0.5f || ringCut[m] != null || HardLand(houses[m], s)) continue;
                     float dm = 2f * houses[m].HalfLot.y, deep = 2f * math.min(houses[l].HalfLot.y, houses[r].HalfLot.y);
                     if (dm > deep * s.Knob("wrapRatio", 0.7f) || deep - dm < 8f) continue;
                     if (math.dot(houses[l].Forward, houses[m].Forward) < 0.94f || math.dot(houses[r].Forward, houses[m].Forward) < 0.94f) continue;
@@ -432,7 +452,7 @@ namespace Placemaker.Core.Neighbours
                         {
                             // nothing near to meet: it still grows this far into open land (cut back later at anything there)
                             float open = K(h, s, "openReach", 0f);
-                            if (open < 1f || !string.IsNullOrEmpty(h.MainSurface) && e != 2) continue;
+                            if (open < 1f || HardLand(h, s) && e != 2) continue;
                             extra[i, e] = open;
                             touched[i] = true;
                             continue;
@@ -576,12 +596,12 @@ namespace Placemaker.Core.Neighbours
                     if (!touched[i] || plots[i] == null) continue;
                     // a garden another pass wrote is its garden (FixedGardens): what this plan would have made of it is never used
                     if (IsFixed(houses[i])) continue;
-                    var clear = ClearOfBarriers(plots[i], Lot(houses[i]), houses[i].Position, s.Knob("barrierMargin", 0.8f));
+                    var clear = ClearOfBarriers(plots[i], Lot(houses[i]), houses[i].Position, s.Knob("barrierMargin", 0.8f), WaterGap(houses[i], s));
                     if (clear == null) continue;
                     plots[i] = clear;
                     clipped++;
                 }
-                if (clipped > 0) plan.Notes.Add($"{clipped} gardens cut back clear of roads, paths and buildings");
+                if (clipped > 0) plan.Notes.Add($"{clipped} gardens cut back clear of roads, paths, buildings and water");
             }
             Stage("clear");
             FillGaps(houses, plots, touched, raw, kept, s, plan);
@@ -860,12 +880,12 @@ namespace Placemaker.Core.Neighbours
             for (int i = 0; i < n; i++) lawnLand[i] = Poly.Normalize(Ccw(plots[i]));
             // a big garden whose look asks for it ("Lawn reach" under 400 m): mowed lawn near the house, the land further out
             // painted (its look's meadow ground). Not by default: a lawn reaches the fence (the user: "it should always line
-            // up with the fence"). Never a shop's, office's or works' paving: it always fills its whole ground.
+            // up with the fence"). Never paved land: it always fills its whole ground.
             for (int i = 0; i < n; i++)
             {
                 var h = houses[i];
                 float lawnReach = K(h, s, "lawnReach", 1000f);
-                if (!touched[i] || !h.Edit || !h.Polished || plots[i] == null || lawnReach >= 400f || !string.IsNullOrEmpty(h.MainSurface)) continue;
+                if (!touched[i] || !h.Edit || !h.Polished || plots[i] == null || lawnReach >= 400f || HardLand(h, s)) continue;
                 var near = Poly.Offset(Ccw(Lot(h)), -math.max(0f, lawnReach), OffsetJoin.Round, 4f, 0.5f);
                 if (near.Count == 0) continue;
                 var beyond = Poly.Boolean(lawnLand[i], near, BoolOp.Difference);
@@ -903,7 +923,7 @@ namespace Placemaker.Core.Neighbours
                 if (K(h, s, "lawns", 1f) < 0.5f) continue;   // the player keeps lawns as the houses come
                 // a painted garden (by its theme), joined to its neighbours or not: the house's own grass surfaces are tucked
                 // away under the house and the whole garden (minus the paving) is painted, lush (a yard: worn ground)
-                if (string.IsNullOrEmpty(h.MainSurface) && PaintedGarden(h, s) && h.Lawns.Any(l => l.Ring != null && l.Ring.Length >= 3) | touched[i])
+                if (!HardLand(h, s) && PaintedGarden(h, s) && h.Lawns.Any(l => l.Ring != null && l.Ring.Length >= 3) | touched[i])
                 {
                     var keepOff = houses.SelectMany(o => o.Hard).Where(r => r != null && r.Length >= 3 && Overlaps(plot, r)).Select(r => new Region(Ccw(r))).Concat(beds[i]).Concat(reserved[i]).ToList();
                     var garden = keepOff.Count > 0 ? Poly.Boolean(lawnLand[i], keepOff, BoolOp.Difference) : lawnLand[i];
@@ -921,15 +941,16 @@ namespace Placemaker.Core.Neighbours
                 var ext = Poly.Boolean(new[] { (IReadOnlyList<float2>)plot }, new[] { (IReadOnlyList<float2>)Ccw(Lot(h)) }, BoolOp.Difference, FillRule.NonZero);
                 if (ext.Sum(r => r.Area) < 1f) continue;
                 var hard0 = houses.SelectMany(o => o.Hard).Where(r => r != null && r.Length >= 3 && Overlaps(plot, r)).Select(r => new Region(Ccw(r))).Concat(beds[i]).Concat(reserved[i]).ToList();
-                // a shop, office or works: its extra land in the surface most of its ground already is (its car park), not lawn
-                if (!string.IsNullOrEmpty(h.MainSurface) && K(h, s, "pavedFill", 1f) > 0.5f)
+                // paved land (a car park yard, or the paving most of a shop's or works' ground already is), not lawn: whatever the
+                // building is (a house or a tower given a car park look gets one)
+                if (HardLand(h, s))
                 {
                     var spare = Poly.Boolean(lawnLand[i], new[] { new Region(Ccw(Lot(h))) }, BoolOp.Difference);
                     float spare0 = spare.Sum(r => r.Area);
                     var off = hard0.Concat(h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3).Select(l => new Region(Ccw(l.Ring)))).ToList();
                     if (off.Count > 0) spare = Poly.Boolean(spare, off, BoolOp.Difference);
-                    // a shop's or an office's bigger back lot: green edges, a service corner, an overflow car park, green further out
-                    if (h.Zone != "industry" && K(h, s, "shopYard", 1f) > 0.5f && spare.Sum(r => r.Area) >= K(h, s, "shopYardMin", 80f))
+                    // a car park yard: green edges, a service corner, an overflow car park, green further out
+                    if (FillOf(h, s) == PolishLooks.FillCarPark && spare.Sum(r => r.Area) >= K(h, s, "shopYardMin", 80f))
                     {
                         ShopYard(houses, h, plot, spare.Where(r => r.Area >= 1f).ToList(), plan, s);
                         continue;
@@ -938,9 +959,9 @@ namespace Placemaker.Core.Neighbours
                     foreach (var r in spare.Where(r => r.Area >= 10f))
                     {
                         var ring = Prepared(r.HasHoles ? Poly.CutHoles(r, 0f).First() : r.Outer);
-                        if (ring != null) { plan.Paths.Add((h.Id, ring, h.MainSurface)); made++; } else failed++;
+                        if (ring != null) { plan.Paths.Add((h.Id, ring, PavingOf(h))); made++; } else failed++;
                     }
-                    plan.Notes.Add($"{h.Id}: its extra land in {h.MainSurface} ({made} pieces{(failed > 0 ? $", {failed} the game would not take" : "")}; land {spare.Sum(r => r.Area):F0} m² in {spare.Count}, {spare0:F0} m² before paving, plot {Poly.Area(plot):F0}, ext {ext.Sum(r => r.Area):F0}, landAll {lawnLand[i].Sum(r => r.Area):F0})");
+                    plan.Notes.Add($"{h.Id}: its extra land in {PavingOf(h)} ({made} pieces{(failed > 0 ? $", {failed} the game would not take" : "")}; land {spare.Sum(r => r.Area):F0} m² in {spare.Count}, {spare0:F0} m² before paving, plot {Poly.Area(plot):F0}, ext {ext.Sum(r => r.Area):F0}, landAll {lawnLand[i].Sum(r => r.Area):F0})");
                     continue;
                 }
                 var lawns = h.Lawns.Where(l => l.Ring != null && l.Ring.Length >= 3).OrderByDescending(l => Poly.Area(l.Ring)).ToList();
@@ -1017,11 +1038,16 @@ namespace Placemaker.Core.Neighbours
                 float nearStrength = blenders.Max(i => K(houses[i], s, "blendStrength", 0.6f));
                 int Most(string knob, float fallback) => blenders.GroupBy(i => (int)K(houses[i], s, knob, fallback)).OrderByDescending(g => g.Count()).First().Key;
                 int nearLayer = Most("blendLayer", s.Knob("lushLayer", 2f)), farLayer = Most("blendFarLayer", s.Knob("lushLayer", 2f));
+                // never painted up to the water: the bands stop half the widest water gap short of it (a beach stays sand)
+                float2 glo = new float2(float.MaxValue), ghi = new float2(float.MinValue);
+                foreach (var g in joined) { Poly.Bounds(g.Outer, out var a, out var b); glo = math.min(glo, a); ghi = math.max(ghi, b); }
+                var wetOff = joined.Count > 0 ? WaterNear(glo - far, ghi + far, 0.5f * blenders.Max(i => WaterGap(houses[i], s))) : new List<Region>();
+                var bandOff = wetOff.Count > 0 ? allPlots.Concat(wetOff).ToList() : allPlots;
                 foreach (var (width, strength, feather, seed, bandLayer) in new[] { (far, nearStrength * s.Knob("blendFarStrength", 0.32f) / 0.6f, far * 0.45f, 0xFA2u, farLayer), (near, nearStrength, near * 0.55f, 0xB1EDu, nearLayer) })
                     foreach (var g in joined)
                         foreach (var grown in Poly.Offset(g.Outer, -width, OffsetJoin.Round, 4f, 0.6f))
                         {
-                            var band = Poly.Boolean(new[] { grown }, allPlots, BoolOp.Difference);
+                            var band = Poly.Boolean(new[] { grown }, bandOff, BoolOp.Difference);
                             foreach (var r in band.Where(r => r.Area >= 12f))
                                 foreach (var piece in r.HasHoles ? Poly.CutHoles(r, 0f) : new List<float2[]> { r.Outer })
                                     if (Poly.Area(piece) >= 12f && bandLayer > 0)
@@ -1231,7 +1257,7 @@ namespace Placemaker.Core.Neighbours
                 .OrderBy(x => x.Item1).ToList();
             for (int i = 0; i < houses.Count; i++)
             {
-                if (!touched[i] || !houses[i].Edit || !string.IsNullOrEmpty(houses[i].MainSurface) || K(houses[i], s, "plant", 1f) < 0.5f) continue;
+                if (!touched[i] || !houses[i].Edit || HardLand(houses[i], s) || K(houses[i], s, "plant", 1f) < 0.5f) continue;
                 string theme = ThemeOf(houses[i]);
                 if (theme == "natural" || theme == "yard") continue;   // no tidy beds in a wild garden or a works yard
                 var h = houses[i];
@@ -1347,7 +1373,7 @@ namespace Placemaker.Core.Neighbours
                 if (!touched[i] || !h.Edit || plots[i] == null || K(h, s, "plant", 1f) < 0.5f || K(h, s, "features", 1f) < 0.5f) continue;
                 string theme = ThemeOf(h);
                 bool industry = theme == "yard";
-                if (!industry && !string.IsNullOrEmpty(h.MainSurface)) continue;   // shops and offices: paving only
+                if (!industry && HardLand(h, s)) continue;   // paved land: only a works yard's storage
                 uint hash = Hash((ulong)h.Id * 0x7F4A7C15UL ^ 0xFEA7UL ^ ((ulong)slot * 0x9E3779B1UL));
                 if (hash % 100 >= (uint)(h.Options != null ? K(h, s, "featureChance", 55f) : theme == "natural" ? s.Knob("naturalFeatureChance", 75f) : s.Knob("featureChance", 55f))) continue;
                 var plot = Ccw(plots[i]);
@@ -1554,7 +1580,7 @@ namespace Placemaker.Core.Neighbours
             bool Wants(int k)
             {
                 var hk = houses[k];
-                if (!touched[k] || !string.IsNullOrEmpty(hk.MainSurface) || hk.Footprint == null || hk.Footprint.Length < 3) return false;
+                if (!touched[k] || HardLand(hk, s) || hk.Footprint == null || hk.Footprint.Length < 3) return false;
                 if (ThemeOf(hk) == "natural" || ThemeOf(hk) == "yard") return false;
                 if (K(hk, s, "plant", 1f) < 0.5f || Hash((ulong)hk.Id * 0x2545F4914F6CDD1DUL) % 100 >= (uint)K(hk, s, "pathChance", 45f)) return false;
                 return Poly.Area(plots[k]) - 4f * hk.HalfLot.x * hk.HalfLot.y >= K(hk, s, "pathMinExtra", 120f);
@@ -2333,13 +2359,17 @@ namespace Placemaker.Core.Neighbours
                 if (kept[i] != null) { var c = Ccw(kept[i]); if (Meets(c)) taken.Add(c); }
             }
             float margin = s.Knob("barrierMargin", 0.8f);
+            // water: kept the widest water gap of these gardens off
+            float wet = math.max(margin, want.Max(i => WaterGap(houses[i], s)));
             if (s_barriers != null)
-                foreach (var (blo, bhi, ring) in s_barriers)
+                for (int k = 0; k < s_barriers.Count; k++)
                 {
-                    // grown by the margin (a sharp corner's miter reaches out up to four times it)
-                    float grow = margin * 4f + 0.5f;
+                    var (blo, bhi, ring) = s_barriers[k];
+                    bool water = s_barrierKind[k] == WaterKind;
+                    // grown by the margin (a sharp corner's miter reaches out up to four times it), water by its gap
+                    float grow = water ? wet + 0.5f : margin * 4f + 0.5f;
                     if (bhi.x + grow < rlo.x || blo.x - grow > rhi.x || bhi.y + grow < rlo.y || blo.y - grow > rhi.y) continue;
-                    foreach (var g in Grown(ring, margin)) { var c = Ccw(g); if (Meets(c)) taken.Add(c); }
+                    foreach (var g in water ? GrownWater(ring, wet) : Grown(ring, margin)) { var c = Ccw(g); if (Meets(c)) taken.Add(c); }
                 }
             var gaps = Poly.Boolean(RingsOf(reached), taken, BoolOp.Difference, FillRule.NonZero);
             int filled = 0;
@@ -2585,6 +2615,34 @@ namespace Placemaker.Core.Neighbours
         [ThreadStatic] private static List<long> s_barrierGroup;
         // each barrier grown by the margin, worked out once per plan (by the ring itself)
         [ThreadStatic] private static Dictionary<float2[], (float Margin, List<float2[]> Rings)> s_grown;
+        // water grown by a water gap, once per plan, ring and gap
+        [ThreadStatic] private static Dictionary<(float2[] Ring, float Gap), List<float2[]>> s_grownWater;
+        /// <summary>StitchSettings.BarrierKinds: water.</summary>
+        private const int WaterKind = 2;
+
+        /// <summary>Water grown by <paramref name="gap"/> with round corners (a smooth line however the water was sampled).</summary>
+        private static List<float2[]> GrownWater(float2[] ring, float gap)
+        {
+            s_grownWater ??= new Dictionary<(float2[], float), List<float2[]>>();
+            if (s_grownWater.TryGetValue((ring, gap), out var g)) return g;
+            g = Poly.Offset(ring, -gap, OffsetJoin.Round, 4f, 0.5f).Select(r => Poly.Simplify(r.Outer, 0.4f)).Where(r => r.Length >= 3).ToList();
+            s_grownWater[(ring, gap)] = g;
+            return g;
+        }
+
+        /// <summary>The water near [lo, hi] grown by <paramref name="gap"/> (0: as it is).</summary>
+        private static List<Region> WaterNear(float2 lo, float2 hi, float gap)
+        {
+            var list = new List<Region>();
+            if (s_barriers == null) return list;
+            foreach (int k in BarriersIn(lo - gap, hi + gap))
+            {
+                if (s_barrierKind[k] != WaterKind) continue;
+                if (gap < 0.01f) { list.Add(new Region(Ccw(s_barriers[k].Ring))); continue; }
+                foreach (var g in GrownWater(s_barriers[k].Ring, gap)) list.Add(new Region(Ccw(g)));
+            }
+            return list;
+        }
 
         private sealed class SameRing : IEqualityComparer<float2[]>
         {
@@ -2680,6 +2738,7 @@ namespace Placemaker.Core.Neighbours
             s_barrierKind = new List<int>();
             s_barrierGroup = new List<long>();
             s_grown = new Dictionary<float2[], (float, List<float2[]>)>(SameRing.Instance);
+            s_grownWater = new Dictionary<(float2[], float), List<float2[]>>();
             if (s.Barriers == null) return;
             for (int k = 0; k < s.Barriers.Count; k++)
             {
@@ -2783,12 +2842,13 @@ namespace Placemaker.Core.Neighbours
             return h.ToArray();
         }
 
-        /// <summary>The nearest barrier along a ray (its distance), not counting <paramref name="skip"/>.</summary>
-        private static bool RayToBarrier(float2 from, float2 dir, float maxT, HashSet<float2[]> skip, out float t)
+        /// <summary>The nearest barrier along a ray (its distance), not counting <paramref name="skip"/>; water counts
+        /// <paramref name="waterPull"/> nearer than it is (a garden stops a water gap short of it).</summary>
+        private static bool RayToBarrier(float2 from, float2 dir, float maxT, HashSet<float2[]> skip, out float t, float waterPull = 0f)
         {
             t = float.MaxValue;
             if (s_barriers == null) return false;
-            var to = from + dir * maxT;
+            var to = from + dir * (maxT + waterPull);
             var lo = math.min(from, to);
             var hi = math.max(from, to);
             foreach (int bi in BarriersIn(lo, hi))
@@ -2796,6 +2856,7 @@ namespace Placemaker.Core.Neighbours
                 var ring = s_barriers[bi].Ring;
                 if (skip != null && skip.Contains(ring)) continue;
                 if (Poly.Contains(ring, from)) { t = 0f; return true; }
+                float pull = s_barrierKind[bi] == WaterKind ? waterPull : 0f;
                 for (int k = 0; k < ring.Length; k++)
                 {
                     var a = ring[k];
@@ -2805,8 +2866,8 @@ namespace Placemaker.Core.Neighbours
                     var w = a - from;
                     float u = (w.x * dir.y - w.y * dir.x) / den;
                     float s = (w.x * e.y - w.y * e.x) / den;
-                    if (u < 0f || u > 1f || s < 0f || s > maxT) continue;
-                    if (s < t) t = s;
+                    if (u < 0f || u > 1f || s < 0f || s > maxT + pull) continue;
+                    if (s - pull < t) t = s - pull;
                 }
             }
             return t <= maxT;
@@ -2839,7 +2900,7 @@ namespace Placemaker.Core.Neighbours
                 // a side from a little behind the street to the back; the back across its width
                 float f = e == 2 ? (k + 0.5f) / samples : 0.15f + 0.85f * k / (samples - 1);
                 var from = math.lerp(e0, e1, f) + nrm * 0.05f;
-                if (!RayToBarrier(from, nrm, maxReach, skip, out float t) || t < 1.5f) continue;
+                if (!RayToBarrier(from, nrm, maxReach, skip, out float t, math.max(0f, WaterGap(h, s) - margin)) || t < 1.5f) continue;
                 // another house's lot in the way: not this ray
                 var hit = from + nrm * t;
                 bool lotFirst = false;
@@ -2867,16 +2928,30 @@ namespace Placemaker.Core.Neighbours
         }
 
         /// <summary>
-        /// The plot minus every road, path, track and other building near it (grown by <paramref name="margin"/>), never cutting
-        /// the house's own lot; the part that holds the house. Null when nothing is in the way.
+        /// The plot minus every road, path, track and other building near it (grown by <paramref name="margin"/>) and the water
+        /// (grown by <paramref name="waterGap"/>, round: a smooth line), never cutting the house's own lot; the part that holds the
+        /// house. Null when nothing is in the way.
         /// </summary>
-        private static float2[] ClearOfBarriers(float2[] plot, float2[] lot, float2 house, float margin)
+        private static float2[] ClearOfBarriers(float2[] plot, float2[] lot, float2 house, float margin, float waterGap)
         {
             // (grown by the margin a barrier reaches at most four margins out, a miter's limit: one further away is never grown)
-            float reach = margin * 4f + 0.01f;
-            var near = BarriersNear(plot, margin + 0.5f).Where(b => Overlaps(plot, b) || (Within(plot, b, reach) && Grown(b, margin).Any(g => Overlaps(plot, g)))).ToList();
-            if (near.Count == 0) return null;
-            var grown = near.SelectMany(b => Grown(b, margin)).Select(g => (IReadOnlyList<float2>)Ccw(g)).ToList();
+            float reach = margin * 4f + 0.01f, wet = math.max(margin, waterGap);
+            Poly.Bounds(plot, out var plo, out var phi);
+            var grown = new List<IReadOnlyList<float2>>();
+            foreach (int k in BarriersIn(plo - (math.max(margin, wet) + 0.5f), phi + (math.max(margin, wet) + 0.5f)))
+            {
+                var (blo, bhi, b) = s_barriers[k];
+                if (s_barrierKind[k] == WaterKind)
+                {
+                    foreach (var g in GrownWater(b, wet)) if (Overlaps(plot, g)) grown.Add(Ccw(g));
+                    continue;
+                }
+                float m = margin + 0.5f;
+                if (bhi.x < plo.x - m || blo.x > phi.x + m || bhi.y < plo.y - m || blo.y > phi.y + m) continue;
+                if (!Overlaps(plot, b) && !(Within(plot, b, reach) && Grown(b, margin).Any(g => Overlaps(plot, g)))) continue;
+                foreach (var g in Grown(b, margin)) grown.Add(Ccw(g));
+            }
+            if (grown.Count == 0) return null;
             var left = Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(plot) }, grown, BoolOp.Difference, FillRule.NonZero);
             var withLot = Poly.Boolean(left.Select(r => r).ToList(), new List<Region> { new Region(Ccw(lot)) }, BoolOp.Union);
             var keep = withLot.OrderByDescending(r => Poly.Contains(r.Outer, house) ? 1 : 0).ThenByDescending(r => r.Area).FirstOrDefault();

@@ -191,7 +191,8 @@ namespace Placemaker.Game.Neighbours
             if (n > 0) Mod.Log.Info($"Placemaker neighbourhood polish: {n} polished lots keep the theme their kind has now.");
         }
 
-        /// <summary>"Redo polished buildings": every polished lot whose theme came from its kind gets its kind's theme now.</summary>
+        /// <summary>"Redo polished buildings": every polished lot whose look came from its zone (not one the painter picked, nor
+        /// one a Zoning type gave the land it grew on) takes its zone's look now (a zone set to Off: its look stays).</summary>
         private void Retheme()
         {
             s_retheme = false;
@@ -201,14 +202,20 @@ namespace Placemaker.Game.Neighbours
                 {
                     var f = EntityManager.GetComponentData<PolishedLot>(e);
                     if (!f.Yes || f.Picked) continue;
-                    byte t = ThemeByte(EntityManager.GetComponentData<PrefabRef>(e).m_Prefab);
-                    if (t == f.Theme) continue;
+                    var prefab = EntityManager.GetComponentData<PrefabRef>(e).m_Prefab;
+                    if (LookAreaAt(EntityManager.GetComponentData<global::Game.Objects.Transform>(e).m_Position.xz, ZoneName(prefab)) != null) continue;
+                    var id = LookOfZone(prefab);
+                    var look = id == "off" ? null : LookById(id);
+                    byte t = look != null ? (byte)Math.Max(1, Array.IndexOf(ThemeNames, look.Theme)) : ThemeByte(prefab);
+                    int hash = look != null ? PolishLooks.Hash(look.Id) : f.Look;
+                    if (t == f.Theme && hash == f.Look) continue;
                     f.Theme = t;
+                    f.Look = hash;
                     EntityManager.SetComponentData(e, f);
                     n++;
                 }
             FlagsVersion++;
-            Mod.Log.Info($"Placemaker neighbourhood polish: redo, {n} polished lots take their kind's new theme.");
+            Mod.Log.Info($"Placemaker neighbourhood polish: redo, {n} polished lots take their zone's look now.");
         }
 
         /// <summary>"Polish every building": every growable lot not yet polished (kinds set to Off left out) is stamped yes.</summary>
@@ -250,7 +257,7 @@ namespace Placemaker.Game.Neighbours
             if (!picked)
             {
                 lookId = LookOfZone(prefab);
-                if (lookId == "off") lookId = ZoneTheme(ZoneKind(prefab)) is var k && k != "off" ? k : ZoneKind(prefab) == "home" ? "garden" : ZoneKind(prefab) == "industry" ? "yard" : "tidy";
+                if (lookId == "off") lookId = DefaultZoneLook(ZoneName(prefab), ZoneKind(prefab));
             }
             var look = LookById(lookId) ?? PolishLooks.BuiltIn[0];
             var now = new PolishedLot { Yes = true, Theme = (byte)Math.Max(1, Array.IndexOf(ThemeNames, look.Theme)), Picked = picked, Look = PolishLooks.Hash(look.Id) };

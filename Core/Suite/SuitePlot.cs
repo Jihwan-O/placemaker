@@ -66,6 +66,9 @@ namespace Placemaker.Core.Suite
         /// </summary>
         public string Water = "";
         public float WaterWidth = 90f, WaterDepth = 4f, Freeboard = 2f, BankGrade = 0.12f, ShoreIn = 0f;
+        /// <summary>A winding waterline: it reaches up to Wave metres further into the land, in waves WaveLength long along
+        /// the side (0: straight). Only inland, so the lake never grows past the ring.</summary>
+        public float Wave = 0f, WaveLength = 140f;
         public const float UnderGrade = 0.10f, FarBank = 20f;
         public bool HasWater => !string.IsNullOrEmpty(Water);
         /// <summary>The water's surface above the base (m): the land meets it Freeboard higher.</summary>
@@ -178,12 +181,15 @@ namespace Placemaker.Core.Suite
         public float IntoWater(float x, float z, out float2 shore)
         {
             float2 lo = LandMin, hi = LandMax;
+            bool alongX = Water != "east" && Water != "west";
+            float along = alongX ? x - Center.x : z - Center.y;
+            float shoreIn = ShoreIn + (Wave > 0f ? Wave * (0.5f + 0.5f * math.sin(2f * math.PI * along / math.max(20f, WaveLength))) : 0f);
             switch (Water)
             {
-                case "south": shore = new float2(x, lo.y + ShoreIn); return shore.y - z;
-                case "east": shore = new float2(hi.x - ShoreIn, z); return x - shore.x;
-                case "west": shore = new float2(lo.x + ShoreIn, z); return shore.x - x;
-                default: shore = new float2(x, hi.y - ShoreIn); return z - shore.y;
+                case "south": shore = new float2(x, lo.y + shoreIn); return shore.y - z;
+                case "east": shore = new float2(hi.x - shoreIn, z); return x - shore.x;
+                case "west": shore = new float2(lo.x + shoreIn, z); return shore.x - x;
+                default: shore = new float2(x, hi.y - shoreIn); return z - shore.y;
             }
         }
 
@@ -196,13 +202,11 @@ namespace Placemaker.Core.Suite
             bool alongX = Water == "north" || Water == "south";
             float a0 = alongX ? RingMin.x - Hold : RingMin.y - Hold, a1 = alongX ? RingMax.x + Hold : RingMax.y + Hold;
             int n = math.max(1, (int)math.ceil((a1 - a0) / (radius * 1.6f)));
-            IntoWater(Center.x, Center.y, out float2 shore);
             for (int k = 0; k < n; k++)
             {
                 float a = math.lerp(a0, a1, (k + 0.5f) / n);
-                float2 p = shore + WaterNormal * (WaterWidth * 0.5f);
-                if (alongX) p.x = a; else p.y = a;
-                r.Add((p, radius));
+                IntoWater(alongX ? a : Center.x, alongX ? Center.y : a, out float2 shore);
+                r.Add((shore + WaterNormal * (WaterWidth * 0.5f), radius));
             }
             return r;
         }
@@ -213,13 +217,11 @@ namespace Placemaker.Core.Suite
             var r = new List<(float2, float)>();
             if (!HasWater) return r;
             float s = math.min(WaterWidth * 0.5f, 15f);
-            IntoWater(Center.x, Center.y, out float2 shore);
             bool alongX = Water == "north" || Water == "south";
             for (int k = -1; k <= 1; k++)
             {
-                float2 p = shore + WaterNormal * s;
-                if (alongX) p.x = Center.x + k * Size.x * 0.35f; else p.y = Center.y + k * Size.y * 0.35f;
-                r.Add((p, math.min(WaterDepth, UnderGrade * s)));
+                IntoWater(alongX ? Center.x + k * Size.x * 0.35f : Center.x, alongX ? Center.y : Center.y + k * Size.y * 0.35f, out float2 shore);
+                r.Add((shore + WaterNormal * s, math.min(WaterDepth, UnderGrade * s)));
             }
             return r;
         }
@@ -279,7 +281,7 @@ namespace Placemaker.Core.Suite
             // (rf-beach) with a lake the ring leaves its side out and its two legs stop on the land, short of the bank
             if (HasWater)
             {
-                float stop = BankRun + 6f;
+                float stop = BankRun + 6f + Wave;
                 IntoWater(Center.x, Center.y, out float2 shore);
                 if (Water == "north") b.y = shore.y - stop;
                 else if (Water == "south") a.y = shore.y + stop;

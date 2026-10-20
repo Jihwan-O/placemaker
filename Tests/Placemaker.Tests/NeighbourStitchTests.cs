@@ -939,5 +939,110 @@ namespace Placemaker.Tests
             var again = YardStitch.Plan(new[] { a }, MiddleLine());
             Assert.Equal(plan.Bushes.Select(b => (b.Kind, b.Position, b.Yaw)), again.Bushes.Select(b => (b.Kind, b.Position, b.Yaw)));
         }
+
+        private static float DistanceToRing(float2[] ring, float2 p)
+        {
+            float best = float.MaxValue;
+            for (int i = 0; i < ring.Length; i++) best = math.min(best, DistanceToSegment(p, ring[i], ring[(i + 1) % ring.Length]));
+            return best;
+        }
+
+        [Fact]
+        public void A_staircase_shore_becomes_a_smooth_line()
+        {
+            // water sampled every 4 m along a diagonal shore: wet where the cell's middle lies past x + z = 244
+            const int n = 60;
+            var wet = new byte[n * n];
+            for (int j = 0; j < n; j++)
+                for (int i = 0; i < n; i++) wet[j * n + i] = (byte)(4 * i + 2 + 4 * j + 2 > 244 ? 1 : 0);
+            var rings = WaterEdge.Outlines(wet, n, n, float2.zero, 4f, n, n);
+            Assert.Single(rings);
+            Assert.True(Poly.IsCcw(rings[0]));
+            // along the shore (away from the sampled box's edges) the outline is one straight line, not 4 m steps
+            var shore = Poly.Resample(rings[0], 1f).Where(p => p.x > 30f && p.y > 30f && p.x < 210f && p.y < 210f).ToList();
+            Assert.True(shore.Count > 100, $"{shore.Count} shore points");
+            float mean = shore.Average(p => p.x + p.y);
+            float worst = shore.Max(p => math.abs(p.x + p.y - mean)) / math.sqrt(2f);
+            Assert.True(worst < 0.3f, $"the shore wanders {worst:F2} m off a straight line (the 4 m staircase: 1.4 m)");
+            Assert.True(math.abs(mean - 246f) < 2f, $"the shore lies where the water is ({mean:F1})");
+        }
+
+        [Fact]
+        public void A_garden_keeps_its_water_gap_off_the_water()
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 80f };
+            // a lake 50 m behind the lot's back
+            var lake = Strip(-300f, -400f, 300f, -74f);
+            var withLake = MiddleLine().WithBarriers(new List<float2[]> { lake }, new List<int> { 2 });
+            var plan = YardStitch.Plan(new[] { a }, withLake);
+            Assert.True(plan.Plots.TryGetValue(1, out var pa), "the garden grows");
+            foreach (var p in pa) Assert.True(!Poly.Contains(lake, p) && DistanceToRing(lake, p) > 29.5f, $"a plot corner {p} is {DistanceToRing(lake, p):F1} m from the water");
+            Assert.True(pa.Min(p => p.y) < -42f, $"it still grows toward the water, up to its gap ({pa.Min(p => p.y):F1})");
+            // a look with a smaller gap comes nearer
+            a.Options["waterGap"] = 10f;
+            var near = YardStitch.Plan(new[] { a }, withLake);
+            Assert.True(near.Plots.TryGetValue(1, out var pn) && pn.Min(p => p.y) < -60f && pn.All(p => DistanceToRing(lake, p) > 9.5f), $"10 m gap: {pn?.Min(p => p.y):F1}");
+        }
+
+        [Fact]
+        public void Any_look_goes_on_any_building_a_house_can_have_a_car_park_and_a_shop_a_garden()
+        {
+            string Name(int k) => YardStitch.BushKinds[k];
+            // a house whose look makes its land a car park yard: paving, marked bays, parked cars; only bins in its corner
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            a.Zone = "home";
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 50f, ["fill"] = PolishLooks.FillCarPark };
+            var plan = YardStitch.Plan(new[] { a }, MiddleLine());
+            Assert.Contains(plan.Paths, p => p.House == 1 && p.Surface == "Pavement Surface 01");
+            Assert.Contains(plan.Bushes, b => b.House == 1 && Name(b.Kind) == "ParkingLotDecal01");
+            Assert.Contains(plan.Bushes, b => b.House == 1 && Name(b.Kind).StartsWith("Placemaker Vehicle"));
+            Assert.DoesNotContain(plan.Bushes, b => b.House == 1 && (Name(b.Kind).StartsWith("Pallet") || Name(b.Kind).StartsWith("CardboardBoxPile") || Name(b.Kind).StartsWith("GasBottle")));
+            Assert.False(plan.Lawns.ContainsKey(15L), "its own lawn is not grown over the car park");
+            Assert.Empty(plan.Beds);
+
+            // the same house as paving: one slab to the fence, no car park
+            a.Options["fill"] = PolishLooks.FillPaved;
+            var paved = YardStitch.Plan(new[] { a }, MiddleLine());
+            Assert.Contains(paved.Paths, p => p.House == 1 && p.Surface == "Pavement Surface 01");
+            Assert.DoesNotContain(paved.Bushes, b => b.Kind >= 29);
+
+            // a shop whose look makes its land a garden: lawn, no paving past its lot, no car park
+            var b2 = House(2, new float2(0f, 0f), new float2(0f, 1f));
+            b2.MainSurface = "Concrete Surface 01";
+            b2.Zone = "shop";
+            b2.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 50f, ["fill"] = PolishLooks.FillGarden, ["paintedGardens"] = 0f };
+            var garden = YardStitch.Plan(new[] { b2 }, MiddleLine());
+            Assert.DoesNotContain(garden.Paths, p => p.House == 2 && p.Surface == "Concrete Surface 01");
+            Assert.True(garden.Lawns.ContainsKey(25L) || garden.NewLawns.Any(l => l.House == 2), "the shop's land is a lawn: " + string.Join(" | ", garden.Notes));
+            Assert.DoesNotContain(garden.Bushes, x => x.Kind >= 29);
+            // by the building (fill 0) a shop still gets its car park yard
+            b2.Options["fill"] = PolishLooks.FillAuto;
+            var auto = YardStitch.Plan(new[] { b2 }, MiddleLine());
+            Assert.Contains(auto.Bushes, x => Name(x.Kind) == "ParkingLotDecal01");
+        }
+
+        [Fact]
+        public void Every_zone_type_gets_a_look_of_its_own()
+        {
+            Assert.Equal("houses", PolishLooks.DefaultZoneLook("residential low", "home"));
+            Assert.Equal("rows", PolishLooks.DefaultZoneLook("residential medium row", "home"));
+            Assert.Equal("apartments", PolishLooks.DefaultZoneLook("residential medium", "home"));
+            Assert.Equal("apartments", PolishLooks.DefaultZoneLook("residential lowrent", "home"));
+            Assert.Equal("towers", PolishLooks.DefaultZoneLook("residential high", "home"));
+            Assert.Equal("mixed", PolishLooks.DefaultZoneLook("residential mixed", "home"));
+            Assert.Equal("shops", PolishLooks.DefaultZoneLook("commercial low", "shop"));
+            Assert.Equal("bigShops", PolishLooks.DefaultZoneLook("commercial high", "shop"));
+            Assert.Equal("offices", PolishLooks.DefaultZoneLook("office low", "office"));
+            Assert.Equal("officeTowers", PolishLooks.DefaultZoneLook("office high", "office"));
+            Assert.Equal("industry", PolishLooks.DefaultZoneLook("industrial manufacturing", "industry"));
+            Assert.Equal("houses", PolishLooks.DefaultZoneLook("", "home"));
+            // every one of them is a built-in look, and says what its land becomes
+            foreach (var id in PolishLooks.ZoneLookIds)
+            {
+                var look = PolishLooks.BuiltIn.Single(l => l.Id == id);
+                Assert.True(look.Values()["fill"] >= PolishLooks.FillGarden, id);
+            }
+        }
     }
 }

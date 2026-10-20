@@ -90,8 +90,9 @@ namespace Placemaker.Core.Layers.Types.Yards
                 // Further out: metal heaps, loose material (sand, dirt, spoil, a rock pile), rubble, in turn.
                 int kind = heapRows++ % 3;
                 if (kind == 1 && YardFill.Stockpiles(s, b, salt) > 0) { b.Use = "stockpiles"; continue; }
-                var heap = kind == 0 ? IndustrialAssets.MetalHeap : IndustrialAssets.Rubble;
-                if (YardFill.HeapRow(s, b, heap, 2.4f, fill, salt) > 0) b.Use = "heaps";
+                var kinds = kind == 0 ? new[] { IndustrialAssets.MetalHeap, IndustrialAssets.MetalHeap, IndustrialAssets.MixedRubble }
+                    : new[] { IndustrialAssets.MixedRubble, IndustrialAssets.WoodRubble, IndustrialAssets.MetalHeap };
+                if (YardFill.Carpet(s, b, kinds, fill, salt) > 0) b.Use = "heaps";
             }
         }
 

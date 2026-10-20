@@ -99,7 +99,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                         if (back)
                         {
                             if ((k++ & 1) == 0 && YardFill.Stockpiles(s, b, salt) > 0) { b.Use = "stockpiles"; break; }
-                            if (YardFill.HeapRow(s, b, IndustrialAssets.Rubble, 3f, fill, salt) > 0) { b.Use = "heaps"; break; }
+                            if (YardFill.Carpet(s, b, new[] { IndustrialAssets.MixedRubble, IndustrialAssets.WoodRubble, IndustrialAssets.MetalHeap }, fill, salt) > 0) { b.Use = "heaps"; break; }
                         }
                         var goods = (b.Index & 1) == 0 ? IndustrialAssets.Pipes : IndustrialAssets.Reels;
                         if ((goods.Z > 5f ? YardFill.RowsAcross(s, b, goods, 0.6f, fill, salt, YardFill.Mess.Goods) : YardFill.Piles(s, b, goods, fill, salt)) > 0) b.Use = "goods";

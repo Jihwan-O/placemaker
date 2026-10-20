@@ -87,11 +87,11 @@ namespace Placemaker.Core.Layers.Types.Yards
                     b.Use = "parts";
                     continue;
                 }
-                if (back && style == "crusher" && YardFill.HeapRow(s, b, IndustrialAssets.MetalHeap, 2.5f, fill, salt) > 0) { b.Use = "crushed"; continue; }
+                if (back && style == "crusher" && YardFill.Carpet(s, b, new[] { IndustrialAssets.MetalHeap, IndustrialAssets.MetalHeap, IndustrialAssets.MixedRubble }, fill, salt) > 0) { b.Use = "crushed"; continue; }
                 // Wrecks: nose to the aisle, a few degrees off true (they were dropped by a forklift, not parked).
                 // Piled higher towards the back: a few on top of each other at the front, most at the back.
-                float pile = b.Band < 0 ? 0.08f : math.min(0.55f, 0.15f + 0.15f * b.Band);
-                int n = YardFill.RowsAcross(s, b, car, 0.75f, fill, salt, YardFill.Mess.Wrecks(pile));
+                float pile = b.Band < 0 ? 0.15f : math.min(0.8f, 0.35f + 0.2f * b.Band);
+                int n = YardFill.RowsAcross(s, b, car, 0.6f, fill, salt, YardFill.Mess.Wrecks(pile));
                 if (n > 0)
                 {
                     b.Use = "wrecks";
@@ -130,7 +130,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 uint v = Hashing.Mix(salt, (uint)(i + 100));
                 if (Hashing.Unit(v) < 0.45f) continue;
                 var p = s.W(u, b.VMid + (Hashing.Unit(Hashing.Mix(v, 1u)) - 0.5f) * 0.6f);
-                if (!s.Occ.Free(p, 0.7f, 0.2f, 0.05f)) continue;
+                if (!s.Occ.Free(p, 0.7f, 0.2f, 0.05f) || !s.ReservedOnly.Free(p, 1.3f, 0f, 0.2f)) continue;
                 bool dead = Hashing.Unit(Hashing.Mix(v, 2u)) < 0.4f;
                 s.Ctx.Object(p, Hashing.Unit(Hashing.Mix(v, 3u)) * 6.283f, ObjectRole.Bush, dead ? DeadBush.Pick(v) : new AssetRef(""), v, -1, AssetCategories.Bush);
                 s.Occ.Take(p, 0.7f, Scrapyard.YardKit.KindStuff);

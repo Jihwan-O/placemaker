@@ -55,7 +55,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             public static Mess Goods => new Mess { Pos = 0.2f, Yaw = 0.2f, Missing = 0.15f };
             // Cars: the game hides one of two props whose boxes meet, so a wreck may wander and turn only as far as its row
             // leaves room (pitch = width + gap + 2 × Pos); a car on another clears it by a hand (Height).
-            public static Mess Wrecks(float stack) => new Mess { Pos = 0.25f, Yaw = 0.12f, Missing = 0.12f, Stack = stack, StackMax = 2, Flip = 0.05f, Side = 0.03f, Height = 1.65f };
+            public static Mess Wrecks(float stack) => new Mess { Pos = 0.25f, Yaw = 0.12f, Missing = 0.1f, Stack = stack, StackMax = 2, Flip = 0.07f, Side = 0.04f, Height = 1.65f };
         }
 
         /// <summary>Container height plus a hair, so a box stands on the one below without their boxes meeting.</summary>
@@ -73,6 +73,14 @@ namespace Placemaker.Core.Layers.Types.Yards
             int run = 3 + (int)(rowPick % 4u);
             if (Hashing.Unit(Hashing.Mix(v, 0xC0Du)) < 0.1f) return (int)(Hashing.Mix(v, 0xC0Eu) & 0x7FFFu);
             return (int)(Hashing.Mix(rowPick, (i / run & 1) == 0 ? 0xC01u : 0xC02u) & 0x7FFFu);
+        }
+
+        /// <summary>Containers: one box kind per run of the row (the colour run, RowColour); anything else its usual pick.</summary>
+        private static AssetRef RunAsset(YardItem item, uint pick, uint rowPick, int i)
+        {
+            if (item.Category != AssetCategories.ScrapContainer) return item.Pick(pick);
+            int run = 3 + (int)(rowPick % 4u);
+            return item.Pick(Hashing.Mix(rowPick, (uint)(i / run)));
         }
 
         /// <summary>Is slot p left empty (clumps of value noise, so gaps come in runs like a yard that is emptying)?</summary>
@@ -107,7 +115,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 if (tiers > 1 && (tv & 3u) == 0) d = -d;   // the odd box turned end for end
                 var off = tiers > 1 ? float2.zero : new float2(Hashing.Unit(Hashing.Mix(tv, 1u)) - 0.5f, Hashing.Unit(Hashing.Mix(tv, 2u)) - 0.5f) * 0.6f;
                 if (!s.ReservedOnly.Free(c + off, math.max(item.X, item.Z) * 0.5f, 0f, 0.3f)) break;   // never over a path another layer keeps
-                var o = s.Ctx.Object(c + off - d * item.CZ, math.atan2(d.x, d.y), ObjectRole.Furniture, item.Pick(tv), tv, -1, item.Category);
+                var o = s.Ctx.Object(c + off - d * item.CZ, math.atan2(d.x, d.y), ObjectRole.Furniture, colour >= 0 && (tv & 3u) != 0 ? asset : item.Pick(tv), tv, -1, item.Category);
                 o.Elevation = t * h;
                 if (colour >= 0) o.ColorSeed = (tv & 3u) == 0 ? colour + 7 : colour;
                 // The top car of a pile sometimes lies on its roof.
@@ -153,7 +161,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                     uint v = Hashing.Mix(rowPick, (uint)i);
                     var c = s.W(slots[i], rows[r].v);
                     if (Gap(c, mess.Missing, salt)) continue;
-                    placed += Place(s, item, item.Pick(perSlot ? v : rowPick), c, rows[r].face, v, mess, Tiers(tiers, use, i, v), RowColour(item, rowPick, i, v));
+                    placed += Place(s, item, RunAsset(item, perSlot ? v : rowPick, rowPick, i), c, rows[r].face, v, mess, Tiers(tiers, use, i, v), RowColour(item, rowPick, i, v));
                 }
             }
             return placed;
@@ -192,7 +200,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                     uint v2 = Hashing.Mix(linePick, (uint)i);
                     var c = s.W(slots[i], v);
                     if (Gap(c, mess.Missing, salt)) continue;
-                    placed += Place(s, item, item.Pick(perSlot ? v2 : linePick), c, dir, v2, mess, Tiers(tiers, use, i, v2), RowColour(item, linePick, i, v2));
+                    placed += Place(s, item, RunAsset(item, perSlot ? v2 : linePick, linePick, i), c, dir, v2, mess, Tiers(tiers, use, i, v2), RowColour(item, linePick, i, v2));
                 }
             }
             return placed;
@@ -379,6 +387,50 @@ namespace Placemaker.Core.Layers.Types.Yards
             if (!s.Put(item, item.Pick(salt), c, dir, salt, -0.2f)) return false;
             s.Heaps++;
             return true;
+        }
+
+        /// <summary>
+        /// A block heaped full (the junk yard's stock, seen too sparse in the game): loads laid edge to edge over the whole block,
+        /// each turned its own quarter, the materials in clumps (rusty metal next to rusty metal, rubble with rubble), on a
+        /// gentle terrain swell so the block rises in the middle; the fill share leaves the outer end bare.
+        /// </summary>
+        public static int Carpet(IndustrialSite s, YardBlock b, YardItem[] kinds, float fill, uint salt)
+        {
+            float cell = 0f;
+            foreach (var k in kinds) cell = math.max(cell, math.max(k.X, k.Z));
+            cell += 0.2f;
+            int nu = (int)math.floor((b.Length - 0.6f) / cell), nv = (int)math.floor((b.Depth - 0.4f) / (cell * 0.87f));
+            if (nu < 1 || nv < 1) return 0;
+            float u0 = b.UMid - (nu - 1) * cell * 0.5f, v0 = b.VMid - (nv - 1) * cell * 0.87f * 0.5f;
+            int use = Take(nu, fill);
+            // Columns nearest the spine first.
+            var cols = new List<int>();
+            for (int i = 0; i < nu; i++) cols.Add(i);
+            cols.Sort((x, y) => math.abs(u0 + x * cell).CompareTo(math.abs(u0 + y * cell)));
+            int made = 0;
+            uint noise = Hashing.Mix(salt, 0xCA9Eu);
+            for (int ci = 0; ci < use; ci++)
+            {
+                int i = cols[ci];
+                for (int k = 0; k < nv; k++)
+                {
+                    float u = u0 + i * cell + ((k & 1) == 0 ? 0f : cell * 0.25f);
+                    if (u + cell * 0.5f > b.U1 + 0.1f) u -= cell * 0.5f;
+                    var p = s.W(u, v0 + k * cell * 0.87f);
+                    uint v = Hashing.Mix(salt, (uint)(b.Index * 977 + i * 31 + k));
+                    // Clumped materials: the same kind over a few cells.
+                    var item = kinds[(int)(ValueNoise.Clumps(p, 14f, noise) * kinds.Length * 0.999f)];
+                    var dir = Turn(s.U, (int)(Hashing.Unit(v) * 4f) * math.PI * 0.5f + (Hashing.Unit(Hashing.Mix(v, 1u)) - 0.5f) * 0.06f);
+                    if (s.Put(item, item.Pick(v), p, dir, v, 0.02f)) made++;
+                }
+            }
+            if (made == 0) return 0;
+            s.Heaps += made;
+            var c = s.W(b.UMid, b.VMid);
+            s.Anchors.Add((c, math.min(b.Length, b.Depth) * 0.4f));
+            float mr = math.min(b.Length, b.Depth) * 0.5f - 0.6f;
+            if (mr > 4f) s.Mounds.Add(new Mound { Center = c, Radius = mr, Height = math.min(2.2f, mr * 0.25f), Flat = 0.35f, Axis = s.U, Ratio = math.max(1f, b.Length / math.max(1f, b.Depth)) });
+            return made;
         }
 
         // ───────────── heaps, carports, plant ─────────────

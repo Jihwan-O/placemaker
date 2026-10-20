@@ -131,8 +131,10 @@ namespace Placemaker.Core.Layers.Types.Zoning
         /// The pads and their banks as terraform (sloped quads), the bank paint; facts and stats. Returns the ground after (null:
         /// nothing changed).
         /// </summary>
-        public static Func<float2, float> Build(LayerContext ctx, List<Lot> lots, IReadOnlyList<(float3[] Line, float Width)> roads, Options o, CancellationToken cancel)
+        public static Func<float2, float> Build(LayerContext ctx, List<Lot> lots, IReadOnlyList<(float3[] Line, float Width)> roads, Options o, CancellationToken cancel,
+            List<KeyValuePair<string, double>> timings = null)
         {
+            var clock = new PlanClock(timings);
             Sculpt sc = null;
             bool[] pad = null;
             List<Lot> level = null;
@@ -141,7 +143,9 @@ namespace Placemaker.Core.Layers.Types.Zoning
             // the lots and the gaps between them (a row levelled as one: no ridge or trench of natural ground between two lots)
             var all = new List<Lot>(lots);
             all.AddRange(Fillers(lots, site.HeightAt));
+            clock.Lap("fillers");
             var walls = PlanWalls(all, site, roads, o);
+            clock.Lap("walls");
             var ws0 = WallStats;
             ctx.Plan.Facts["polishWallPoints"] = ws0.Ok;
             ctx.Plan.Facts["polishWallPointsLow"] = ws0.Low;
@@ -153,7 +157,9 @@ namespace Placemaker.Core.Layers.Types.Zoning
             {
                 level = all.FindAll(l => l.Level && l.D > 0);
                 if (level.Count == 0 && walls.Count == 0) { sc = null; break; }
-                sc = Field(ctx, level, all, walls, roads, o, cancel, out pad);
+                var fieldTimes = timings != null ? new List<KeyValuePair<string, double>>() : null;
+                sc = Field(ctx, level, all, walls, roads, o, cancel, out pad, fieldTimes);
+                clock.Lap("field " + (pass + 1) + " (" + level.Count + " lots, " + sc.Count + " nodes)", fieldTimes);
                 // the walls the limits left standing (a wall that cannot is laid again as a bank)
                 if (walls.Count > 0)
                 {
@@ -184,6 +190,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     if (!Fit(sc, l)) continue;
                     changed = true;
                 }
+                clock.Lap("fit " + (pass + 1));
                 if (!changed) break;
             }
             int lost = 0, shorter = 0; foreach (var l in lots) { if (l.D == 0) lost++; else if (l.D < l.D0) shorter++; }
@@ -191,6 +198,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
             Inspect?.Invoke(sc, lots);
             if (sc == null) return null;
             var tr = sc.Emit(ctx, null, Sculpt.MinChange, 2);
+            clock.Lap("emit");
             if (tr.Cells == 0) return null;
             if (walls.Count > 0)
             {
@@ -228,6 +236,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                 var g = new TerraceGround { Grid = sc, Terrace = pad, Corridor = under, HeightAfter = sc.HeightAfter, Cells = tr.Cells };
                 ctx.Plan.Facts["polishLevelPaints"] = TerraceDressing.Paint(ctx.Plan, g, null, new TerraceOptions { Seed = o.Seed });
             }
+            clock.Lap("measure, paint");
             return sc.HeightAfter;
         }
 
@@ -383,8 +392,9 @@ namespace Placemaker.Core.Layers.Types.Zoning
 
         /// <summary>The pads of the levelled lots and the banks around them (not emitted).</summary>
         private static Sculpt Field(LayerContext ctx, List<Lot> level, List<Lot> all, List<LotWall> walls, IReadOnlyList<(float3[] Line, float Width)> roads, Options o,
-            CancellationToken cancel, out bool[] pad)
+            CancellationToken cancel, out bool[] pad, List<KeyValuePair<string, double>> timings = null)
         {
+            var clock = new PlanClock(timings);
             var site = ctx.Input.Site;
             float a = math.clamp(o.BankSlope, 0.1f, 0.46f);
             float margin = o.MaxEarth / a * 1.3f + 6f;
@@ -403,28 +413,52 @@ namespace Placemaker.Core.Layers.Types.Zoning
             bool Sculptable(float2 p)
             {
                 if (p.x < inMin.x || p.y < inMin.y || p.x > inMax.x || p.y > inMax.y) return false;
-                if (obstacles.BlockedAt(p)) return false;
-                foreach (var (line, width) in roads)
-                    if (Near(line, p, width * 0.5f + 0.5f)) return false;
-                return true;
+                return !obstacles.BlockedAt(p);
             }
             var sc = new Sculpt(ctx.H, mn, mx, 2f, Sculptable);
+            // (zoning speed) The roads' ground stays: each road segment visits only the nodes around it (every road for every node
+            // was 2.6 s a pass on 4 x 4 blocks; the same nodes come out).
+            foreach (var (line, width) in roads)
+            {
+                cancel.ThrowIfCancellationRequested();
+                float r = width * 0.5f + 0.5f;
+                for (int i = 0; i + 1 < line.Length; i++)
+                {
+                    float2 s0 = line[i].xz, e = line[i + 1].xz - s0;
+                    float ee = math.max(1e-6f, math.dot(e, e));
+                    Nodes(sc, math.min(s0, s0 + e) - r, math.max(s0, s0 + e) + r, out int i0, out int i1, out int j0, out int j1);
+                    for (int jj = j0; jj <= j1; jj++)
+                        for (int ii = i0; ii <= i1; ii++)
+                        {
+                            int k = jj * sc.Nx + ii;
+                            if (!sc.Free[k]) continue;
+                            var p = sc.Pos(k);
+                            float t = math.saturate(math.dot(p - s0, e) / ee);
+                            if (math.distancesq(p, s0 + e * t) <= r * r) sc.Free[k] = false;
+                        }
+                }
+            }
+            clock.Lap("grid");
             int count = sc.Count;
             var protect = new byte[count];
             pad = new bool[count];
-            for (int k = 0; k < count; k++)
+            // each node the pad of the first lot it lies in: each lot visits only the nodes under it
+            foreach (var (r, l) in rects)
             {
-                if ((k & 4095) == 0) cancel.ThrowIfCancellationRequested();
-                if (!sc.Free[k]) continue;
-                var p = sc.Pos(k);
-                foreach (var (r, l) in rects)
-                {
-                    if (!Poly.Contains(r, p)) continue;
-                    sc.Target[k] = PadAt(l, p);
-                    protect[k] = 1;
-                    pad[k] = true;
-                    break;
-                }
+                cancel.ThrowIfCancellationRequested();
+                Poly.Bounds(r, out var rmn, out var rmx);
+                Nodes(sc, rmn, rmx, out int i0, out int i1, out int j0, out int j1);
+                for (int jj = j0; jj <= j1; jj++)
+                    for (int ii = i0; ii <= i1; ii++)
+                    {
+                        int k = jj * sc.Nx + ii;
+                        if (!sc.Free[k] || pad[k]) continue;
+                        var p = sc.Pos(k);
+                        if (!Poly.Contains(r, p)) continue;
+                        sc.Target[k] = PadAt(l, p);
+                        protect[k] = 1;
+                        pad[k] = true;
+                    }
             }
             // walls: the lot below runs on to the quay's middle, the ground above the quay is the lot above it (its pad, though
             // it gave up that row) or the hillside; the jump between them is the wall, held through the limits
@@ -433,6 +467,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
             {
                 side = new sbyte[count];
                 const float reach = BlockField.QuayHalf + 0.5f;
+                var laidOut = new LotRects(all, l => l.D0 > 0 ? RectOf(l, l.D0, 0.5f) : null);   // the lots as laid out
                 foreach (var lw in walls)
                 {
                     var w = lw.Wall;
@@ -460,9 +495,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                                 if (v < 0f) sc.Target[k] = PadAt(lw.Below, p);
                                 else
                                 {
-                                    Lot above = null;
-                                    foreach (var l in all)
-                                        if (l != lw.Below && l.D0 > 0 && Poly.Contains(RectOf(l, l.D0, 0.5f), p)) { above = l; break; }
+                                    var above = laidOut.Find(p, lw.Below);
                                     sc.Target[k] = above != null ? PadAt(above, p) : sc.Base[k];
                                 }
                                 side[k] = v < 0f ? (sbyte)-1 : (sbyte)1;
@@ -472,11 +505,56 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     }
                 }
             }
+            clock.Lap("pads");
             Settle(sc, protect, side, a, o.MaxEarth, cancel);
+            clock.Lap("banks");
             for (int k = 0; k < count; k++)
                 if (sc.Free[k]) sc.Target[k] = sc.Base[k] + math.clamp(sc.Target[k] - sc.Base[k], -o.MaxEarth, o.MaxEarth);
             Settle(sc, protect, side, a, o.MaxEarth, cancel);
+            clock.Lap("banks again");
             return sc;
+        }
+
+        /// <summary>The grid's nodes over the box [mn, mx] (a node more each way, clamped to the grid; none when it lies off it).</summary>
+        private static void Nodes(Sculpt sc, float2 mn, float2 mx, out int i0, out int i1, out int j0, out int j1)
+        {
+            float2 lo = math.floor((mn - sc.Origin) / sc.Cell) - 1f, hi = math.ceil((mx - sc.Origin) / sc.Cell) + 1f;
+            i0 = (int)math.max(lo.x, 0f); j0 = (int)math.max(lo.y, 0f);
+            i1 = (int)math.min(hi.x, sc.Nx - 1); j1 = (int)math.min(hi.y, sc.Ny - 1);
+        }
+
+        /// <summary>
+        /// (zoning speed) The lots' rectangles and their bounds, in the lots' order: the first lot a point lies in. (A lot's
+        /// rectangle was made again, and every lot tried, for every point asked about.)
+        /// </summary>
+        private sealed class LotRects
+        {
+            private readonly List<Lot> _lots = new List<Lot>();
+            private readonly List<float2[]> _rects = new List<float2[]>();
+            private readonly List<float4> _box = new List<float4>();
+
+            /// <param name="rect">A lot's rectangle (null: not a lot to find).</param>
+            public LotRects(List<Lot> lots, Func<Lot, float2[]> rect)
+            {
+                foreach (var l in lots)
+                {
+                    var r = rect(l);
+                    if (r == null) continue;
+                    Poly.Bounds(r, out var mn, out var mx);
+                    _lots.Add(l); _rects.Add(r); _box.Add(new float4(mn, mx));
+                }
+            }
+
+            public Lot Find(float2 p, Lot except)
+            {
+                for (int i = 0; i < _lots.Count; i++)
+                {
+                    var b = _box[i];
+                    if (p.x < b.x || p.y < b.y || p.x > b.z || p.y > b.w || _lots[i] == except) continue;
+                    if (Poly.Contains(_rects[i], p)) return _lots[i];
+                }
+                return null;
+            }
         }
 
         private static readonly int[] Ni = { 1, -1, 0, 0, 1, 1, -1, -1 };
@@ -555,6 +633,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
             var obstacles = new RoadObstacles(site, mn - 40f, mx + 40f);
             // the quay just behind the lot: its low edge on the lot's back line (the lot keeps its cells, the lot behind gives one row)
             const float off = BlockField.QuayHalf;
+            var behind = new LotRects(lots, l => l.D > 0 ? RectOf(l, l.D, 0.5f) : null);
             foreach (var A in lots)
             {
                 if (A.D <= 0) continue;
@@ -594,9 +673,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
                     var pb = origin + right * u + dir * vBack;
                     float foot = PadAt(A, pb + dir * 1f);
                     var q = pb - dir * 2f;
-                    Lot B = null;
-                    foreach (var l in lots)
-                        if (l != A && l.D > 0 && Poly.Contains(RectOf(l, l.D, 0.5f), q)) { B = l; break; }
+                    var B = behind.Find(q, A);
                     float top = B != null ? PadAt(B, q) : ground(pb - dir * 6f);
                     float rise = top - foot;
                     var c = pb - dir * off;
@@ -654,8 +731,7 @@ namespace Placemaker.Core.Layers.Types.Zoning
         private static void Interfaces(List<Lot> lots, List<LotWall> walls, Options o)
         {
             float run = math.clamp(o.BankSlope, 0.1f, 0.46f) / 1.08f;
-            var rects = new Dictionary<Lot, float2[]>();
-            foreach (var l in lots) if (l.D > 0) rects[l] = RectOf(l, l.D, 0.5f);
+            var rects = new LotRects(lots, l => l.D > 0 ? RectOf(l, l.D, 0.5f) : null);
             var cuts = new Dictionary<Lot, int3>();   // x: back rows, y: columns at the first column's side, z: at the last's
             bool UnderWall(float2 p)
             {
@@ -686,12 +762,8 @@ namespace Placemaker.Core.Layers.Types.Zoning
                         var p = math.lerp(a, b, t / len);
                         var q = p + n * 1.5f;
                         if (UnderWall(p)) continue;
-                        foreach (var kv in rects)
-                        {
-                            if (kv.Key == A || !Poly.Contains(kv.Value, q)) continue;
-                            most = math.max(most, PadAt(kv.Key, q) - PadAt(A, p - n * 1f));
-                            break;
-                        }
+                        var B = rects.Find(q, A);
+                        if (B != null) most = math.max(most, PadAt(B, q) - PadAt(A, p - n * 1f));
                     }
                     return most;
                 }

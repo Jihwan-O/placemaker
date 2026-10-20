@@ -69,6 +69,7 @@ namespace Placemaker.Core.Tool
 
         public void Clear()
         {
+            _hasFirstClick = false;
             if (_points.Count == 0 && !Closed) return;
             _points.Clear();
             _axes.Clear();
@@ -177,6 +178,38 @@ namespace Placemaker.Core.Tool
             _nodes.Add(node);
             Version++;
             return true;
+        }
+
+        // (zoning speed run) The first corner's snap may have moved it from where it was clicked (onto a road node, a curb): a
+        // click back on that spot closes the outline too. Compared with the corner itself only, the closing click went 7-10 m off
+        // it after the camera's zoom changed the snap radius, and it added a fifth corner beside the first: the outline stayed open.
+        private float2 _firstClick, _firstAt;
+        private bool _hasFirstClick;
+
+        /// <summary>A snapped cursor this close to the first corner (m) is on it.</summary>
+        public const float OnFirstCorner = 1f;
+
+        /// <summary>Where the first corner was clicked (right after adding it; the snap may have put it elsewhere).</summary>
+        public void SetFirstClick(float2 clickedAt)
+        {
+            if (_points.Count != 1) return;
+            _firstClick = clickedAt;
+            _firstAt = _points[0].xz;
+            _hasFirstClick = true;
+        }
+
+        /// <summary>
+        /// Whether a click at <paramref name="click"/> (the snap puts it at <paramref name="snapped"/>) closes the open outline:
+        /// within <paramref name="radius"/> of the first corner or of the spot that corner was clicked at, or snapped onto it.
+        /// </summary>
+        public bool ClosesAt(float2 click, float2 snapped, float radius)
+        {
+            if (Closed || _points.Count < MinPoints) return false;
+            float2 first = _points[0].xz;
+            if (math.distance(click, first) <= radius) return true;
+            // (only while the first corner is still where that click put it)
+            if (_hasFirstClick && math.distancesq(_firstAt, first) < 1e-4f && math.distance(click, _firstClick) <= radius) return true;
+            return math.distance(snapped, first) <= OnFirstCorner;
         }
 
         /// <summary>Why the outline cannot be closed now (null = it can).</summary>

@@ -65,8 +65,7 @@ namespace Placemaker.Game.Tool
             float radius = HandleRadius(_in.Hit);
             _hoverPoint = _draw.HitPoint(_in.Hit.xz, radius);
             _hoverEdge = _hoverPoint < 0 ? _draw.HitEdge(_in.Hit.xz, radius * 0.8f, out _, out _) : -1;
-            _hoverClose = !_draw.Closed && _draw.Count >= PolygonEditor.MinPoints
-                          && math.distance(_in.Hit.xz, _draw.Points[0].xz) <= radius * 1.4f;
+            _hoverClose = _draw.ClosesAt(_in.Hit.xz, _in.Hit.xz, radius * 1.4f);
 
             if (!_draw.Closed) UpdateDrawOpen(radius);
             else UpdateDrawClosed(radius);
@@ -76,6 +75,8 @@ namespace Placemaker.Game.Tool
         {
             // Near the first corner the click closes; snapping there would only pull the cursor away.
             _cursor = _hoverClose ? _draw.Points[0] : Snap(_in.Hit, -1);
+            // a click the snap puts on the first corner closes too (it could only add a corner on top of it)
+            if (!_hoverClose && _draw.ClosesAt(_in.Hit.xz, _cursor.xz, radius * 1.4f)) { _hoverClose = true; _cursor = _draw.Points[0]; }
 
             if (_in.LeftPressed)
             {
@@ -91,6 +92,7 @@ namespace Placemaker.Game.Tool
                 var problem = _draw.CheckAdd(_cursor.xz);
                 if (problem != null) { Flash(new LocText(problem)); return; }
                 _draw.AddPoint(_cursor, _lastSnap.Kind != SnapKind.None ? _lastSnap.Direction : float2.zero, _lastSnap.Kind == SnapKind.RoadNode ? _lastSnap.Node : 0L);
+                _draw.SetFirstClick(_in.Hit.xz);   // (only the first corner's counts)
                 _lastAddTime = _in.Time;
                 _lastAddPos = _cursor;
                 ShapeChanged();

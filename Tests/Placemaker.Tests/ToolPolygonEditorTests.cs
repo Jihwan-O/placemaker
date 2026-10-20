@@ -34,6 +34,32 @@ namespace Placemaker.Tests
             Assert.True(e.IsValid);
         }
 
+        /// <summary>
+        /// (zoning speed run) The first corner snapped 9 m off its click (a road node, a curb); after the camera zoomed in the
+        /// close radius was 7.6 m: the click back on the same spot did not close and added a fifth corner beside the first.
+        /// </summary>
+        [Fact]
+        public void ClickingWhereTheFirstCornerWasClickedCloses()
+        {
+            var e = new PolygonEditor();
+            var click = new float2(0, 0);
+            e.AddPoint(new float3(6, 0, 7));   // the snap put it 9.2 m from the click
+            e.SetFirstClick(click);
+            e.AddPoint(new float3(400, 0, 0));
+            e.AddPoint(new float3(400, 0, 400));
+            Assert.False(e.ClosesAt(new float2(200, 200), new float2(200, 200), 7.6f));
+            Assert.True(e.ClosesAt(click, new float2(-3, 2), 7.6f));                 // the same spot, wherever it snaps now
+            Assert.True(e.ClosesAt(new float2(30, 30), new float2(6.3f, 7.2f), 7.6f)); // snapped onto the first corner
+            Assert.True(e.ClosesAt(new float2(10, 3), new float2(10, 3), 7.6f));      // near the corner itself, as before
+            // a corner placed somewhere the first corner's snap no longer accounts for
+            e.MovePoint(0, new float3(-50, 0, -50), new float3(6, 0, 7));
+            Assert.False(e.ClosesAt(click, new float2(-3, 2), 7.6f));
+            // fewer than three corners: nothing to close
+            var two = new PolygonEditor();
+            two.AddPoint(new float3(6, 0, 7)); two.SetFirstClick(click); two.AddPoint(new float3(400, 0, 0));
+            Assert.False(two.ClosesAt(click, click, 7.6f));
+        }
+
         [Fact]
         public void AddingACrossingSegmentIsRefused()
         {

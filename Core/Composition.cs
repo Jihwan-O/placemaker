@@ -125,6 +125,8 @@ namespace Placemaker.Core
         /// the land of the layers that take part (parks, leisure types) and leaves the rest alone.
         /// </summary>
         public Dictionary<AreaPlan, float2[]> FillRings = new Dictionary<AreaPlan, float2[]>();
+        /// <summary>(zoning speed) Where the plan's time went: each layer and each step after them, ms (PlanTimings.Describe). Not persisted.</summary>
+        public List<KeyValuePair<string, double>> Timings = new List<KeyValuePair<string, double>>();
 
         public bool HasErrors
         {
@@ -177,28 +179,37 @@ namespace Placemaker.Core
             int budget = MaxSteps;
             var dress = new Dictionary<AreaPlan, Decals.DressSettings>();
             Run(recipe.Root, area, new[] { RegionTags.Root }, "root", site, reserved, null, "0", 0, result, ref budget, cancel, false, null, dress);
+            var clock = new PlanClock(result.Timings);
             // CS2 joins paths only at identical nodes: split a path where a spur (often a feature's
             // "path to it") ends on it (g5).
             Layers.Common.PathJoins.JoinAll(result);
+            clock.Lap("path joins");
             // s21: decals complement what was planned (leaves under trees, oil in bays, wear at junctions…). Before
             // cutouts and building lots are enforced, so those rules apply to decals too.
             Decals.Dressing.Apply(result, area, site, dress, cancel);
+            clock.Lap("decals");
             // (s33) Paint intents (1 dry, 2 lush, 3 dirt, 4 sand) → this map's material slots (identity on vanilla maps).
             Paint.TerrainPalette.Remap(result, site?.Terrain);
             // s14: zoning cutouts stay empty whatever a feature placed (Layers/Common/Cutouts.cs).
             Layers.Common.Cutouts.Enforce(result, area?.Ring != null && area.Ring.Length >= 3 ? new[] { area.Ring2D() } : null);
+            clock.Lap("cutouts");
             // (s31) Site harmony: one graded ground for everything planned. Paths level across and smooth along, pads and hard
             // surfaces flat, decorative mounds kept off them, all terraform merged into one smooth field (no curtains).
             Build.SiteHarmony.Apply(result, area, site, cancel);
+            clock.Lap("site harmony");
             // (s15) Never build on existing buildings: drop / cut whatever would touch a building lot.
             Build.SiteSafety.Apply(result, area, site);
+            clock.Lap("site safety");
             // (core) Our roads zone only on the sides that hold the build's shops: the vanilla per-side "no zoning" flag elsewhere.
             try { Build.LaneSides.Apply(result, site); } catch (Exception) { /* never fail a plan over it */ }
+            clock.Lap("lane sides");
             // (s19) Road zone cells under the build are blocked outside the zoning; the zoning snaps to the cells.
             Build.ZoneGuard.Apply(result, site);
+            clock.Lap("zone guard");
             // (s22) Terraform preview: a heat map of the height change instead of dashed boxes.
             try { result.TerrainHeat = Build.TerrainHeat.Build(result, area?.Ring2D(), site?.HeightAt); }
             catch (Exception) { result.TerrainHeat = null; }
+            clock.Lap("height map");
             return result;
         }
 
@@ -237,9 +248,11 @@ namespace Placemaker.Core
             if (ownPlaces != null) foreach (var mine in ownPlaces) input.Reserved.Polygons.Remove(mine);
 
             AreaPlan plan;
+            var layerClock = new PlanClock(result.Timings);
             try
             {
                 plan = gen.Plan(input, cancel) ?? new AreaPlan();
+                layerClock.Lap(gen.Id, plan.Timings);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception e)

@@ -1,6 +1,6 @@
 {
   "generatedBy": "the in-game suite from GeneratorRegistry",
-  "assembly": "0.1.1+0717cca",
+  "assembly": "0.1.1+96edfc5",
   "categories": [
     {
       "id": "zoning",
@@ -19902,7 +19902,7 @@
           "max": 14.0,
           "step": 0.5,
           "unit": "m",
-          "default": 9.0
+          "default": 8.0
         },
         {
           "id": "office",
@@ -20022,7 +20022,7 @@
           "max": 14.0,
           "step": 0.5,
           "unit": "m",
-          "default": 9.0
+          "default": 8.0
         },
         {
           "id": "office",
@@ -20142,7 +20142,7 @@
           "max": 14.0,
           "step": 0.5,
           "unit": "m",
-          "default": 9.0
+          "default": 8.0
         },
         {
           "id": "office",
@@ -20262,7 +20262,7 @@
           "max": 14.0,
           "step": 0.5,
           "unit": "m",
-          "default": 9.0
+          "default": 8.0
         },
         {
           "id": "office",

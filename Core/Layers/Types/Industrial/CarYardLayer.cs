@@ -33,6 +33,9 @@ namespace Placemaker.Core.Layers.Types.Yards
         // Two wrecks nose to tail (4.7 m each) with a walkway between their tails.
         private const float DoubleRow = 2f * 5.2f + 1.0f + 2f * 0.5f + 0.5f;
 
+        /// <summary>Every car yard is a scrapyard: tracks through a field of wrecks (OrganicYard), not rows in blocks.</summary>
+        protected override bool Organic(string style) => true;
+
         protected override SiteSpec Spec(LayerContext ctx, string style)
         {
             switch (style)
@@ -66,6 +69,19 @@ namespace Placemaker.Core.Layers.Types.Yards
         protected override void Fill(IndustrialSite s, string style)
         {
             float fill = s.Ctx.F("fill") / 100f;
+            if (s.Organic)
+            {
+                // The work pad first (kept clear), then the wrecks lining the tracks, then the field round them.
+                OrganicYard.WorkPad(s, style == "crusher", s.Salt(0x9AD0u));
+                OrganicYard.TrackRows(s, IndustrialAssets.Car, fill, s.Salt(0x7A0Bu));
+                var zones = style == "crusher"
+                    ? new[] { new OrganicYard.Zone(YardFill.CrushedMix, 0.9f, 0.7f), new OrganicYard.Zone(YardFill.MetalMix, 0.85f, 0.2f), new OrganicYard.Zone(YardFill.CarsMix, 0.85f, 0.6f) }
+                    : style == "breakers"
+                        ? new[] { new OrganicYard.Zone(YardFill.PartsMix, 0.8f, 0.3f), new OrganicYard.Zone(YardFill.CarsMix, 0.8f, 0.35f) }
+                        : new[] { new OrganicYard.Zone(YardFill.CarsMix, 0.9f, 0.4f), new OrganicYard.Zone(YardFill.PartsMix, 0.85f, 0.5f), new OrganicYard.Zone(YardFill.CarsMix, 0.9f, 0.65f) };
+                OrganicYard.Field(s, zones, fill, s.Salt(0xF1E1u));
+                return;
+            }
             int last = LastBand(s);
             var car = IndustrialAssets.Car;
             YardBlock pad = null;

@@ -78,6 +78,9 @@ namespace Placemaker.Core.Layers.Types.Yards
         public readonly List<float2> AisleEnds = new List<float2>();
         /// <summary>Things a type wants grime / machines next to (heaps, crusher, stacks).</summary>
         public readonly List<(float2 p, float r)> Anchors = new List<(float2, float)>();
+        /// <summary>Organic yards: the tracks as smooth polylines (their segments are also the Aisles).</summary>
+        public readonly List<List<float2>> Tracks = new List<List<float2>>();
+        public bool Organic;
         /// <summary>Terrain mounds the types raise (the scrap mountain stands on one).</summary>
         public readonly List<Mound> Mounds = new List<Mound>();
         public int Items, Containers, Wrecks, Heaps, Bays, Machines, Lights, Offices, Parked;
@@ -104,6 +107,25 @@ namespace Placemaker.Core.Layers.Types.Yards
             s.MakeFrame();
             s.MakeInner();
             s.Layout();
+            return s;
+        }
+
+        /// <summary>The organic layout (OrganicYard): the same frame, edge and front yard, tracks instead of aisles, no blocks.</summary>
+        public static IndustrialSite PlanOrganic(LayerContext ctx, List<Gate> gates, SiteSpec spec, uint salt)
+        {
+            var s = new IndustrialSite
+            {
+                Ctx = ctx, Region = ctx.LayerRegion, Gates = gates, Spec = spec, Organic = true,
+                Occ = new Occupancy(ctx.LayerRegion, ctx.Input.Reserved, ctx.Site),
+                ReservedOnly = new Occupancy(ctx.LayerRegion, ctx.Input.Reserved, ctx.Site),
+            };
+            s.MakeFrame();
+            s.MakeInner();
+            float depth = s.VMax - math.max(0f, s.VMin);
+            s.Spec.Front = math.clamp(math.min(spec.Front, depth * 0.34f), math.min(12f, depth * 0.3f), spec.Front);
+            var mid = Around(s.Chord(s.Spec.Front * 0.5f), 0f);
+            if (mid != null) s.OfficeSide = mid.Value.y >= -mid.Value.x ? 1 : -1;
+            OrganicYard.Tracks(s, salt);
             return s;
         }
 

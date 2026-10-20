@@ -221,6 +221,8 @@ namespace Placemaker.Core.Layers.Types.Yards
                 for (int j = i + 1; j < s.Aisles.Count; j++)
                 {
                     var (a0, a1) = s.Aisles[i]; var (b0, b1) = s.Aisles[j];
+                    // Pieces of one bending track meet end to end: that is no crossing.
+                    if (math.distancesq(a0, b0) < 0.01f || math.distancesq(a0, b1) < 0.01f || math.distancesq(a1, b0) < 0.01f || math.distancesq(a1, b1) < 0.01f) continue;
                     if (Poly.SegmentIntersection(a0, a1, b0, b1, out var x, out _, out _)) list.Add(x);
                     else
                     {
@@ -368,7 +370,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 if (len < 20f) continue;
                 var dir = (q - p) / len; var nrm = new float2(-dir.y, dir.x);
                 int j = 0;
-                for (float t = 12f; t < len - 8f; t += 18f, j++)
+                for (float t = 12f; t < len - 8f; t += 26f, j++)
                 {
                     uint v = Hashing.Mix(salt, 0x7100u + (uint)k++);
                     // On the aisle's edge, alternating sides: where the water stands at the kerb of a yard road.

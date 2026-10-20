@@ -30,6 +30,9 @@ namespace Placemaker.Core.Layers.Types.Yards
             Preset("tip", ("style", "tip"), ("ground", "concrete"), ("edge", "blocks"), ("aisle", 8.0), ("fill", 90.0), ("weighbridge", true));
         }
 
+        /// <summary>The scrap-metal yard is a scrapyard (tracks through a field of scrap); the reclamation yard and the tip keep their order.</summary>
+        protected override bool Organic(string style) => style == "sorted";
+
         protected override SiteSpec Spec(LayerContext ctx, string style)
         {
             switch (style)
@@ -71,6 +74,16 @@ namespace Placemaker.Core.Layers.Types.Yards
             {
                 case "reclaim": Reclaim(s, fill); return;
                 case "tip": Tip(s, fill, last); return;
+            }
+            if (s.Organic)
+            {
+                OrganicYard.WorkPad(s, false, s.Salt(0x9AD1u));
+                OrganicYard.Field(s, new[]
+                {
+                    new OrganicYard.Zone(YardFill.MetalMix, 0.9f, 0.5f), new OrganicYard.Zone(YardFill.ScrapMix, 0.9f, 0.5f),
+                    new OrganicYard.Zone(YardFill.RubbleMix, 0.85f, 0f), new OrganicYard.Zone(YardFill.TrashMix, 0.75f, 0.3f),
+                }, fill, s.Salt(0xF1E2u));
+                return;
             }
             // The mountain in the biggest block that is not against the back fence (the back is for the bays).
             var mountain = Biggest(s, b => b.Band >= 0 && (b.Band != last || last == 0)) ?? Biggest(s, b => b.Band >= 0) ?? Biggest(s);

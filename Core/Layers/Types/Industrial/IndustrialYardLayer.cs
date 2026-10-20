@@ -65,6 +65,9 @@ namespace Placemaker.Core.Layers.Types.Yards
             c.Fixed("level");
         }
 
+        /// <summary>The style is a scrapyard laid out organically (tracks and a scrap field, OrganicYard), not in blocks.</summary>
+        protected virtual bool Organic(string style) => false;
+
         /// <summary>Layout numbers for a style.</summary>
         protected abstract SiteSpec Spec(LayerContext ctx, string style);
         /// <summary>What stands in the front yard for a style.</summary>
@@ -106,7 +109,8 @@ namespace Placemaker.Core.Layers.Types.Yards
             float officeZone = front.Offices > 0 ? 3.2f + front.Office.Z + 0.6f : front.Booth ? 4f : 0f;
             float parkingZone = front.Parking ? 6.8f : 0f;
             spec.FrontZone = spec.Aisle * 0.5f + math.max(officeZone, parkingZone) + 2.5f;
-            var s = IndustrialSite.Plan(ctx, gates, spec);
+            if (Organic(style)) spec.Aisle = OrganicYard.TrackWidth;
+            var s = Organic(style) ? IndustrialSite.PlanOrganic(ctx, gates, spec, Hashing.Mix(ctx.Seed, 0x7A4Cu)) : IndustrialSite.Plan(ctx, gates, spec);
             ctx.Check();
 
             Ground(s);
@@ -194,6 +198,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 }
             // Concrete yards drive on dark pavement lanes; dirt and gravel yards on their own trodden ground (the paint's
             // mud tracks), the way a real scrap yard does: no white roads through the mud.
+            if (s.Organic) { OrganicYard.TrackSurfaces(s); OrganicYard.FieldGround(s, Hashing.Mix(ctx.Seed, 0x6F0Du)); return; }
             float hw = s.Spec.Aisle * 0.5f;
             foreach (var (a, b) in s.Aisles)
                     YardKit.Strip(ctx, a, b, hw, SurfaceRole.Asphalt, AisleSurface, AssetCategories.SurfaceAsphalt);

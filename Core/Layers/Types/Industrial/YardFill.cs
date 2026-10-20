@@ -63,7 +63,7 @@ namespace Placemaker.Core.Layers.Types.Yards
         /// <summary>Container height plus a hair, so a box stands on the one below without their boxes meeting.</summary>
         public const float TierHeight = 2.62f;
 
-        private static float2 Turn(float2 d, float a) => new float2(d.x * math.cos(a) - d.y * math.sin(a), d.x * math.sin(a) + d.y * math.cos(a));
+        public static float2 Turn(float2 d, float a) => new float2(d.x * math.cos(a) - d.y * math.sin(a), d.x * math.sin(a) + d.y * math.cos(a));
 
         /// <summary>
         /// The colour seed of the i-th box of a row: runs of three to six boxes of one shipping line, two lines a row, now and
@@ -84,6 +84,9 @@ namespace Placemaker.Core.Layers.Types.Yards
             int run = 3 + (int)(rowPick % 4u);
             return item.Pick(Hashing.Mix(rowPick, (uint)(i / run)));
         }
+
+        /// <summary>One prop with a mess applied (wander, pile, tip), for fillers outside this class.</summary>
+        public static int PlaceOne(IndustrialSite s, YardItem item, AssetRef asset, float2 c, float2 face, uint v, Mess m) => Place(s, item, asset, c, face, v, m, 1);
 
         /// <summary>Is slot p left empty (clumps of value noise, so gaps come in runs like a yard that is emptying)?</summary>
         private static bool Gap(float2 p, float share, uint seed) => share > 0f && ValueNoise.Clumps(p, 9f, seed) < share;
@@ -449,6 +452,28 @@ namespace Placemaker.Core.Layers.Types.Yards
             new Part(IndustrialAssets.Car, 0.34f), new Part(IndustrialAssets.MixedRubble, 0.14f), new Part(IndustrialAssets.Trash, 0.14f),
             new Part(IndustrialAssets.Drums, 0.12f), new Part(IndustrialAssets.Crates, 0.08f), new Part(IndustrialAssets.WoodRubble, 0.08f),
             new Part(IndustrialAssets.Tyres, 0.06f), new Part(IndustrialAssets.Reels, 0.04f),
+        };
+        public static readonly Part[] CarsMix =
+        {
+            new Part(IndustrialAssets.Car, 0.8f), new Part(IndustrialAssets.Van, 0.06f), new Part(IndustrialAssets.Drums, 0.05f),
+            new Part(IndustrialAssets.Tyres, 0.04f), new Part(IndustrialAssets.Crates, 0.03f), new Part(IndustrialAssets.Gas, 0.02f),
+        };
+        public static readonly Part[] PartsMix =
+        {
+            new Part(IndustrialAssets.Car, 0.45f), new Part(IndustrialAssets.Crates, 0.14f), new Part(IndustrialAssets.Drums, 0.12f),
+            new Part(IndustrialAssets.Pallets, 0.1f), new Part(IndustrialAssets.Gas, 0.06f), new Part(IndustrialAssets.Reels, 0.05f),
+            new Part(IndustrialAssets.Tyres, 0.08f),
+        };
+        public static readonly Part[] MetalMix =
+        {
+            new Part(IndustrialAssets.MetalHeap, 0.4f), new Part(IndustrialAssets.MixedRubble, 0.2f), new Part(IndustrialAssets.TruckLoad, 0.15f),
+            new Part(IndustrialAssets.Car, 0.15f), new Part(IndustrialAssets.Drums, 0.05f), new Part(IndustrialAssets.Reels, 0.05f),
+        };
+        public static readonly Part[] TrashMix =
+        {
+            new Part(IndustrialAssets.Trash, 0.35f), new Part(IndustrialAssets.Drums, 0.15f), new Part(IndustrialAssets.Crates, 0.12f),
+            new Part(IndustrialAssets.Pallets, 0.12f), new Part(IndustrialAssets.Boxes, 0.1f), new Part(IndustrialAssets.WoodRubble, 0.1f),
+            new Part(IndustrialAssets.Car, 0.06f),
         };
         public static readonly Part[] RubbleMix =
         {

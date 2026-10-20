@@ -339,7 +339,9 @@ namespace Placemaker.Game.Suite
             }
         }
 
-        private bool PlanReady() => _tool.Shape == null || (!_tool.Planning && _tool.Plan != null && _tool.PlanRevision == _tool.InputRevision);
+        // (no type chosen yet, e.g. an area drawn first or after a build: no plan will come, nothing to wait for; it waited 240 s)
+        private bool PlanReady() => _tool.Shape == null || _tool.CurrentRecipe == null
+            || (!_tool.Planning && _tool.Plan != null && _tool.PlanRevision == _tool.InputRevision);
 
         /// <summary>The plan for the current input revision is finished. At "user" pace a person does not wait: a few frames only.</summary>
         private IEnumerator WaitPlan(ScenarioState st, JObject rec, float timeout = 240f, bool always = false)

@@ -141,6 +141,8 @@ namespace Placemaker.Game.Neighbours
         /// <summary>For the game runner: our pieces shown again after the game hid them, and the ones left hidden.</summary>
         public static int TotalShownAgain, TotalKeptHidden;
         private int _shownSinceLog, _keptSinceLog, _againSinceLog;
+        // pieces queued for deletion (NeighbourDeleteSystem, next frame's PostTool)
+        private readonly HashSet<Entity> _goingSoon = new HashSet<Entity>();
 
         private void CreateHiddenQuery()
         {
@@ -165,11 +167,14 @@ namespace Placemaker.Game.Neighbours
         {
             if (_hiddenPieces.IsEmptyIgnoreFilter) return;
             if (_keptHidden.Count > 20000) _keptHidden.Clear();
+            _goingSoon.Clear();
+            foreach (var q in NeighbourDeleteSystem.Queue) _goingSoon.Add(q);
             var show = new List<Entity>();
             using (var all = _hiddenPieces.ToEntityArray(Allocator.Temp))
                 foreach (var e in all)
                 {
-                    if (_keptHidden.TryGetValue(e, out int when) && LotFrame - when < 900) continue;
+                    // looked at again every 2 s (what it doubled may be gone: a garden planned again)
+                    if (_keptHidden.TryGetValue(e, out int when) && LotFrame - when < 120) continue;
                     if (!EntityManager.HasComponent<global::Game.Objects.Object>(e) || !PieceSegment(e, out var a, out var b, out bool fence)) continue;
                     if ((fence && Doubled(e, a, b)) || OnRoadOrBuilding(e, (a + b) * 0.5f))
                     {
@@ -214,13 +219,27 @@ namespace Placemaker.Game.Neighbours
             }
         }
 
-        /// <summary>Another fence or hedge lies along this piece (nearly parallel, within 0.7 m, overlapping by over a metre),
-        /// drawn: a doubled border, where the game is right to show only one.</summary>
+        /// <summary>Other fences or hedges lie along this piece (nearly parallel, within 0.7 m) over nearly all of its length,
+        /// drawn: a doubled border, where the game is right to show only one. Covering only part of it is no double: hiding
+        /// the piece then left the rest of its stretch open (gaps seen in the game runner).</summary>
         private bool Doubled(Entity e, float2 a, float2 b)
         {
             float len = math.distance(a, b);
             if (len < 0.5f) return false;
             var d = (b - a) / len;
+            var spans = new List<(float From, float To)>();
+            bool Covered()
+            {
+                spans.Sort((x, y) => x.From.CompareTo(y.From));
+                float reach = 0f, open = 0f;
+                foreach (var (from, to) in spans)
+                {
+                    if (from > reach) open += from - reach;
+                    reach = math.max(reach, to);
+                }
+                open += math.max(0f, len - reach);
+                return open <= math.max(0.4f, len * 0.1f);
+            }
             bool Along(float2 p, float2 q)
             {
                 float l = math.distance(p, q);
@@ -228,8 +247,11 @@ namespace Placemaker.Game.Neighbours
                 if (math.abs(math.dot((q - p) / l, d)) < 0.95f) return false;
                 var n = new float2(-d.y, d.x);
                 if (math.abs(math.dot((p + q) * 0.5f - a, n)) > 0.7f) return false;
-                float t0 = math.dot(p - a, d), t1 = math.dot(q - a, d);
-                return math.min(len, math.max(t0, t1)) - math.max(0f, math.min(t0, t1)) > 1f;
+                float t0 = math.clamp(math.min(math.dot(p - a, d), math.dot(q - a, d)), 0f, len);
+                float t1 = math.clamp(math.max(math.dot(p - a, d), math.dot(q - a, d)), 0f, len);
+                if (t1 - t0 < 0.05f) return false;
+                spans.Add((t0, t1));
+                return Covered();
             }
             var lo = math.min(a, b) - 1.5f;
             var hi = math.max(a, b) + 1.5f;
@@ -247,6 +269,9 @@ namespace Placemaker.Game.Neighbours
                     {
                         var o = found[i];
                         if (o == e || !EntityManager.Exists(o) || EntityManager.HasComponent<Deleted>(o) || EntityManager.HasComponent<Temp>(o)) continue;
+                        // a piece its garden no longer wants (deleted next frame) doubles nothing: the new piece taking its
+                        // place was kept hidden for good
+                        if (_goingSoon.Contains(o)) continue;
                         if (!PieceSegment(o, out var p, out var q, out bool fence) || !fence) continue;
                         // one that is hidden too only counts when it comes first (of two hidden ones, one is shown)
                         if (EntityManager.HasComponent<Overridden>(o) && o.Index > e.Index) continue;

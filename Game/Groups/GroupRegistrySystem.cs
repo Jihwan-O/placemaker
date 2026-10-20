@@ -716,7 +716,9 @@ namespace Placemaker.Game.Groups
                 if (rec == null) continue;
                 var missing = new List<string>();
                 foreach (var name in rec.PrefabNames)
-                    if (!string.IsNullOrEmpty(name) && !catalog.PrefabExists(name)) missing.Add(name);
+                    if (!string.IsNullOrEmpty(name) && !catalog.PrefabExists(name)
+                        // (issue #2) see-through decal copies are gone for good: OldDecalCleanupSystem removes them after a load
+                        && !name.StartsWith(Core.Decals.DecalLook.ClonePrefix, StringComparison.Ordinal)) missing.Add(name);
                 bool was = (rec.Flags & GroupFlags.MissingAssets) != 0;
                 if (missing.Count > 0) _missing[kv.Key] = missing;
                 if (was != (missing.Count > 0))

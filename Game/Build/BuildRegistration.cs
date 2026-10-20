@@ -17,7 +17,6 @@ namespace Placemaker.Game.Build
             // miss Initialize/LateInitialize and never get an archetype (RESEARCH-NOTES 1). Both
             // run unconditionally so saves that reference the clones by name always resolve (rule 3).
             updateSystem.UpdateBefore<SurfaceCloneSystem, global::Game.Prefabs.PrefabInitializeSystem>(SystemUpdatePhase.PrefabUpdate);
-            updateSystem.UpdateBefore<DecalOpacitySystem, global::Game.Prefabs.PrefabInitializeSystem>(SystemUpdatePhase.PrefabUpdate);
             updateSystem.UpdateBefore<ParkingCompanionPrefabSystem, global::Game.Prefabs.PrefabInitializeSystem>(SystemUpdatePhase.PrefabUpdate);
             // Industrial: the game's vehicles as static props (car yards, staff parking, machines), before any save loads.
             updateSystem.UpdateBefore<Placemaker.Game.Assets.VehiclePropSystem, global::Game.Prefabs.PrefabInitializeSystem>(SystemUpdatePhase.PrefabUpdate);
@@ -60,6 +59,8 @@ namespace Placemaker.Game.Build
             // Game.Net.ReferencesSystem (Modification2B) clears node references in the same frame
             // (RESEARCH-NOTES 11–12).
             updateSystem.UpdateAt<GroupRemovalSystem>(SystemUpdatePhase.PreTool);
+            // After a load: objects on a missing see-through decal copy of older builds are deleted (issue #2), as above.
+            updateSystem.UpdateAt<OldDecalCleanupSystem>(SystemUpdatePhase.PreTool);
             // ModificationEnd: deleted members of this frame still exist (CleanUp is at frame end), so
             // carrier SubNet links are dropped before anything reads them next frame; runs while paused.
             updateSystem.UpdateAt<GroupRegistrySystem>(SystemUpdatePhase.ModificationEnd);

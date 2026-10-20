@@ -327,10 +327,6 @@ namespace Placemaker.Game.Settings
         [SettingsUISection(SectionMain, GroupBuild)]
         public bool DecalsNeverCollide { get; set; }
 
-        /// <summary>(s23) Decorative decals built see-through (runtime clones per opacity tier, DecalOpacitySystem).</summary>
-        [SettingsUISection(SectionMain, GroupBuild)]
-        public bool SeeThroughDecals { get; set; }
-
         [SettingsUISection(SectionMain, GroupBuild)]
         public bool ChargeNetConstruction { get; set; }
 
@@ -427,7 +423,6 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Build.BuildService.RecoverRejectedPieces = RecoverRejectedPieces;
                 global::Placemaker.Game.Build.BuildService.OverlayPavedSurfaces = OverlayPavedSurfaces;
                 global::Placemaker.Game.Build.BuildService.SinkDecals = DecalsNeverCollide;
-                global::Placemaker.Game.Build.DecalOpacitySystem.FeatureEnabled = SeeThroughDecals;
                 global::Placemaker.Game.Build.BuildService.ChargeNetConstruction = ChargeNetConstruction;
                 global::Placemaker.Game.Build.BuildService.DebugTerrainDump = DebugTerrainDump;
                 global::Placemaker.Game.Build.BuildService.ApplyParkStats = ApplyParkStats;
@@ -512,7 +507,6 @@ namespace Placemaker.Game.Settings
             RecoverRejectedPieces = true;
             OverlayPavedSurfaces = true;
             DecalsNeverCollide = true;
-            SeeThroughDecals = true;
             NeighbourhoodPolish = true;
             PolishNewHouses = true;
             PolishThemeHomes = "garden";

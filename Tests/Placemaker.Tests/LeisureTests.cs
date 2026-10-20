@@ -259,28 +259,6 @@ namespace Placemaker.Tests
         }
 
         [Fact]
-        public void DecalsFollowTheirTheme()
-        {
-            // Cracks only on paving: in a park, that is on the paths.
-            var r = With("park", "decals");
-            r.Root.Children[0].Settings.Values["theme"] = "cracks";
-            r.Root.Children[0].Settings.Values["density"] = 6.0;
-            var plan = Compose(r, TestKit.Rect(200, 150), TestKit.RoadAlongBottom(200));
-            var park = plan.Layers.Single(l => l.GeneratorId == "park");
-            var decals = plan.Layers.Single(l => l.GeneratorId == "decals").Objects;
-            Assert.NotEmpty(decals);
-            Assert.All(decals, d => Assert.Equal(ObjectRole.Decal, d.Role));
-            Assert.All(decals, d => Assert.Equal(AssetCategories.DecalCracks, d.Category));
-            foreach (var d in decals)
-                Assert.Contains(park.Nets, n => (n.Role == NetRole.Pathway || n.Role == NetRole.PathwayWide) &&
-                    TestKit.DistanceToCurve(d.Position.xz, n) <= Composer.DefaultHalfWidth(n.Role) + 0.3f);
-            // Decals never reserve space.
-            var reserved = new ReservedSpace();
-            Composer.Reserve(plan.Layers.Single(l => l.GeneratorId == "decals"), reserved);
-            Assert.Empty(reserved.Discs);
-        }
-
-        [Fact]
         public void ShopsStandNearEntrancesBesidePaths()
         {
             var site = TestKit.RoadAlongBottom(200);

@@ -392,6 +392,27 @@ the git hash and the deployed DLL's hash; the game checks it loaded that DLL ("w
 If the game is closed early the quit hook writes what is known, marked incomplete; the host says how it ended
 (`quit`, `closed-externally`, `crashed`, `killed`, `hung`, `boot-timeout`) at the top of summary.md.
 
+## Save and reload
+
+What a player sees after quitting and loading their city again needs a second game: a game keeps every runtime prefab
+it made in memory, so a load in the same game finds them even when a fresh game would not (GitHub issue #2: white boxes
+where a save named a prefab the new game did not have yet). Two files, two games:
+
+```
+powershell -File tools/suite/Send-Suite.ps1 -File suite/scenarios/decal-reload-save.json -Who <you>
+powershell -File tools/suite/Send-Suite.ps1 -File suite/scenarios/decal-reload-load.json -Fresh -Who <you>
+```
+
+* `{"do":"lab","op":"saveCity","name":"..."}` saves the city in the player's saves; `{"do":"lab","op":"loadCity",
+  "name":"...","delete":true}` loads it (and deletes it after). The load's record says how many objects stand on a
+  missing prefab (`objectsOnMissingPrefabs`; the game draws those as its white missing-object box) and what the
+  old-decal clean-up removed. After a load only camera and shot steps make sense (frame with `"target":"point"`,
+  `"at":[x,z]`, `"abs":true`: the first file's `atAbs`).
+* `-Fresh` (Send-Suite) asks for a game launched for that file: never one that has already run other requests.
+* `{"do":"lab","op":"oldDecal","decal":"...","tier":25}` places an object the way builds up to 0.1.1 left decorative
+  decals (a runtime copy named `Placemaker Decal <tier> - <decal>`); `{"do":"lab","op":"oldDecalCleanup","on":false}`
+  turns the clean-up after loads off for the "before" picture.
+
 ## Live queue
 
 `Run-Suite -Direct -Queue` keeps the game open (after the set, or right after the fixture with `-Set queue`); the game queue's

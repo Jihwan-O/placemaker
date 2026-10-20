@@ -272,8 +272,6 @@
   "Placemaker.Settings.RecoverRejectedPieces.Desc": "If the game refuses some pieces, repair or leave out just those and build the rest. Placemaker tells you what was skipped.",
   "Placemaker.Settings.OverlayPavedSurfaces": "Paving drawn above grass",
   "Placemaker.Settings.OverlayPavedSurfaces.Desc": "Paving, asphalt and plaza surfaces are drawn on top of grass instead of flickering with it.",
-  "Placemaker.Settings.SeeThroughDecals": "See-through decals",
-  "Placemaker.Settings.SeeThroughDecals.Desc": "Leaves, stains and wear decals are built mostly transparent so they blend with the ground. Turn off if decals look wrong.",
   "Placemaker.Settings.DecalsNeverCollide": "Decals never collide",
   "Placemaker.Settings.DecalsNeverCollide.Desc": "Leaves, stains and other ground decals lie under trees, benches and paths instead of being hidden where they overlap. Turn off if decals do not show.",
   "Placemaker.Settings.ChargeNetConstruction": "Charge for roads and paths",

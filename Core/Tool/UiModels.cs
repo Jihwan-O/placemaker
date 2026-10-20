@@ -327,7 +327,8 @@ namespace Placemaker.Core.Tool
             var group = GeneratorGroups.Of(g);
             if (!string.IsNullOrEmpty(group)) o.Set("group", group);
             var controls = JsonValue.Arr();
-            if (g.Controls != null) foreach (var c in g.Controls) if (c != null) controls.Add(Control(c));
+            // (issue #2) controls that only placed decals from decal packs are not shown (Decals.PackDecals)
+            if (g.Controls != null) foreach (var c in g.Controls) if (c != null && !Decals.PackDecals.IsHiddenControl(g.Id, c.Id)) controls.Add(Control(c));
             o.Set("controls", controls);
             var presets = JsonValue.Arr();
             IReadOnlyList<PresetView> views = null;

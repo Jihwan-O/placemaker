@@ -139,7 +139,7 @@ The area is drawn in the land's shape with the Points tool. Land is laid out at 
 open (the queue's), when its request arrives.
 
 * `-Category`: a category of the Make row, as the central shelf defines it (`Recipes/shelf/<category>.json`: roads,
-  parking, parks, beach, shops, nature, farms, sports; industry and transport are hidden). `Show.ps1` with no arguments
+  parking, parks, beach, shops, nature, farms, sports, industry; transport is hidden). `Show.ps1` with no arguments
   lists them with their types and styles; hidden types and styles are marked.
 * `-Type`, `-Style`: one or more (`a,b`), or `all` (with `-Category` for types). Every type x every style is built.
   `all` leaves out what the shelf hides; a hidden type or style named by id is still built (picked by id: the panel

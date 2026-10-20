@@ -902,6 +902,11 @@ namespace Placemaker.Tests
             Assert.True(bins.Count == 2, $"{bins.Count} bins: " + string.Join(" | ", plan.Notes.Where(n => n.StartsWith("1:"))));
             Assert.Contains(mine, b => Name(b.Kind).StartsWith("Pallet"));
             Assert.Contains(mine, b => Name(b.Kind).StartsWith("CardboardBoxPile"));
+            // ...in one corner, not a row along the whole back of the lot
+            var service = mine.Where(b => b.Kind == 17 || b.Kind == 18 || (b.Kind >= 29 && b.Kind < 40)).ToList();
+            float spread = service.Max(x => service.Max(y => math.distance(x.Position, y.Position)));
+            Assert.True(spread < 20f, $"the service corner spreads over {spread:F1} m");
+            Assert.True(service.All(x => math.abs(x.Position.x) > 3f) && (service.All(x => x.Position.x > 0f) || service.All(x => x.Position.x < 0f)), "the service corner sits to one side");
             // the overflow car park: marked bays, most with a parked car or van, each car on a bay
             var bays = mine.Where(b => Name(b.Kind) == "ParkingLotDecal01").ToList();
             var cars = mine.Where(b => Name(b.Kind).StartsWith("Placemaker Vehicle")).ToList();

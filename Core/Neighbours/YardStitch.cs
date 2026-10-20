@@ -44,8 +44,8 @@ namespace Placemaker.Core.Neighbours
             "Placemaker Vehicle Car 1", "Placemaker Vehicle Car 2", "Placemaker Vehicle Car 3", "Placemaker Vehicle Car 4", "Placemaker Vehicle Car 5",
             "Placemaker Vehicle Car 6", "Placemaker Vehicle Car 7", "Placemaker Vehicle Car 8", "Placemaker Vehicle Car 9", "Placemaker Vehicle Car 10",
             "Placemaker Vehicle Van 1", "Placemaker Vehicle Van 2", "Placemaker Vehicle Van 3",
-            // 54-56 street trees
-            "NA_LindenTree01", "EU_ChestnutTree01", "NA_LondonPlaneTree01",
+            // 54-56 trees along a shop yard's fence
+            "EU_PoplarTree01", "BirchTree01", "NA_LindenTree01",
         };
         private const int FirstRock = 5, FirstStone = 8, FirstRubble = 13, FirstStock = 17, FirstLog = 23, FirstBench = 26, Flowerbed = 28;
         /// <summary>The kinds gardens are given (0-28); the rest are a shop yard's.</summary>

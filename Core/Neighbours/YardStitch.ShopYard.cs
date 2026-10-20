@@ -2,10 +2,10 @@
 //
 // A shop's extra land used to be one concrete slab out to its fence ("it's just kind of an empty field, it's weird"). Now,
 // as the land behind real shops looks:
-//   * a grass strip inside the fence (not along the street) with a row of street trees and bushes between them;
-//   * near the shop: paved, a service corner by the building (dumpsters, a skip on a bigger lot, pallets, crates, cardboard,
-//     a gas-bottle cage, a shed or a backup generator on a big one) and an overflow car park in marked rows, most bays with
-//     a parked car or van (Placemaker's vehicle props; decoration: nobody drives in);
+//   * a grass strip inside the fence (not along the street) with a few slim trees and bushes between them;
+//   * near the shop: paved, a service corner behind one of the building's back corners (dumpsters, a gas cage; pallets,
+//     crates, cardboard, a skip on a bigger lot, a shed or a backup generator on a big one) and an overflow car park in
+//     marked rows, most bays with a parked car or van (Placemaker's vehicle props; decoration: nobody drives in);
 //   * further out (past shopFar of the lot): no concrete, the ground painted green with a few trees and bushes.
 // Pieces are the house's own (StitchPlan.Paths and Bushes), made and kept like every garden piece.
 
@@ -134,7 +134,8 @@ namespace Placemaker.Core.Neighbours
             plan.Notes.Add($"{h.Id}: shop yard: {paved} paved pieces ({near.Sum(r => r.Area):F0} m²), {grass} grass strips with {trees} trees, a service corner of {service}, {stalls} parking bays ({cars} cars), {far.Sum(r => r.Area):F0} m² green further out ({farTrees} trees)");
         }
 
-        /// <summary>Street trees along the grass strip (one kind per shop, every 9 m), bushes between them.</summary>
+        /// <summary>Trees along the grass strip (one slim kind per shop, every 13.5 m: big crowns hid the parked cars in the game),
+        /// bushes between them.</summary>
         private static int StreetTrees(StitchHouse h, float2[] plot, List<Region> greenLand, Obstacle built, List<float2[]> taken, StitchPlan plan, uint seed)
         {
             if (greenLand.Count == 0) return 0;
@@ -152,7 +153,7 @@ namespace Placemaker.Core.Neighbours
                 {
                     var p = a + d * t + n * 1.5f;
                     if (!InLand(greenLand, p)) continue;
-                    bool treeSpot = ((int)math.round(t / 4.5f) & 1) == 1;
+                    bool treeSpot = (int)math.round(t / 4.5f) % 3 == 1;
                     var fp = Footprint(p, new float2(0.6f, 0.6f), 0f, treeSpot ? 0.4f : 0.1f);
                     if (built.Near(fp).Any(r => Overlaps(fp, r.Outer)) || taken.Any(x => Overlaps(fp, x))) continue;
                     uint hk = Hash(seed + (uint)k * 7919u + (uint)(t * 10f));
@@ -165,87 +166,117 @@ namespace Placemaker.Core.Neighbours
         }
 
         /// <summary>
-        /// The service corner: at the roomiest spot of the paved land nearest the building, a row along the nearest edge of the
-        /// land (bins, a skip, pallets, crates, cardboard, a gas cage; a shed, a container or a generator on a big lot).
+        /// The service corner: in the corner of the paved land behind one of the building's back corners, an L along the two
+        /// edges meeting there: the bins (and a gas cage) along one, the stock (pallets, crates, cardboard; a skip, and a shed,
+        /// a container or a generator on a bigger lot) along the other. Each leg is kept short (in the game, one row along the
+        /// whole back of the lot read as a line of junk).
         /// </summary>
         private static int ServiceCorner(StitchHouse h, List<Region> near, Obstacle built, List<float2[]> taken, StitchPlan plan, uint seed)
         {
             if (near.Count == 0) return 0;
             float area = near.Sum(r => r.Area);
-            var target = h.Footprint != null && h.Footprint.Length >= 3 ? Poly.Centroid(h.Footprint) : h.Position;
-            // the spot: 2.5 m clear of the land's edge, nearest the building
-            float2 best = default;
-            float bestD = float.MaxValue;
-            Region home = null;
-            foreach (var r in near)
+            // which back corner: by the shop's hash, the other one when that has no room
+            float first = (seed >> 3) % 2 == 0 ? 1f : -1f;
+            foreach (float side in new[] { first, -first })
             {
-                Poly.Bounds(r.Outer, out var lo, out var hi);
-                for (float x = lo.x + 0.5f; x < hi.x; x += 1f)
-                    for (float y = lo.y + 0.5f; y < hi.y; y += 1f)
-                    {
-                        var p = new float2(x, y);
-                        if (!Poly.Contains(r.Outer, p) || r.Holes.Any(hl => Poly.Contains(hl, p)) || DistanceToRing(r.Outer, p) < 2.5f) continue;
-                        float dist = math.distance(p, target);
-                        if (dist < bestD) { bestD = dist; best = p; home = r; }
-                    }
-            }
-            if (home == null) return 0;
-            // the nearest edge of that land: the row runs along it, its back a metre off it
-            var ring = home.Outer;
-            float edgeBest = float.MaxValue;
-            float2 ea = ring[0], eb = ring[1];
-            for (int k = 0; k < ring.Length; k++)
-            {
-                var a = ring[k];
-                var b = ring[(k + 1) % ring.Length];
-                if (math.distance(a, b) < 3f) continue;
-                float dd = DistanceToSegment(best, a, b);
-                if (dd < edgeBest) { edgeBest = dd; ea = a; eb = b; }
-            }
-            var dir = math.normalizesafe(eb - ea, h.Right);
-            var nrm = new float2(-dir.y, dir.x);
-            if (math.dot(best - ea, nrm) < 0f) nrm = -nrm;
-            var foot = ea + dir * math.dot(best - ea, dir);
-            var items = new List<int> { Dumpster3, Dumpster2 };
-            if (area >= 400f) items.Add(Skip);
-            items.AddRange(new[] { 17 + (int)(seed % 2), Pallet3, CratePile3, Cardboard3, Cardboard1, GasCage });
-            if (area >= 700f)
-                items.Add(h.Zone == "office" ? Generator : (seed >> 8) % 2 == 0 ? ShedBig : Container);
-            // the row grows both ways from the spot, on the shorter side first; what does not fit is left out
-            var placed = new List<(float2 At, float Yaw, int Kind, float2[] Fp)>();
-            var reach = new[] { 0f, 0f };   // how far the row runs each way (+dir, -dir)
-            foreach (int kind in items)
-            {
-                var half = HalfSize(kind);
-                // long side along the row (a container stands along it too), its front (local +z, a bin's lid side) to the yard
-                bool alongZ = half.y > half.x;
-                float hl = alongZ ? half.y : half.x, hd = alongZ ? half.x : half.y;
-                float yaw = alongZ ? YawX(nrm) : YawZ(nrm);
-                bool done = false;
-                foreach (int way in reach[0] <= reach[1] ? new[] { 0, 1 } : new[] { 1, 0 })
+                var target = h.ToWorld(new float2(side * (h.HalfLot.x - 1f), -h.HalfLot.y - 2f));
+                // the spot: 2.5 m clear of the land's edge, nearest that corner
+                float2 best = default;
+                float bestD = float.MaxValue;
+                Region home = null;
+                foreach (var r in near)
                 {
-                    float side = way == 0 ? 1f : -1f;
-                    for (int tries = 0; tries < 3 && !done; tries++)
-                    {
-                        float t = reach[way] + tries * 0.6f;
-                        var at = foot + dir * side * (t + hl) + nrm * (1f + hd);
-                        var fp = Footprint(at, half, yaw, 0.15f);
-                        if (!Fits(fp, near, built, taken) || placed.Any(x => Overlaps(fp, x.Fp))) continue;
-                        placed.Add((at, yaw, kind, fp));
-                        reach[way] = t + 2f * hl + 0.5f;
-                        done = true;
-                    }
-                    if (done) break;
+                    Poly.Bounds(r.Outer, out var lo, out var hi);
+                    for (float x = lo.x + 0.5f; x < hi.x; x += 1f)
+                        for (float y = lo.y + 0.5f; y < hi.y; y += 1f)
+                        {
+                            var p = new float2(x, y);
+                            if (!Poly.Contains(r.Outer, p) || r.Holes.Any(hl => Poly.Contains(hl, p)) || DistanceToRing(r.Outer, p) < 2.5f) continue;
+                            float dist = math.distance(p, target);
+                            if (dist < bestD) { bestD = dist; best = p; home = r; }
+                        }
                 }
+                if (home == null || bestD > 25f) continue;
+                // the two nearest edges of that land that are not parallel: the corner's legs
+                var edges = new List<(float D, float2 A, float2 B)>();
+                var ring = home.Outer;
+                for (int k = 0; k < ring.Length; k++)
+                {
+                    var a = ring[k];
+                    var b = ring[(k + 1) % ring.Length];
+                    if (math.distance(a, b) >= 3f) edges.Add((DistanceToSegment(best, a, b), a, b));
+                }
+                if (edges.Count == 0) continue;
+                edges.Sort((x, y) => x.D.CompareTo(y.D));
+                var e1 = edges[0];
+                var d1 = math.normalize(e1.B - e1.A);
+                int i2 = edges.FindIndex(1, e => e.D < 8f && math.abs(math.dot(math.normalize(e.B - e.A), d1)) < 0.7f);
+                var legs = new List<(float2 Edge0, float2 Dir)> { (e1.A, d1) };
+                // where the legs meet, near the spot (else one leg from the spot's foot on the nearest edge)
+                float2 corner = e1.A + d1 * math.dot(best - e1.A, d1);
+                if (i2 > 0)
+                {
+                    var d2 = math.normalize(edges[i2].B - edges[i2].A);
+                    if (LineCross(e1.A, d1, edges[i2].A, d2, out var cross) && math.distance(cross, best) < 8f) { legs.Add((edges[i2].A, d2)); corner = cross; }
+                }
+
+                var bins = new List<int> { GasCage, Dumpster3, Dumpster2 };
+                var stock = new List<int> { 17 + (int)(seed % 2), CratePile3, Cardboard3 };
+                if (area >= 400f) stock.Add(Skip);
+                if (area >= 700f) stock.Add(h.Zone == "office" ? Generator : (seed >> 8) % 2 == 0 ? ShedBig : Container);
+                var placed = new List<(float2 At, float Yaw, int Kind, float2[] Fp)>();
+                var groups = legs.Count == 2 ? new[] { bins, stock } : new[] { bins.Concat(stock).ToList() };
+                float[] caps = legs.Count == 2 ? new[] { 9f, area >= 700f ? 16f : 11f } : new[] { area >= 700f ? 18f : 13f };
+                for (int g = 0; g < groups.Length; g++)
+                {
+                    var (edge0, dir) = legs[g];
+                    // along the leg, away from the corner (towards the spot); its back a metre off the edge, facing the yard
+                    if (math.dot(best - corner, dir) < 0f) dir = -dir;
+                    var nrm = new float2(-dir.y, dir.x);
+                    if (math.dot(best - corner, nrm) < 0f) nrm = -nrm;
+                    // the second leg starts past the first one's depth
+                    float reach = g == 0 ? 0.3f : 3.4f;
+                    foreach (int kind in groups[g])
+                    {
+                        var half = HalfSize(kind);
+                        bool alongZ = half.y > half.x;
+                        float hl = alongZ ? half.y : half.x, hd = alongZ ? half.x : half.y;
+                        float yaw = alongZ ? YawX(nrm) : YawZ(nrm);
+                        for (int tries = 0; tries < 3; tries++)
+                        {
+                            float t = reach + tries * 0.5f;
+                            if (t + 2f * hl > caps[g]) break;
+                            var at = corner + dir * (t + hl) + nrm * (1f + hd);
+                            var fp = Footprint(at, half, yaw, 0.15f);
+                            if (!Fits(fp, near, built, taken) || placed.Any(x => Overlaps(fp, x.Fp))) continue;
+                            placed.Add((at, yaw, kind, fp));
+                            reach = t + 2f * hl + 0.3f;
+                            break;
+                        }
+                    }
+                }
+                if (placed.Count < 3) continue;
+                foreach (var (at, yaw, kind, _) in placed)
+                {
+                    plan.Bushes.Add((h.Id, at, yaw, kind));
+                    // kept clear: a little room round the corner
+                    taken.Add(Footprint(at, HalfSize(kind), yaw, 1.2f));
+                }
+                return placed.Count;
             }
-            if (placed.Count < 3) return 0;
-            foreach (var (at, yaw, kind, _) in placed)
-            {
-                plan.Bushes.Add((h.Id, at, yaw, kind));
-                // kept clear: a little room round the corner
-                taken.Add(Footprint(at, HalfSize(kind), yaw, 1.2f));
-            }
-            return placed.Count;
+            return 0;
+        }
+
+        /// <summary>Where two lines (point and direction) cross; false when (nearly) parallel.</summary>
+        private static bool LineCross(float2 p, float2 d, float2 q, float2 e, out float2 at)
+        {
+            at = default;
+            float den = d.x * e.y - d.y * e.x;
+            if (math.abs(den) < 1e-3f) return false;
+            var w = q - p;
+            float t = (w.x * e.y - w.y * e.x) / den;
+            at = p + d * t;
+            return true;
         }
 
         /// <summary>An overflow car park in marked rows (3.3 m bays, 6 m deep, 6.5 m aisles) over one piece of paved land; most bays

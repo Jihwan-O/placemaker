@@ -922,7 +922,7 @@ namespace Placemaker.Game.Neighbours
                     if (!EntityManager.Exists(o) || EntityManager.HasComponent<global::Game.Objects.Tree>(o) || EntityManager.HasComponent<global::Game.Objects.Plant>(o)) continue;
                     if (!EntityManager.HasComponent<global::Game.Objects.Transform>(o) || !EntityManager.HasComponent<PrefabRef>(o) || EntityManager.HasComponent<PolishPiece>(o)) continue;
                     var op = EntityManager.GetComponentData<PrefabRef>(o).m_Prefab;
-                    if (!EntityManager.HasComponent<ObjectGeometryData>(op) || Array.IndexOf(YardStitch.BushKinds, NameOf(op)) >= 0) continue;   // not our own rocks
+                    if (!EntityManager.HasComponent<ObjectGeometryData>(op) || Array.IndexOf(YardStitch.BushKinds, NameOf(op), 0, YardStitch.GardenKinds) >= 0) continue;   // not our own rocks (a shop's own bins and bay marks are obstacles)
                     var gb = EntityManager.GetComponentData<ObjectGeometryData>(op).m_Bounds;
                     var size = gb.max - gb.min;
                     if (size.x * size.z < 1.5f || size.y < 0.25f) continue;

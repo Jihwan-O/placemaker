@@ -248,17 +248,28 @@ namespace Placemaker.Core.Layers.Types.Yards
             v = front + a;
             foreach (var d in depths) { bands.Add(new float2(v, v + d)); v += d + a; }
 
-            // Column aisles cut long blocks into equal pieces on each side of the spine.
-            var columns = new List<float>();
-            foreach (int side in new[] { -1, 1 })
+            // Column aisles cut long blocks into equal pieces on each side of the spine, staggered band by band like brickwork:
+            // an odd band's cuts fall half a block along, so the lanes meet in T-junctions, not a grid of crossroads (the user,
+            // 2026-10-19: "things are just too well laid out").
+            List<float> ColumnsFor(int band)
             {
-                float span = (side > 0 ? UMax : -UMin) - a * 0.5f;
-                if (span <= Spec.MaxBlock) continue;
-                int n = (int)math.ceil((span + a) / (Spec.MaxBlock + a));
-                float len = (span - (n - 1) * a) / n;
-                for (int k = 1; k < n; k++) columns.Add(side * (a * 0.5f + k * len + (k - 0.5f) * a));
+                var cols = new List<float>();
+                foreach (int side in new[] { -1, 1 })
+                {
+                    float span = (side > 0 ? UMax : -UMin) - a * 0.5f;
+                    if (span <= Spec.MaxBlock) continue;
+                    int n = (int)math.ceil((span + a) / (Spec.MaxBlock + a));
+                    float len = (span - (n - 1) * a) / n;
+                    float shift = (band & 1) == 1 ? (len + a) * 0.5f : 0f;
+                    for (int k = 1; k < n + ((band & 1) == 1 ? 1 : 0); k++)
+                    {
+                        float c = a * 0.5f + k * len + (k - 0.5f) * a - shift;
+                        if (c > a + 4f && c < span - 4f) cols.Add(side * c);
+                    }
+                }
+                cols.Sort();
+                return cols;
             }
-            columns.Sort();
 
             // Blocks: inside the band, clear of the spine and the columns.
             int index = 0;
@@ -270,7 +281,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 {
                     // Cut by the spine and the columns.
                     var cuts = new List<float2> { new float2(-a * 0.5f - gap, a * 0.5f + gap) };
-                    foreach (var c in columns) cuts.Add(new float2(c - a * 0.5f - gap, c + a * 0.5f + gap));
+                    foreach (var c in ColumnsFor(bi)) cuts.Add(new float2(c - a * 0.5f - gap, c + a * 0.5f + gap));
                     var pieces = new List<float2> { iv };
                     foreach (var cut in cuts)
                     {
@@ -357,20 +368,23 @@ namespace Placemaker.Core.Layers.Types.Yards
 
             // Spine from the gate to the last cross aisle; columns from the header to the last band they cut.
             Aisles.Insert(0, (W(0f, -1.5f), W(0f, spineEnd)));
-            foreach (var c in columns)
+            // Each band's column lanes run across that band only, from the lane in front of it to the one behind (or to the
+            // back of the last band), and only where a block stands beside them.
+            for (int bi = 0; bi < bands.Count; bi++)
             {
-                float top = header;
-                foreach (var b in Blocks) if (math.abs(b.U0 - gap - a * 0.5f - c) < 0.6f || math.abs(b.U1 + gap + a * 0.5f - c) < 0.6f) top = math.max(top, b.V1);
-                if (top <= header + 1f) continue;
-                float2? span = null;
-                // The column must lie inside along its whole length: shorten it until it does.
-                for (float t = top; t > header + 1f; t -= 2f)
+                float vf = bands[bi].x - a * 0.5f, vb = bi < bands.Count - 1 ? bands[bi].y + a * 0.5f : bands[bi].y;
+                foreach (var c in ColumnsFor(bi))
                 {
-                    var ch = StripInsideAlong(c, header, t);
-                    if (ch) { span = new float2(header, t); break; }
+                    bool beside = false;
+                    foreach (var b in Blocks)
+                        if (b.Band == bi && (math.abs(b.U0 - gap - a * 0.5f - c) < 0.6f || math.abs(b.U1 + gap + a * 0.5f - c) < 0.6f)) { beside = true; break; }
+                    if (!beside) continue;
+                    float2? span = null;
+                    for (float t = vb; t > vf + 1f; t -= 2f)
+                        if (StripInsideAlong(c, vf, t)) { span = new float2(vf, t); break; }
+                    if (span == null) continue;
+                    Aisles.Add((W(c, span.Value.x), W(c, span.Value.y)));
                 }
-                if (span == null) continue;
-                Aisles.Add((W(c, span.Value.x), W(c, span.Value.y)));
             }
 
             // Office side: the side with more room in the front yard.

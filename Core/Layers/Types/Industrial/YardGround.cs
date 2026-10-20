@@ -138,7 +138,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 {
                     case "stacks": case "box20": case "box40": case "units": case "containers": asset = (b.Index & 1) == 0 ? Hard.Concrete : Hard.ConcreteLight; role = SurfaceRole.Paving; break;
                     case "wrecks": case "carports": asset = (b.Index % 3) == 0 ? Hard.Gravel : Hard.Ore; role = SurfaceRole.Ground; break;
-                    case "mountain": case "heaps": case "crusher": case "crushed": asset = Hard.Oil; role = SurfaceRole.Ground; break;
+                    case "mountain": case "heaps": case "crusher": case "crushed": asset = (b.Index % 3) == 2 ? Hard.Ore : Hard.Rubbish; role = SurfaceRole.Ground; break;
                     case "bays": case "parts": asset = ground == "concrete" ? Hard.Concrete : Hard.Rubbish; role = ground == "concrete" ? SurfaceRole.Paving : SurfaceRole.Ground; break;
                     case "plant": asset = Hard.Concrete; role = SurfaceRole.Paving; break;
                     default: asset = (b.Index & 1) == 0 ? Hard.Pavement : Hard.Gravel; role = (b.Index & 1) == 0 ? SurfaceRole.Paving : SurfaceRole.Ground; break;

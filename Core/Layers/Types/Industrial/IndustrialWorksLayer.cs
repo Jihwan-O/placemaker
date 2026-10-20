@@ -25,9 +25,9 @@ namespace Placemaker.Core.Layers.Types.Yards
 
         protected override void DefinePresets()
         {
-            Preset("recycling", ("style", "recycling"), ("ground", "gravel"), ("edge", "trees"), ("aisle", 10.0), ("fill", 90.0), ("weighbridge", true));
-            Preset("salvage", ("style", "salvage"), ("ground", "dirt"), ("edge", "containers"), ("aisle", 9.0), ("fill", 85.0), ("weighbridge", true));
-            Preset("works", ("style", "works"), ("ground", "dirt"), ("edge", "blocks"), ("aisle", 11.0), ("fill", 85.0), ("weighbridge", false));
+            Preset("recycling", ("style", "recycling"), ("ground", "gravel"), ("edge", "trees"), ("aisle", 8.0), ("fill", 90.0), ("weighbridge", true));
+            Preset("salvage", ("style", "salvage"), ("ground", "dirt"), ("edge", "containers"), ("aisle", 8.0), ("fill", 85.0), ("weighbridge", true));
+            Preset("works", ("style", "works"), ("ground", "dirt"), ("edge", "blocks"), ("aisle", 9.0), ("fill", 85.0), ("weighbridge", false));
         }
 
         protected override SiteSpec Spec(LayerContext ctx, string style)
@@ -99,7 +99,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                         if (back)
                         {
                             if ((k++ & 1) == 0 && YardFill.Stockpiles(s, b, salt) > 0) { b.Use = "stockpiles"; break; }
-                            if (YardFill.Carpet(s, b, new[] { IndustrialAssets.MixedRubble, IndustrialAssets.WoodRubble, IndustrialAssets.MetalHeap }, fill, salt) > 0) { b.Use = "heaps"; break; }
+                            if (YardFill.Jumble(s, b, YardFill.RubbleMix, fill, salt) > 0) { b.Use = "heaps"; break; }
                         }
                         var goods = (b.Index & 1) == 0 ? IndustrialAssets.Pipes : IndustrialAssets.Reels;
                         if ((goods.Z > 5f ? YardFill.RowsAcross(s, b, goods, 0.6f, fill, salt, YardFill.Mess.Goods) : YardFill.Piles(s, b, goods, fill, salt)) > 0) b.Use = "goods";

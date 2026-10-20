@@ -43,7 +43,7 @@ namespace Placemaker.Core.Layers.Types.Yards
         {
             c.Choice("style", Styles[0], ControlTier.Essential, "yard", Styles).Tip();
             c.Slider("fill", 85, 30, 100, 5, "%", ControlTier.Essential, "yard").Tip();
-            c.Slider("aisle", 9, 6, 14, 0.5, "m", ControlTier.Essential, "yard").Tip();
+            c.Slider("aisle", 8, 6, 14, 0.5, "m", ControlTier.Essential, "yard").Tip();
 
             c.Toggle("office", true, ControlTier.More, "front").Tip();
             c.Toggle("parking", true, ControlTier.More, "front").Tip();
@@ -88,6 +88,8 @@ namespace Placemaker.Core.Layers.Types.Yards
 
             var spec = Spec(ctx, style);
             spec.Aisle = math.max(6f, ctx.F("aisle"));
+            // A big plot gets longer blocks (a 20 ha yard of 60 m blocks is a car park).
+            spec.MaxBlock *= 1f + 0.7f * math.saturate((math.sqrt(region.Area) - 160f) / 240f);
             // A small plot (the user: "What about really tiny areas?") gets a compact yard: a thin edge, a short front with one
             // office, no parking under 2000 m², short blocks, a narrower aisle.
             if (region.Area < 4000f)

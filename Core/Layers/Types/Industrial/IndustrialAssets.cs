@@ -121,7 +121,8 @@ namespace Placemaker.Core.Layers.Types.Yards
         // ───────────── vehicles (wrecks, staff cars, machines) ─────────────
 
         /// <summary>Cars (wrecks in the yard, staff cars at the office): Placemaker's car props, then pack props, then a trailer.</summary>
-        public static readonly YardItem Car = new YardItem(AssetCategories.ScrapWreck, 2.0f, 4.8f,
+        // Footprint of the largest car the game has (Car10 2.2 × 5.2 m, VehiclePropSystem log): rows never let two touch.
+        public static readonly YardItem Car = new YardItem(AssetCategories.ScrapWreck, 2.25f, 5.2f,
             VehicleProps.Car(1) + "|Prop_ParkMaintenanceVehicle01|Prop_CarTrailer01|CarTrailer01_Props02",
             VehicleProps.Car(2) + "|Prop_ParkMaintenanceVehicle01|Prop_CarTrailer01|CarTrailer01_Props01",
             VehicleProps.Car(3) + "|Prop_CarTrailer01|Prop_ParkMaintenanceVehicle01|CarTrailer01_Props03",

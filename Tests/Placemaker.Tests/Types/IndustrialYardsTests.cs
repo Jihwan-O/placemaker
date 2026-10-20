@@ -116,7 +116,9 @@ namespace Placemaker.Tests.Types
                     if (m > 0.2f) offRow++;
                 }
             }
-            Assert.True(offRow <= wrecks / 10, $"{type}/{preset}: {offRow} of {wrecks} wrecks more than 11° off their rows");
+            // Rows of wrecks only in the car yards that rack them; scrap jumbles (junk yard, crusher pad, salvage works) lie any way.
+            if (type == "carYard" && preset != "crusher")
+                Assert.True(offRow <= wrecks / 10, $"{type}/{preset}: {offRow} of {wrecks} wrecks more than 11° off their rows");
         }
 
         /// <summary>
@@ -207,10 +209,13 @@ namespace Placemaker.Tests.Types
                 foreach (var p in TestKit.Gen(type).Presets)
                 {
                     var plan = YardTestKit.PlanPreset(type, p.Id, Site15, TestKit.RoadAlongBottom(140));
-                    var top = plan.Objects.Where(o => o.Role != ObjectRole.Decal).GroupBy(o => o.Asset.Id).OrderByDescending(g => g.Count()).Take(3).Select(g => g.Key);
-                    mixes.Add(string.Join(",", top));
+                    // What the style keeps (walls, rocks and bushes are the yard's frame, shared by all).
+                    var top = plan.Objects.Where(o => o.Role == ObjectRole.Furniture && o.Category != AssetCategories.ScrapBarrier && o.Category != AssetCategories.Rock).GroupBy(o => o.Asset.Id).OrderByDescending(g => g.Count()).Take(3).Select(g => g.Key);
+                    // Container yards keep the same boxes: their difference is how high they stack and what lines the fence.
+                    int high = plan.Objects.Count(o => o.Elevation > 0f), trees = plan.Objects.Count(o => o.Role == ObjectRole.Tree);
+                    mixes.Add(string.Join(",", top) + $" high {high / 25} trees {trees / 10}");
                 }
-                Assert.Equal(mixes.Count, mixes.Distinct().Count());
+                Assert.True(mixes.Count == mixes.Distinct().Count(), type + ": " + string.Join(" | ", mixes));
             }
         }
 

@@ -26,12 +26,12 @@ namespace Placemaker.Core.Layers.Types.Yards
         protected override void DefinePresets()
         {
             Preset("salvage", ("style", "salvage"), ("ground", "dirt"), ("edge", "wrecks"), ("aisle", 7.0), ("fill", 90.0), ("weighbridge", false));
-            Preset("crusher", ("style", "crusher"), ("ground", "dirt"), ("edge", "wrecks"), ("aisle", 9.0), ("fill", 85.0), ("weighbridge", true));
-            Preset("breakers", ("style", "breakers"), ("ground", "gravel"), ("edge", "trees"), ("aisle", 8.0), ("fill", 85.0), ("weighbridge", false));
+            Preset("crusher", ("style", "crusher"), ("ground", "dirt"), ("edge", "wrecks"), ("aisle", 8.0), ("fill", 85.0), ("weighbridge", true));
+            Preset("breakers", ("style", "breakers"), ("ground", "gravel"), ("edge", "trees"), ("aisle", 7.0), ("fill", 85.0), ("weighbridge", false));
         }
 
         // Two wrecks nose to tail (4.7 m each) with a walkway between their tails.
-        private const float DoubleRow = 2f * 4.8f + 1.0f + 2f * 0.5f + 0.5f;
+        private const float DoubleRow = 2f * 5.2f + 1.0f + 2f * 0.5f + 0.5f;
 
         protected override SiteSpec Spec(LayerContext ctx, string style)
         {
@@ -87,7 +87,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                     b.Use = "parts";
                     continue;
                 }
-                if (back && style == "crusher" && YardFill.Carpet(s, b, new[] { IndustrialAssets.MetalHeap, IndustrialAssets.MetalHeap, IndustrialAssets.MixedRubble }, fill, salt) > 0) { b.Use = "crushed"; continue; }
+                if (back && style == "crusher" && YardFill.Jumble(s, b, YardFill.CrushedMix, fill, salt) > 0) { b.Use = "crushed"; continue; }
                 // Wrecks: nose to the aisle, a few degrees off true (they were dropped by a forklift, not parked).
                 // Piled higher towards the back: a few on top of each other at the front, most at the back.
                 float pile = b.Band < 0 ? 0.15f : math.min(0.8f, 0.35f + 0.2f * b.Band);

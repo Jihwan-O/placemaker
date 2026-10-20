@@ -372,7 +372,7 @@ namespace Placemaker.Game.Build
             _itemByKey[key] = w;
             // Uniform categories (benches, lamps, bins…): one random seed per build, so colour/mesh
             // variations do not turn a row of one bench into a mix (FEEDBACK-2 #1).
-            int? seed = AutoAssets.IsUniform(w.Category) ? AutoAssets.UniformSeed(w.Category, (uint)_groupId) : (int?)null;
+            int? seed = AutoAssets.IsUniform(w.Category) ? AutoAssets.UniformSeed(w.Category, (uint)_groupId) : o.ColorSeed >= 0 ? o.ColorSeed : (int?)null;
             float elevation = SinkDecals && (o.Role == ObjectRole.Decal || SinkStallMarkings && PlanWork.SinkInBuild(o.Role)) ? DecalSink : 0f;
             if (o.Elevation > 0.01f && o.Role != ObjectRole.Decal) elevation = o.Elevation;   // (Industrial) stacked on another prop
             EmitObjectDefinition(prefab, o.Position, o.Yaw, o.Scale, o.Age, o.Variation, key, true, seed, elevation, optional: !IgnoreOwnCollisions && !PlanWork.IsFunctional(o.Role), roll: o.Roll, pitch: o.Pitch);   // (s59) anarchy: the ghost shows what the build places — nothing is cancelled

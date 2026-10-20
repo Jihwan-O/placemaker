@@ -102,7 +102,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                             if (YardFill.HeapRow(s, b, IndustrialAssets.Rubble, 3f, fill, salt) > 0) { b.Use = "heaps"; break; }
                         }
                         var goods = (b.Index & 1) == 0 ? IndustrialAssets.Pipes : IndustrialAssets.Reels;
-                        if ((goods.Z > 5f ? YardFill.RowsAcross(s, b, goods, 0.6f, fill, salt, YardFill.Mess.Goods) : YardFill.RowsAlong(s, b, goods, 0.8f, 1f, fill, salt, YardFill.Mess.Goods)) > 0) b.Use = "goods";
+                        if ((goods.Z > 5f ? YardFill.RowsAcross(s, b, goods, 0.6f, fill, salt, YardFill.Mess.Goods) : YardFill.Piles(s, b, goods, fill, salt)) > 0) b.Use = "goods";
                         break;
                 }
             }
@@ -113,7 +113,8 @@ namespace Placemaker.Core.Layers.Types.Yards
             var item = kinds[i % kinds.Length];
             uint v = Hashing.Mix(salt, (uint)i);
             if (item.X >= 7f) YardFill.Heap(s, c, face, w, d, item, v);
-            else YardFill.Grid(s, c, face, w, d, item, 0.3f, 0.85f, v);
+            else if (item.Category == AssetCategories.ScrapPallet) YardFill.Grid(s, c, face, w, d, item, 0.3f, 0.85f, v);
+            else YardFill.Clump(s, c, math.min(w, d) * 0.4f, item, 6 + (int)(v % 5u), v);
         }
     }
 }

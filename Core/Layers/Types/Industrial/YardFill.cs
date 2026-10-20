@@ -51,7 +51,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             public float Height;
 
             public static Mess Tidy => new Mess { Pos = 0.08f, Yaw = 0.015f, Missing = 0.03f };
-            public static Mess Containers => new Mess { Pos = 0.12f, Yaw = 0.025f, Missing = 0.06f, Height = TierHeight };
+            public static Mess Containers => new Mess { Pos = 0.15f, Yaw = 0.03f, Missing = 0.12f, Height = TierHeight };
             public static Mess Goods => new Mess { Pos = 0.2f, Yaw = 0.2f, Missing = 0.15f };
             // Cars: the game hides one of two props whose boxes meet, so a wreck may wander and turn only as far as its row
             // leaves room (pitch = width + gap + 2 × Pos); a car on another clears it by a hand (Height).
@@ -63,6 +63,18 @@ namespace Placemaker.Core.Layers.Types.Yards
 
         private static float2 Turn(float2 d, float a) => new float2(d.x * math.cos(a) - d.y * math.sin(a), d.x * math.sin(a) + d.y * math.cos(a));
 
+        /// <summary>
+        /// The colour seed of the i-th box of a row: runs of three to six boxes of one shipping line, two lines a row, now and
+        /// then an odd box (the game picks a box's colour from its seed). -1 for anything but containers.
+        /// </summary>
+        private static int RowColour(YardItem item, uint rowPick, int i, uint v)
+        {
+            if (item.Category != AssetCategories.ScrapContainer) return -1;
+            int run = 3 + (int)(rowPick % 4u);
+            if (Hashing.Unit(Hashing.Mix(v, 0xC0Du)) < 0.1f) return (int)(Hashing.Mix(v, 0xC0Eu) & 0x7FFFu);
+            return (int)(Hashing.Mix(rowPick, (i / run & 1) == 0 ? 0xC01u : 0xC02u) & 0x7FFFu);
+        }
+
         /// <summary>Is slot p left empty (clumps of value noise, so gaps come in runs like a yard that is emptying)?</summary>
         private static bool Gap(float2 p, float share, uint seed) => share > 0f && ValueNoise.Clumps(p, 9f, seed) < share;
 
@@ -70,7 +82,7 @@ namespace Placemaker.Core.Layers.Types.Yards
         /// One prop of a row with the mess applied: placed (checked) on the ground, maybe flipped, maybe with more on top.
         /// Returns how many props it made.
         /// </summary>
-        private static int Place(IndustrialSite s, YardItem item, AssetRef asset, float2 c, float2 face, uint v, Mess m, int tiers)
+        private static int Place(IndustrialSite s, YardItem item, AssetRef asset, float2 c, float2 face, uint v, Mess m, int tiers, int colour = -1)
         {
             var dir = m.Yaw > 0f ? Turn(face, (Hashing.Unit(Hashing.Mix(v, 9u)) - 0.5f) * 2f * m.Yaw) : face;
             if (m.Pos > 0f) c += new float2(Hashing.Unit(Hashing.Mix(v, 10u)) - 0.5f, Hashing.Unit(Hashing.Mix(v, 11u)) - 0.5f) * 2f * m.Pos;
@@ -78,6 +90,7 @@ namespace Placemaker.Core.Layers.Types.Yards
             int n = 1;
             var objs = s.Ctx.Plan.Objects;
             var ground = objs[objs.Count - 1];
+            ground.ColorSeed = colour;
             float roll = Hashing.Unit(Hashing.Mix(v, 12u));
             bool flipped = false;
             if (m.Flip > 0f && roll < m.Flip) { ground.Roll = math.PI; ground.Elevation = m.Height; flipped = true; }
@@ -96,6 +109,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 if (!s.ReservedOnly.Free(c + off, math.max(item.X, item.Z) * 0.5f, 0f, 0.3f)) break;   // never over a path another layer keeps
                 var o = s.Ctx.Object(c + off - d * item.CZ, math.atan2(d.x, d.y), ObjectRole.Furniture, item.Pick(tv), tv, -1, item.Category);
                 o.Elevation = t * h;
+                if (colour >= 0) o.ColorSeed = (tv & 3u) == 0 ? colour + 7 : colour;
                 // The top car of a pile sometimes lies on its roof.
                 if (tiers <= 1 && t == extra && m.Flip > 0f && Hashing.Unit(Hashing.Mix(tv, 3u)) < 0.3f) { o.Roll = math.PI; o.Elevation = (t + 1) * h; }
                 s.Items++;
@@ -139,7 +153,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                     uint v = Hashing.Mix(rowPick, (uint)i);
                     var c = s.W(slots[i], rows[r].v);
                     if (Gap(c, mess.Missing, salt)) continue;
-                    placed += Place(s, item, item.Pick(perSlot ? v : rowPick), c, rows[r].face, v, mess, Tiers(tiers, use, i, v));
+                    placed += Place(s, item, item.Pick(perSlot ? v : rowPick), c, rows[r].face, v, mess, Tiers(tiers, use, i, v), RowColour(item, rowPick, i, v));
                 }
             }
             return placed;
@@ -178,7 +192,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                     uint v2 = Hashing.Mix(linePick, (uint)i);
                     var c = s.W(slots[i], v);
                     if (Gap(c, mess.Missing, salt)) continue;
-                    placed += Place(s, item, item.Pick(perSlot ? v2 : linePick), c, dir, v2, mess, Tiers(tiers, use, i, v2));
+                    placed += Place(s, item, item.Pick(perSlot ? v2 : linePick), c, dir, v2, mess, Tiers(tiers, use, i, v2), RowColour(item, linePick, i, v2));
                 }
             }
             return placed;
@@ -195,7 +209,8 @@ namespace Placemaker.Core.Layers.Types.Yards
                 uint v = Hashing.Mix(salt, (uint)i);
                 var p = c + new float2(math.cos(i * golden), math.sin(i * golden)) * r * t;
                 float a = Hashing.Unit(v) * 6.283f;
-                if (s.Put(item, item.Pick(v), p, new float2(math.sin(a), math.cos(a)), v, -0.1f)) n++;
+                // Touching, never overlapping: the game hides one of two props whose boxes meet.
+                if (s.Occ.Free(p, item.Radius * 0.92f, 0f, 0.02f) && s.Put(item, item.Pick(v), p, new float2(math.sin(a), math.cos(a)), v, 0.02f)) n++;
             }
             return n;
         }
@@ -458,69 +473,104 @@ namespace Placemaker.Core.Layers.Types.Yards
         }
 
         /// <summary>
-        /// The yard's centrepiece: the scrap mountain. The game's big pile props are empty without the building that fills them
-        /// (seen in the game), so the mountain is tipped from metal truck loads and rubble heaped together, unevenly, on a
-        /// real terrain mound: a big middle, smaller loads tipped round its foot at odd angles, a loader nosing into it and a
-        /// line of skips along the aisle.
+        /// The yard's centrepiece: the scrap mountain. The game's big pile props are empty without their building and two props
+        /// whose boxes meet lose one of them (both seen in the game), so the mountain is metal truck loads laid edge to edge on
+        /// a round patch, each turned its own quarter, on a real terrain mound that lifts the middle; dark spoil and rubble loads
+        /// at its rim, a loader nosing into it and a ragged line of skips along the aisle.
         /// </summary>
         public static bool Mountain(IndustrialSite s, YardBlock b, uint salt, bool skips = true)
         {
             var face = b.AisleFront ? -s.V : s.V;
             var heap = IndustrialAssets.MetalHeap;   // 7.6 × 9.0
-            float rad = math.min(b.Length * 0.5f - 7f, b.Depth * 0.5f - 1f);
-            if (rad < 5f) return false;
-            rad = math.min(rad, 16f);
-            float vc = b.AisleFront ? b.V1 - rad - 0.5f : b.V0 + rad + 0.5f;
+            float rad = math.min(b.Length * 0.5f - 7f, b.Depth * 0.5f - 0.8f);
+            if (rad < 4.6f) return false;
+            rad = math.min(rad, 20f);
+            float vc = b.AisleFront ? b.V1 - rad - 0.4f : b.V0 + rad + 0.4f;
             var c = s.W(b.UMid, vc);
+            const float cell = 9.25f;   // the load's long side + a hand: any quarter turn fits its cell
+            int m = (int)math.ceil(rad / cell) + 1;
             int made = 0;
-            // Loads tipped on a golden spiral from the middle out, each turned its own way, overlapping a little.
-            int want = math.clamp((int)(rad * rad * 0.09f), 3, 18);
-            const float golden = 2.39996323f;
-            float phase = Hashing.Unit(salt) * 6.283f;
-            for (int i = 0; i < want * 3 && made < want; i++)
-            {
-                float t = math.sqrt((i + 0.5f) / (want * 1.1f));
-                if (t > 1f) break;
-                uint hv = Hashing.Mix(salt, (uint)i);
-                var p = c + new float2(math.cos(i * golden + phase), math.sin(i * golden + phase)) * (rad - 3.5f) * t;
-                float a = Hashing.Unit(Hashing.Mix(hv, 1u)) * 6.283f;
-                var dir = new float2(math.sin(a), math.cos(a));
-                // The outer loads are rubble and dark loads tipped against the metal: a mixed tip, not a single colour.
-                var item = t > 0.75f && (hv & 3u) == 0 ? IndustrialAssets.MixedRubble : heap;
-                if (s.Put(item, item.Pick(hv), p, dir, hv, -1.2f)) made++;
-            }
+            for (int i = -m; i <= m; i++)
+                for (int k = -m; k <= m; k++)
+                {
+                    // Every other row shifted half a cell: a heap, not a chessboard.
+                    var o = new float2(i * cell + ((k & 1) == 0 ? 0f : cell * 0.5f), k * cell * 0.87f);
+                    if (math.length(o) > rad - 3.2f) continue;
+                    uint hv = Hashing.Mix(salt, (uint)((i + 50) * 131 + k + 50));
+                    var dir = Turn(face, (int)(Hashing.Unit(hv) * 4f) * math.PI * 0.5f + (Hashing.Unit(Hashing.Mix(hv, 1u)) - 0.5f) * 0.08f);
+                    var p = c + s.U * o.x + s.V * o.y;
+                    if (s.Put(heap, heap.Pick(hv), p, dir, hv, 0.02f)) made++;
+                }
             if (made == 0) return false;
-            s.Heaps += made;
+            // Darker loads tipped against the rim, every 60° or so.
+            int rim = 0;
+            for (int j = 0; j < 8; j++)
+            {
+                uint rv = Hashing.Mix(salt, 0x4100u + (uint)j);
+                float ang = (j + Hashing.Unit(rv) * 0.6f) / 8f * 6.283f;
+                var p = c + Turn(s.U, ang) * (rad - 1.6f);
+                var item = (rv & 1u) == 0 ? IndustrialAssets.MixedRubble : IndustrialAssets.TruckLoad;
+                if (s.Put(item, item.Pick(rv), p, Turn(s.U, ang + 1.57f), rv, 0.05f)) rim++;
+            }
+            s.Heaps += made + rim;
             s.Anchors.Add((c, rad));
             // The heap stands on a real mound inside the block (it never lifts an aisle): the middle rises highest.
-            s.Mounds.Add(new Mound { Center = c, Radius = rad + 1f, Height = math.min(3.5f, rad * 0.3f), Flat = 0.25f });
+            s.Mounds.Add(new Mound { Center = c, Radius = rad + 0.5f, Height = math.min(4f, rad * 0.3f), Flat = 0.2f });
             // The loader at the heap's foot, on the spine side, nose to the heap, a little askew.
             var loader = IndustrialAssets.Loader;
             float side = b.UMid >= 0f ? -1f : 1f;
-            var lp = s.W(b.UMid + side * (rad + loader.Z * 0.5f + 0.5f), vc + (Hashing.Unit(Hashing.Mix(salt, 9u)) - 0.5f) * 3f);
-            var ld = -s.U * side;
-            float la = (Hashing.Unit(Hashing.Mix(salt, 10u)) - 0.5f) * 0.5f;
-            ld = new float2(ld.x * math.cos(la) - ld.y * math.sin(la), ld.x * math.sin(la) + ld.y * math.cos(la));
-            if (s.Put(loader, loader.Pick(salt), lp, ld, Hashing.Mix(salt, 2u), 0.05f)) s.Machines++;
+            var lp = s.W(b.UMid + side * (rad + loader.Z * 0.5f + 0.6f), vc + (Hashing.Unit(Hashing.Mix(salt, 9u)) - 0.5f) * 3f);
+            if (s.Put(loader, loader.Pick(salt), lp, Turn(-s.U * side, (Hashing.Unit(Hashing.Mix(salt, 10u)) - 0.5f) * 0.5f), Hashing.Mix(salt, 2u), 0.05f)) s.Machines++;
             if (skips)
             {
-                // Skips along the aisle side, roughly in a line (each dropped where the lorry left it).
                 var skip = IndustrialAssets.OpenSkip;
-                float vs = b.AisleFront ? b.V0 + skip.Z * 0.5f + 0.4f : b.V1 - skip.Z * 0.5f - 0.4f;
-                if (math.abs(vs - vc) > rad * 0.8f + skip.Z * 0.5f)
+                float vs = b.AisleFront ? b.V0 + skip.Z * 0.5f + 0.5f : b.V1 - skip.Z * 0.5f - 0.5f;
+                if (math.abs(vs - vc) > rad + skip.Z * 0.5f)
                 {
-                    int n = (int)math.floor((rad * 2f + 4f) / (skip.X + 1.2f));
+                    int n = (int)math.floor((rad * 2f + 4f) / (skip.X + 1.4f));
                     for (int i = 0; i < n; i++)
                     {
                         uint sv = Hashing.Mix(salt, 0x5C1u + (uint)i);
-                        float u = b.UMid + (i - (n - 1) * 0.5f) * (skip.X + 1.2f) + (Hashing.Unit(sv) - 0.5f) * 0.8f;
-                        float sa = (Hashing.Unit(Hashing.Mix(sv, 1u)) - 0.5f) * 0.25f;
-                        var sd = new float2(face.x * math.cos(sa) - face.y * math.sin(sa), face.x * math.sin(sa) + face.y * math.cos(sa));
-                        s.Put(skip, skip.Pick(sv), s.W(u, vs), sd, sv, 0.05f);
+                        float u = b.UMid + (i - (n - 1) * 0.5f) * (skip.X + 1.4f) + (Hashing.Unit(sv) - 0.5f) * 0.6f;
+                        s.Put(skip, skip.Pick(sv), s.W(u, vs), Turn(face, (Hashing.Unit(Hashing.Mix(sv, 1u)) - 0.5f) * 0.2f), sv, 0.05f);
                     }
                 }
             }
             return true;
+        }
+
+        /// <summary>
+        /// Small goods (reels, crates, drums, boxes, pallets) the way a yard keeps them: in loose piles along the block, each a
+        /// clump of one kind, the piles a few metres apart and not in line. Fills from the spine outward.
+        /// </summary>
+        public static int Piles(IndustrialSite s, YardBlock b, YardItem item, float fill, uint salt)
+        {
+            int made = 0;
+            float span = b.Length - 2f;
+            if (span < 4f || b.Depth < 3f) return 0;
+            var centres = new List<float2>();
+            float u = b.U0 + 2f;
+            int i = 0;
+            while (u < b.U1 - 2f)
+            {
+                uint v = Hashing.Mix(salt, (uint)(b.Index * 41 + i));
+                float r = math.min(b.Depth * 0.5f - 0.6f, 1.4f + Hashing.Unit(v) * 1.2f);
+                float vOff = (Hashing.Unit(Hashing.Mix(v, 1u)) - 0.5f) * math.max(0f, b.Depth - 2f * r - 1f);
+                centres.Add(new float2(u + r, b.VMid + vOff));
+                u += 2f * r + 1.5f + Hashing.Unit(Hashing.Mix(v, 2u)) * 3f;
+                i++;
+            }
+            centres.Sort((x, y) => math.abs(x.x).CompareTo(math.abs(y.x)));
+            int use = Take(centres.Count, fill);
+            for (int k = 0; k < use; k++)
+            {
+                uint v = Hashing.Mix(salt, 0x9110u + (uint)(b.Index * 41 + k));
+                float r = math.min(b.Depth * 0.5f - 0.6f, 1.4f + Hashing.Unit(v) * 1.2f);
+                int count = 3 + (int)(Hashing.Unit(Hashing.Mix(v, 3u)) * 5f);
+                made += Clump(s, s.W(centres[k].x, centres[k].y), r, item, count, v);
+            }
+            if (made > 0) s.Anchors.Add((s.W(b.UMid, b.VMid), math.min(b.Length, b.Depth) * 0.3f));
+            return made;
         }
 
         // ───────────── front yard ─────────────

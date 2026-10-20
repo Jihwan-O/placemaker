@@ -1,6 +1,6 @@
 {
   "generatedBy": "the in-game suite from GeneratorRegistry",
-  "assembly": "0.1.1+25ca7aa",
+  "assembly": "0.1.1+0717cca",
   "categories": [
     {
       "id": "zoning",
@@ -19931,6 +19931,7 @@
             "trees",
             "blocks",
             "containers",
+            "wrecks",
             "plain"
           ],
           "default": "blocks"
@@ -20050,6 +20051,7 @@
             "trees",
             "blocks",
             "containers",
+            "wrecks",
             "plain"
           ],
           "default": "blocks"
@@ -20169,6 +20171,7 @@
             "trees",
             "blocks",
             "containers",
+            "wrecks",
             "plain"
           ],
           "default": "blocks"
@@ -20288,6 +20291,7 @@
             "trees",
             "blocks",
             "containers",
+            "wrecks",
             "plain"
           ],
           "default": "blocks"

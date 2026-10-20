@@ -63,7 +63,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                         // Bands in turn: 20 ft rows, two-high stacks, 40 ft lines.
                         int k = b.Band % 3;
                         // Every band one way of keeping boxes: 20 ft rows doors to the aisle, the same two high, 40 ft lines two high.
-                        int n = k == 2 ? YardFill.RowsAlong(s, b, IndustrialAssets.Box40, 0.8f, 0.4f, fill, salt, YardFill.Mess.Containers, 3, true, 2)
+                        int n = k == 2 ? YardFill.RowsAlong(s, b, IndustrialAssets.Box20, 0.3f, 0.4f, fill, salt, YardFill.Mess.Containers, 3, true, 2)
                             : YardFill.RowsAcross(s, b, IndustrialAssets.Box20, 0.35f, fill, salt, YardFill.Mess.Containers, true, 0.5f, k == 1 ? 2 : 1);
                         if (n > 0) { b.Use = k == 2 ? "box40" : "box20"; s.Containers += n; }
                         break;
@@ -80,9 +80,8 @@ namespace Placemaker.Core.Layers.Types.Yards
                         // Terminal blocks: lines of 40 ft boxes end to end, five wide, stacked; a skyline that steps up away from
                         // the street (two high at the front, three, four at the back) and down at each block's outer end.
                         int tiers = b.Band < 0 ? 2 : b.Band == last && last > 0 ? 4 : math.clamp(b.Band + 2, 2, 4);
-                        int n = YardFill.RowsAlong(s, b, IndustrialAssets.Box40, 0.6f, 0.35f, fill, salt, YardFill.Mess.Containers, 99, true, tiers);
-                        // A block too short for a 40 ft box takes 20 ft ones.
-                        if (n == 0) n = YardFill.RowsAlong(s, b, IndustrialAssets.Box20, 0.5f, 0.35f, fill, salt, YardFill.Mess.Containers, 99, true, tiers);
+                        // (The 40 ft box props render empty on their own, seen in the game: pairs of 20 ft boxes instead.)
+                        int n = YardFill.RowsAlong(s, b, IndustrialAssets.Box20, 0.3f, 0.35f, fill, salt, YardFill.Mess.Containers, 99, true, tiers);
                         if (n > 0) { b.Use = "stacks"; s.Containers += n; s.Anchors.Add((s.W(b.UMid, b.VMid), b.Length * 0.25f)); }
                         break;
                     }

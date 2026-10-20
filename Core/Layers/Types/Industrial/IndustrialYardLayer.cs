@@ -126,7 +126,12 @@ namespace Placemaker.Core.Layers.Types.Yards
             var mounds = new List<Mound>(s.Mounds);
             if (ctx.B("spoil")) mounds.AddRange(YardGround.Spoil(s, math.clamp((int)(region.Area / 6000f), 1, 6), s.Salt(0x5B0Au)));
             if (ctx.B("spoil")) YardGround.DeadCorners(s, s.Salt(0xDEADu));
-            if (ctx.B("paint")) YardGround.Paint(s, ctx.S("ground"), s.Salt(0x9A17u));
+            if (ctx.B("paint"))
+            {
+                YardGround.Paint(s, ctx.S("ground"), s.Salt(0x9A17u));
+                YardGround.Slabs(s, ctx.S("ground"), s.Salt(0x51ABu));
+            }
+            YardGround.Rocks(s, s.Salt(0x20C4u));
             int decals = YardGround.Decals(s, s.Salt(0xDECAu));
             ctx.Check();
 
@@ -176,17 +181,19 @@ namespace Placemaker.Core.Layers.Types.Yards
             var ctx = s.Ctx;
             // Concrete: one slab over the yard inside the edge band. Gravel and dirt are painted into the terrain itself
             // (YardGround.Paint); without paint they fall back to a surface so the yard is never bare grass.
-            switch (ctx.S("ground"))
-            {
-                case "concrete": ctx.Surface(s.Inner.Ring, SurfaceRole.Paving, Concrete, AssetCategories.SurfacePaving); break;
-                case "dirt": if (!ctx.B("paint")) ctx.Surface(s.Inner.Ring, SurfaceRole.Ground, Dirt, AssetCategories.SurfaceDirt); break;
-                default: if (!ctx.B("paint")) ctx.Surface(s.Inner.Ring, SurfaceRole.Ground, Gravel, AssetCategories.SurfaceNatural); break;
-            }
+            // Without paint the yard keeps one surface so it is never bare grass; with paint it is a patchwork of slabs per
+            // block over painted earth (YardGround.Slabs, after the blocks are filled).
+            if (!ctx.B("paint"))
+                switch (ctx.S("ground"))
+                {
+                    case "concrete": ctx.Surface(s.Inner.Ring, SurfaceRole.Paving, Concrete, AssetCategories.SurfacePaving); break;
+                    case "dirt": ctx.Surface(s.Inner.Ring, SurfaceRole.Ground, Dirt, AssetCategories.SurfaceDirt); break;
+                    default: ctx.Surface(s.Inner.Ring, SurfaceRole.Ground, Gravel, AssetCategories.SurfaceNatural); break;
+                }
             // Concrete yards drive on dark pavement lanes; dirt and gravel yards on their own trodden ground (the paint's
             // mud tracks), the way a real scrap yard does: no white roads through the mud.
             float hw = s.Spec.Aisle * 0.5f;
-            if (ctx.S("ground") == "concrete" || !ctx.B("paint"))
-                foreach (var (a, b) in s.Aisles)
+            foreach (var (a, b) in s.Aisles)
                     YardKit.Strip(ctx, a, b, hw, SurfaceRole.Asphalt, AisleSurface, AssetCategories.SurfaceAsphalt);
         }
 

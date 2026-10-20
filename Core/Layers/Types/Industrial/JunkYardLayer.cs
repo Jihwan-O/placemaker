@@ -103,7 +103,8 @@ namespace Placemaker.Core.Layers.Types.Yards
             var item = kinds[((i % kinds.Length) + kinds.Length) % kinds.Length];
             uint v = Hashing.Mix(salt, (uint)i);
             if (item.X >= 7f) YardFill.Heap(s, c, face, w, d, item, v);
-            else YardFill.Grid(s, c, face, w, d, item, 0.3f, 0.85f, v);
+            else if (item.Category == AssetCategories.ScrapPallet) YardFill.Grid(s, c, face, w, d, item, 0.3f, 0.85f, v);
+            else YardFill.Clump(s, c, math.min(w, d) * 0.4f, item, 6 + (int)(v % 5u), v);
         }
 
         private static void Reclaim(IndustrialSite s, float fill)
@@ -117,7 +118,7 @@ namespace Placemaker.Core.Layers.Types.Yards
                 var item = Goods[k % Goods.Length];
                 int n = item.Z > 5f
                     ? YardFill.RowsAcross(s, b, item, 0.6f, fill, salt, YardFill.Mess.Goods)          // timber bundles and pipe stacks nose to the aisle
-                    : YardFill.RowsAlong(s, b, item, 0.5f, 0.9f, fill, salt, YardFill.Mess.Goods);   // small goods in lines
+                    : YardFill.Piles(s, b, item, fill, salt);                                       // small goods in loose piles
                 if (n > 0) { b.Use = "goods"; k++; }
             }
         }

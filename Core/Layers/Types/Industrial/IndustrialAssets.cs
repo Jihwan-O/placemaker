@@ -74,7 +74,8 @@ namespace Placemaker.Core.Layers.Types.Yards
         /// <summary>A 20 ft box (6.06 × 2.44 m), long side along local Z.</summary>
         public static readonly YardItem Box20 = new YardItem(AssetCategories.ScrapContainer, 2.45f, 6.06f,
             "ShippingContainer01", "ShippingContainer02", "ShippingContainer03");
-        /// <summary>A 40 ft box (12.2 × 2.44 m): the train-car container, else the trailer box.</summary>
+        /// <summary>A 40 ft box (12.2 × 2.44 m): the train-car container, else the trailer box. NOT USED: both render empty
+        /// without their vehicle (seen in the game 2026-10-19).</summary>
         public static readonly YardItem Box40 = new YardItem(AssetCategories.ScrapContainer, 2.6f, 12.6f,
             "TrainCargoCar01_Container01|TruckTrailer02_Container01|ShippingContainer01");
         /// <summary>Open-top roll-off container (skip): long side along local X.</summary>

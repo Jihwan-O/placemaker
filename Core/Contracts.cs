@@ -699,6 +699,9 @@ namespace Placemaker.Core
         /// <summary>(Industrial) Tilt in radians: Roll about the prop's own length (π = on its roof, ±π/2 = on its side), Pitch
         /// about its width. 0 = upright (every other type). The build turns the prop by yaw, then pitch, then roll.</summary>
         public float Roll, Pitch;
+        /// <summary>(Industrial) The game's random seed for this prop (its colour variation) when >= 0: boxes of one row share a
+        /// couple of seeds so a row reads as one shipping line's boxes. -1 = the build's own per-object seed.</summary>
+        public int ColorSeed = -1;
         /// <summary>Tree growth stage 0..3 (young..old), 4 = dead (PlannedAge.Dead), -1 = n/a.</summary>
         public int Age = -1;
         public uint Variation;

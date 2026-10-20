@@ -106,7 +106,8 @@ namespace Placemaker.Core.Layers.Types.Yards
             var item = Parts[i % Parts.Length];
             uint v = Hashing.Mix(salt, (uint)i);
             if (item.X >= 7f) YardFill.Heap(s, c, face, w, d, item, v);
-            else YardFill.Grid(s, c, face, w, d, item, 0.25f, 0.75f, v);
+            else if (item.Category == AssetCategories.ScrapPallet) YardFill.Grid(s, c, face, w, d, item, 0.25f, 0.75f, v);
+            else YardFill.Clump(s, c, math.min(w, d) * 0.4f, item, 6 + (int)(v % 5u), v);
         }
 
         private static readonly YardItem DeadBush = new YardItem(AssetCategories.Bush, 1.8f, 1.8f, "FlowerBushWildDead02");

@@ -40,7 +40,7 @@ const STAGES: { id: Stage; key: string; en: string }[] = [
 // ───────────── position (dock / drag) and width (resize) ─────────────
 
 const POS_KEY = "placemaker.panelPos.v2";
-const WIDTH_KEY = "placemaker.panelWidth.v1";
+const WIDTH_KEY = "placemaker.panelWidth.v2";   // v2: the narrower default (450) for everyone once
 const HEIGHT_KEY = "placemaker.panelHeight.v1";
 /** Smallest panel height in rem (header + a few rows). */
 const MIN_HEIGHT_REM = 200;
@@ -218,8 +218,11 @@ function usePanelPosition() {
     const clampWidth = (w: number) => Math.max(MIN_REM, Math.min(maxWidth(), Math.round(w)));
     const width = clampWidth(resizing ?? chosen ?? defaultWidth());
 
-    // The real pixels per rem, from the panel as drawn: mouse moves (pixels) and sizes (rem) use the same scale.
+    // The real pixels per rem, from the panel as drawn: mouse moves (pixels) and sizes (rem) use the same scale. Not while
+    // it is dragged or resized: the drawn width lags a frame behind, the scale read then jumped and the width with it
+    // ("glitchy when I drag it out far").
     useLayoutEffect(() => {
+        if (resizing !== null || resizingH !== null || drag) return;
         const w = wrapRef.current?.getBoundingClientRect().width ?? 0;
         if (w > 0 && width > 0) measuredRemPx = w / width;
     });
@@ -279,7 +282,10 @@ function usePanelPosition() {
         const sx = e.clientX;
         const start = width;
         const floating = !!pos;
-        const at = (ev: MouseEvent) => clampWidth(start + (sx - ev.clientX) / r);
+        // the limits fixed for the whole drag; a floating panel stops widening at the screen's left edge (it used to be
+        // pushed back to the right, its edge running away from the mouse)
+        const cap = Math.max(MIN_REM, Math.min(maxWidth(), floating ? Math.floor(rect.right / r) : Number.MAX_SAFE_INTEGER));
+        const at = (ev: MouseEvent) => Math.max(MIN_REM, Math.min(cap, Math.round(start + (sx - ev.clientX) / r)));
         const place = (w: number) => (floating ? clamp(rect.right - w * r, rect.top, w) : null);
         const move = (ev: MouseEvent) => {
             const w = at(ev);

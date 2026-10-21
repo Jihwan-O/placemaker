@@ -264,11 +264,12 @@ export const OutgrowStats = ({ p, st, typeName, typeColor }: { p: PainterState; 
                     })}
                     {st.kindTotal.every((n) => n === 0) ? <div className={s.muted}>{L("NoBuildings", "No buildings yet")}</div> : null}
                 </Card>
-                <Card title={L("Queue", "Queue")} right={pace} testId="outgrow-card-work">
+                <Card title={L("Queue", "Queue")} testId="outgrow-card-work">
                     <div className={s.queueBig}>
                         <div className={s.queueValue}>{fmt(line)}</div>
                         <div className={s.queueLabel}>{L("QueueWaiting", "buildings waiting")}</div>
                     </div>
+                    <div className={s.queuePace}>{pace}</div>
                     {work.map((w) => (
                         <div key={w.key} className={classNames(s.queueRow, { [s.cellZero]: w.value === 0 })} data-testid={"outgrow-work-" + w.key}>
                             <div className={s.dot} style={{ backgroundColor: w.color }} />

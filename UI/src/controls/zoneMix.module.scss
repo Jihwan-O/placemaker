@@ -231,6 +231,7 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 // a zone's line: boxes with their label inside (Zone, Outgrow, Allowed road width), the lot grid beside them
 .topRow {
     @include row;
+    flex-wrap: wrap;
     min-width: 0;
 }
 
@@ -257,6 +258,7 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 
 .zoneField {
     flex: 1 1 auto;
+    min-width: 140rem;
     margin-right: 6rem;
 }
 

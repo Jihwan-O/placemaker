@@ -149,9 +149,9 @@ export interface PainterState {
   /** Lots whose middle lies in the area, and how many of them are polished now. */
   lots: number;
   polished: number;
-  /** The master switch "Stitch neighbouring houses" (off: the flags are kept, gardens change once it is on). */
+  /** This city's master switch "Outgrow" (off: paused; the flags are kept, gardens change once it is on). */
   featureOn: boolean;
-  /** "Polish new houses". */
+  /** "Outgrow new buildings", this city's. */
   newHouses: boolean;
   /** The theme Polish gives: "zone" (each house by its zone's setting), "garden", "natural", "tidy", "yard". */
   theme: string;

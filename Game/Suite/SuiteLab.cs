@@ -312,6 +312,8 @@ namespace Placemaker.Game.Suite
                     // neighbourhood polish totals since the game started (Game/Neighbours/NeighbourPolishSystem)
                     yield return Frames(30);
                     rec["enabled"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled;
+                    rec["paused"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.Paused;
+                    rec["newBuildings"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.PolishNew;
                     rec["passes"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPasses;
                     rec["pairs"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalPairs;
                     rec["linesMoved"] = Placemaker.Game.Neighbours.NeighbourPolishSystem.TotalMoved;

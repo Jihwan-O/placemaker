@@ -480,6 +480,17 @@ namespace Placemaker.Game.Suite
         private IEnumerator StepSetting(ScenarioState st, JObject step, JObject rec)
         {
             string name = (string)step["name"];
+            if (name == "PolishNewHouses" || name == "NeighbourhoodPolish")
+            {
+                // Outgrow's switches are the city's own now (NeighbourPolishSystem.Switches), no longer settings
+                bool on = (bool?)step["value"] ?? true;
+                if (name == "PolishNewHouses") global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetNewBuildings(on);
+                else global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetRunning(on);
+                rec["effective"] = on;
+                rec["city"] = true;
+                yield return Frames(2);
+                yield break;
+            }
             var s = ToolRegistration.Settings;
             var prop = s?.GetType().GetProperty(name ?? "");
             if (s == null || prop == null || !prop.CanWrite) { rec["error"] = $"unknown setting '{name}'"; yield break; }

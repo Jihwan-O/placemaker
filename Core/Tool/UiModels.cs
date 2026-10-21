@@ -72,9 +72,9 @@ namespace Placemaker.Core.Tool
     {
         /// <summary>Lots whose middle lies in the area, and how many of them are polished now.</summary>
         public int Lots, Polished;
-        /// <summary>The master switch "Stitch neighbouring houses" (off: flags are kept, gardens change once it is on).</summary>
+        /// <summary>This city's master switch "Outgrow" (off: paused; flags are kept, gardens change once it is on).</summary>
         public bool FeatureOn;
-        /// <summary>"Polish new houses".</summary>
+        /// <summary>"Outgrow new buildings", this city's.</summary>
         public bool NewHouses;
         /// <summary>The theme Polish stamps: "zone" (each house by its zone's setting), "garden", "natural", "tidy", "yard".</summary>
         public string Theme = "zone";

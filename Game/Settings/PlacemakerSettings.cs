@@ -374,9 +374,9 @@ namespace Placemaker.Game.Settings
 
         // ───────────── Neighbourhood polish: shown and changed in Placemaker's panel (Polish gardens), saved here ─────────────
 
-        /// <summary>Neighbourhood polish on: polished gardens keep fitting as the city changes (off: nothing changes). NeighbourPolishSystem.</summary>
+        /// <summary>Unused: Outgrow's master switch and "Outgrow new buildings" are each city's own, saved with it
+        /// (NeighbourPolishSystem.Switches). Kept so older settings files still read.</summary>
         [SettingsUIHidden] public bool NeighbourhoodPolish { get; set; }
-        /// <summary>Buildings that grow are polished, each with its kind's theme and the look below.</summary>
         [SettingsUIHidden] public bool PolishNewHouses { get; set; }
         /// <summary>The theme for each kind of building: garden, natural, tidy, yard, or off (new ones of that kind not polished).</summary>
         [SettingsUIHidden] public string PolishThemeHomes { get; set; }
@@ -436,9 +436,9 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Economy.ParkingEconomySystem.DefaultFee = DefaultParkingFee;
                 global::Placemaker.Game.Economy.ParkingCompanionSystem.CompanionEnabled = ExperimentalParkingCompanion;
                 global::Placemaker.Game.Economy.ParkingCompanionUpkeepSystem.UpkeepFactor = CompanionUpkeepFactor;
-                global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PolishNew = PolishNewHouses;
-                // always on: what is polished keeps fitting as the city changes; only new buildings (Polish new buildings) and
-                // what the player polishes are ever polished, buildings standing before are left as they are
+                // always on (the player's master switch and new buildings are the city's own: NeighbourPolishSystem.Switches):
+                // what is polished keeps fitting as the city changes; only new buildings and what the player polishes are
+                // ever polished, buildings standing before are left as they are
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = true;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetZoneThemes(PolishThemeHomes, PolishThemeShops, PolishThemeOffices, PolishThemeIndustry);
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetZoneLooks(PolishZoneLooks);
@@ -508,7 +508,7 @@ namespace Placemaker.Game.Settings
             OverlayPavedSurfaces = true;
             DecalsNeverCollide = true;
             NeighbourhoodPolish = true;
-            PolishNewHouses = true;
+            PolishNewHouses = false;
             PolishThemeHomes = "garden";
             PolishThemeShops = "tidy";
             PolishThemeOffices = "tidy";

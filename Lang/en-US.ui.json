@@ -394,8 +394,12 @@
   "Placemaker.UI.ZoneMix.Add": "Mix in another zone",
   "Placemaker.UI.ZoneMix.AnyRoad": "any",
   "Placemaker.UI.ZoneMix.Buildings": "{0} buildings",
+  "Placemaker.UI.ZoneMix.CapOutgrow": "Outgrow",
+  "Placemaker.UI.ZoneMix.CapRoads2": "Allowed road width",
+  "Placemaker.UI.ZoneMix.CapZone": "Zone",
   "Placemaker.UI.ZoneMix.ClearOwn2": "Clear {0} settings changed here before",
   "Placemaker.UI.ZoneMix.DragTip": "Drag to share the land",
+  "Placemaker.UI.ZoneMix.EditTypeTip": "Opens this outgrow type in Global outgrow's Edit tab: a change there is for every zone that uses it.",
   "Placemaker.UI.ZoneMix.Empty": "Empty",
   "Placemaker.UI.ZoneMix.Exact": "exact",
   "Placemaker.UI.ZoneMix.ExactPick": "Pick an exact zone (mods' too)…",
@@ -411,7 +415,6 @@
   "Placemaker.UI.ZoneMix.OutgrowOnTip": "On: this zone's buildings outgrow their lots with the outgrow type beside it. Off: they stay as the game makes them.",
   "Placemaker.UI.ZoneMix.Remove": "Remove this zone",
   "Placemaker.UI.ZoneMix.RoadTip3": "Allowed road width: the roads this zone may line, by their width (two lanes 16 m, four lanes 24 m, six lanes 32 m). Its lots are only placed along roads in this range.",
-  "Placemaker.UI.ZoneMix.RoadsValue": "Roads: {0}",
   "Placemaker.UI.Zoning": "Zoning",
   "Placemaker.UI.Zoning.Sub2": "zones, and how their lots outgrow"
 }

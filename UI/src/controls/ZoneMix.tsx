@@ -561,13 +561,17 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                               <div className={z.line} data-testid={"zonemix-line-" + x.sl}>
                                   <div className={z.leftCol}>
                                       <div className={z.topRow}>
-                                          <ZoneButton id={x.sl} kind={x.kind} asset={x.asset} />
+                                          <div className={z.zoneField}>
+                                              <div className={z.fieldLabel}>{t("Placemaker.UI.ZoneMix.CapZone", "Zone")}</div>
+                                              <ZoneButton id={x.sl} kind={x.kind} asset={x.asset} />
+                                          </div>
                                           {outgrowInline(key, x.sl)}
                                       </div>
                                       <div
-                                          className={z.roadsRow}
+                                          className={z.roadField}
                                           title={t("Placemaker.UI.ZoneMix.RoadTip3", "Allowed road width: the roads this zone may line, by their width (two lanes 16 m, four lanes 24 m, six lanes 32 m). Its lots are only placed along roads in this range.")}
                                       >
+                                          <div className={z.fieldLabel}>{t("Placemaker.UI.ZoneMix.CapRoads2", "Allowed road width")}</div>
                                           <RangeSlider
                                               lo={x.r0}
                                               hi={x.r1}
@@ -580,7 +584,7 @@ export const ZoneMix = ({ step, layer, rows, found, outgrow }: { step: StepView;
                                                   if (b !== x.r1) set("roadMax" + x.sl, b);
                                               }}
                                           />
-                                          <div className={z.roadsValue}>{t("Placemaker.UI.ZoneMix.RoadsValue", "Roads: {0}", [roadText(x.r0, x.r1)])}</div>
+                                          <div className={z.fieldValue}>{roadText(x.r0, x.r1)}</div>
                                       </div>
                                   </div>
                                   <LotGrid

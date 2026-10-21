@@ -558,14 +558,29 @@ export const ZoneOutgrowInline = ({ p, value, typeLook, on, setOn, open, toggle,
     const { t } = useT();
     const current = value || typeLook;
     return (
-        <div className={classNames(s.zoInline, { [s.zoInlineOff]: !on })} data-testid={testId}>
+        <div className={classNames(s.zoBox, { [s.zoBoxOff]: !on })} data-testid={testId}>
             <Tip title={t("Placemaker.UI.ZoneMix.OutgrowOn", "Outgrow")} description={t("Placemaker.UI.ZoneMix.OutgrowOnTip", "On: this zone's buildings outgrow their lots with the outgrow type beside it. Off: they stay as the game makes them.")}>
-                <div className={s.zoSwitch}>
+                <div className={s.zoHead}>
+                    <div className={s.zoLabel}>{t("Placemaker.UI.ZoneMix.CapOutgrow", "Outgrow")}</div>
                     <Switch testId={testId + "-on"} on={on} onChange={setOn} />
                 </div>
             </Tip>
             <TypeButton p={p} id={current} on={open} onClick={() => on && toggle()} testId={testId + "-open"} />
-            {editable(p, current) ? <Btn icon="edit" iconSize={11} title={t("Placemaker.UI.Polish.EditLook", "Edit {0}", [lookName(t, p, current)])} onClick={() => openLookEditor(current)} testId={testId + "-edit"} /> : null}
+            {editable(p, current) ? (
+                <Tip title={t("Placemaker.UI.Polish.EditLook", "Edit {0}", [lookName(t, p, current)])} description={t("Placemaker.UI.ZoneMix.EditTypeTip", "Opens this outgrow type in Global outgrow's Edit tab: a change there is for every zone that uses it.")}>
+                    <button
+                        type="button"
+                        className={s.zoEdit}
+                        data-testid={testId + "-edit"}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            openLookEditor(current);
+                        }}
+                    >
+                        <Icon name="edit" size={11} tint="dim" />
+                    </button>
+                </Tip>
+            ) : null}
         </div>
     );
 };

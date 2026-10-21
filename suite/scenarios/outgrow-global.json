@@ -178,6 +178,49 @@
           "shotMode": "ui"
         }
       ]
+    },
+    {
+      "id": "outgrow-zoning-existing",
+      "land": {
+        "shape": "rect",
+        "size": [
+          260,
+          200
+        ],
+        "ground": "flat",
+        "roads": "none"
+      },
+      "steps": [
+        {
+          "do": "lab",
+          "op": "street",
+          "shape": "straight",
+          "length": 200,
+          "zone": "NA Residential Low"
+        },
+        {
+          "do": "grow",
+          "seconds": 60
+        },
+        {
+          "do": "area",
+          "tool": "points",
+          "rect": [
+            180,
+            80
+          ]
+        },
+        {
+          "do": "type",
+          "layer": "zoningSuburb"
+        },
+        {
+          "do": "polish",
+          "click": "zonemix-mode-edit",
+          "shot": "zone-existing",
+          "shotMode": "ui"
+        }
+      ]
     }
   ]
 }

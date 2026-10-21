@@ -456,24 +456,75 @@
     margin: 0 0 4rem 0;
 }
 
-// a Zoning type's zone's Outgrow on its line: switch, outgrow type, edit
-.zoInline {
+// a Zoning type's zone's Outgrow, one box on its line: its label and switch | the outgrow type | edit
+.zoBox {
+    @include row(stretch);
+    flex: 0 0 auto;
+    height: 24rem;
+    border-radius: $radius;
+    background-color: $c-surface;
+    @include border(1rem, $c-line);
+}
+
+.zoHead {
     @include row;
     flex: 0 0 auto;
+    padding: 0 8rem 0 7rem;
+}
+
+.zoLabel {
+    margin-right: 7rem;
+    font-size: 10rem;
+    font-weight: bold;
+    letter-spacing: 0.3rem;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: $c-text-faint;
+}
+
+.zoBox .typeBtn {
+    flex: 0 0 auto;
+    width: 88rem;
+    max-width: 88rem;
+    height: auto;
+    border-radius: 0;
+    background-color: transparent;
+    border-left-width: 1rem;
+    border-left-style: solid;
+    border-left-color: $c-line;
+}
+
+.zoBox .typeBtn .choiceText {
+    flex: 1 1 auto;
     min-width: 0;
+    text-align: left;
 }
 
-.zoInlineOff .typeBtn {
-    opacity: 0.45;
+.zoBox .typeBtnOn {
+    background-color: rgba(143, 209, 255, 0.22);
 }
 
-.zoSwitch {
-    margin-right: 5rem;
+.zoEdit {
+    @include button-reset;
+    @include row;
+    flex: 0 0 auto;
+    justify-content: center;
+    width: 26rem;
+    border-radius: 0 $radius $radius 0;
+    border-left-width: 1rem;
+    border-left-style: solid;
+    border-left-color: $c-line;
+    cursor: pointer;
 }
 
-.zoInline .typeBtn {
-    width: 112rem;
-    max-width: 112rem;
+.zoBox .typeBtn:hover,
+.zoEdit:hover {
+    background-color: $c-surface-hover;
+}
+
+.zoBoxOff .typeBtn,
+.zoBoxOff .zoEdit {
+    opacity: 0.4;
 }
 
 .pickBox {

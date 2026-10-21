@@ -152,6 +152,7 @@ function Get-RunEnd {
 # -RunEnded: the caller's game is gone now (the host's own restore): recorded first, so a restore that has to wait (a
 # game the user started) later knows which files changed after the run.
 function Restore-Settings([string]$why, [switch]$RunEnded) {
+    MI-ReshadeBack $why
     $pending = Join-Path $saved 'pending.txt'
     if (-not (Test-Path -LiteralPath $pending)) { return }
     Disarm
@@ -406,6 +407,8 @@ try {
     # while it runs, the user's build goes back once no game runs)
     $other = @(Get-OtherGames)
     if ($other.Count -gt 0) { $status = 'not started'; Disarm; Say ("STOP: Cities2.exe is running or starting ({0}) and it is not this run's; the game was not started." -f ($other -join ', ')); exit 2 }   # the finally puts back what it may
+    # ReShade hangs the GPU in a test game: off for this launch, back on once no game runs (ModsInstall.ps1)
+    MI-ReshadeOff
     $proc = [System.Diagnostics.Process]::Start($psi)
     $ourPid = $proc.Id
     $script:ourPid = $ourPid

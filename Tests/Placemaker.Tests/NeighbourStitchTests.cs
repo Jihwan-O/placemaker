@@ -856,8 +856,8 @@ namespace Placemaker.Tests
         [Fact]
         public void A_shops_paving_fills_its_ground_up_to_the_fence_whatever_its_lawn_reach()
         {
-            // without a shop yard (and always for a works): one slab to the fence
-            foreach (var (zone, options) in new[] { ("shop", new Dictionary<string, float> { ["shopYard"] = 0f }), ("industry", new Dictionary<string, float>()) })
+            // without a shop yard (a shop or a works): one slab to the fence
+            foreach (var (zone, options) in new[] { ("shop", new Dictionary<string, float> { ["shopYard"] = 0f }), ("industry", new Dictionary<string, float> { ["shopYard"] = 0f }) })
             {
                 var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
                 a.MainSurface = "Concrete Surface 01";
@@ -983,6 +983,34 @@ namespace Placemaker.Tests
             a.Options["waterGap"] = 10f;
             var near = YardStitch.Plan(new[] { a }, withLake);
             Assert.True(near.Plots.TryGetValue(1, out var pn) && pn.Min(p => p.y) < -60f && pn.All(p => DistanceToRing(lake, p) > 9.5f), $"10 m gap: {pn?.Min(p => p.y):F1}");
+        }
+
+        [Fact]
+        public void A_car_park_yard_takes_its_style_from_the_building_clean_everyday_or_industrial()
+        {
+            string Name(int k) => YardStitch.BushKinds[k];
+            (StitchPlan Plan, string Note) Yard(string zone, float style = 0f)
+            {
+                var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+                a.Zone = zone;
+                a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 50f, ["fill"] = PolishLooks.FillCarPark, ["parkStyle"] = style };
+                var plan = YardStitch.Plan(new[] { a }, MiddleLine());
+                return (plan, plan.Notes.FirstOrDefault(n => n.Contains("shop yard")) ?? "");
+            }
+            var works = Yard("industry");
+            Assert.Contains("(industrial)", works.Note);
+            Assert.Contains(works.Plan.Paths, p => p.House == 1 && p.Surface == "Concrete Surface 01");
+            Assert.DoesNotContain(works.Plan.Paths, p => p.Surface == "Grass Surface 01");
+            Assert.DoesNotContain(works.Plan.Bushes, b => Name(b.Kind).EndsWith("Tree01"));
+            Assert.Contains("(clean)", Yard("office").Note);
+            Assert.Contains("(clean)", Yard("home").Note);
+            Assert.Contains("(everyday)", Yard("shop").Note);
+            Assert.Contains("(industrial)", Yard("shop", PolishLooks.ParkIndustrial).Note);
+            Assert.Contains(Yard("office").Plan.Paths, p => p.Surface == "Grass Surface 01");
+            // the bigger homes, offices and works park by default
+            foreach (var id in new[] { "apartments", "towers", "mixed", "offices", "officeTowers", "industry", "shops", "bigShops" })
+                Assert.Equal(PolishLooks.FillCarPark, PolishLooks.BuiltIn.Single(l => l.Id == id).Values()["fill"]);
+            Assert.Equal(PolishLooks.FillGarden, PolishLooks.BuiltIn.Single(l => l.Id == "houses").Values()["fill"]);
         }
 
         [Fact]

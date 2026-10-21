@@ -79,14 +79,24 @@ namespace Placemaker.Core.Neighbours
             h?.Options != null && h.Options.TryGetValue(name, out var v) ? v : s.Knob(name, fallback);
 
         /// <summary>What a house's land past its lot becomes (its look's "fill": PolishLooks.FillGarden, FillCarPark, FillPaved),
-        /// whatever the building is. By the building (FillAuto): a home a garden; a shop or office a car park yard and a works its
-        /// paving, as most of its ground already is ("Shops keep paving" off, or no paving of its own: a garden).</summary>
+        /// whatever the building is. By the building (FillAuto): a home a garden; a shop, office or works a car park yard (in its
+        /// own style: ParkStyleOf), on the paving most of its ground already is ("Shops keep paving" off, or no paving of its
+        /// own: a garden; "shopYard" off: the paving alone).</summary>
         private static int FillOf(StitchHouse h, StitchSettings s)
         {
             int f = (int)math.round(K(h, s, "fill", 0f));
             if (f >= PolishLooks.FillGarden && f <= PolishLooks.FillPaved) return f;
             if (string.IsNullOrEmpty(h.MainSurface) || K(h, s, "pavedFill", 1f) < 0.5f) return PolishLooks.FillGarden;
-            return h.Zone != "industry" && K(h, s, "shopYard", 1f) > 0.5f ? PolishLooks.FillCarPark : PolishLooks.FillPaved;
+            return K(h, s, "shopYard", 1f) > 0.5f ? PolishLooks.FillCarPark : PolishLooks.FillPaved;
+        }
+
+        /// <summary>A car park yard's style (its look's "parkStyle"); by the building (ParkAuto): an office or a home clean, a shop
+        /// everyday, a works industrial.</summary>
+        private static int ParkStyleOf(StitchHouse h, StitchSettings s)
+        {
+            int p = (int)math.round(K(h, s, "parkStyle", 0f));
+            if (p >= PolishLooks.ParkClean && p <= PolishLooks.ParkIndustrial) return p;
+            return h.Zone == "industry" ? PolishLooks.ParkIndustrial : h.Zone == "shop" ? PolishLooks.ParkEveryday : PolishLooks.ParkClean;
         }
 
         /// <summary>Its land past the lot is hard ground (a car park yard or paving), not a garden.</summary>

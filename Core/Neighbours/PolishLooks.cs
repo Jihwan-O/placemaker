@@ -48,6 +48,9 @@ namespace Placemaker.Core.Neighbours
             // what the land past the lot becomes: 0 by the building (a home a garden, a shop or office a car park yard, a works
             // its paving: Core/Neighbours/YardStitch.FillOf), 1 a garden, 2 a car park yard, 3 paving
             ["fill"] = 0f,
+            // a car park yard's look: 0 by the building (an office or a home clean, a shop everyday, a works industrial), 1 clean,
+            // 2 everyday, 3 industrial (YardStitch.ParkStyleOf)
+            ["parkStyle"] = 0f,
             // reach and joining
             ["sideReach"] = 100f, ["maxFrontGap"] = 100f, ["maxBackGap"] = 150f, ["maxRearGap"] = 60f, ["maxFacingGap"] = 50f,
             ["maxDeepen"] = 60f, ["hug"] = 1f, ["hugReach"] = 80f, ["openReach"] = 20f, ["wrap"] = 1f, ["closeBacks"] = 1f,
@@ -83,6 +86,9 @@ namespace Placemaker.Core.Neighbours
         /// <summary>What the land past the lot becomes (knob "fill").</summary>
         public const int FillAuto = 0, FillGarden = 1, FillCarPark = 2, FillPaved = 3;
 
+        /// <summary>A car park yard's look (knob "parkStyle").</summary>
+        public const int ParkAuto = 0, ParkClean = 1, ParkEveryday = 2, ParkIndustrial = 3;
+
         public enum KnobKind { Toggle, Slider, Choice }
 
         /// <summary>One setting of a look as the Zoning types' option rows show it (Core/Layers/Types/Zoning/PolishLookLayer).</summary>
@@ -106,6 +112,7 @@ namespace Placemaker.Core.Neighbours
         public static readonly IReadOnlyList<Knob> Knobs = new[]
         {
             new Knob("fill", "land", KnobKind.Choice, ControlTier.Essential, options: new[] { "0", "1", "2", "3" }),
+            new Knob("parkStyle", "land", KnobKind.Choice, ControlTier.Essential, options: new[] { "0", "1", "2", "3" }),
             new Knob("waterGap", "land", KnobKind.Slider, ControlTier.Essential, 0, 200, 1, "m"),
             new Knob("sideReach", "reach", KnobKind.Slider, ControlTier.Essential, 0, 500, 1, "m"),
             new Knob("maxFrontGap", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
@@ -177,14 +184,14 @@ namespace Placemaker.Core.Neighbours
             // one per zone type: what its buildings get until the player picks another look for that zone
             new PolishLook { Id = "houses", Name = "Placemaker.UI.Painter.Theme.houses", Theme = "garden", Knobs = { ["fill"] = FillGarden } },
             new PolishLook { Id = "rows", Name = "Placemaker.UI.Painter.Theme.rows", Theme = "tidy", Knobs = { ["fill"] = FillGarden, ["bedChance"] = 90f, ["rockChance"] = 0f, ["sideReach"] = 30f, ["maxDeepen"] = 16f, ["hugReach"] = 16f, ["openReach"] = 0f } },
-            new PolishLook { Id = "apartments", Name = "Placemaker.UI.Painter.Theme.apartments", Theme = "tidy", Knobs = { ["fill"] = FillGarden, ["paintedGardens"] = 0f, ["bedChance"] = 70f, ["rockChance"] = 0f, ["pathChance"] = 70f } },
-            new PolishLook { Id = "towers", Name = "Placemaker.UI.Painter.Theme.towers", Theme = "tidy", Knobs = { ["fill"] = FillGarden, ["paintedGardens"] = 0f, ["bedChance"] = 95f, ["rockChance"] = 0f, ["pathChance"] = 80f, ["patchChance"] = 0f, ["edgeLayer"] = 0f, ["blendFarLayer"] = 0f } },
-            new PolishLook { Id = "mixed", Name = "Placemaker.UI.Painter.Theme.mixed", Theme = "tidy", Knobs = { ["fill"] = FillGarden, ["paintedGardens"] = 0f, ["bedChance"] = 90f, ["rockChance"] = 0f, ["sideReach"] = 30f, ["openReach"] = 0f } },
+            new PolishLook { Id = "apartments", Name = "Placemaker.UI.Painter.Theme.apartments", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["paintedGardens"] = 0f, ["bedChance"] = 70f, ["rockChance"] = 0f, ["pathChance"] = 70f } },
+            new PolishLook { Id = "towers", Name = "Placemaker.UI.Painter.Theme.towers", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["paintedGardens"] = 0f, ["bedChance"] = 95f, ["rockChance"] = 0f, ["pathChance"] = 80f, ["patchChance"] = 0f, ["edgeLayer"] = 0f, ["blendFarLayer"] = 0f } },
+            new PolishLook { Id = "mixed", Name = "Placemaker.UI.Painter.Theme.mixed", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["paintedGardens"] = 0f, ["bedChance"] = 90f, ["rockChance"] = 0f, ["sideReach"] = 30f, ["openReach"] = 0f } },
             new PolishLook { Id = "shops", Name = "Placemaker.UI.Painter.Theme.shops", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["bedChance"] = 90f, ["rockChance"] = 0f } },
             new PolishLook { Id = "bigShops", Name = "Placemaker.UI.Painter.Theme.bigShops", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["bedChance"] = 95f, ["rockChance"] = 0f, ["patchChance"] = 0f } },
             new PolishLook { Id = "offices", Name = "Placemaker.UI.Painter.Theme.offices", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["bedChance"] = 95f, ["rockChance"] = 0f, ["patchChance"] = 0f, ["paintedGardens"] = 0f } },
             new PolishLook { Id = "officeTowers", Name = "Placemaker.UI.Painter.Theme.officeTowers", Theme = "tidy", Knobs = { ["fill"] = FillCarPark, ["bedChance"] = 95f, ["rockChance"] = 0f, ["patchChance"] = 0f, ["paintedGardens"] = 0f } },
-            new PolishLook { Id = "industry", Name = "Placemaker.UI.Painter.Theme.industry", Theme = "yard", Knobs = { ["fill"] = FillPaved, ["bedChance"] = 0f, ["rockChance"] = 0f, ["gardenLayer"] = 3f, ["meadowLayer"] = 3f, ["blendLayer"] = 3f, ["patchChance"] = 60f } },
+            new PolishLook { Id = "industry", Name = "Placemaker.UI.Painter.Theme.industry", Theme = "yard", Knobs = { ["fill"] = FillCarPark, ["bedChance"] = 0f, ["rockChance"] = 0f, ["gardenLayer"] = 3f, ["meadowLayer"] = 3f, ["blendLayer"] = 3f, ["patchChance"] = 60f } },
         };
 
         /// <summary>Each built-in look's colour (the zone ones: the dataviz palette's dark steps, in its validated order).</summary>

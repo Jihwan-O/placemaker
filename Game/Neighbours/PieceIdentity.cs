@@ -68,6 +68,27 @@ namespace Placemaker.Game.Neighbours
             return n > 0 ? c / n : c;
         }
 
+        /// <summary>A surface's middle by its area (not its points: the game's copy of an outline may have a point more, its
+        /// first one again, which moved the points' average of a big wrapping piece past the tag's reach); the points' average
+        /// when it has no area. And its area (m²).</summary>
+        public static float2 AreaCentre(float2[] ring, out float area)
+        {
+            int n = Count(ring);
+            double a2 = 0, cx = 0, cy = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var p = ring[i];
+                var q = ring[(i + 1) % n];
+                double cross = (double)p.x * q.y - (double)q.x * p.y;
+                a2 += cross;
+                cx += (p.x + q.x) * cross;
+                cy += (p.y + q.y) * cross;
+            }
+            area = (float)math.abs(a2 * 0.5);
+            if (math.abs(a2) < 1e-3) return Centre(ring);
+            return new float2((float)(cx / (3.0 * a2)), (float)(cy / (3.0 * a2)));
+        }
+
         /// <summary>The same outline: as many points, each within 5 cm of the other's, in order (from any start).</summary>
         public static bool SameRing(float2[] a, float2[] b)
         {

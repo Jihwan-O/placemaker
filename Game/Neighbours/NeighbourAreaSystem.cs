@@ -87,7 +87,7 @@ namespace Placemaker.Game.Neighbours
                     EntityManager.AddComponent<Updated>(def);
                     EntityManager.AddComponent<Deleted>(def);
                     if (r.Owner != Entity.Null)
-                        NeighbourPolishSystem.PendingTags.Add(new NeighbourPolishSystem.PendingTag { Owner = r.Owner, Prefab = prefab, At = c, Kind = r.Kind, Frame = NeighbourPolishSystem.LotFrame });
+                        NeighbourPolishSystem.PendingTags.Add(new NeighbourPolishSystem.PendingTag { Owner = r.Owner, Prefab = prefab, At = PieceIdentity.AreaCentre(ring, out _), Area = true, Kind = r.Kind, Frame = NeighbourPolishSystem.LotFrame });
                     TotalMade++;
                 }
             }

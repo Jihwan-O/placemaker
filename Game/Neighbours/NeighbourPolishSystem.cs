@@ -1072,7 +1072,35 @@ namespace Placemaker.Game.Neighbours
             var d = c - h.T.m_Position.xz;
             var half = (float2)h.Lot * 4f;
             if (math.abs(math.dot(d, right)) > half.x + 0.5f || math.abs(math.dot(d, fwd)) > half.y + 0.5f) return true;
+            // paving reaching past the lot (a shop yard wrapped round its building has its middle inside the lot)
+            return !IsGrass(EntityManager.GetComponentData<PrefabRef>(area).m_Prefab) && PastLot(h.T, h.Lot, nodes);
+        }
+
+        /// <summary>A point of the outline more than a metre outside the lot (the game's own surfaces lie inside it).</summary>
+        private static bool PastLot(global::Game.Objects.Transform t, int2 lot, DynamicBuffer<global::Game.Areas.Node> nodes)
+        {
+            var fwd = math.normalizesafe(math.mul(t.m_Rotation, new float3(0f, 0f, 1f)).xz, new float2(0f, 1f));
+            var right = new float2(fwd.y, -fwd.x);
+            var half = (float2)lot * 4f + 1f;
+            for (int i = 0; i < nodes.Length; i++)
+            {
+                var d = nodes[i].m_Position.xz - t.m_Position.xz;
+                if (math.abs(math.dot(d, right)) > half.x || math.abs(math.dot(d, fwd)) > half.y) return true;
+            }
             return false;
+        }
+
+        /// <summary>A surface of the house without our tag that is ours all the same: paving (not a lawn, which the polish
+        /// grows past the lot) reaching past the lot.</summary>
+        private bool UntaggedOurs(Entity house, Entity area)
+        {
+            if (!EntityManager.HasComponent<global::Game.Areas.Surface>(area) || !EntityManager.HasComponent<PrefabRef>(area)) return false;
+            if (_lawnOriginal.ContainsKey(area) || IsGrass(EntityManager.GetComponentData<PrefabRef>(area).m_Prefab)) return false;
+            if (!EntityManager.HasComponent<global::Game.Objects.Transform>(house) || !EntityManager.HasComponent<PrefabRef>(house)) return false;
+            var prefab = EntityManager.GetComponentData<PrefabRef>(house).m_Prefab;
+            if (!EntityManager.HasComponent<BuildingData>(prefab)) return false;
+            return PastLot(EntityManager.GetComponentData<global::Game.Objects.Transform>(house), EntityManager.GetComponentData<BuildingData>(prefab).m_LotSize,
+                EntityManager.GetBuffer<global::Game.Areas.Node>(area, true));
         }
 
         private static float2 Centre(float2[] ring)

@@ -9,6 +9,14 @@
 //     marked rows, most bays with a parked car or van (Placemaker's vehicle props; decoration: nobody drives in);
 //   * further out (past shopFar of the lot): no concrete, the ground painted green with a few trees and bushes.
 // Pieces are the house's own (StitchPlan.Paths and Bushes), made and kept like every garden piece.
+//
+// Three styles (knob "parkStyle", YardStitch.ParkStyleOf; by the building: offices and homes clean, shops everyday, works
+// industrial):
+//   * clean: a wider grass strip, trees in planters at the ends of the rows, fewer cars, a tidy service corner (bins; an
+//     office's generator);
+//   * everyday: as above;
+//   * industrial: concrete, no grass strip or street trees, more vans, a fuller service corner (pallets, crates, barrels, a
+//     skip, a container, a shed), and dry worn ground further out instead of green.
 
 using System;
 using System.Collections.Generic;
@@ -78,7 +86,10 @@ namespace Placemaker.Core.Neighbours
         private static void ShopYard(IReadOnlyList<StitchHouse> houses, StitchHouse h, float2[] plot, List<Region> spare, StitchPlan plan, StitchSettings s)
         {
             uint seed = Hash((ulong)h.Id * 0x51F15EEDUL ^ 0x5409UL);
-            float greenW = K(h, s, "shopGreen", 3f), farD = K(h, s, "shopFar", 32f);
+            int style = ParkStyleOf(h, s);
+            bool clean = style == PolishLooks.ParkClean, works = style == PolishLooks.ParkIndustrial;
+            float greenW = K(h, s, "shopGreen", clean ? 4f : works ? 0f : 3f), farD = K(h, s, "shopFar", 32f);
+            string paving = works && string.IsNullOrEmpty(h.MainSurface) ? "Concrete Surface 01" : PavingOf(h);
             var built = new Obstacle(houses);
             var lot = Ccw(Lot(h));
             var plotR = new Region(Ccw(plot));
@@ -115,7 +126,7 @@ namespace Placemaker.Core.Neighbours
             foreach (var r in near)
             {
                 var ring = Prepared(r.HasHoles ? Poly.CutHoles(r, 0f).First() : r.Outer);
-                if (ring != null) { plan.Paths.Add((h.Id, ring, PavingOf(h))); paved++; }
+                if (ring != null) { plan.Paths.Add((h.Id, ring, paving)); paved++; }
             }
             foreach (var r in greenLand)
             {
@@ -126,13 +137,14 @@ namespace Placemaker.Core.Neighbours
             // what the lot's look leaves out stays out: planting (trees, bushes), features (the service corner, the car park), paint
             bool planting = K(h, s, "plant", 1f) > 0.5f, features = K(h, s, "features", 1f) > 0.5f, paint = K(h, s, "paint", 1f) > 0.5f;
             var taken = new List<float2[]>();
-            int trees = planting ? StreetTrees(h, plot, greenLand, built, taken, plan, seed) : 0;
-            int service = features ? ServiceCorner(h, near, built, taken, plan, seed) : 0;
-            int stalls = 0, cars = 0;
+            int trees = planting && !works ? StreetTrees(h, plot, greenLand, built, taken, plan, seed) : 0;
+            int service = features ? ServiceCorner(h, near, built, taken, plan, seed, style) : 0;
+            int stalls = 0, cars = 0, planters = 0;
             if (features)
-                foreach (var r in near.OrderByDescending(r => r.Area)) Parking(h, r, built, taken, plan, seed, ref stalls, ref cars);
-            int farTrees = GreenEnd(h, far, built, taken, plan, s, seed, planting, paint);
-            plan.Notes.Add($"{h.Id}: shop yard: {paved} paved pieces ({near.Sum(r => r.Area):F0} m²), {grass} grass strips with {trees} trees, a service corner of {service}, {stalls} parking bays ({cars} cars), {far.Sum(r => r.Area):F0} m² green further out ({farTrees} trees)");
+                foreach (var r in near.OrderByDescending(r => r.Area)) Parking(h, r, built, taken, plan, seed, style, planting, ref stalls, ref cars, ref planters);
+            int farTrees = GreenEnd(h, far, built, taken, plan, s, seed, planting && !works, paint, works);
+            string[] styleName = { "auto", "clean", "everyday", "industrial" };
+            plan.Notes.Add($"{h.Id}: shop yard ({styleName[style]}): {paved} paved pieces ({near.Sum(r => r.Area):F0} m², {paving}), {grass} grass strips with {trees} trees, a service corner of {service}, {stalls} parking bays ({cars} cars, {planters} planters), {far.Sum(r => r.Area):F0} m² {(works ? "worn ground" : "green")} further out ({farTrees} trees)");
         }
 
         /// <summary>Trees along the grass strip (one slim kind per shop, every 13.5 m: big crowns hid the parked cars in the game),
@@ -172,7 +184,7 @@ namespace Placemaker.Core.Neighbours
         /// a container or a generator on a bigger lot) along the other. Each leg is kept short (in the game, one row along the
         /// whole back of the lot read as a line of junk).
         /// </summary>
-        private static int ServiceCorner(StitchHouse h, List<Region> near, Obstacle built, List<float2[]> taken, StitchPlan plan, uint seed)
+        private static int ServiceCorner(StitchHouse h, List<Region> near, Obstacle built, List<float2[]> taken, StitchPlan plan, uint seed, int style)
         {
             if (near.Count == 0) return 0;
             float area = near.Sum(r => r.Area);
@@ -221,15 +233,30 @@ namespace Placemaker.Core.Neighbours
                     if (LineCross(e1.A, d1, edges[i2].A, d2, out var cross) && math.distance(cross, best) < 8f) { legs.Add((edges[i2].A, d2)); corner = cross; }
                 }
 
-                // homes: their bins only (no stock, no gas cage)
+                // homes: their bins only (no stock, no gas cage); clean: bins (an office's generator on a big lot); industrial:
+                // a fuller corner of stock (pallets, crates, barrels, a skip, a container, a shed)
                 bool homeBins = h.Zone == null || h.Zone == "home";
+                bool clean = style == PolishLooks.ParkClean, works = style == PolishLooks.ParkIndustrial;
                 var bins = homeBins ? new List<int> { Dumpster3, Dumpster2 } : new List<int> { GasCage, Dumpster3, Dumpster2 };
-                var stock = homeBins ? new List<int>() : new List<int> { 17 + (int)(seed % 2), CratePile3, Cardboard3 };
-                if (!homeBins && area >= 400f) stock.Add(Skip);
-                if (!homeBins && area >= 700f) stock.Add(h.Zone == "office" ? Generator : (seed >> 8) % 2 == 0 ? ShedBig : Container);
+                var stock = new List<int>();
+                if (works)
+                {
+                    stock.AddRange(new[] { 17 + (int)(seed % 2), CratePile3, 21, Pallet3 });
+                    if (area >= 250f) stock.Add(Skip);
+                    if (area >= 400f) stock.Add(Container);
+                    if (area >= 900f) stock.Add(ShedBig);
+                }
+                else if (clean) { if (!homeBins && h.Zone == "office" && area >= 700f) stock.Add(Generator); }
+                else if (!homeBins)
+                {
+                    stock.AddRange(new[] { 17 + (int)(seed % 2), CratePile3, Cardboard3 });
+                    if (area >= 400f) stock.Add(Skip);
+                    if (area >= 700f) stock.Add(h.Zone == "office" ? Generator : (seed >> 8) % 2 == 0 ? ShedBig : Container);
+                }
                 var placed = new List<(float2 At, float Yaw, int Kind, float2[] Fp)>();
                 var groups = legs.Count == 2 && stock.Count > 0 ? new[] { bins, stock } : new[] { bins.Concat(stock).ToList() };
-                float[] caps = groups.Length == 2 ? new[] { 9f, area >= 700f ? 16f : 11f } : new[] { area >= 700f ? 18f : 13f };
+                float big = works ? 6f : 0f;   // a works' corner runs further along its edges
+                float[] caps = groups.Length == 2 ? new[] { 9f, (area >= 700f ? 16f : 11f) + big } : new[] { (area >= 700f ? 18f : 13f) + big };
                 for (int g = 0; g < groups.Length; g++)
                 {
                     var (edge0, dir) = legs[g];
@@ -283,9 +310,12 @@ namespace Placemaker.Core.Neighbours
         }
 
         /// <summary>An overflow car park in marked rows (3.3 m bays, 6 m deep, 6.5 m aisles) over one piece of paved land; most bays
-        /// with a parked car or van. At least four bays, else none.</summary>
-        private static void Parking(StitchHouse h, Region land, Obstacle built, List<float2[]> taken, StitchPlan plan, uint seed, ref int stalls, ref int cars)
+        /// with a parked car or van (industrial: more vans, fewer cars; clean: fewer, and a tree in a planter at both ends of a
+        /// row of six or more). At least four bays, else none.</summary>
+        private static void Parking(StitchHouse h, Region land, Obstacle built, List<float2[]> taken, StitchPlan plan, uint seed, int style, bool planting, ref int stalls, ref int cars, ref int planters)
         {
+            bool clean = style == PolishLooks.ParkClean, works = style == PolishLooks.ParkIndustrial;
+            uint carShare = clean ? 55u : works ? 50u : 65u, vanShare = works ? 45u : 15u;
             if (land.Area < 80f) return;
             const float W = 3.3f, D = 6f, Aisle = 6.5f;
             // rows along the land's longer side (in the house's frame)
@@ -296,7 +326,7 @@ namespace Placemaker.Core.Neighbours
             var dAxis = rowsAlongX ? h.Forward : h.Right;     // across rows (a bay's depth)
             float r0 = rowsAlongX ? lo.x : lo.y, r1 = rowsAlongX ? hi.x : hi.y, d0 = rowsAlongX ? lo.y : lo.x, d1 = rowsAlongX ? hi.y : hi.x;
             var one = new List<Region> { land };
-            var bays = new List<(float2 At, float Yaw, bool Car, uint Hash)>();
+            var bays = new List<(float2 At, float Yaw, bool Car, uint Hash, int Row)>();
             for (int row = 0; ; row++)
             {
                 // rows 0,1 face one aisle, 2,3 the next (1 and 2 back to back)
@@ -311,17 +341,38 @@ namespace Placemaker.Core.Neighbours
                     var fp = Footprint(at, new float2(W * 0.5f, D * 0.5f), yaw, 0f);
                     if (!Fits(fp, one, built, taken)) continue;
                     uint hk = Hash(seed + (uint)row * 104729u + (uint)(int)math.round(r * 10f));
-                    bays.Add((at, aisleAfter ? yaw : yaw + math.PI, hk % 100 < 65, hk));
+                    bays.Add((at, aisleAfter ? yaw : yaw + math.PI, hk % 100 < carShare, hk, row));
                 }
             }
             if (bays.Count < 4) return;
-            foreach (var (at, yaw, car, hk) in bays)
+            // clean: the first and last bay of a row of six or more is a planter (a tree with a bush at its foot)
+            var ends = new HashSet<int>();
+            if (clean && planting)
+                foreach (var g in bays.Select((b, i) => (b, i)).GroupBy(x => x.b.Row))
+                {
+                    var row = g.ToList();
+                    if (row.Count < 6) continue;
+                    ends.Add(row[0].i);
+                    ends.Add(row[row.Count - 1].i);
+                }
+            int treeKind = FirstStreetTree + (int)((seed >> 5) % StreetTreeCount);
+            for (int i = 0; i < bays.Count; i++)
             {
-                plan.Bushes.Add((h.Id, at, yaw, StallLine));
+                var (at, yaw, car, hk, _) = bays[i];
                 taken.Add(Footprint(at, new float2(W * 0.5f, D * 0.5f), yaw, 0f));
+                if (ends.Contains(i))
+                {
+                    plan.Bushes.Add((h.Id, at, (hk & 1023) / 1023f * 2f * math.PI, treeKind));
+                    var along = new float2(math.cos(yaw), -math.sin(yaw));
+                    plan.Bushes.Add((h.Id, at + along * 0.9f, yaw, (int)((hk >> 3) % 2)));
+                    plan.Bushes.Add((h.Id, at - along * 0.9f, yaw + 1.3f, (int)((hk >> 5) % 2)));
+                    planters++;
+                    continue;
+                }
+                plan.Bushes.Add((h.Id, at, yaw, StallLine));
                 stalls++;
                 if (!car) continue;
-                int kind = (hk >> 8) % 100 < 15 ? FirstVan + (int)((hk >> 12) % VanCount) : FirstCar + (int)((hk >> 12) % CarCount);
+                int kind = (hk >> 8) % 100 < vanShare ? FirstVan + (int)((hk >> 12) % VanCount) : FirstCar + (int)((hk >> 12) % CarCount);
                 // nose to the aisle, a little off the bay's back
                 var to = new float2(math.sin(yaw), math.cos(yaw));
                 plan.Bushes.Add((h.Id, at + to * 0.2f, yaw, kind));
@@ -330,8 +381,11 @@ namespace Placemaker.Core.Neighbours
         }
 
         /// <summary>The land further out: green ground (painted, lush with dry patches), a few trees with bushes round them.</summary>
-        private static int GreenEnd(StitchHouse h, List<Region> far, Obstacle built, List<float2[]> taken, StitchPlan plan, StitchSettings s, uint seed, bool planting, bool paint)
+        private static int GreenEnd(StitchHouse h, List<Region> far, Obstacle built, List<float2[]> taken, StitchPlan plan, StitchSettings s, uint seed, bool planting, bool paint, bool worn = false)
         {
+            // industrial: dry worn ground (dirt, dry grass) rather than lush green
+            int layer = worn ? (int)K(h, s, "yardLayer", 3f) : (int)s.Knob("lushLayer", 2f);
+            float strength = worn ? 0.7f : K(h, s, "gardenPaint", 0.85f);
             int trees = 0;
             foreach (var r in far)
             {
@@ -339,7 +393,7 @@ namespace Placemaker.Core.Neighbours
                     foreach (var piece in r.HasHoles ? Poly.CutHoles(r, 0f) : new List<float2[]> { r.Outer })
                     {
                         if (Poly.Area(piece) < 12f) continue;
-                        Paint(plan, Poly.Simplify(piece, 0.3f), (int)s.Knob("lushLayer", 2f), K(h, s, "gardenPaint", 0.85f), 2f, 1.5f, 6f, seed ^ (uint)Poly.Area(piece));
+                        Paint(plan, Poly.Simplify(piece, 0.3f), layer, strength, 2f, 1.5f, 6f, seed ^ (uint)Poly.Area(piece));
                     }
                 // a few trees at roomy spots, 9 m or more apart
                 int want = planting ? (int)math.clamp(r.Area / 150f, 1f, 8f) : 0;

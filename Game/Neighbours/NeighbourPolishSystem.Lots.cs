@@ -128,7 +128,9 @@ namespace Placemaker.Game.Neighbours
         internal struct PendingTag
         {
             public Entity Owner, Prefab;
+            /// <summary>Where it was asked for: an object's spot, a surface's middle by its area (PieceIdentity.AreaCentre).</summary>
             public float2 At;
+            public bool Area;
             public PolishPieceKind Kind;
             public int Frame;
         }
@@ -383,20 +385,23 @@ namespace Placemaker.Game.Neighbours
                         var owner = EntityManager.GetComponentData<Owner>(e).m_Owner;
                         var prefab = EntityManager.GetComponentData<PrefabRef>(e).m_Prefab;
                         float2 at;
+                        float reach = 1.5f;
                         if (EntityManager.HasBuffer<global::Game.Areas.Node>(e))
                         {
                             var nodes = EntityManager.GetBuffer<global::Game.Areas.Node>(e, true);
                             if (nodes.Length == 0) continue;
-                            var c = float2.zero;
-                            for (int i = 0; i < nodes.Length; i++) c += nodes[i].m_Position.xz;
-                            at = c / nodes.Length;
+                            var ring = new float2[nodes.Length];
+                            for (int i = 0; i < ring.Length; i++) ring[i] = nodes[i].m_Position.xz;
+                            // its middle by area (the game's outline may repeat its first point); a big piece a little further
+                            at = PieceIdentity.AreaCentre(ring, out float m2);
+                            reach = math.max(1.5f, 0.1f * math.sqrt(m2));
                         }
                         else if (EntityManager.HasComponent<global::Game.Objects.Transform>(e)) at = EntityManager.GetComponentData<global::Game.Objects.Transform>(e).m_Position.xz;
                         else continue;
-                        // the nearest request of this owner and kind (an area's centre moves a little with its node count)
+                        // the nearest request of this owner and kind
                         if (!byOwner.TryGetValue((owner, prefab), out var mine)) continue;
                         int best = -1;
-                        float bestD = 1.5f;
+                        float bestD = reach;
                         foreach (int k in mine)
                         {
                             if (used[k]) continue;
@@ -607,13 +612,21 @@ namespace Placemaker.Game.Neighbours
         private List<PieceIdentity.Have> OwnPieceShapes(Entity house, PolishPieceKind kind)
         {
             var list = new List<PieceIdentity.Have>();
+            List<Entity> untagged = null;
             if (!EntityManager.Exists(house)) return list;
             if (EntityManager.HasBuffer<global::Game.Areas.SubArea>(house))
                 foreach (var sa in EntityManager.GetBuffer<global::Game.Areas.SubArea>(house, true))
                 {
                     var a = sa.m_Area;
-                    if (!EntityManager.Exists(a) || EntityManager.HasComponent<Deleted>(a) || !EntityManager.HasComponent<PolishPiece>(a) || !EntityManager.HasBuffer<global::Game.Areas.Node>(a)) continue;
-                    if (EntityManager.GetComponentData<PolishPiece>(a).Kind != kind) continue;
+                    if (!EntityManager.Exists(a) || EntityManager.HasComponent<Deleted>(a) || !EntityManager.HasBuffer<global::Game.Areas.Node>(a)) continue;
+                    if (!EntityManager.HasComponent<PolishPiece>(a))
+                    {
+                        // a paved piece of ours that never got its tag (it reaches past the lot, where the game's own never
+                        // do): tagged now, so it is replaced like the rest instead of standing for good as the house's own
+                        if (kind != PolishPieceKind.Garden || !UntaggedOurs(house, a)) continue;
+                        (untagged ??= new List<Entity>()).Add(a);
+                    }
+                    else if (EntityManager.GetComponentData<PolishPiece>(a).Kind != kind) continue;
                     var nodes = EntityManager.GetBuffer<global::Game.Areas.Node>(a, true);
                     if (nodes.Length == 0) continue;
                     var ring = new float2[nodes.Length];
@@ -628,6 +641,13 @@ namespace Placemaker.Game.Neighbours
                     if (EntityManager.GetComponentData<PolishPiece>(o).Kind != kind) continue;
                     var t = EntityManager.GetComponentData<global::Game.Objects.Transform>(o);
                     list.Add(new PieceIdentity.Have { Entity = o, Name = NameOf(EntityManager.GetComponentData<PrefabRef>(o).m_Prefab), At = t.m_Position.xz, Yaw = PieceIdentity.YawOf(t.m_Rotation) });
+                }
+            // tagged once the house's buffers are read (a new component moves the entity)
+            if (untagged != null)
+                foreach (var a in untagged)
+                {
+                    EntityManager.AddComponentData(a, new PolishPiece { Kind = PolishPieceKind.Garden });
+                    TotalTagged++;
                 }
             return list;
         }

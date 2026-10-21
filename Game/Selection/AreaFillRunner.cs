@@ -4,7 +4,9 @@
 // walls into a grid and measures it (tens of milliseconds, more for a big reach), so hovering runs it on a worker
 // thread: the walls are read on the main thread (ECS), handed over as a snapshot, and when the fill needs a bigger
 // window than the snapshot covers it stops (FillNeedsWalls) and is started again with the bigger box next frame.
-// The newest hover wins; a click waits for the job of its own spot or fills right away. Windows (grids) are kept
+// (2026-10-21, the user: "when I mouse over things with my paint bucket tool, not even clicking, I get a lag spike") The
+// tools no longer fill on hover: a click asks here and is applied when its fill is back.
+// The newest request wins; a click waits for the job of its own spot or fills right away. Windows (grids) are kept
 // for further hovers nearby while the walls and the rules stay the same.
 
 using System;
@@ -58,6 +60,13 @@ namespace Placemaker.Game.Selection
 
         public bool Matches(FillResult r, float2 seed, BrushRules rules, int group) =>
             r != null && math.distance(r.Seed, seed) < 0.01f && LatestRules != null && Same(LatestRules, rules) && LatestGroup == group;
+
+        /// <summary>The finished fill at <paramref name="seed"/> with these rules, or null (not asked, or still running).</summary>
+        public FillResult Ready(float2 seed, BrushRules rules, int group)
+        {
+            rules = rules.ForOutline();
+            return Matches(Latest, seed, rules, group) ? Latest : null;
+        }
 
         private static bool Same(BrushRules a, BrushRules b) => a.SameWalls(b) && a.Gap == b.Gap && a.Reach == b.Reach;
 

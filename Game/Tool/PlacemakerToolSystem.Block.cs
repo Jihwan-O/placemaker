@@ -1,10 +1,11 @@
-// Block mode ("Paint bucket"), area overhaul (2026-10-17): hover → the fill under the cursor is outlined; click takes it;
+// Block mode ("Paint bucket"), area overhaul (2026-10-17): click takes the fill under the cursor;
 // Shift+click adds another fill next to it (or removes one); right-click removes the one under the cursor.
 //
 // The fill is Core/Geometry/AreaFill on the shared walls (Game/Selection/AreaWalls, the "Stops at" rules): road and path
 // surfaces with their junctions and turning circles, buildings, lots, my builds, zoning, water. Openings narrower than
 // the Gap setting count as closed and narrower places are left out; the Reach setting bounds it in open land. It runs
-// in the background while hovering (AreaFillRunner); a click uses the hover's result for that spot. The user's grades
+// in the background (AreaFillRunner), only after a click (2026-10-21; it used to fill on hover, a lag spike each time the
+// cursor left the outline), and is taken when it is back. The user's grades
 // that started it: "Paint bucket gets like a D minus ... it needs more settings ... a threshold ... doesn't always avoid
 // zones ... in corners it doesn't get to the full corner ... goes inside tiny little cracks ... goes onto roads even
 // though I have avoid roads on ... things cut into it that don't make any sense".
@@ -38,9 +39,7 @@ namespace Placemaker.Game.Tool
         }
 
         private BlockPick _hoverFace;
-        private float2 _hoverFaceAt = new float2(float.MaxValue);
         private LocText _hoverFaceProblem;
-        private int _hoverFillVersion = -1;
         private AreaWalls _areaWalls;
         private AreaFillRunner _fills;
 
@@ -59,10 +58,15 @@ namespace Placemaker.Game.Tool
             _areaWalls?.Invalidate();
             _fills?.Invalidate();
             _hoverFace = null;
-            _hoverFaceAt = new float2(float.MaxValue);
+            _bucketClick = null;
         }
 
-        private int _hoverRulesKey, _blockRulesKey;
+        private int _blockRulesKey;
+        /// <summary>A bucket click whose fill is still being worked out (and whether Shift was held).</summary>
+        private float2? _bucketClick;
+        private bool _bucketShift;
+        /// <summary>A click is waiting for its fill (the overlay can say so).</summary>
+        public bool FillPending => _bucketClick.HasValue || _bpStart != null;
 
         private int FillKey(BrushRules rules)
         {
@@ -81,18 +85,31 @@ namespace Placemaker.Game.Tool
                 _blockRulesKey = key;
                 if (!first && _blocks.Seeds.Count > 0 && _gesture == Gesture.None) RepickBlocks();
             }
-            if (_in.HasHit)
-            {
-                _cursor = _in.Hit;
-                HoverFill(_in.Hit.xz);
-            }
-            else _hoverFace = null;
+            // No fill on hover (2026-10-21, the user: "when I mouse over things with my paint bucket tool, not even
+            // clicking, I get a lag spike. Shouldn't we not calculate the fill until you click?"): a click asks for the fill
+            // in the background and takes it a few frames later, when it is back.
+            if (_in.HasHit) _cursor = _in.Hit;
+            // the clicked fill keeps its stops, closed gaps and reach on show while the cursor stays in it
+            if (_hoverFace?.Fill?.Ring != null && !(_in.HasHit && Poly.Contains(_hoverFace.Fill.Ring, _in.Hit.xz))) _hoverFace = null;
 
-            if (_in.LeftPressed)
+            if (_in.LeftPressed && _in.HasHit)
             {
-                var pick = PickAt(_in.Hit.xz, out var problem);
-                if (pick == null) { Flash(problem ?? new LocText("Placemaker.Problem.NoBlockHere")); return; }
-                if (!_in.Shift)
+                _bucketClick = _in.Hit.xz;
+                _bucketShift = _in.Shift;
+                Fills.Request(_bucketClick.Value, BrushRules, _editingGroup);
+                Touch();
+            }
+            if (_bucketClick.HasValue)
+            {
+                var r = Fills.Ready(_bucketClick.Value, BrushRules, _editingGroup);
+                if (r == null) { if (!Fills.Busy) Fills.Request(_bucketClick.Value, BrushRules, _editingGroup); return; }
+                _bucketClick = null;
+                Touch();
+                LogFill("click", r);
+                var pick = r.Status == FillStatus.Ok ? ToPick(r) : null;
+                if (pick == null) { Flash(Problem(r) ?? new LocText("Placemaker.Problem.NoBlockHere")); return; }
+                _hoverFace = pick;
+                if (!_bucketShift)
                 {
                     _blocks = new BlockSelectionState();
                     _blocks.Seeds.Add(pick.Seed);
@@ -110,37 +127,6 @@ namespace Placemaker.Game.Tool
                 int idx = IndexOfFill(_in.Hit.xz);
                 if (idx >= 0) RemoveBlock(idx);
             }
-        }
-
-        /// <summary>Hover: keep the outline under the cursor; ask for a new fill when the cursor leaves it.</summary>
-        private void HoverFill(float2 p)
-        {
-            var rules = BrushRules;
-            // The rules changed elsewhere (the options page, the game runner): the hover was filled with the old ones.
-            int key = FillKey(rules);
-            if (key != _hoverRulesKey)
-            {
-                _hoverRulesKey = key;
-                _hoverFace = null;
-                _hoverFaceAt = new float2(float.MaxValue);
-            }
-            var latest = _fills.Latest;
-            if (_fills.Version != _hoverFillVersion)
-            {
-                _hoverFillVersion = _fills.Version;
-                if (latest != null && _fills.Matches(latest, latest.Seed, rules, _editingGroup))
-                {
-                    _hoverFace = latest.Status == FillStatus.Ok ? ToPick(latest) : null;
-                    _hoverFaceProblem = Problem(latest);
-                    if (latest.Ms > 40) LogFill("hover", latest);
-                }
-                else _hoverFace = null;
-                Touch();   // the area legend follows the hover
-            }
-            bool inside = _hoverFace?.Fill?.Ring != null && Poly.Contains(_hoverFace.Fill.Ring, p);
-            if (inside || math.distance(p, _hoverFaceAt) <= 1f) return;
-            _hoverFaceAt = p;
-            _fills.Request(p, rules, _editingGroup);
         }
 
         /// <summary>The fill at a click: the hover's when the click is inside it, else filled now.</summary>
@@ -323,7 +309,6 @@ namespace Placemaker.Game.Tool
         private void RepickBlocks()
         {
             _hoverFace = null;
-            _hoverFaceAt = new float2(float.MaxValue);
             if (_blocks.Seeds.Count == 0) return;
             var next = new BlockSelectionState();
             foreach (var seed in _blocks.Seeds)

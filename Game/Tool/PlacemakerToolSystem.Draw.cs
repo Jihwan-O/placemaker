@@ -264,6 +264,8 @@ namespace Placemaker.Game.Tool
         /// <summary>Esc / tool deactivation mid-drag: put everything back as it was before the gesture.</summary>
         private void CancelGesture()
         {
+            // a finished Paint area stroke waiting for its outline is kept (an undo step), not cancelled
+            CommitBlockPaintStroke(true);
             switch (_gesture)
             {
                 case Gesture.DragPoint:
@@ -277,6 +279,13 @@ namespace Placemaker.Game.Tool
                     _gesture = Gesture.None;
                     if (s != null) RestoreSelectionOnly(s);
                     break;
+            }
+            // a click waiting for its fill (bucket) or a Paint area stroke waiting to start
+            _bucketClick = null;
+            if (_bpStart != null)
+            {
+                _bpStart = null;
+                if (_history.Current != null) RestoreSelectionOnly(_history.Current);
             }
             _gesture = Gesture.None;
             _dragIndex = -1;

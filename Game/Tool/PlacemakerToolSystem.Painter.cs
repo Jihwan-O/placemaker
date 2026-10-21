@@ -237,7 +237,6 @@ namespace Placemaker.Game.Tool
             // other stops: the fills and the outline are worked out again
             _fills?.Invalidate();
             _hoverFace = null;
-            _hoverFaceAt = new float2(float.MaxValue);
             if (_mode == SelectionMode.Block) RepickBlocks();
             else if (_mode == SelectionMode.Draw && _draw.Closed) ShapeChanged();
             // a painted area keeps what was painted and is fenced again with the painter's stops (lots and buildings no
@@ -298,8 +297,9 @@ namespace Placemaker.Game.Tool
             bool on = value == "true";
             switch (what)
             {
-                case "on": s.NeighbourhoodPolish = on; break;
-                case "newHouses": s.PolishNewHouses = on; break;
+                // this city's switches (saved with it, never in the settings)
+                case "on": NeighbourPolishSystem.SetRunning(on); Touch(); return;
+                case "newHouses": NeighbourPolishSystem.SetNewBuildings(on); Touch(); return;
                 case "homes": case "shops": case "offices": case "industry":
                     if (value != "off" && value != NeighbourPolishSystem.KindAuto && NeighbourPolishSystem.LookById(value) == null) return;
                     if (what == "homes") s.PolishThemeHomes = value;
@@ -308,11 +308,9 @@ namespace Placemaker.Game.Tool
                     else s.PolishThemeIndustry = value;
                     break;
                 case "polishAll":
-                    if (!s.NeighbourhoodPolish) s.NeighbourhoodPolish = true;
-                    s.ApplyAndSave();
                     NeighbourPolishSystem.PolishEverything(0);
                     Mod.Log.Info("Placemaker painter: polish the whole city (each building its zone's look)");
-                    Flash(new LocText("Placemaker.Painter.CityPolishing"));
+                    Flash(new LocText(NeighbourPolishSystem.Paused ? "Placemaker.Painter.Paused" : "Placemaker.Painter.CityPolishing"));
                     Touch();
                     return;
                 case "unpolishAll":
@@ -481,15 +479,13 @@ namespace Placemaker.Game.Tool
             if (_shape == null) { Flash(new LocText("Placemaker.Reason.NoArea")); return; }
             var lots = PainterLots(polish);
             if (lots.Count == 0) { Flash(new LocText("Placemaker.Painter.NoLots")); return; }
-            // polishing is what the player asked for: the polish runs from now on (Whole city: Neighbourhood polish)
-            var settings = global::Placemaker.Game.Tool.ToolRegistration.Settings;
-            if (yes && settings != null && !settings.NeighbourhoodPolish) { settings.NeighbourhoodPolish = true; settings.ApplyAndSave(); }
+            // paused (the master switch): the flags are kept and the lots outgrow once it runs again; it is never switched on here
             // "By zone": each lot gets its zone's look; a look picked: that look, and what the rows changed in it
             NeighbourPolishSystem.Stamp(lots, yes, PainterLook, yes ? LookChanges() : null);
             LastStamp = (lots.Count, yes);
             Mod.Log.Info($"Placemaker painter: {(yes ? "polish" : "unpolish")} {lots.Count} lots ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
             // the selection stays: Polish again (another look, changed settings) or Unpolish whenever
-            Flash(new LocText(yes ? "Placemaker.Painter.Polished" : "Placemaker.Painter.Unpolished", lots.Count));
+            Flash(yes && NeighbourPolishSystem.Paused ? new LocText("Placemaker.Painter.Paused") : new LocText(yes ? "Placemaker.Painter.Polished" : "Placemaker.Painter.Unpolished", lots.Count));
         }
 
         /// <summary>The houses the painter acts on: in the area, or (Paint area) painted over by the brush.</summary>
@@ -577,7 +573,7 @@ namespace Placemaker.Game.Tool
             var s = global::Placemaker.Game.Tool.ToolRegistration.Settings;
             var v = new PainterView
             {
-                Lots = lots, Polished = yes, FeatureOn = NeighbourPolishSystem.FeatureEnabled, NewHouses = NeighbourPolishSystem.PolishNew, Theme = PainterLook,
+                Lots = lots, Polished = yes, FeatureOn = NeighbourPolishSystem.FeatureEnabled && !NeighbourPolishSystem.Paused, NewHouses = NeighbourPolishSystem.PolishNew, Theme = PainterLook,
                 Tool = _painter,
                 CityPolished = NeighbourPolishSystem.StatusPolished, CityTotal = NeighbourPolishSystem.StatusTotal,
                 Waiting = NeighbourPolishSystem.StatusWaiting, Restoring = NeighbourPolishSystem.StatusRestoring,

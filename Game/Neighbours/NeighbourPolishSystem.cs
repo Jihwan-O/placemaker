@@ -38,34 +38,11 @@ namespace Placemaker.Game.Neighbours
 {
     public sealed partial class NeighbourPolishSystem : GameSystemBase
     {
-        /// <summary>Setting "Stitch neighbouring houses".</summary>
+        /// <summary>The polish can run this session (false after repeated errors). The player's master switch is Paused.</summary>
         public static bool FeatureEnabled;
-        /// <summary>"Outgrow new buildings": a lot that spawns gets the flag yes (off: no; the painter decides). Only yes lots are
-        /// ever edited (PolishedLot, NeighbourPolishSystem.Lots). Kept with each city (PolishCitySettings): a new city, or one
-        /// saved before it was kept there, starts with it off.</summary>
+        /// <summary>"Outgrow new buildings", this city's (NeighbourPolishSystem.Switches): a lot that spawns gets the flag yes
+        /// (off: no; the painter decides). Only yes lots are ever edited (PolishedLot, NeighbourPolishSystem.Lots).</summary>
         public static bool PolishNew;
-        private static bool s_newWrite;
-        private EntityQuery _citySettings;
-
-        /// <summary>"Outgrow new buildings" for the city open now (written into it on the next update; before a city is open,
-        /// the city's own value replaces it when one opens).</summary>
-        public static void SetNewBuildings(bool on)
-        {
-            PolishNew = on;
-            s_newWrite = true;
-        }
-
-        private void WriteCitySettings()
-        {
-            s_newWrite = false;
-            var data = new PolishCitySettings { NewBuildings = PolishNew };
-            using (var all = _citySettings.ToEntityArray(Allocator.Temp))
-            {
-                if (all.Length == 0) { EntityManager.AddComponentData(EntityManager.CreateEntity(), data); return; }
-                EntityManager.SetComponentData(all[0], data);
-                for (int i = 1; i < all.Length; i++) EntityManager.DestroyEntity(all[i]);
-            }
-        }
 
         // the look a lot is polished with (PolishedLot.Parts): never renumber
         public const byte PartLawns = 1, PartPlanting = 2, PartFeatures = 4, PartPaths = 8, PartRocks = 16, PartPaint = 32, PartShopPaving = 64, PartsAll = 127;
@@ -293,8 +270,8 @@ namespace Placemaker.Game.Neighbours
                 None = new[] { ComponentType.ReadOnly<Deleted>(), ComponentType.ReadOnly<Temp>() },
             });
             CreateLotQueries();
-            _citySettings = GetEntityQuery(new EntityQueryDesc { All = new[] { ComponentType.ReadOnly<PolishCitySettings>() }, None = new[] { ComponentType.ReadOnly<Deleted>() } });
             CreateAreaQueries();
+            CreateSwitchesQuery();
             CreateNearbyQuery();
             CreateHiddenQuery();
             CreateRebuiltQueries();
@@ -306,12 +283,7 @@ namespace Placemaker.Game.Neighbours
             base.OnGameLoaded(serializationContext);
             // another city: everything kept in memory names entities of the old one (their indices are reused)
             ForgetCity();
-            // "Outgrow new buildings" as this city keeps it (a new city, or one saved before it was kept: off)
-            PolishNew = false;
-            s_newWrite = false;
-            using (var kept = _citySettings.ToComponentDataArray<PolishCitySettings>(Allocator.Temp))
-                if (kept.Length > 0) PolishNew = kept[0].NewBuildings;
-            Mod.Log.Info($"Placemaker neighbourhood polish: city loaded, outgrow new buildings {(PolishNew ? "on" : "off")}");
+            ForgetSwitches();
             // a loaded city is as it was saved: nothing to plan until something changes, but the outgrown buildings an older
             // build left empty (NeighbourPolishSystem.Rebuilt)
             StartHeal();
@@ -329,15 +301,19 @@ namespace Placemaker.Game.Neighbours
         {
             try
             {
-                // "Outgrow new buildings" changed: kept with the city (once one is open)
-                if (s_newWrite && StatusInCity) WriteCitySettings();
+                // this city's switches first: new lots below are flagged by them
+                SwitchesUpdate();
+            }
+            catch (Exception e) { if (_errors++ < 5) Mod.Log.Error(e, "Placemaker neighbourhood polish (switches) failed"); }
+            try
+            {
                 // the painter's stamps, "Remove all polish", new lots' flags and our new pieces' tags: also with the polish
                 // off (putting a lot back never hurts, and a flag given now is used once it is switched on)
                 LotsUpdate();
             }
             catch (Exception e) { if (_errors++ < 5) Mod.Log.Error(e, "Placemaker neighbourhood polish (lots) failed"); }
             // (our own pieces the game hid: shown again by NeighbourShowSystem, after the game's check of this frame)
-            if (!FeatureEnabled)
+            if (!FeatureEnabled || Paused)
             {
                 // off: nothing is planned or written. Polished houses the game rebuilds meanwhile (a level-up gives back its
                 // own fences) are remembered and fitted again once it is on: switching on never replans the whole city

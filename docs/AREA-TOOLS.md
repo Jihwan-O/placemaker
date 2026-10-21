@@ -25,12 +25,13 @@ water, buildings, lots, my builds, and zoning as one choice (ignore / built / zo
   *body* within half a gap of it, corners kept where they end within about a gap, cracks and passages left out, the
   **Reach** as a disc. The grid only picks the piece: the outline is the grid region minus the wall polygons, exactly.
   Tests: `Tests/Placemaker.Tests/GeometryAreaFillTests.cs`.
-* **Paint bucket** (`PlacemakerToolSystem.Block`): the fill under the cursor, worked out on a worker thread while
-  hovering (`Game/Selection/AreaFillRunner`); Shift+click adds a fill next to it (the street between two is taken
+* **Paint bucket** (`PlacemakerToolSystem.Block`): the fill under the cursor, worked out on a worker thread after a
+  click (`Game/Selection/AreaFillRunner`; not on hover since 2026-10-21: lag spikes) and taken when it is back; Shift+click adds a fill next to it (the street between two is taken
   along), right-click drops one. Outlines along curbs for most of their length are `AreaSource.Block` (no perimeter
   road, junction anchors), like the old block pick.
 * **Paint area** (`PlacemakerToolSystem.BlockPaint`): with One block on, the brush is fenced to the fill where the
-  stroke starts; off, to a 600 m box with every stop fenced out. 2 m cells (were 4).
+  stroke starts; off, to a 600 m box with every stop fenced out. 2 m cells (were 4). A stroke waits a few frames for its fill and fence
+  (both on a worker; the mouse path is painted when it starts); the box grows and the fence is re-read in the background.
 * **Points** (`PlacemakerToolSystem.Points`): corners snap to road nodes over a junction or a dead end; two in a row
   follow the road between them; the outline is cut by the stops (biggest piece kept, the rest shaded grey).
 * **Legend** while choosing the area (`Core/Tool/AreaLegend`, `state.areaLegend`): the fill, closed gaps (amber), the
@@ -40,7 +41,8 @@ water, buildings, lots, my builds, and zoning as one choice (ignore / built / zo
 
 `suite/scenarios/area-tools.json`: dead ends, paths, a street that stops short of another (gap), open land (reach),
 Points on road nodes, a zoned block. Land can carry extra roads and paths (`land.nets`), and the `hover` step rests
-the cursor so a picture shows what the tool shows under it.
+the cursor so a picture shows what the tool shows under it (no fill: the tools fill on a click). `suite/scenarios/area-lag.json`:
+the worst frame of bucket hovers and clicks and of Paint area strokes (`suite.log`).
 
 ```
 powershell -File tools/suite/Run-Suite.ps1 -Set suite/scenarios/area-tools.json -Who area-tools

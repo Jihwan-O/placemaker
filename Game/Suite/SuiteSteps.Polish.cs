@@ -111,8 +111,8 @@ namespace Placemaker.Game.Suite
                 string value = (string)step["value"] ?? "";
                 Func<bool> done = what switch
                 {
-                    "on" => () => s.NeighbourhoodPolish == (value == "true"),
-                    "newHouses" => () => s.PolishNewHouses == (value == "true"),
+                    "on" => () => NeighbourPolishSystem.Paused == (value != "true"),
+                    "newHouses" => () => NeighbourPolishSystem.PolishNew == (value == "true"),
                     "homes" => () => s.PolishThemeHomes == value,
                     "shops" => () => s.PolishThemeShops == value,
                     "offices" => () => s.PolishThemeOffices == value,

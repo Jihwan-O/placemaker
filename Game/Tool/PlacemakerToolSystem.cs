@@ -444,6 +444,7 @@ namespace Placemaker.Game.Tool
 
         public void Undo()
         {
+            CommitBlockPaintStroke(true);   // a Paint area stroke whose outline is still on a worker is a step first
             if (!CanUndo) return;
             EndValuePreview(false);
             Restore(_history.Undo());
@@ -451,6 +452,7 @@ namespace Placemaker.Game.Tool
 
         public void Redo()
         {
+            CommitBlockPaintStroke(true);
             if (!CanRedo) return;
             EndValuePreview(false);
             Restore(_history.Redo());

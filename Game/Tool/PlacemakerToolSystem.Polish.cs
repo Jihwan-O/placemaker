@@ -39,7 +39,6 @@ namespace Placemaker.Game.Tool
             if (now && _painterRules == null) _painterRules = PainterRulesFrom(PlayerBrushRules);
             _fills?.Invalidate();
             _hoverFace = null;
-            _hoverFaceAt = new float2(float.MaxValue);
             if (_mode == SelectionMode.Block) RepickBlocks();
             else if (_mode == SelectionMode.Draw && _draw.Closed) ShapeChanged();
             else if ((_mode == SelectionMode.Paint || _mode == SelectionMode.BlockPaint) && _shape != null) ShapeChanged();
@@ -184,7 +183,7 @@ namespace Placemaker.Game.Tool
             }
             LastStamp = (stamped, true);
             Mod.Log.Info($"Placemaker zoning: {stamped} buildings outgrown with {layer.LookId} by zone type: {perZone} ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
-            Flash(new LocText("Placemaker.Polish.Built", stamped), 5f);
+            Flash(NeighbourPolishSystem.Paused ? new LocText("Placemaker.Painter.Paused") : new LocText("Placemaker.Polish.Built", stamped), 5f);
             SuiteNoteBuilt(0);
             _countShape = null;
             Touch();

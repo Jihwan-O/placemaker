@@ -374,7 +374,8 @@ namespace Placemaker.Game.Settings
 
         // ───────────── Neighbourhood polish: shown and changed in Placemaker's panel (Polish gardens), saved here ─────────────
 
-        /// <summary>Neighbourhood polish on: polished gardens keep fitting as the city changes (off: nothing changes). NeighbourPolishSystem.</summary>
+        /// <summary>Unused: Outgrow's master switch and "Outgrow new buildings" are each city's own, saved with it
+        /// (NeighbourPolishSystem.Switches). Kept so older settings files still read.</summary>
         [SettingsUIHidden] public bool NeighbourhoodPolish { get; set; }
         /// <summary>"Outgrow new buildings": kept with each city (NeighbourPolishSystem.PolishNew, PolishCitySettings; a new
         /// city: off), not in this file; the property stays for the panel and the game runner's "setting" step.</summary>
@@ -457,8 +458,9 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Economy.ParkingEconomySystem.DefaultFee = DefaultParkingFee;
                 global::Placemaker.Game.Economy.ParkingCompanionSystem.CompanionEnabled = ExperimentalParkingCompanion;
                 global::Placemaker.Game.Economy.ParkingCompanionUpkeepSystem.UpkeepFactor = CompanionUpkeepFactor;
-                // always on: what is polished keeps fitting as the city changes; only new buildings (Polish new buildings) and
-                // what the player polishes are ever polished, buildings standing before are left as they are
+                // always on (the player's master switch and new buildings are the city's own: NeighbourPolishSystem.Switches):
+                // what is polished keeps fitting as the city changes; only new buildings and what the player polishes are
+                // ever polished, buildings standing before are left as they are
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = true;
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetZoneThemes(PolishThemeHomes, PolishThemeShops, PolishThemeOffices, PolishThemeIndustry);
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetZoneLooks(PolishZoneLooks);

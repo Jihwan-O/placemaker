@@ -735,6 +735,13 @@ export const PolishCityCard = ({ state }: { state: ToolState }) => {
     const editFp = tab === "edit" ? JSON.stringify([p.theme, p.looks, p.values, p.lookValues, p.lookTheme, p.lookSavedTheme, p.modified, p.swatches, st?.looks?.[p.theme ?? ""]]) : "";
     return (
         <div className={s.cityEmbedded} data-testid="polish-city" onMouseDown={(e) => e.stopPropagation()}>
+                {/* this city's master switch (saved with it): off pauses Outgrow, nothing is put back */}
+                <div className={classNames(s.masterRow, { [s.masterRowOff]: !p.featureOn })} data-testid="polish-master">
+                    <Tip title={L("Master", "Outgrow")} description={L("Master.Tip", "This city's master switch. Off: nothing outgrows (new buildings, zoned areas, what you outgrow), and nothing is put back: outgrown buildings stay as they are. Saved with the city.")}>
+                        <div className={s.masterLabel}>{p.featureOn ? L("MasterOn", "Outgrow is on in this city") : L("MasterOff", "Outgrow is paused in this city")}</div>
+                    </Tip>
+                    <Switch testId="polish-on" on={p.featureOn} onChange={(v) => act.polishCity("on", v ? "true" : "false")} />
+                </div>
                 <div className={s.cityActions}>
                     <Btn variant="accent" icon="sparkle" iconSize={13} label={L("OutgrowAllShort2", "Set all to defaults")} title={L("OutgrowAll2", "Outgrow every building in the city with its zone type's default outgrow type (the Defaults tab), also the ones you brushed")} testId="polish-all" onClick={() => setAsk({ what: "polishAll" })} />
                     <Btn variant="ghost" icon="reset" iconSize={13} label={L("RemoveAllShort2", "Remove all")} title={L("RemoveAll", "Put every outgrown building in the city back as the game made it")} testId="polish-none" disabled={city.polished === 0} onClick={() => setAsk({ what: "unpolishAll" })} />

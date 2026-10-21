@@ -32,7 +32,7 @@
         { "do": "lab", "op": "street", "shape": "straight", "length": 300, "at": [ 0, -130 ], "zone": "Office Low" },
         { "do": "grow", "seconds": 60 },
         { "do": "polish", "stamp": "pick" },
-        { "do": "polish", "click": "polish-city-open" },
+        { "do": "polish", "click": "panel-mode-outgrow" },
         { "do": "polish", "click": "polish-all" },
         { "do": "polish", "clickText": "Set to defaults" },
         { "do": "lab", "op": "polishIdle", "seconds": 180 },

@@ -93,11 +93,10 @@ namespace Placemaker.Game.Overlay
                     if (_tool.OutgrowLens) DrawOutgrowLens();
                     else if (_tool.Painter && !_tool.OutgrowCityOpen) DrawPolishedLots();
                     else PolishedShown = 0;
-                    if (_tool.Stage == ToolStage.Design || _tool.Stage == ToolStage.Review || _tool.Stage == ToolStage.Building)
+                    if ((_tool.Stage == ToolStage.Design || _tool.Stage == ToolStage.Review || _tool.Stage == ToolStage.Building) && !_tool.OutgrowMode)
                         DrawPlan(buffer, w, detail);
-                    if (!_tool.OutgrowBrushOn) DrawSelection(buffer, w);   // the brush: no area tool's cursor or hover
-                    DrawMarkers(buffer, w);
-                    DrawErrors(buffer, w);
+                    if (!_tool.OutgrowBrushOn && !_tool.OutgrowMode) DrawSelection(buffer, w);   // Outgrow: no area tool's cursor or hover
+                    if (!_tool.OutgrowMode) { DrawMarkers(buffer, w); DrawErrors(buffer, w); }
                 }
                 if (_tool.OutgrowBrushOn) DrawOutgrowBrush(buffer, w);
                 _fill.EndFrame();

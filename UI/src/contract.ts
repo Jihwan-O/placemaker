@@ -189,6 +189,8 @@ export interface PainterState {
   brushLook?: string;
   /** The brush's diameter in metres. */
   brushSize?: number;
+  /** The panel shows Outgrow (its switcher; the toolbar's Outgrow button) instead of Placemaker's stages. */
+  outgrowMode?: boolean;
   /** A Zoning type picked: the look its zones take unless one picks its own. */
   typeLook?: string;
   /** Every zone type of the game: its look ("off": not polished) and whether it has its own (else its kind's). */

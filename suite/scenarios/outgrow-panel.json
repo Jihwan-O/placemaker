@@ -33,7 +33,7 @@
         },
         {
           "do": "polish",
-          "click": "polish-city-open",
+          "click": "panel-mode-outgrow",
           "shot": "global-zones",
           "shotMode": "ui"
         },

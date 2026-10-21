@@ -56,7 +56,7 @@
         },
         {
           "do": "polish",
-          "click": "polish-city-open"
+          "click": "panel-mode-outgrow"
         },
         {
           "do": "wait",
@@ -80,7 +80,7 @@
         },
         {
           "do": "polish",
-          "click": "polish-city-close"
+          "click": "panel-mode-placemaker"
         },
         {
           "do": "wait",

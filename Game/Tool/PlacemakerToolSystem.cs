@@ -158,10 +158,11 @@ namespace Placemaker.Game.Tool
             // While a build runs the build service owns the tool slot; switching tools would abort it.
             if (m_ToolSystem == null || _building) return;
             // the polish tool (its own button) shares this tool: Placemaker's button switches over to Placemaker
-            if (m_ToolSystem.activeTool == this) { if (_painter) SetPainter(false); else Close(); }
+            if (m_ToolSystem.activeTool == this) { if (_painter || _outgrowMode) { SetPainter(false); SetOutgrowMode(false); } else Close(); }
             else
             {
                 if (_painter) SetPainter(false);
+                if (_outgrowMode) SetOutgrowMode(false);
                 _closeAfterGhost = 0;
                 _closeAfterBuild = false;   // opened by the player: a Build & close the build never handed back is void
                 m_ToolSystem.activeTool = this;
@@ -251,7 +252,8 @@ namespace Placemaker.Game.Tool
 
                 if (HandleKeys()) { /* key handled: no tool input this frame */ }
                 else if (_stage == ToolStage.Building) { /* input ignored while building */ }
-                else if (_brush != 0) UpdateOutgrowBrushInput();   // Global outgrow's brush: the mouse is its own
+                else if (_brush != 0) UpdateOutgrowBrushInput();   // Outgrow's brush: the mouse is its own
+                else if (_outgrowMode) _cursorValid = false;       // Outgrow mode: the area tools rest
                 else if (_markerKind != null) UpdateMarkers();
                 else if (_stage == ToolStage.Manage) UpdateManage();
                 else

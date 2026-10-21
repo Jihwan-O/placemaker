@@ -51,9 +51,9 @@ const DOCK_BOTTOM = 112;
 /** Floating position as fractions of the viewport (survives resolution / UI-scale changes). */
 type Pos = { fx: number; fy: number } | null;
 
-function loadPos(key = POS_KEY): Pos {
+function loadPos(): Pos {
     try {
-        const raw = window.localStorage?.getItem(key);
+        const raw = window.localStorage?.getItem(POS_KEY);
         if (!raw) return null;
         const v = JSON.parse(raw);
         return v && typeof v.fx === "number" && typeof v.fy === "number" ? { fx: v.fx, fy: v.fy } : null;
@@ -62,10 +62,10 @@ function loadPos(key = POS_KEY): Pos {
     }
 }
 
-function savePos(p: Pos, key = POS_KEY) {
+function savePos(p: Pos) {
     try {
-        if (p) window.localStorage?.setItem(key, JSON.stringify(p));
-        else window.localStorage?.removeItem(key);
+        if (p) window.localStorage?.setItem(POS_KEY, JSON.stringify(p));
+        else window.localStorage?.removeItem(POS_KEY);
     } catch {
         /* storage unavailable: the position is simply not remembered */
     }
@@ -131,74 +131,8 @@ function remPx() {
     return fs > 0 ? fs : window.innerHeight / 1080;
 }
 
-const CITY_POS_KEY = "placemaker.cityPos.v1";
-/** Global outgrow's window width in rem (keep in sync with .cityWindow). */
-const CITY_WIDTH_REM = 326;
-
-/**
- * Global outgrow's own window: on the left of the screen until moved by its header (remembered as fractions of the
- * screen, like the panel); a double-click on the header puts it back.
- */
-function useCityWindow() {
-    const [pos, setPos] = useState<Pos>(() => loadPos(CITY_POS_KEY));
-    const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
-    const ref = useRef<HTMLDivElement | null>(null);
-    const clamp = (x: number, y: number) => {
-        const r = remPx();
-        return {
-            x: Math.max(0, Math.min(window.innerWidth - CITY_WIDTH_REM * r, x)),
-            y: Math.max(0, Math.min(window.innerHeight - (MIN_HEIGHT_REM + DOCK_BOTTOM) * r, y)),
-        };
-    };
-    const onMouseDown = (e: React.MouseEvent<HTMLElement>) => {
-        if (e.button !== 0 || isInsideButton(e.target as HTMLElement, e.currentTarget)) return;
-        const rect = ref.current?.getBoundingClientRect();
-        if (!rect) return;
-        e.preventDefault();
-        const sx = e.clientX,
-            sy = e.clientY;
-        let moved = false;
-        const move = (ev: MouseEvent) => {
-            const dx = ev.clientX - sx,
-                dy = ev.clientY - sy;
-            if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
-            moved = true;
-            setDrag(clamp(rect.left + dx, rect.top + dy));
-        };
-        const up = (ev: MouseEvent) => {
-            window.removeEventListener("mousemove", move);
-            window.removeEventListener("mouseup", up);
-            if (!moved) return;
-            const c = clamp(rect.left + ev.clientX - sx, rect.top + ev.clientY - sy);
-            const p = { fx: c.x / window.innerWidth, fy: c.y / window.innerHeight };
-            savePos(p, CITY_POS_KEY);
-            setPos(p);
-            setDrag(null);
-        };
-        window.addEventListener("mousemove", move);
-        window.addEventListener("mouseup", up);
-    };
-    const onDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
-        if (isInsideButton(e.target as HTMLElement, e.currentTarget)) return;
-        savePos(null, CITY_POS_KEY);
-        setPos(null);
-        setDrag(null);
-    };
-    const r = remPx();
-    let style: React.CSSProperties | undefined;
-    let left = 12 * r;
-    if (drag || pos) {
-        const c = drag ?? clamp((pos as { fx: number }).fx * window.innerWidth, (pos as { fy: number }).fy * window.innerHeight);
-        // moved: its top where it was dropped, as tall as the room down to the bottom toolbar (the card itself is only as tall as it needs)
-        style = { left: c.x + "px", top: c.y + "px", bottom: "auto", height: Math.max(MIN_HEIGHT_REM * r, window.innerHeight - c.y - DOCK_BOTTOM * r) + "px" };
-        left = c.x;
-    }
-    const side: TipDirection = left + (CITY_WIDTH_REM * r) / 2 > window.innerWidth / 2 ? "left" : "right";
-    return { ref, style, side, move: { onMouseDown, onDoubleClick, dragging: !!drag } };
-}
-
 function usePanelPosition() {
-    const [pos, setPos] = useState<Pos>(() => loadPos());
+    const [pos, setPos] = useState<Pos>(loadPos);
     const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
     const [chosen, setChosen] = useState<number | null>(loadWidth);
     const [resizing, setResizing] = useState<number | null>(null);
@@ -786,11 +720,10 @@ export const PlacemakerPanel = () => {
     const pickerSerial = useRef(0);
     const [ack, setAck] = useState(false);
     // Outgrow's Global outgrow window (beside the panel; a look to edit asked for elsewhere opens it)
-    const [cityOpen, setCityOpen] = useState(false);
-    useLookEditorRequests(useCallback(() => setCityOpen(true), []));
+    // an outgrow type to edit asked for elsewhere (a zone's Edit in Zoning): the panel switches to Outgrow
+    useLookEditorRequests(useCallback(() => act.polishCity("mode", "outgrow"), []));
     const permKey = useMemo(() => JSON.stringify(summary.permanent), [summary.permanent]);
     const position = usePanelPosition();
-    const city = useCityWindow();
     const layout = useMemo(() => layoutFor(position.width), [position.width]);
 
     useEffect(() => setAck(false), [permKey, state.stage === "review"]);
@@ -853,6 +786,8 @@ export const PlacemakerPanel = () => {
     const polish = !!state.painter?.tool;
     // a Zoning type (or the old painter): the City window
     const cityAvailable = !!state.painter;
+    // the panel's two modes: Placemaker (its stages) or Outgrow (the whole city's), by the switcher under the header
+    const outgrow = cityAvailable && !!state.painter?.outgrowMode;
     const leftOut = !polish && (state.stage === "area" || state.stage === "review") ? <LeftOut audit={summary.audit} /> : null;
     let body: React.ReactNode = null;
     switch (state.stage) {
@@ -876,7 +811,7 @@ export const PlacemakerPanel = () => {
     }
 
     const collapsed = state.panelCollapsed;
-    const showPreviewToggle = !polish && (state.stage === "design" || state.stage === "review");
+    const showPreviewToggle = !polish && !outgrow && (state.stage === "design" || state.stage === "review");
     // Header tips open UPWARDS (over the game's top bar), so they never sit on the stage bar below.
     const header = (
         <TipDirectionContext.Provider value="up">
@@ -896,9 +831,9 @@ export const PlacemakerPanel = () => {
                         <Icon name="grip" size={12} tint="dim" />
                     </div>
                 </Tip>
-                <Tip title={polish ? t("Placemaker.UI.Polish.Name", "Outgrow") : t("Placemaker.Name", "Placemaker")}>
+                <Tip title={polish || outgrow ? t("Placemaker.UI.Polish.Name", "Outgrow") : t("Placemaker.Name", "Placemaker")}>
                     <div className={s.logo}>
-                        <Icon name={polish ? "shrub" : "logo"} size={16} tint="accent" />
+                        <Icon name={polish || outgrow ? "shrub" : "logo"} size={16} tint="accent" />
                     </div>
                 </Tip>
                 {/* Design / Review show the preview toggle in the title's place (the logo names the tool). */}
@@ -906,29 +841,17 @@ export const PlacemakerPanel = () => {
                     <PreviewToggle state={state} />
                 ) : (
                     <div className={s.title}>
-                        {polish ? t("Placemaker.UI.Polish.Name", "Outgrow") : state.stage === "manage" ? t("Placemaker.UI.Manage.Title", "Built with Placemaker") : t("Placemaker.Name", "Placemaker")}
+                        {polish || outgrow ? t("Placemaker.UI.Polish.Name", "Outgrow") : state.stage === "manage" ? t("Placemaker.UI.Manage.Title", "Built with Placemaker") : t("Placemaker.Name", "Placemaker")}
                     </div>
                 )}
                 {state.editingGroup != null ? <div className={s.editingPill}>{t("Placemaker.UI.Editing", "Editing")}</div> : null}
-                {state.planning && !showPreviewToggle && !polish ? (
+                {state.planning && !showPreviewToggle && !polish && !outgrow ? (
                     <Tip title={t("Placemaker.UI.Planning", "Planning…")}>
                         <div className={classNames(s.spinner, s.headSpinner)} data-testid="planning" />
                     </Tip>
                 ) : null}
                 <div className={s.flex} />
-                {cityAvailable ? (
-                    <Btn
-                        icon="building"
-                        iconSize={13}
-                        label={t("Placemaker.UI.Polish.GlobalButton", "Global outgrow")}
-                        selected={cityOpen}
-                        title={t("Placemaker.UI.Polish.Global", "Global outgrow")}
-                        description={t("Placemaker.UI.Polish.GlobalTip", "Outgrow for the whole city: new buildings on or off, a look for each zone type, every look and its settings, outgrow or put back every building.")}
-                        onClick={() => setCityOpen(!cityOpen)}
-                        testId="polish-city-open"
-                    />
-                ) : null}
-                {state.stage === "manage" ? null : <UndoRedo state={state} />}
+                {state.stage === "manage" || outgrow ? null : <UndoRedo state={state} />}
                 {state.anarchy?.available ? (
                     <Btn
                         icon="anarchy"
@@ -1012,6 +935,20 @@ export const PlacemakerPanel = () => {
                         <div className={classNames(s.panel, { [s.panelCompact]: collapsed })} data-testid="placemaker-panel" data-stage={state.stage}>
                             <div className={s.panelTint}>
                                 {header}
+                                {cityAvailable && !collapsed ? (
+                                    <div className={s.modeRow} data-testid="panel-mode-row">
+                                        <Segmented
+                                            testId="panel-mode"
+                                            stretch
+                                            value={outgrow ? "outgrow" : "placemaker"}
+                                            onChange={(v) => act.polishCity("mode", v)}
+                                            options={[
+                                                { value: "placemaker", icon: "logo", label: t("Placemaker.Name", "Placemaker"), description: t("Placemaker.UI.ModePlacemakerTip", "Make roads, parks, car parks, shops and zones in an area you pick.") },
+                                                { value: "outgrow", icon: "shrub", label: t("Placemaker.UI.Polish.Name", "Outgrow"), description: t("Placemaker.UI.ModeOutgrowTip", "The whole city's outgrow: each zone type's default, the brush, the map lens, the outgrow types and their numbers.") },
+                                            ]}
+                                        />
+                                    </div>
+                                ) : null}
                                 {collapsed ? (
                                     <ErrorBoundary name="compact">
                                         <div className={s.compact} data-testid="panel-compact">
@@ -1046,6 +983,10 @@ export const PlacemakerPanel = () => {
                                             <Footer state={state} summary={summary} blockedReason={blockedReason} lead={lead} compact />
                                         </div>
                                     </ErrorBoundary>
+                                ) : outgrow ? (
+                                    <ErrorBoundary name="outgrow">
+                                        <PolishCityCard state={state} />
+                                    </ErrorBoundary>
                                 ) : (
                                     <>
                                         {state.stage === "manage" ? null : (
@@ -1068,7 +1009,7 @@ export const PlacemakerPanel = () => {
                                 )}
                             </div>
                         </div>
-                        {!picker && !collapsed && !(cityAvailable && cityOpen) ? (
+                        {!picker && !collapsed && !outgrow ? (
                             <ErrorBoundary name="legend">
                                 <Legend state={state} summary={summary} side={position.side === "left" ? "left" : "right"} />
                             </ErrorBoundary>
@@ -1081,15 +1022,6 @@ export const PlacemakerPanel = () => {
                             </div>
                         ) : null}
                     </div>
-                    {cityAvailable && cityOpen && !collapsed ? (
-                        <TipDirectionContext.Provider value={city.side}>
-                            <div ref={city.ref} className={s.cityWindow} style={city.style} data-testid="polish-city-flyout">
-                                <ErrorBoundary name="polish-city">
-                                    <PolishCityCard state={state} onClose={() => setCityOpen(false)} move={city.move} />
-                                </ErrorBoundary>
-                            </div>
-                        </TipDirectionContext.Provider>
-                    ) : null}
                 </div>
                 </PanelLayoutContext.Provider>
             </TipDirectionContext.Provider>

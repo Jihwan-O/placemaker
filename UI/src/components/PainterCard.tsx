@@ -513,7 +513,7 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
                                 color={color}
                                 name={lookName(t, p, "zone")}
                                 on={byZone}
-                                description={t("Placemaker.UI.Painter.ThemeTip.zone2", "Each building gets its zone type's outgrow type (Global outgrow)")}
+                                description={t("Placemaker.UI.Painter.ThemeTip.zone3", "Each building gets its zone type's outgrow type (Outgrow, its Defaults)")}
                                 onClick={() => act.polishTheme("zone")}
                             />
                         }
@@ -523,7 +523,7 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
             {byZone ? (
                 <div className={s.off} data-testid="polish-byzone-note">
                     <Icon name="info" size={12} tint="dim" />
-                    <div className={s.offText}>{t("Placemaker.UI.Polish.ByZoneNote3", "Each building gets the outgrow type its zone type has. Change them in Global outgrow (the button at the top), or pick any type here to outgrow the area with it.")}</div>
+                    <div className={s.offText}>{t("Placemaker.UI.Polish.ByZoneNote4", "Each building gets the outgrow type its zone type has. Change them in Outgrow (the switcher at the top), or pick any type here to outgrow the area with it.")}</div>
                 </div>
             ) : (
                 <LookEditor p={p} />
@@ -609,7 +609,7 @@ export const ZoneOutgrowInline = ({ p, value, typeLook, on, setOn, open, toggle,
             </Tip>
             <TypeButton p={p} id={current} on={open} onClick={() => on && toggle()} testId={testId + "-open"} />
             {editable(p, current) ? (
-                <Tip title={t("Placemaker.UI.Polish.EditLook", "Edit {0}", [lookName(t, p, current)])} description={t("Placemaker.UI.ZoneMix.EditTypeTip", "Opens this outgrow type in Global outgrow's Edit tab: a change there is for every zone that uses it.")}>
+                <Tip title={t("Placemaker.UI.Polish.EditLook", "Edit {0}", [lookName(t, p, current)])} description={t("Placemaker.UI.ZoneMix.EditTypeTip2", "Opens this outgrow type in Outgrow's Edit tab: a change there is for every zone that uses it.")}>
                     <button
                         type="button"
                         className={s.zoEdit}
@@ -687,10 +687,7 @@ type Ask = { what: "polishAll" | "unpolishAll" | "polishSome" | "unpolishSome"; 
  *  laid out again each time (Gameface: a quarter-second hitch every half second with the window open). */
 const Frozen = React.memo(({ children }: { fp: string; children: ReactNode }) => <>{children}</>, (a, b) => a.fp === b.fp);
 
-/** How Global outgrow's window moves: dragged by its header, a double-click puts it back (Panel.tsx). */
-export type WindowMove = { onMouseDown: (e: React.MouseEvent<HTMLElement>) => void; onDoubleClick: (e: React.MouseEvent<HTMLElement>) => void; dragging: boolean };
-
-export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onClose: () => void; move?: WindowMove }) => {
+export const PolishCityCard = ({ state }: { state: ToolState }) => {
     const { t } = useT();
     const [ask, setAsk] = useState<Ask>(null);
     const [picking, setPicking] = useState<string | null>(null);   // a zone id, or "brush"
@@ -706,7 +703,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
     }, []);
     useEffect(() => takeRequest(), [takeRequest]);
     useLookEditorRequests(takeRequest);
-    // the window open: the lens shows (and the brush stops when it closes)
+    // Outgrow shown: the lens shows (and the brush stops when it goes)
     useEffect(() => {
         act.polishCity("cityOpen", "true");
         return () => act.polishCity("cityOpen", "false");
@@ -729,23 +726,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
     const zonesFp = tab === "zones" ? JSON.stringify([p.zones, looksFp, st?.zones, st?.kindTotal, st?.kindPolished, picking, p.newHouses]) : "";
     const editFp = tab === "edit" ? JSON.stringify([p.theme, p.looks, p.values, p.lookValues, p.lookTheme, p.lookSavedTheme, p.modified, p.swatches, st?.looks?.[p.theme ?? ""]]) : "";
     return (
-        <div className={classNames(pn.panel, s.cityPanel)} data-testid="polish-city" onMouseDown={(e) => e.stopPropagation()}>
-            <div className={pn.panelTint}>
-                <div className={classNames(pn.header, { [pn.headerDragging]: !!move?.dragging })} data-testid="polish-city-header" onMouseDown={move?.onMouseDown} onDoubleClick={move?.onDoubleClick}>
-                    {move ? (
-                        <Tip title={L("Move", "Move the window")} description={L("MoveTip", "Drag to move. Double-click to put it back on the left.")}>
-                            <div className={pn.grip}>
-                                <Icon name="grip" size={12} tint="dim" />
-                            </div>
-                        </Tip>
-                    ) : null}
-                    <div className={pn.logo} style={move ? undefined : { marginLeft: "6rem" }}>
-                        <Icon name="building" size={15} tint="accent" />
-                    </div>
-                    <div className={pn.title}>{L("Global", "Global outgrow")}</div>
-                    <div className={pn.flex} />
-                    <Btn icon="close" iconSize={14} title={t("Placemaker.UI.Close", "Close")} onClick={onClose} testId="polish-city-close" />
-                </div>
+        <div className={s.cityEmbedded} data-testid="polish-city" onMouseDown={(e) => e.stopPropagation()}>
                 <div className={s.cityActions}>
                     <Btn variant="accent" icon="sparkle" iconSize={13} label={L("OutgrowAllShort2", "Set all to defaults")} title={L("OutgrowAll2", "Outgrow every building in the city with its zone type's default outgrow type (the Defaults tab), also the ones you brushed")} testId="polish-all" onClick={() => setAsk({ what: "polishAll" })} />
                     <Btn variant="ghost" icon="reset" iconSize={13} label={L("RemoveAllShort2", "Remove all")} title={L("RemoveAll", "Put every outgrown building in the city back as the game made it")} testId="polish-none" disabled={city.polished === 0} onClick={() => setAsk({ what: "unpolishAll" })} />
@@ -939,7 +920,6 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                         )}
                     </div>
                 </div>
-            </div>
             {ask ? (
                 <Confirm
                     title={

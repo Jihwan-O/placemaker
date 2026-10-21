@@ -45,7 +45,7 @@
         },
         {
           "do": "polish",
-          "click": "polish-city-open",
+          "click": "panel-mode-outgrow",
           "shot": "global-top",
           "shotMode": "ui"
         },

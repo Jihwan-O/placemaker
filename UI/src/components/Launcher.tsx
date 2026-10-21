@@ -22,7 +22,7 @@ const LauncherInner = () => {
             footer={<Keys keys={["Ctrl", "Shift", "A"]} />}
         >
             <div className={s.wrap} data-testid="launcher" data-open={state.open ? "true" : "false"}>
-                <SafeFloatingButton src={icon("logo")} selected={state.open && !state.painter?.tool} onSelect={act.toggleTool} className={s.button} />
+                <SafeFloatingButton src={icon("logo")} selected={state.open && !state.painter?.tool && !state.painter?.outgrowMode} onSelect={act.toggleTool} className={s.button} />
             </div>
         </Tip>
     );
@@ -32,7 +32,7 @@ const LauncherInner = () => {
 const PolishLauncherInner = () => {
     const { t } = useT();
     const state = useToolState();
-    const on = state.open && !!state.painter?.tool;
+    const on = state.open && (!!state.painter?.tool || !!state.painter?.outgrowMode);
     return (
         <Tip
             direction="down"

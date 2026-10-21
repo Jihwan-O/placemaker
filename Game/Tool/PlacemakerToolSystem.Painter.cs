@@ -178,12 +178,28 @@ namespace Placemaker.Game.Tool
         /// </summary>
         public void TogglePolishTool()
         {
+            // the toolbar's Outgrow button: the panel in its Outgrow mode (open), or closed when it already shows it
             if (m_ToolSystem == null || _building) return;
             bool active = m_ToolSystem.activeTool == this;
-            if (active && _painter) { Close(); return; }
-            if (_stage == ToolStage.Manage) GoToStage(ToolStage.Area);
-            SetPainter(true);
-            if (!active) { _closeAfterGhost = 0; m_ToolSystem.activeTool = this; }
+            if (active && _outgrowMode) { Close(); return; }
+            SetOutgrowMode(true);
+            if (!active) { _closeAfterGhost = 0; _closeAfterBuild = false; m_ToolSystem.activeTool = this; }
+        }
+
+        // The panel's two modes (its switcher, the toolbar's two buttons): Placemaker, or Outgrow (the whole city's outgrow:
+        // defaults, the brush, the lens, types, numbers), which replaces the panel's stages; the area tools rest meanwhile
+        private bool _outgrowMode;
+        public bool OutgrowMode => _outgrowMode;
+
+        public void SetOutgrowMode(bool on)
+        {
+            if (on && _painter) SetPainter(false);
+            if (!on && _brush != 0) SetOutgrowBrush("off", null);
+            if (_outgrowMode == on) { Touch(); return; }
+            _outgrowMode = on;
+            if (on) { CancelGesture(); _cursorValid = false; }
+            Mod.Log.Info($"Placemaker panel: {(on ? "Outgrow" : "Placemaker")}");
+            Touch();
         }
 
         /// <summary>For the game runner: the theme picked in the painter's Style row.</summary>
@@ -321,12 +337,12 @@ namespace Placemaker.Game.Tool
                     Touch();
                     return;
                 case "cityOpen":
-                    // Global outgrow opening: the panel's area goes (an undo step), its window is a tool of its own
-                    if (on && !_cityOpen && !_building) ClearArea();
+                    // Outgrow shown (the panel's Outgrow mode): the area stays for Placemaker (hidden, its tools resting)
                     _cityOpen = on;
                     if (!on && _brush != 0) { _brush = 0; _brushDown = false; ClearBrushHits(); }
                     Touch();
                     return;
+                case "mode": SetOutgrowMode(value == "outgrow"); return;
                 case "lens": _lensWanted = on; Touch(); return;
                 case "lensMode": _lensMode = value == "types" ? "types" : "status"; Touch(); return;
                 case "brushSize":
@@ -388,9 +404,8 @@ namespace Placemaker.Game.Tool
             ClearBrushHits();
             if (_brush != 0)
             {
-                // the tool takes the mouse (the brush's strokes); the panel's area goes (an undo step), its stage stays
+                // the tool takes the mouse (the brush's strokes); Placemaker's area and stage stay as they are
                 if (m_ToolSystem != null && m_ToolSystem.activeTool != this) { _closeAfterGhost = 0; m_ToolSystem.activeTool = this; }
-                if (!_building) ClearArea();
                 // the map lens shows what the brush changes: outgrow types while painting, outgrown or not while erasing
                 _lensWanted = true;
                 _lensMode = _brush > 0 ? "types" : "status";
@@ -586,6 +601,7 @@ namespace Placemaker.Game.Tool
             v.Brush = _brush > 0 ? "paint" : _brush < 0 ? "erase" : "";
             v.BrushLook = _brushLook ?? "";
             v.BrushSize = _brushWidth;
+            v.OutgrowMode = _outgrowMode;
             if (NeighbourPolishSystem.StatusInCity) v.Stats = StatsView();
             v.AreaZones.AddRange(_areaZones);
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();

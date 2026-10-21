@@ -643,15 +643,10 @@
     margin-left: 10rem;
 }
 
-// Global outgrow's own window: on the left of the screen until moved by its header (Panel.tsx, useCityWindow)
-.cityWindow {
-    @include col;
-    position: absolute;
-    top: 64rem;
-    left: 12rem;
-    bottom: 112rem;
-    width: 326rem;
-    pointer-events: none;
+// the switcher under the header: Placemaker or Outgrow
+.modeRow {
+    flex-shrink: 0;
+    padding: 6rem 8rem 2rem 8rem;
 }
 
 // ── crash ──

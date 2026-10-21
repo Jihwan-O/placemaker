@@ -104,7 +104,7 @@
         },
         {
           "do": "polish",
-          "click": "polish-city-open"
+          "click": "panel-mode-outgrow"
         },
         {
           "do": "shot",

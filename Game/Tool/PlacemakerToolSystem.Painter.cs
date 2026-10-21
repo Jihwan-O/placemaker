@@ -214,7 +214,6 @@ namespace Placemaker.Game.Tool
             // other stops: the fills and the outline are worked out again
             _fills?.Invalidate();
             _hoverFace = null;
-            _hoverFaceAt = new float2(float.MaxValue);
             if (_mode == SelectionMode.Block) RepickBlocks();
             else if (_mode == SelectionMode.Draw && _draw.Closed) ShapeChanged();
             // a painted area keeps what was painted and is fenced again with the painter's stops (lots and buildings no

@@ -54,7 +54,7 @@ namespace Placemaker.Core.Geometry
         {
             CellSize = cellSize > 0.01f && !float.IsNaN(cellSize) ? cellSize : BrushMask.DefaultCellSize;
             Block = block != null && block.Count >= 3 ? Poly.Clean(block, 0.05f) : Array.Empty<float2>();
-            Allowed = new BrushMask(CellSize);
+            Allowed = new BrushMask(CellSize) { TrackEdges = false };
             if (Block.Length < 3) return;
             Poly.Bounds(Block, out var bmin, out var bmax);
             if (obstacles != null)
@@ -80,7 +80,7 @@ namespace Placemaker.Core.Geometry
 
         public float CellSize { get; }
         /// <summary>The block's curb outline (simple, CCW). Empty when the input was unusable.</summary>
-        public float2[] Block { get; }
+        public float2[] Block { get; private set; }
         /// <summary>Obstacles that touch the block (CCW).</summary>
         public IReadOnlyList<float2[]> Obstacles => _obstacles;
         /// <summary>Cells that may be painted (centre inside the block and outside every obstacle).</summary>
@@ -130,8 +130,84 @@ namespace Placemaker.Core.Geometry
             float cellSize = BrushMask.DefaultCellSize, Func<float2, bool> blockedAt = null, bool keepSide = true)
         {
             var box = new[] { min, new float2(max.x, min.y), max, new float2(min.x, max.y) };
-            var b = new BlockBrush(box, obstacles, cellSize, blockedAt) { IsOpen = true };
-            if (keepSide) b.Allowed = b.Allowed.ConnectedComponent(centre);
+            var b = new BlockBrush(box, obstacles, cellSize, blockedAt) { IsOpen = true, _keepSide = keepSide, _seed = centre, _boxMinAt = min, _boxMaxAt = max };
+            if (keepSide)
+            {
+                b._candidate = b.Allowed;
+                b.Allowed = b.Allowed.ConnectedComponent(centre);
+            }
+            return b;
+        }
+
+        private bool _keepSide;
+        private float2 _seed, _boxMinAt, _boxMaxAt;
+        /// <summary>Open, kept on the start's side: every cell of the box that is not under a stop (Allowed is its part connected to the start).</summary>
+        private BrushMask _candidate;
+
+        /// <summary>
+        /// (Lag spikes, 2026-10-21: Paint area rebuilt its whole box each time a stroke neared the edge, 8.5 s for a 2 km box
+        /// on a worker while the brush stopped at the old edge.) The open-land brush over a bigger box min..max (containing
+        /// this one's) as a new brush; this one is left as it is. Only the new strips are rasterised and flooded from the cells
+        /// already allowed, so the cost follows the new area. <paramref name="obstacles"/> are the stops over the whole new
+        /// box; <paramref name="blockedAt"/> needs to answer only in the new strips. Null when this is not an open box brush or
+        /// the box does not contain the old one (build it with <see cref="OpenBox"/> instead).
+        /// </summary>
+        public BlockBrush Grow(float2 min, float2 max, IEnumerable<IReadOnlyList<float2>> obstacles, Func<float2, bool> blockedAt = null)
+        {
+            if (!IsOpen || Unconstrained || Block.Length < 3) return null;
+            float2 omin = _boxMinAt, omax = _boxMaxAt;
+            if (math.any(min > omin) || math.any(max < omax)) return null;
+            var b = new BlockBrush(null, null, CellSize)
+            {
+                IsOpen = true, _keepSide = _keepSide, _seed = _seed, _boxMinAt = min, _boxMaxAt = max,
+                _snap = _snap, Smoothing = Smoothing,
+            };
+            b.Block = new[] { min, new float2(max.x, min.y), max, new float2(min.x, max.y) };
+            if (obstacles != null)
+                foreach (var o in obstacles)
+                {
+                    if (o == null || o.Count < 3) continue;
+                    var ring = new float2[o.Count];
+                    bool finite = true;
+                    for (int i = 0; i < ring.Length; i++) { ring[i] = o[i]; if (!Poly.IsFinite(ring[i])) finite = false; }
+                    if (!finite || Poly.Area(ring) < 0.01f) continue;
+                    b._obstacles.Add(Poly.EnsureCcw(ring));
+                }
+            // The new strips: left and right full height, bottom and top between them.
+            var strips = new List<(float2 a, float2 b)>();
+            if (min.x < omin.x) strips.Add((min, new float2(omin.x, max.y)));
+            if (max.x > omax.x) strips.Add((new float2(omax.x, min.y), max));
+            if (min.y < omin.y) strips.Add((new float2(omin.x, min.y), new float2(omax.x, omin.y)));
+            if (max.y > omax.y) strips.Add((new float2(omin.x, omax.y), new float2(omax.x, max.y)));
+            var cand = (_keepSide ? _candidate : Allowed).Copy();
+            foreach (var (a, c) in strips)
+            {
+                cand.PaintPolygon(new[] { a, new float2(c.x, a.y), c, new float2(a.x, c.y) });
+                foreach (var o in b._obstacles)
+                {
+                    Poly.Bounds(o, out var p, out var q);
+                    if (q.x < a.x || q.y < a.y || p.x > c.x || p.y > c.y) continue;
+                    // (its part in the old box was erased there already: the same stop)
+                    cand.PaintPolygon(o, erase: true);
+                }
+                if (blockedAt != null) cand.EraseWhere(blockedAt, a, c);
+            }
+            if (!_keepSide) { b.Allowed = cand; return b; }
+            b._candidate = cand;
+            var allowed = Allowed.Copy();
+            // seeds: the new cells next to a cell already allowed (the flood also reaches old cells around a road from there)
+            var seeds = new List<int2>();
+            foreach (var (a, c) in strips)
+            {
+                int2 c0 = (int2)math.floor(a / CellSize), c1 = (int2)math.floor(c / CellSize);
+                for (int j = c0.y; j <= c1.y; j++)
+                    for (int i = c0.x; i <= c1.x; i++)
+                        if (cand.IsPainted(i, j) && !allowed.IsPainted(i, j)
+                            && (allowed.IsPainted(i + 1, j) || allowed.IsPainted(i - 1, j) || allowed.IsPainted(i, j + 1) || allowed.IsPainted(i, j - 1)))
+                            seeds.Add(new int2(i, j));
+            }
+            allowed.FloodFrom(cand, seeds);
+            b.Allowed = allowed;
             return b;
         }
 

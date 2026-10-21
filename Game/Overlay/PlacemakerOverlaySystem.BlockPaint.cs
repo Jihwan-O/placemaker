@@ -19,6 +19,9 @@ namespace Placemaker.Game.Overlay
         private static readonly Color HoverBlock = new Color(1f, 1f, 1f, 0.45f);
 
         private int _bpVersion = -1;
+        private float _bpBoundaryAt;
+        /// <summary>Time (ms) of the last painted-cells outline (the tool's slow-frame log reads it).</summary>
+        public static float BoundaryMs;
         private List<(float2 a, float2 b)> _bpBoundary = new List<(float2, float2)>();
         private PlacemakerToolSystem.BlockPaintContext _bpSigFor;
         private long _bpSig;
@@ -105,10 +108,16 @@ namespace Placemaker.Game.Overlay
             }
 
             var mask = _tool.BlockPaintMask;
-            if (mask.Version != _bpVersion)
+            // The cells' edges are found again over the whole painted area: during a stroke at most 8 times a second (lag
+            // spikes painting fast, 2026-10-21: every frame the brush moved, more the bigger the area).
+            float now = UnityEngine.Time.realtimeSinceStartup;
+            if (mask.Version != _bpVersion && (!_tool.Painting || now - _bpBoundaryAt > 0.125f))
             {
                 _bpVersion = mask.Version;
+                _bpBoundaryAt = now;
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 _bpBoundary = mask.RawBoundary();
+                BoundaryMs = (float)sw.Elapsed.TotalMilliseconds;
             }
             // While painting: the outline the stroke would give (worked out in the background) over the painted cells, dim;
             // the cells alone until the first outline is in. Once the shape exists: its outline.

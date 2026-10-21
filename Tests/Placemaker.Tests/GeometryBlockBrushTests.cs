@@ -330,6 +330,27 @@ namespace Placemaker.Tests
         }
 
         [Fact]
+        public void Open_Grow_SameCellsAsTheBigBoxBuiltWhole_AroundARoadsEnd()
+        {
+            // a road ending at x = 200: in the small box its far side is cut off, in the grown box it is reached round the end
+            var road = Footprints(Road(new float2(-400, 0), new float2(200, 0)));
+            var seed = new float2(0, 40);
+            var small = BlockBrush.OpenBox(seed, new float2(-100), new float2(100), road, 2f);
+            Assert.False(small.CanPaintAt(new float2(0, -40)));
+            var grown = small.Grow(new float2(-300), new float2(300), road);
+            var whole = BlockBrush.OpenBox(seed, new float2(-300), new float2(300), road, 2f);
+            Assert.NotNull(grown);
+            Assert.True(grown.CanPaintAt(new float2(0, -40)));
+            Assert.Equal(whole.Allowed.PaintedCellCount, grown.Allowed.PaintedCellCount);
+            for (float x = -299; x < 300; x += 2f)
+                for (float z = -299; z < 300; z += 2f)
+                    Assert.Equal(whole.CanPaintAt(new float2(x, z)), grown.CanPaintAt(new float2(x, z)));
+            // the small one is left as it was (the game paints with it until the grown one is in)
+            Assert.False(small.CanPaintAt(new float2(0, -40)));
+            Assert.Null(small.Grow(new float2(-50), new float2(300), road));
+        }
+
+        [Fact]
         public void Open_DeadEndRoad_PaintWrapsAroundItsEnd()
         {
             var road = Footprints(Road(new float2(0, -400), new float2(0, 100)));   // dead end at z = 100

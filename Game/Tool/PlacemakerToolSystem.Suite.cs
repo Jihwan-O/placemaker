@@ -223,7 +223,6 @@ namespace Placemaker.Game.Tool
             var face = PickAt(xz, out var why);
             if (face == null) { problem = why?.Key ?? "no block"; return false; }
             _hoverFace = face;
-            _hoverFaceAt = xz;
             _blocks = new BlockSelectionState();
             _blocks.Seeds.Add(face.Seed);
             _blocks.Rings.Add(face.Fill.Ring);

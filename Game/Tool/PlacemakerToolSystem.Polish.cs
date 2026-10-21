@@ -39,7 +39,6 @@ namespace Placemaker.Game.Tool
             if (now && _painterRules == null) _painterRules = PainterRulesFrom(PlayerBrushRules);
             _fills?.Invalidate();
             _hoverFace = null;
-            _hoverFaceAt = new float2(float.MaxValue);
             if (_mode == SelectionMode.Block) RepickBlocks();
             else if (_mode == SelectionMode.Draw && _draw.Closed) ShapeChanged();
             else if ((_mode == SelectionMode.Paint || _mode == SelectionMode.BlockPaint) && _shape != null) ShapeChanged();

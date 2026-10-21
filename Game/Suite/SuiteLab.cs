@@ -30,6 +30,8 @@ namespace Placemaker.Game.Suite
                 case "street": yield return LabStreet(st, step, rec); yield break;
                 case "yards": yield return LabYards(st, step, rec); yield break;
                 case "outgrowcheck": yield return LabOutgrowCheck(st, step, rec); yield break;
+                case "outgrowaudit": yield return LabOutgrowAudit(st, step, rec); yield break;
+                case "outgrowrepaint": yield return LabOutgrowRepaint(st, step, rec); yield break;
                 case "yardscheck": LabYardsCheck(rec); yield break;
                 case "anatomy": LabAnatomy(st, rec); yield break;
                 case "lineup": yield return LabLineup(st, step, rec); yield break;

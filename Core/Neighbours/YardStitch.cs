@@ -141,6 +141,11 @@ namespace Placemaker.Core.Neighbours
         public static StitchPlan Plan(IReadOnlyList<StitchHouse> houses, StitchSettings s = null)
         {
             s = s ?? new StitchSettings();
+            // the same houses always in the same order, however the caller gathered them (the game takes a pass's houses from
+            // a set): a house re-planned in a neighbour's pass gets exactly what its own pass gave it. Before, who closed a
+            // shared garden edge (and where the closing pieces stood) followed the order, so every pass took a row's hedge
+            // pieces away and made them again on the other side
+            houses = houses.OrderBy(h => h.Id).ToArray();
             var plan = new StitchPlan();
             Feature.Clear();
             SetBarriers(s);

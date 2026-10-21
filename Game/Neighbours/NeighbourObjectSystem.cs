@@ -4,8 +4,10 @@
 // way the game spawns a growable's pieces (ZoneSpawnSystem): a CreationDefinition flagged Permanent, with the house as
 // owner, and an ObjectDefinition, Updated and Deleted, just before GenerateObjectsSystem (Modification1) makes the object
 // in the same frame. Owned by the house: it is one of the house's own pieces, bulldozed with it; a rebuild (level-up)
-// removes it with the house's other pieces and the next polish pass plants it again. One per spot: a bush of the same
-// kind the house already owns within 0.5 m is left alone.
+// removes it with the house's other pieces and the house is planned again, and the game's SubObjectSystem removes it
+// whenever people or a company move in or out (it rebuilds the house's objects): it is made again where it stood
+// (NeighbourPolishSystem.Rebuilt). One per spot: a piece of the same kind the house already owns at the same spot and
+// angle is left alone.
 
 using System;
 using System.Collections.Generic;
@@ -27,6 +29,8 @@ namespace Placemaker.Game.Neighbours
         public sealed class Request
         {
             public string Name;
+            /// <summary>The piece's prefab when known (a piece the game took away, made again as it was); else by <see cref="Name"/>.</summary>
+            public Entity Prefab;
             public float2 Position;
             public float Yaw;
             public Entity Owner;
@@ -70,7 +74,9 @@ namespace Placemaker.Game.Neighbours
                 {
                     var r = Queue[qi];
                     if (r.Owner == Entity.Null || !EntityManager.Exists(r.Owner) || EntityManager.HasComponent<Deleted>(r.Owner)) continue;
-                    if (string.IsNullOrEmpty(r.Name) || !_byName.TryGetValue(r.Name, out var prefab)) continue;
+                    var prefab = r.Prefab;
+                    if (prefab == Entity.Null && (string.IsNullOrEmpty(r.Name) || !_byName.TryGetValue(r.Name, out prefab))) continue;
+                    if (!EntityManager.Exists(prefab)) continue;
                     if (Owns(r.Owner, prefab, r.Position, r.Yaw)) continue;
                     var pos = new float3(r.Position.x, TerrainUtils.SampleHeight(ref heights, new float3(r.Position.x, 0f, r.Position.y)), r.Position.y);
                     var rot = quaternion.RotateY(r.Yaw);

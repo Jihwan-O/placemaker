@@ -940,6 +940,64 @@ namespace Placemaker.Tests
             Assert.Equal(plan.Bushes.Select(b => (b.Kind, b.Position, b.Yaw)), again.Bushes.Select(b => (b.Kind, b.Position, b.Yaw)));
         }
 
+        // A row of shops along a street (40 x 32 m lots, car park in front) back to back with a row of offices: every lot a
+        // car park look, as Global outgrow gives them by default.
+        private static List<StitchHouse> ShopsAndOffices()
+        {
+            var list = new List<StitchHouse>();
+            for (int k = 0; k < 4; k++)
+            {
+                var shop = new StitchHouse { Id = 1 + k, Position = new float2(k * 40f, 0f), Forward = new float2(0f, 1f), HalfLot = new float2(20f, 16f), MainSurface = "Concrete Surface 01", Zone = "shop", Theme = "tidy" };
+                shop.Footprint = new[] { shop.ToWorld(new float2(-14f, -14f)), shop.ToWorld(new float2(14f, -14f)), shop.ToWorld(new float2(14f, 2f)), shop.ToWorld(new float2(-14f, 2f)) };
+                shop.Hard.Add(new[] { shop.ToWorld(new float2(-19f, 3f)), shop.ToWorld(new float2(19f, 3f)), shop.ToWorld(new float2(19f, 15.5f)), shop.ToWorld(new float2(-19f, 15.5f)) });
+                shop.Options = PolishLooks.BuiltIn.Single(l => l.Id == "shops").Values();
+                list.Add(shop);
+                var office = new StitchHouse { Id = 11 + k, Position = new float2(k * 40f, -16f - 22f - 16f), Forward = new float2(0f, -1f), HalfLot = new float2(20f, 16f), MainSurface = "Pavement Surface 01", Zone = "office", Theme = "tidy" };
+                office.Footprint = new[] { office.ToWorld(new float2(-12f, -12f)), office.ToWorld(new float2(12f, -12f)), office.ToWorld(new float2(12f, 4f)), office.ToWorld(new float2(-12f, 4f)) };
+                office.Options = PolishLooks.BuiltIn.Single(l => l.Id == "offices").Values();
+                list.Add(office);
+            }
+            return list;
+        }
+
+        /// <summary>A house as a later pass sees it: edited, or fixed with the garden an earlier plan wrote (its lot when that
+        /// plan gave it none), as the game layer hands them over.</summary>
+        private static StitchHouse Planned(StitchHouse h, bool edit, StitchPlan earlier) => new StitchHouse
+        {
+            Id = h.Id, Position = h.Position, Forward = h.Forward, HalfLot = h.HalfLot, Lines = h.Lines, Lawns = h.Lawns, Hard = h.Hard, Footprint = h.Footprint, Props = h.Props,
+            MainSurface = h.MainSurface, Zone = h.Zone, Theme = h.Theme, Options = h.Options, Edit = edit,
+            Garden = edit ? null : earlier.Plots.TryGetValue(h.Id, out var g) ? g : new[] { h.BackLeft, h.BackRight, h.FrontRight, h.FrontLeft },
+            // its closing pieces as they stand (NeighbourPolishSystem.StandingOf)
+            Standing = edit ? null : earlier.FencePieces.Where(p => p.House == h.Id).Select(p => { var d = new float2(math.sin(p.Yaw), math.cos(p.Yaw)) * 1.95f; return (p.Position - d, p.Position + d); }).ToList(),
+        };
+
+        private static string Diff(List<string> a, List<string> b) =>
+            "only before: " + string.Join(", ", a.Except(b)) + " | only after: " + string.Join(", ", b.Except(a));
+
+        private static List<string> PiecesOf(StitchPlan plan, long id) =>
+            plan.Paths.Where(p => p.House == id).Select(p => $"{p.Surface} {Poly.Area(p.Ring):F0}")
+                .Concat(plan.Bushes.Where(b => b.House == id).Select(b => $"{YardStitch.BushKinds[b.Kind]} {b.Position.x:F1},{b.Position.y:F1}"))
+                .Concat(plan.Beds.Where(b => b.House == id).Select(b => $"bed {Poly.Area(b.Ring):F0}"))
+                .Concat(plan.FencePieces.Where(p => p.House == id).Select(p => $"{p.Name} {p.Position.x:F1},{p.Position.y:F1}"))
+                .Concat(plan.NewLawns.Where(l => l.House == id).Select(l => $"lawn {Poly.Area(l.Ring):F0}")).OrderBy(x => x).ToList();
+
+        [Fact]
+        public void A_shop_re_planned_as_a_neighbour_of_another_pass_keeps_its_yard()
+        {
+            // its own pass: every lot edited (Outgrow all, the brush); the yards are written and kept with the lots
+            var all = ShopsAndOffices();
+            var first = YardStitch.Plan(all, MiddleLine());
+            var yard = PiecesOf(first, 2);
+            Assert.True(yard.Count > 10, "shop 2 gets a yard: " + string.Join(" | ", first.Notes.Where(n => n.StartsWith("2:"))));
+            // then a pass for shop 1 next door: shop 2 is in its core (re-planned), the rest are fixed with their gardens, in
+            // another order (the game gathers a pass's houses from a set)
+            var second = YardStitch.Plan(all.AsEnumerable().Reverse().Select(h => Planned(h, h.Id == 1 || h.Id == 2, first)).ToList(), MiddleLine());
+            var again = PiecesOf(second, 2);
+            Assert.True(yard.SequenceEqual(again), Diff(yard, again));
+            var one = PiecesOf(second, 1);
+            Assert.True(PiecesOf(first, 1).SequenceEqual(one), Diff(PiecesOf(first, 1), one));
+        }
+
         private static float DistanceToRing(float2[] ring, float2 p)
         {
             float best = float.MaxValue;

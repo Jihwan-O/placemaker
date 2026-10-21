@@ -639,7 +639,8 @@ const num = (n: number) => Math.round(n).toLocaleString("en-US");
 type Ask = { what: "polishAll" | "unpolishAll" | "polishSome" | "unpolishSome"; scope?: string; label?: string } | null;
 
 /** The Global outgrow window beside the panel: the whole city's buttons, new buildings, the brush, the lens, the numbers,
- *  then Zones (each zone type and its outgrow type) and Edit (every outgrow type and its settings). */
+ *  then Defaults (Outgrow new buildings, each zone type's default outgrow type), Edit (every outgrow type and its
+ *  settings) and Numbers. */
 /** How Global outgrow's window moves: dragged by its header, a double-click puts it back (Panel.tsx). */
 export type WindowMove = { onMouseDown: (e: React.MouseEvent<HTMLElement>) => void; onDoubleClick: (e: React.MouseEvent<HTMLElement>) => void; dragging: boolean };
 
@@ -696,7 +697,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                     <Btn icon="close" iconSize={14} title={t("Placemaker.UI.Close", "Close")} onClick={onClose} testId="polish-city-close" />
                 </div>
                 <div className={s.cityActions}>
-                    <Btn variant="accent" icon="sparkle" iconSize={13} label={L("OutgrowAllShort", "Outgrow all")} title={L("OutgrowAll", "Outgrow every building in the city")} testId="polish-all" onClick={() => setAsk({ what: "polishAll" })} />
+                    <Btn variant="accent" icon="sparkle" iconSize={13} label={L("OutgrowAllShort2", "Set all to defaults")} title={L("OutgrowAll2", "Outgrow every building in the city with its zone type's default outgrow type (the Defaults tab), also the ones you brushed")} testId="polish-all" onClick={() => setAsk({ what: "polishAll" })} />
                     <Btn variant="ghost" icon="reset" iconSize={13} label={L("RemoveAllShort2", "Remove all")} title={L("RemoveAll", "Put every outgrown building in the city back as the game made it")} testId="polish-none" disabled={city.polished === 0} onClick={() => setAsk({ what: "unpolishAll" })} />
                 </div>
                 <StatusStrip polished={city.polished} total={city.total} st={st} />
@@ -777,7 +778,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                                 value={tab}
                                 onChange={(v) => setTab(v as "zones" | "edit" | "numbers")}
                                 options={[
-                                    { value: "zones", icon: "zone", label: L("TabZones", "Zones"), description: L("TabZonesTip2", "Which outgrow type each zone type gets") },
+                                    { value: "zones", icon: "zone", label: L("TabDefaults", "Defaults"), description: L("TabDefaultsTip", "Each zone type's default outgrow type: what new buildings and Set all to defaults give its buildings") },
                                     { value: "edit", icon: "edit", label: L("TabEdit", "Edit"), description: L("TabEditTip", "Every outgrow type and its settings: change one, or make your own") },
                                     { value: "numbers", icon: "layers", label: L("TabNumbers", "Numbers"), description: L("TabNumbersTip", "Outgrown by type and by kind, the queue, speed, frames per second") },
                                 ]}
@@ -794,7 +795,16 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                             )
                         ) : tab === "zones" ? (
                             <div data-testid="polish-city-zones">
-                                <div className={s.zhead}>{L("ZonesHead", "Each zone type: outgrown of its buildings, and the outgrow type it gets (open a group)")}</div>
+                                <div className={classNames(s.newCard, { [s.newCardOn]: p.newHouses })} data-testid="polish-new-card">
+                                    <Tip title={L("NewHouses3", "Outgrow new buildings (this city)")} description={L("NewHouses.Tip4", "Buildings that grow from now on get their zone type's outgrow type. Kept with this city; a new city starts with it off.")}>
+                                        <div className={s.newText}>
+                                            <div className={s.newLabel}>{L("NewHouses3", "Outgrow new buildings (this city)")}</div>
+                                            <div className={s.newSub}>{L("NewHousesSub2", "With their zone type's default, below")}</div>
+                                        </div>
+                                    </Tip>
+                                    <Switch testId="polish-newHouses" on={p.newHouses} onChange={(v) => act.polishCity("newHouses", v ? "true" : "false")} />
+                                </div>
+                                <div className={s.zhead}>{L("ZonesHead2", "Each zone type's default outgrow type, and how many of its buildings are outgrown (open a group)")}</div>
                                 {KINDS.map((k, ki) => {
                                     const list = zones.filter((z) => z.kind === k.id);
                                     if (!list.length) return null;
@@ -810,7 +820,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                                             summary={st ? `${num(kp)} / ${num(kt)}` : undefined}
                                             right={
                                                 <div className={s.kindBtns} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
-                                                    <Btn icon="sparkle" iconSize={11} title={L("OutgrowKind", "Outgrow all {0}", [kindName(k).toLowerCase()])} testId={"polish-kind-" + k.id + "-all"} onClick={() => setAsk({ what: "polishSome", scope: "kind:" + k.id, label: kindName(k).toLowerCase() })} />
+                                                    <Btn icon="sparkle" iconSize={11} title={L("OutgrowKind2", "Set all {0} to their defaults", [kindName(k).toLowerCase()])} testId={"polish-kind-" + k.id + "-all"} onClick={() => setAsk({ what: "polishSome", scope: "kind:" + k.id, label: kindName(k).toLowerCase() })} />
                                                     <Btn icon="reset" iconSize={11} title={L("RemoveKind", "Remove outgrow from {0}", [kindName(k).toLowerCase()])} disabled={kp === 0} testId={"polish-kind-" + k.id + "-none"} onClick={() => setAsk({ what: "unpolishSome", scope: "kind:" + k.id, label: kindName(k).toLowerCase() })} />
                                                 </div>
                                             }
@@ -825,7 +835,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                                                     <React.Fragment key={r.key}>
                                                         <div className={classNames(s.zrow, { [s.zrowOn]: on, [s.zrowEmpty]: counts[0] === 0 })} data-testid={"polish-zone-" + r.key} data-look={look}>
                                                             <Icon name={r.icon || "zone"} size={12} fallback="zone" />
-                                                            <div className={s.zrowName}>{r.name}</div>
+                                                            <div className={s.zrowName}>{r.name.replace(/\s+Housing$/i, "")}</div>
                                                             <div className={s.zrowCount}>{`${num(counts[1])} / ${num(counts[0])}`}</div>
                                                             <TypeButton p={p} id={look || "off"} label={look ? undefined : L("Mixed", "Mixed")} on={on} onClick={() => setPicking(on ? null : r.key)} testId={"polish-zone-" + r.key + "-type"} />
                                                             {editable(p, look) ? <Btn icon="edit" iconSize={10} title={L("EditLook", "Edit {0}", [lookName(t, p, look)])} onClick={() => editLook(look)} testId={"polish-zone-" + r.key + "-edit"} /> : <div className={s.zrowEditGap} />}
@@ -843,7 +853,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                                                                     }}
                                                                 />
                                                                 <div className={s.pickFoot}>
-                                                                    <Btn icon="sparkle" iconSize={11} label={L("OutgrowZone", "Outgrow these")} testId={"polish-zone-" + r.key + "-all"} onClick={() => setAsk({ what: "polishSome", scope: "zone:" + r.key, label: r.name })} />
+                                                                    <Btn icon="sparkle" iconSize={11} label={L("OutgrowZone2", "Set these to it")} testId={"polish-zone-" + r.key + "-all"} onClick={() => setAsk({ what: "polishSome", scope: "zone:" + r.key, label: r.name })} />
                                                                     <Btn variant="ghost" icon="reset" iconSize={11} label={L("RemoveZone", "Remove from these")} disabled={counts[1] === 0} testId={"polish-zone-" + r.key + "-none"} onClick={() => setAsk({ what: "unpolishSome", scope: "zone:" + r.key, label: r.name })} />
                                                                 </div>
                                                             </div>
@@ -854,15 +864,6 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                                         </Collapsible>
                                     );
                                 })}
-                                <div className={classNames(s.newCard, { [s.newCardOn]: p.newHouses })} data-testid="polish-new-card">
-                                    <Tip title={L("NewHouses3", "Outgrow new buildings (this city)")} description={L("NewHouses.Tip4", "Buildings that grow from now on get their zone type's outgrow type. Kept with this city; a new city starts with it off.")}>
-                                        <div className={s.newText}>
-                                            <div className={s.newLabel}>{L("NewHouses3", "Outgrow new buildings (this city)")}</div>
-                                            <div className={s.newSub}>{L("NewHousesSub", "New buildings get their zone type's outgrow type, above")}</div>
-                                        </div>
-                                    </Tip>
-                                    <Switch testId="polish-newHouses" on={p.newHouses} onChange={(v) => act.polishCity("newHouses", v ? "true" : "false")} />
-                                </div>
                             </div>
                         ) : (
                             <div data-testid="polish-city-edit">
@@ -888,19 +889,19 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                 <Confirm
                     title={
                         ask.what === "polishAll"
-                            ? L("OutgrowAll.Title", "Outgrow the whole city?")
+                            ? L("OutgrowAll.Title2", "Set the whole city to its defaults?")
                             : ask.what === "unpolishAll"
                               ? L("RemoveAll.Title", "Remove all outgrow?")
                               : ask.what === "polishSome"
-                                ? L("OutgrowSome.Title", "Outgrow all {0}?", [ask.label ?? ""])
+                                ? L("OutgrowSome.Title2", "Set all {0} to their defaults?", [ask.label ?? ""])
                                 : L("RemoveSome.Title", "Remove outgrow from {0}?", [ask.label ?? ""])
                     }
                     message={
                         ask.what === "polishAll" || ask.what === "polishSome"
-                            ? t("Placemaker.UI.Polish.PolishAll.ByZone2", "Each building gets its zone type's outgrow type (zone types set to Off are left out). It runs in the background a few buildings at a time, so the game keeps running smoothly.")
+                            ? t("Placemaker.UI.Polish.PolishAll.ByZone3", "Every building is outgrown with its zone type's default outgrow type, also the ones you brushed another type onto (zone types set to Off are left out). It runs in the background a few buildings at a time, so the game keeps running smoothly.")
                             : t("Placemaker.UI.Polish.UnpolishAll.Message2", "The outgrown buildings go back to how the game made them: fences, hedges and lawns back, the beds, paths, bushes and paving taken away (ground paint stays). It runs in the background a few hundred at a time.")
                     }
-                    confirm={ask.what === "polishAll" || ask.what === "polishSome" ? L("OutgrowAll.Ok", "Outgrow all") : L("RemoveAll.Ok", "Remove all")}
+                    confirm={ask.what === "polishAll" || ask.what === "polishSome" ? L("OutgrowAll.Ok2", "Set to defaults") : L("RemoveAll.Ok", "Remove all")}
                     danger={ask.what === "unpolishAll" || ask.what === "unpolishSome"}
                     onConfirm={() => {
                         act.polishCity(ask.what, ask.scope ?? "");

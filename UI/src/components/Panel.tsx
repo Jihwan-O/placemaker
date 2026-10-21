@@ -133,7 +133,7 @@ function remPx() {
 
 const CITY_POS_KEY = "placemaker.cityPos.v1";
 /** Global outgrow's window width in rem (keep in sync with .cityWindow). */
-const CITY_WIDTH_REM = 296;
+const CITY_WIDTH_REM = 326;
 
 /**
  * Global outgrow's own window: on the left of the screen until moved by its header (remembered as fractions of the

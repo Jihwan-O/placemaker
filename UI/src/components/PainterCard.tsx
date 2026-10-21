@@ -64,7 +64,7 @@ const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Kno
         id: "land", en: "What the land becomes", icon: "layers", open: true,
         knobs: [
             {
-                id: "fill", en: "Land past the lot", tip: "What a building's land past its own lot becomes, whatever the building is: a garden (lawn, fences, beds), a car park yard (green edges, bins, marked bays with parked cars), or paving. The outgrow type alone decides: whatever the building is (a house given a car park type gets a car park).", kind: "choice",
+                id: "fill", en: "Beyond the lot", tip: "What a building's land past its own lot becomes, whatever the building is: a garden (lawn, fences, beds), a car park yard (green edges, bins, marked bays with parked cars), or paving. The outgrow type alone decides: whatever the building is (a house given a car park type gets a car park).", kind: "choice",
                 options: [{ value: 1, en: "Garden" }, { value: 2, en: "Car park" }, { value: 3, en: "Paved" }],
             },
             {

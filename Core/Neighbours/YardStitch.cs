@@ -3055,7 +3055,7 @@ namespace Placemaker.Core.Neighbours
             return merged.FirstOrDefault(r => Poly.Contains(r.Outer, probe)) ?? merged.OrderByDescending(r => r.Area).First();
         }
 
-        private static float2[] Ccw(float2[] r) => Poly.IsCcw(r) ? r : r.Reverse().ToArray();
+        private static float2[] Ccw(float2[] r) => Poly.IsCcw(r) ? r : Enumerable.Reverse(r).ToArray();   // (not the span Reverse a newer C# picks)
         private static float2[] Ccw(List<float2> r) => Ccw(r.ToArray());
     }
 }

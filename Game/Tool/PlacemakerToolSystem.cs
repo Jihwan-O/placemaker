@@ -161,8 +161,8 @@ namespace Placemaker.Game.Tool
             if (m_ToolSystem.activeTool == this) { if (_painter || _outgrowMode) { SetPainter(false); SetOutgrowMode(false); } else Close(); }
             else
             {
+                // opened again: the mode it was left in (Outgrow stays Outgrow)
                 if (_painter) SetPainter(false);
-                if (_outgrowMode) SetOutgrowMode(false);
                 _closeAfterGhost = 0;
                 _closeAfterBuild = false;   // opened by the player: a Build & close the build never handed back is void
                 m_ToolSystem.activeTool = this;

@@ -21,7 +21,7 @@ import { Tip, TipDirection, TipDirectionContext } from "../lib/tips";
 import { statIcon } from "../lib/icons";
 import { walk } from "../lib/schema";
 import { requestReveal } from "../lib/reveal";
-import { AreaStage, modeAvailability, modeOptions, toolOf } from "../stages/AreaStage";
+import { AreaStage } from "../stages/AreaStage";
 import { DesignStage, markerLabel } from "../stages/DesignStage";
 import { BuildingStage, ReviewStage } from "../stages/ReviewStage";
 import { ManageStage } from "../stages/ManageStage";
@@ -363,36 +363,6 @@ const StageBar = ({ state }: { state: ToolState }) => {
     );
 };
 
-const cap = (x: string) => (x ? x.charAt(0).toUpperCase() + x.slice(1) : x);
-
-const UndoRedo = ({ state }: { state: ToolState }) => {
-    const { t, tl } = useT();
-    const undo = state.undoLabel ? tl(state.undoLabel) : "";
-    const redo = state.redoLabel ? tl(state.redoLabel) : "";
-    return (
-        <div className={s.undoRedo}>
-            <Btn
-                icon="undo"
-                iconSize={14}
-                disabled={!state.canUndo}
-                testId="undo"
-                title={undo ? t("Placemaker.UI.UndoWhat", "Undo: {0}", [cap(undo)]) : t("Placemaker.UI.Undo", "Undo")}
-                description={<Keys keys={["Ctrl", "Z"]} />}
-                onClick={act.undo}
-            />
-            <Btn
-                icon="redo"
-                iconSize={14}
-                disabled={!state.canRedo}
-                testId="redo"
-                title={redo ? t("Placemaker.UI.RedoWhat", "Redo: {0}", [cap(redo)]) : t("Placemaker.UI.Redo", "Redo")}
-                description={<Keys keys={["Ctrl", "Y"]} />}
-                onClick={act.redo}
-            />
-        </div>
-    );
-};
-
 /** The preview mode in effect: C#'s choice, else Real on Review and Sketch before it. */
 export function effectivePreviewMode(state: ToolState): "sketch" | "ghost" {
     if (state.previewMode === "sketch" || state.previewMode === "ghost") return state.previewMode;
@@ -722,6 +692,10 @@ export const PlacemakerPanel = () => {
     // Outgrow's Global outgrow window (beside the panel; a look to edit asked for elsewhere opens it)
     // an outgrow type to edit asked for elsewhere (a zone's Edit in Zoning): the panel switches to Outgrow
     useLookEditorRequests(useCallback(() => act.polishCity("mode", "outgrow"), []));
+    // never minimised any more (its button is gone): a panel saved minimised opens full
+    useEffect(() => {
+        if (state.panelCollapsed) act.setPanelCollapsed(false);
+    }, [state.panelCollapsed]);
     const permKey = useMemo(() => JSON.stringify(summary.permanent), [summary.permanent]);
     const position = usePanelPosition();
     const layout = useMemo(() => layoutFor(position.width), [position.width]);
@@ -810,7 +784,6 @@ export const PlacemakerPanel = () => {
             break;
     }
 
-    const collapsed = state.panelCollapsed;
     const showPreviewToggle = !polish && !outgrow && (state.stage === "design" || state.stage === "review");
     // Header tips open UPWARDS (over the game's top bar), so they never sit on the stage bar below.
     const header = (
@@ -833,25 +806,32 @@ export const PlacemakerPanel = () => {
                 </Tip>
                 <Tip title={polish || outgrow ? t("Placemaker.UI.Polish.Name", "Outgrow") : t("Placemaker.Name", "Placemaker")}>
                     <div className={s.logo}>
-                        <Icon name={polish || outgrow ? "shrub" : "logo"} size={16} tint="accent" />
+                        <Icon name={polish || outgrow ? "shrub" : "logo"} size={16} tint="light" />
                     </div>
                 </Tip>
-                {/* Design / Review show the preview toggle in the title's place (the logo names the tool). */}
-                {showPreviewToggle ? (
-                    <PreviewToggle state={state} />
-                ) : (
-                    <div className={s.title}>
-                        {polish || outgrow ? t("Placemaker.UI.Polish.Name", "Outgrow") : state.stage === "manage" ? t("Placemaker.UI.Manage.Title", "Built with Placemaker") : t("Placemaker.Name", "Placemaker")}
+                {/* the panel's two modes, in the title's place */}
+                {cityAvailable ? (
+                    <div className={s.headMode}>
+                        <Segmented
+                            testId="panel-mode"
+                            value={outgrow ? "outgrow" : "placemaker"}
+                            onChange={(v) => act.polishCity("mode", v)}
+                            options={[
+                                { value: "placemaker", label: t("Placemaker.Name", "Placemaker"), description: t("Placemaker.UI.ModePlacemakerTip", "Make roads, parks, car parks, shops and zones in an area you pick.") },
+                                { value: "outgrow", label: t("Placemaker.UI.Polish.Name", "Outgrow"), description: t("Placemaker.UI.ModeOutgrowTip", "The whole city's outgrow: each zone type's default, the brush, the map lens, the outgrow types and their numbers.") },
+                            ]}
+                        />
                     </div>
+                ) : (
+                    <div className={s.title}>{t("Placemaker.Name", "Placemaker")}</div>
                 )}
-                {state.editingGroup != null ? <div className={s.editingPill}>{t("Placemaker.UI.Editing", "Editing")}</div> : null}
-                {state.planning && !showPreviewToggle && !polish && !outgrow ? (
+                {state.editingGroup != null && !outgrow ? <div className={s.editingPill}>{t("Placemaker.UI.Editing", "Editing")}</div> : null}
+                {state.planning && !polish && !outgrow ? (
                     <Tip title={t("Placemaker.UI.Planning", "Planning…")}>
                         <div className={classNames(s.spinner, s.headSpinner)} data-testid="planning" />
                     </Tip>
                 ) : null}
                 <div className={s.flex} />
-                {state.stage === "manage" || outgrow ? null : <UndoRedo state={state} />}
                 {state.anarchy?.available ? (
                     <Btn
                         icon="anarchy"
@@ -864,15 +844,6 @@ export const PlacemakerPanel = () => {
                     />
                 ) : null}
                 <div className={s.headSep} />
-                {collapsed ? null : (
-                    <Btn
-                        icon="collapse"
-                        iconSize={14}
-                        title={t("Placemaker.UI.Collapse", "Minimize")}
-                                                onClick={() => act.setPanelCollapsed(true)}
-                        testId="collapse"
-                    />
-                )}
                 <Btn
                     icon="close"
                     iconSize={14}
@@ -893,15 +864,14 @@ export const PlacemakerPanel = () => {
                     {picker ? <div className={s.backdrop} data-testid="picker-backdrop" onMouseDown={closePicker} /> : null}
                     <div
                         ref={position.wrapRef}
-                        className={classNames(s.wrap, { [s.wrapCollapsed]: collapsed })}
+                        className={s.wrap}
                         style={position.style}
                         data-testid="placemaker-wrap"
                         data-docked={position.floating ? "false" : "true"}
                         data-width={position.width}
                         data-cols={layout.wide ? "2" : "1"}
                     >
-                        {collapsed ? null : (
-                            <Tip
+                        <Tip
                                 title={t("Placemaker.UI.Resize", "Resize the panel")}
                                 description={t("Placemaker.UI.ResizeTip", "Drag to make it wider or narrower. Double-click for the default width.")}
                             >
@@ -915,9 +885,7 @@ export const PlacemakerPanel = () => {
                                     }}
                                 />
                             </Tip>
-                        )}
-                        {collapsed ? null : (
-                            <Tip
+                        <Tip
                                 title={t("Placemaker.UI.ResizeHeight", "Resize the height")}
                                 description={t("Placemaker.UI.ResizeHeightTip", "Drag to make it taller or shorter. Double-click for full height.")}
                             >
@@ -931,59 +899,15 @@ export const PlacemakerPanel = () => {
                                     }}
                                 />
                             </Tip>
-                        )}
-                        <div className={classNames(s.panel, { [s.panelCompact]: collapsed })} data-testid="placemaker-panel" data-stage={state.stage}>
+                        <div className={s.panel} data-testid="placemaker-panel" data-stage={state.stage}>
                             <div className={s.panelTint}>
                                 {header}
-                                {cityAvailable && !collapsed ? (
-                                    <div className={s.modeRow} data-testid="panel-mode-row">
-                                        <Segmented
-                                            testId="panel-mode"
-                                            stretch
-                                            value={outgrow ? "outgrow" : "placemaker"}
-                                            onChange={(v) => act.polishCity("mode", v)}
-                                            options={[
-                                                { value: "placemaker", icon: "logo", label: t("Placemaker.Name", "Placemaker"), description: t("Placemaker.UI.ModePlacemakerTip", "Make roads, parks, car parks, shops and zones in an area you pick.") },
-                                                { value: "outgrow", icon: "shrub", label: t("Placemaker.UI.Polish.Name", "Outgrow"), description: t("Placemaker.UI.ModeOutgrowTip", "The whole city's outgrow: each zone type's default, the brush, the map lens, the outgrow types and their numbers.") },
-                                            ]}
-                                        />
+                                {showPreviewToggle ? (
+                                    <div className={s.subRow} data-testid="panel-preview-row">
+                                        <PreviewToggle state={state} />
                                     </div>
                                 ) : null}
-                                {collapsed ? (
-                                    <ErrorBoundary name="compact">
-                                        <div className={s.compact} data-testid="panel-compact">
-                                            <div className={s.compactRow}>
-                                                {state.stage === "area" ? (
-                                                    <Segmented
-                                                        iconOnly
-                                                        value={toolOf(state.areaMode)}
-                                                        onChange={(v) => {
-                                                            const m = v === "paint" ? (state.brush.rules?.anything ? "paint" : "blockPaint") : v;
-                                                            if (modeAvailability(state, m, t, tl).enabled) act.setAreaMode(m as any);
-                                                        }}
-                                                        options={modeOptions(t).map((o) => {
-                                                            const av = modeAvailability(state, o.value, t, tl);
-                                                            return av.enabled ? o : { ...o, description: av.reason + " — " + o.description };
-                                                        })}
-                                                        testId="area-mode-compact"
-                                                    />
-                                                ) : (
-                                                    <div className={s.compactStage}>{t(STAGES.find((x) => x.id === state.stage)?.key ?? "", "")}</div>
-                                                )}
-                                                <div className={s.flex} />
-                                                <Btn
-                                                    variant="solid"
-                                                    icon="expand"
-                                                    iconSize={14}
-                                                    label={t("Placemaker.UI.Expand", "Options")}
-                                                    onClick={() => act.setPanelCollapsed(false)}
-                                                    testId="expand"
-                                                />
-                                            </div>
-                                            <Footer state={state} summary={summary} blockedReason={blockedReason} lead={lead} compact />
-                                        </div>
-                                    </ErrorBoundary>
-                                ) : outgrow ? (
+                                {outgrow ? (
                                     <ErrorBoundary name="outgrow">
                                         <PolishCityCard state={state} />
                                     </ErrorBoundary>
@@ -1009,7 +933,7 @@ export const PlacemakerPanel = () => {
                                 )}
                             </div>
                         </div>
-                        {!picker && !collapsed && !outgrow ? (
+                        {!picker && !outgrow ? (
                             <ErrorBoundary name="legend">
                                 <Legend state={state} summary={summary} side={position.side === "left" ? "left" : "right"} />
                             </ErrorBoundary>

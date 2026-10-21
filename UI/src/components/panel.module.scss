@@ -254,10 +254,6 @@
     animation-iteration-count: infinite;
 }
 
-.undoRedo {
-    @include row;
-}
-
 // ── stage bar: three equal steps under the header ──
 .stageBar {
     @include row;
@@ -643,10 +639,27 @@
     margin-left: 10rem;
 }
 
-// the switcher under the header: Placemaker or Outgrow
-.modeRow {
+// the header's Placemaker | Outgrow switcher, in the title's place
+.headMode {
     flex-shrink: 0;
-    padding: 6rem 8rem 2rem 8rem;
+    margin-left: 6rem;
+}
+
+// under the header (Placemaker's Design and Review): Sketch | Real across the panel
+.subRow {
+    @include row;
+    flex-shrink: 0;
+    padding: 6rem 8rem 0 8rem;
+}
+
+.subRow .previewToggle {
+    flex: 1 1 auto;
+    margin-left: 0;
+}
+
+.subRow .pvBtn {
+    flex: 1 1 0;
+    justify-content: center;
 }
 
 // ── crash ──

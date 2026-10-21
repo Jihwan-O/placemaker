@@ -687,11 +687,18 @@ type Ask = { what: "polishAll" | "unpolishAll" | "polishSome" | "unpolishSome"; 
  *  laid out again each time (Gameface: a quarter-second hitch every half second with the window open). */
 const Frozen = React.memo(({ children }: { fp: string; children: ReactNode }) => <>{children}</>, (a, b) => a.fp === b.fp);
 
+/** The Outgrow tab last shown: Outgrow opens on it again (the panel closed and opened, the mode switched). */
+let lastCityTab: "zones" | "edit" | "numbers" = "zones";
+
 export const PolishCityCard = ({ state }: { state: ToolState }) => {
     const { t } = useT();
     const [ask, setAsk] = useState<Ask>(null);
     const [picking, setPicking] = useState<string | null>(null);   // a zone id, or "brush"
-    const [tab, setTab] = useState<"zones" | "edit" | "numbers">(() => (pendingLook != null ? "edit" : "zones"));
+    const [tab, setTabState] = useState<"zones" | "edit" | "numbers">(() => (pendingLook != null ? "edit" : lastCityTab));
+    const setTab = (v: "zones" | "edit" | "numbers") => {
+        lastCityTab = v;
+        setTabState(v);
+    };
     const [brushLook, setBrushLook] = useState<string>("");
     // an outgrow type to edit asked for elsewhere (a zone's dropdown in Zoning): the Edit tab, that type picked
     const takeRequest = useCallback(() => {

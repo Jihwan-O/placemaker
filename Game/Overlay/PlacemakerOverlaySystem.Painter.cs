@@ -20,18 +20,19 @@ namespace Placemaker.Game.Overlay
         /// <summary>For the game runner: polished lots the tint shows now.</summary>
         public static int PolishedShown { get; private set; }
 
-        // Global outgrow's status lens (NeighbourPolishSystem.LensRingsNear): outgrown, not, being planned now, just put in
-        // line, then waiting by how long (the line's heat map: pale to red)
+        // Outgrow's status lens (NeighbourPolishSystem.LensRingsNear): outgrown, not, being planned now, just put in line, then
+        // waiting by how long (the line's heat map: pale to red). Half as strong as it was ("50% more transparent"): the
+        // brush's lit buildings (DrawOutgrowBrush) stay as strong, so what a stroke takes stands out
         private static readonly Color[] LensTints =
         {
-            new Color(0.47f, 0.88f, 0.33f, 0.34f),   // outgrown
-            new Color(0.75f, 0.78f, 0.82f, 0.13f),   // not outgrown
-            new Color(0.22f, 0.53f, 0.95f, 0.6f),    // being planned now
-            new Color(1f, 0.95f, 0.45f, 0.7f),       // just put in line
-            new Color(1f, 0.78f, 0.42f, 0.42f),      // waiting under 10 s
-            new Color(1f, 0.58f, 0.22f, 0.48f),      // under 30 s
-            new Color(0.93f, 0.36f, 0.13f, 0.54f),   // under 90 s
-            new Color(0.82f, 0.13f, 0.13f, 0.6f),    // longer
+            new Color(0.47f, 0.88f, 0.33f, 0.17f),   // outgrown
+            new Color(0.75f, 0.78f, 0.82f, 0.07f),   // not outgrown
+            new Color(0.22f, 0.53f, 0.95f, 0.3f),    // being planned now
+            new Color(1f, 0.95f, 0.45f, 0.35f),      // just put in line
+            new Color(1f, 0.78f, 0.42f, 0.21f),      // waiting under 10 s
+            new Color(1f, 0.58f, 0.22f, 0.24f),      // under 30 s
+            new Color(0.93f, 0.36f, 0.13f, 0.27f),   // under 90 s
+            new Color(0.82f, 0.13f, 0.13f, 0.3f),    // longer
         };
         private readonly List<float3[]>[] _lens = System.Linq.Enumerable.Range(0, NeighbourPolishSystem.LensLayers).Select(_ => new List<float3[]>()).ToArray();
         private readonly long[] _lensSig = new long[NeighbourPolishSystem.LensLayers];
@@ -76,7 +77,7 @@ namespace Placemaker.Game.Overlay
             {
                 if (kv.Value.Count == 0) continue;
                 Color color = LensTints[NeighbourPolishSystem.LensNot];
-                if (kv.Key != "-" && ColorUtility.TryParseHtmlString(PolishLooksColor(kv.Key), out var c)) color = new Color(c.r, c.g, c.b, 0.5f);
+                if (kv.Key != "-" && ColorUtility.TryParseHtmlString(PolishLooksColor(kv.Key), out var c)) color = new Color(c.r, c.g, c.b, 0.25f);
                 _fill.SetLayer("outgrowType:" + kv.Key, kv.Value, color, -94.4f, _typeSig.TryGetValue(kv.Key, out var sig) ? sig : 0);
             }
         }

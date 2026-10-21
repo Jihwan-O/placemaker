@@ -1,0 +1,181 @@
+{
+  "_about": "Global outgrow, the whole window: a street of houses grows with Outgrow new buildings on, then: the window (the whole city's buttons on top, new buildings for this city, the brush, the map lens, the numbers and charts), Zones (Homes open: zone types two to a row with their counts, per-kind buttons), the lens's Types map, a brush stroke painting some houses as Towers (they turn to Towers' colour), the Numbers tab (a donut of outgrown buildings by type, bars by kind, the work line, rate and FPS charts), the Edit tab (one list of outgrow types, colours, planting style). Then a Zoning type's zone row: just its outgrow type and Edit. Send with: powershell -File tools/suite/Send-Suite.ps1 -File suite/scenarios/outgrow-global.json -Who outgrow-global",
+  "scenarios": [
+    {
+      "id": "outgrow-global",
+      "land": {
+        "shape": "rect",
+        "size": [
+          300,
+          240
+        ],
+        "ground": "flat",
+        "roads": "none"
+      },
+      "steps": [
+        {
+          "do": "setting",
+          "name": "NeighbourhoodPolish",
+          "value": true
+        },
+        {
+          "do": "setting",
+          "name": "PolishNewHouses",
+          "value": true
+        },
+        {
+          "do": "lab",
+          "op": "street",
+          "shape": "straight",
+          "length": 220,
+          "zone": "NA Residential Low"
+        },
+        {
+          "do": "grow",
+          "seconds": 90
+        },
+        {
+          "do": "lab",
+          "op": "polishIdle",
+          "seconds": 90
+        },
+        {
+          "do": "polish",
+          "stamp": "pick"
+        },
+        {
+          "do": "polish",
+          "click": "polish-city-open",
+          "shot": "global-top",
+          "shotMode": "ui"
+        },
+        {
+          "do": "polish",
+          "click": "polish-zones-home-toggle",
+          "shot": "global-zones-homes",
+          "shotMode": "ui"
+        },
+        {
+          "do": "polish",
+          "click": "polish-lens-mode-types",
+          "shot": "global-lens-types",
+          "shotMode": "ui",
+          "camera": {
+            "target": "point",
+            "at": [
+              0,
+              0
+            ],
+            "view": "top",
+            "distance": 260
+          }
+        },
+        {
+          "do": "polish",
+          "click": "polish-brush-type"
+        },
+        {
+          "do": "polish",
+          "click": "polish-brush-pick-towers"
+        },
+        {
+          "do": "polish",
+          "click": "polish-brush-paint"
+        },
+        {
+          "do": "area",
+          "tool": "paint",
+          "stroke": [
+            [
+              -60,
+              30
+            ],
+            [
+              0,
+              30
+            ],
+            [
+              40,
+              30
+            ]
+          ],
+          "size": 40
+        },
+        {
+          "do": "wait",
+          "seconds": 4
+        },
+        {
+          "do": "shot",
+          "name": "global-brushed-towers",
+          "shotMode": "ui",
+          "camera": {
+            "target": "point",
+            "at": [
+              0,
+              0
+            ],
+            "view": "top",
+            "distance": 260
+          }
+        },
+        {
+          "do": "polish",
+          "click": "polish-city-tab-numbers",
+          "shot": "global-numbers",
+          "shotMode": "ui"
+        },
+        {
+          "do": "polish",
+          "click": "polish-lens-mode-status",
+          "shot": "global-lens-status",
+          "shotMode": "ui"
+        },
+        {
+          "do": "polish",
+          "click": "polish-city-tab-edit",
+          "shot": "global-edit",
+          "shotMode": "ui"
+        }
+      ]
+    },
+    {
+      "id": "outgrow-global-zoning",
+      "land": {
+        "shape": "rect",
+        "size": [
+          200,
+          160
+        ],
+        "ground": "flat",
+        "roads": "none"
+      },
+      "steps": [
+        {
+          "do": "area",
+          "tool": "points",
+          "rect": [
+            80,
+            60
+          ]
+        },
+        {
+          "do": "type",
+          "layer": "zoningSuburb"
+        },
+        {
+          "do": "polish",
+          "click": "zonemix-outgrow-A",
+          "shot": "zone-outgrow-row",
+          "shotMode": "ui"
+        },
+        {
+          "do": "polish",
+          "click": "zonemix-look-residential-low-open",
+          "shot": "zone-outgrow-pick",
+          "shotMode": "ui"
+        }
+      ]
+    }
+  ]
+}

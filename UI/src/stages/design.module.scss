@@ -495,3 +495,17 @@
     flex-shrink: 0;
     pointer-events: none;
 }
+
+// a zone type's Outgrow in a Zoning type: settings changed there before the outgrow types held them
+.zoneOwnNote {
+    @include row;
+    min-width: 0;
+    margin: 0 0 4rem 0;
+    font-size: 11rem;
+}
+
+.zoneOwnText {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: $c-text-dim;
+}

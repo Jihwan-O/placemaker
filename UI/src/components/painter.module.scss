@@ -209,6 +209,202 @@
     @include border(1rem, rgba(143, 209, 255, 0.75));
 }
 
+// Global outgrow: the whole city's buttons, under the header
+.cityActions {
+    @include row;
+    flex-shrink: 0;
+    padding: 6rem 8rem 6rem 8rem;
+    border-bottom-width: 1rem;
+    border-bottom-style: solid;
+    border-bottom-color: $c-line;
+}
+
+.cityActions > * {
+    flex: 1 1 0;
+    margin-right: 6rem;
+}
+
+// a boxed block (the brush, the lens)
+.block {
+    @include col;
+    min-width: 0;
+    margin: 4rem 0 6rem 0;
+    padding: 6rem 7rem;
+    border-radius: $radius;
+    background-color: $c-surface;
+}
+
+.blockHead {
+    @include row;
+    min-width: 0;
+}
+
+.blockTitle {
+    margin: 0 8rem 0 6rem;
+    font-size: $fs;
+    font-weight: bold;
+}
+
+.blockHint {
+    margin-top: 4rem;
+    font-size: 11rem;
+    color: $c-text-dim;
+}
+
+.dot {
+    flex: 0 0 auto;
+    width: 9rem;
+    height: 9rem;
+    margin-right: 5rem;
+    border-radius: 5rem;
+}
+
+.typeBtn {
+    @include button-reset;
+    @include row;
+    min-width: 0;
+    max-width: 150rem;
+    height: 20rem;
+    padding: 0 6rem;
+    border-radius: $radius-s;
+    background-color: $c-surface-strong;
+    font-size: $fs-s;
+    color: var(--menuText1Normal);
+    cursor: pointer;
+}
+
+.typeBtnOn {
+    background-color: rgba(143, 209, 255, 0.3);
+}
+
+.swatches {
+    @include row;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.swatchBtn {
+    @include button-reset;
+    width: 14rem;
+    height: 14rem;
+    margin: 1rem 3rem 1rem 0;
+    border-radius: 3rem;
+    @include border(1rem, rgba(0, 0, 0, 0.35));
+    cursor: pointer;
+}
+
+.swatchBtnOn {
+    @include border(2rem, #ffffff);
+}
+
+.typeLegend {
+    @include row;
+    flex-wrap: wrap;
+    min-width: 0;
+    margin-top: 4rem;
+}
+
+.typeLegendItem {
+    @include row;
+    width: 50%;
+    min-width: 0;
+    padding-right: 8rem;
+    margin: 1rem 0;
+    font-size: $fs-s;
+}
+
+.typeLegendCount {
+    flex: 0 0 auto;
+    margin-left: 6rem;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+
+
+.kindActions {
+    @include row;
+    min-width: 0;
+    margin: 2rem 0 4rem 0;
+}
+
+.kindActions > * {
+    margin-right: 6rem;
+}
+
+// zone types two to a row
+.zoneGrid {
+    @include row(flex-start);
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.zoneCell {
+    width: 50%;
+    min-width: 0;
+    padding: 0 4rem 4rem 0;
+}
+
+.zoneCard {
+    @include col;
+    min-width: 0;
+    padding: 5rem 6rem;
+    border-radius: $radius;
+    background-color: $c-surface;
+}
+
+.zoneCardOn {
+    background-color: rgba(143, 209, 255, 0.12);
+}
+
+.zoneCardHead {
+    @include row;
+    min-width: 0;
+}
+
+.zoneCounts {
+    margin: 2rem 0 4rem 0;
+    font-size: 11rem;
+    color: $c-text-dim;
+}
+
+.zoneCardFoot {
+    @include row;
+    min-width: 0;
+}
+
+.zoneBar {
+    height: 4rem;
+    margin: 0 0 5rem 0;
+    border-radius: 2rem;
+    background-color: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.zoneBarFill {
+    height: 100%;
+    border-radius: 2rem;
+    background-color: #78e054;
+}
+
+.zoneCardName {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 5rem;
+    font-size: $fs-s;
+    font-weight: bold;
+}
+
+.zonePick {
+    @include col;
+    width: 100%;
+    min-width: 0;
+    margin: 0 4rem 6rem 0;
+    padding: 6rem 6rem 2rem 6rem;
+    border-radius: 4rem;
+    background-color: rgba(143, 209, 255, 0.07);
+}
+
 .cityTabs {
     margin: 2rem 0 6rem 0;
 }

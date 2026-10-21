@@ -26,6 +26,8 @@ namespace Placemaker.Core.Neighbours
         public bool Edited;
         /// <summary>garden, natural, tidy or yard.</summary>
         public string Theme = "garden";
+        /// <summary>Its colour on Global outgrow's map and charts ("#rrggbb"; empty: PolishLooks.DefaultColors, else grey).</summary>
+        public string Color = "";
         /// <summary>Every knob that differs from <see cref="PolishLooks.Defaults"/>.</summary>
         public Dictionary<string, float> Knobs = new Dictionary<string, float>();
 
@@ -185,6 +187,26 @@ namespace Placemaker.Core.Neighbours
             new PolishLook { Id = "industry", Name = "Placemaker.UI.Painter.Theme.industry", Theme = "yard", Knobs = { ["fill"] = FillPaved, ["bedChance"] = 0f, ["rockChance"] = 0f, ["gardenLayer"] = 3f, ["meadowLayer"] = 3f, ["blendLayer"] = 3f, ["patchChance"] = 60f } },
         };
 
+        /// <summary>Each built-in look's colour (the zone ones: the dataviz palette's dark steps, in its validated order).</summary>
+        public static readonly IReadOnlyDictionary<string, string> DefaultColors = new Dictionary<string, string>
+        {
+            ["houses"] = "#3987e5", ["shops"] = "#d95926", ["apartments"] = "#199e70", ["offices"] = "#c98500", ["towers"] = "#d55181",
+            ["industry"] = "#008300", ["rows"] = "#9085e9", ["bigShops"] = "#e66767", ["mixed"] = "#4cb8c4", ["officeTowers"] = "#a0782a",
+            ["garden"] = "#6fbf3f", ["natural"] = "#9c8455", ["tidy"] = "#3fa98a", ["yard"] = "#8a7560", ["meadow"] = "#b5b84a",
+            ["rustic"] = "#b07a45", ["coastal"] = "#3fa9d6", ["manicured"] = "#2e9e5e",
+        };
+
+        /// <summary>The colours the player picks from (a new look of theirs takes the first one no look has).</summary>
+        public static readonly string[] Swatches =
+        {
+            "#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767",
+            "#4cb8c4", "#a0782a", "#6fbf3f", "#9c8455", "#3fa9d6", "#b5b84a", "#e0e0e0", "#7d5fb2",
+        };
+
+        /// <summary>A look's colour: its own, else its built-in one, else grey.</summary>
+        public static string ColorOf(PolishLook l) =>
+            l == null ? "#8a93a3" : !string.IsNullOrEmpty(l.Color) ? l.Color : DefaultColors.TryGetValue(l.Id, out var c) ? c : "#8a93a3";
+
         /// <summary>The built-in looks made for zone types, in the order the panel lists them.</summary>
         public static readonly string[] ZoneLookIds = { "houses", "rows", "apartments", "towers", "mixed", "shops", "bigShops", "offices", "officeTowers", "industry" };
 
@@ -232,7 +254,7 @@ namespace Placemaker.Core.Neighbours
             {
                 var id = o["id"].AsString();
                 if (string.IsNullOrEmpty(id) || BuiltIn.Any(b => b.Id == id) || list.Any(l => l.Id == id)) continue;
-                var look = new PolishLook { Id = id, Name = o["name"].AsString(id), Custom = true, Theme = Array.IndexOf(Themes, o["theme"].AsString()) >= 0 ? o["theme"].AsString() : "garden" };
+                var look = new PolishLook { Id = id, Name = o["name"].AsString(id), Custom = true, Theme = Array.IndexOf(Themes, o["theme"].AsString()) >= 0 ? o["theme"].AsString() : "garden", Color = o["color"].AsString("") };
                 foreach (var kv in o["knobs"].Properties)
                     if (Defaults.ContainsKey(kv.Key) && kv.Value.Kind == JsonKind.Number) look.Knobs[kv.Key] = (float)kv.Value.AsNumber();
                 list.Add(look);
@@ -254,7 +276,7 @@ namespace Placemaker.Core.Neighbours
                 var id = o["id"].AsString();
                 var builtIn = BuiltIn.FirstOrDefault(b => b.Id == id);
                 if (builtIn == null || list.Any(l => l.Id == id)) continue;
-                var look = new PolishLook { Id = id, Name = builtIn.Name, Edited = true, Theme = Array.IndexOf(Themes, o["theme"].AsString()) >= 0 ? o["theme"].AsString() : builtIn.Theme };
+                var look = new PolishLook { Id = id, Name = builtIn.Name, Edited = true, Theme = Array.IndexOf(Themes, o["theme"].AsString()) >= 0 ? o["theme"].AsString() : builtIn.Theme, Color = o["color"].AsString("") };
                 foreach (var kv in o["knobs"].Properties)
                     if (Defaults.ContainsKey(kv.Key) && kv.Value.Kind == JsonKind.Number) look.Knobs[kv.Key] = (float)kv.Value.AsNumber();
                 list.Add(look);
@@ -270,6 +292,7 @@ namespace Placemaker.Core.Neighbours
                 foreach (var kv in l.Knobs.OrderBy(k => k.Key)) knobs.Set(kv.Key, kv.Value);
                 var o = JsonValue.Obj().Set("id", l.Id);
                 if (named) o.Set("name", l.Name);
+                if (!string.IsNullOrEmpty(l.Color)) o.Set("color", l.Color);
                 return o.Set("theme", l.Theme).Set("knobs", knobs);
             }
             var arr = JsonValue.Arr();

@@ -83,6 +83,7 @@ namespace Placemaker.Game.Tool
         /// <summary>Every frame: the selection polished again once the look or the selection has settled for a moment.</summary>
         private void UpdateLivePolish()
         {
+            UpdateOutgrowBrush();
             if (!_painter || !_polishLive || _building) return;
             if (!ReferenceEquals(_liveShape, _shape)) { _liveShape = _shape; LiveChanged(); }
             if (_shape == null || _liveDone == _liveVersion || _gesture != Gesture.None || UnityEngine.Time.realtimeSinceStartup - _liveAt < LiveDelay) return;
@@ -136,6 +137,9 @@ namespace Placemaker.Game.Tool
                     break;
                 case "reset":
                     if (look != null && look.Edited && NeighbourPolishSystem.ResetLook(look.Id)) SelectLook(look.Id);
+                    break;
+                case "color":
+                    if (look != null && NeighbourPolishSystem.SetLookColor(look.Id, arg)) Touch();
                     break;
                 case "saveAs":
                     var id = NeighbourPolishSystem.SaveLook(null, string.IsNullOrWhiteSpace(arg) ? "My look" : arg, _lookTheme, _lookValues);
@@ -302,10 +306,94 @@ namespace Placemaker.Game.Tool
                     Flash(new LocText("Placemaker.Painter.CityUnpolishing"));
                     Touch();
                     return;
+                case "polishSome":
+                    // one kind ("kind:home") or zone type ("zone:<prefab>") of the city
+                    if (!s.NeighbourhoodPolish) s.NeighbourhoodPolish = true;
+                    s.ApplyAndSave();
+                    NeighbourPolishSystem.PolishEverything(0, value);
+                    Mod.Log.Info($"Placemaker painter: outgrow {value} (each building its zone's look)");
+                    Flash(new LocText("Placemaker.Painter.CityPolishing"));
+                    Touch();
+                    return;
+                case "unpolishSome":
+                    NeighbourPolishSystem.RemoveAll(value);
+                    Mod.Log.Info($"Placemaker painter: remove outgrow from {value}");
+                    Flash(new LocText("Placemaker.Painter.CityUnpolishing"));
+                    Touch();
+                    return;
+                case "cityOpen": _cityOpen = on; if (!on && _brush != 0) { _brush = 0; } Touch(); return;
+                case "lens": _lensWanted = on; Touch(); return;
+                case "lensMode": _lensMode = value == "types" ? "types" : "status"; Touch(); return;
+                case "brush":
+                {
+                    // "paint:<look>", "erase" or "off"
+                    int colon = value.IndexOf(':');
+                    SetOutgrowBrush(colon > 0 ? value.Substring(0, colon) : value, colon > 0 ? value.Substring(colon + 1) : null);
+                    return;
+                }
                 default: return;
             }
             s.ApplyAndSave();
             Touch();
+        }
+
+        // Global outgrow's status lens: on while the window is open and its switch is on; its map: "status" or "types"
+        private bool _cityOpen, _lensWanted = true;
+        private string _lensMode = "status";
+        /// <summary>The status lens is drawn (PlacemakerOverlaySystem).</summary>
+        public bool OutgrowLens => _cityOpen && _lensWanted;
+        public string OutgrowLensMode => _lensMode;
+
+        // Global outgrow's brush: the Outgrow tool with Paint area; every stroke, once let go, stamps the buildings under it
+        // with the outgrow type picked (erase: puts them back) at the front of the line, and the area clears for the next one
+        private int _brush;
+        private string _brushLook;
+        private AreaShape _brushShape;
+        private float _brushShapeAt;
+
+        /// <summary>The brush on ("paint" with a look, "erase") or off ("").</summary>
+        public void SetOutgrowBrush(string mode, string look)
+        {
+            _brush = mode == "paint" ? 1 : mode == "erase" ? -1 : 0;
+            if (_brush > 0)
+            {
+                if (NeighbourPolishSystem.LookById(look) == null) { _brush = 0; Touch(); return; }
+                _brushLook = look;
+            }
+            if (_brush != 0)
+            {
+                if (_stage == ToolStage.Manage) GoToStage(ToolStage.Area);
+                if (!_painter) SetPainter(true);
+                if (m_ToolSystem != null && m_ToolSystem.activeTool != this) { _closeAfterGhost = 0; m_ToolSystem.activeTool = this; }
+                if (_brush > 0) SelectLook(look, remember: false);
+                SetAreaMode(SelectionMode.Paint);
+                _brushShape = _shape;
+                Mod.Log.Info($"Placemaker outgrow brush: {(_brush > 0 ? "paint " + look : "erase")}");
+            }
+            Touch();
+        }
+
+        /// <summary>Every frame: a brush stroke let go stamps the buildings under it, then the area clears.</summary>
+        private void UpdateOutgrowBrush()
+        {
+            if (_brush == 0) return;
+            if (!_painter) { _brush = 0; Touch(); return; }
+            if (_building || _gesture != Gesture.None) return;
+            if (!ReferenceEquals(_brushShape, _shape)) { _brushShape = _shape; _brushShapeAt = UnityEngine.Time.realtimeSinceStartup; return; }
+            if (_shape == null || UnityEngine.Time.realtimeSinceStartup - _brushShapeAt < 0.2f) return;
+            var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
+            if (polish == null) return;
+            var lots = PainterLots(polish);
+            if (lots.Count > 0)
+            {
+                var settings = global::Placemaker.Game.Tool.ToolRegistration.Settings;
+                if (_brush > 0 && settings != null && !settings.NeighbourhoodPolish) { settings.NeighbourhoodPolish = true; settings.ApplyAndSave(); }
+                NeighbourPolishSystem.Stamp(lots, _brush > 0, _brush > 0 ? _brushLook : "zone", null);
+                LastStamp = (lots.Count, _brush > 0);
+                Mod.Log.Info($"Placemaker outgrow brush: {lots.Count} buildings {(_brush > 0 ? "outgrown as " + _brushLook : "put back")}");
+            }
+            ClearArea();
+            _brushShape = _shape;
         }
 
         /// <summary>Polish (yes) or Unpolish (no) the lots in the area. The selection stays (press it again as often as wanted).</summary>
@@ -378,6 +466,35 @@ namespace Placemaker.Game.Tool
 
         /// <summary>Outgrow as the panel shows it: always (the Global outgrow window and the looks are there whatever is picked);
         /// the area's counts only for the Outgrow tool and the Zoning types.</summary>
+        /// <summary>Global outgrow's numbers as the panel shows them.</summary>
+        private static PainterStats StatsView()
+        {
+            var st = NeighbourPolishSystem.Stats;
+            var v = new PainterStats
+            {
+                KindTotal = (int[])st.KindTotal.Clone(), KindPolished = (int[])st.KindPolished.Clone(),
+                ToFit = st.ToFit, Stamps = st.Stamps, Planning = st.Planning, PuttingBack = st.PuttingBack, Pieces = st.Pieces,
+                FittedPerSecond = st.FittedPerSecond, AddedPerSecond = st.AddedPerSecond, Fps = st.Fps, MsPerFrame = st.MsPerFrame,
+                HistLine = NeighbourPolishSystem.HistLine.ToArray(), HistFitted = NeighbourPolishSystem.HistFitted.ToArray(),
+                HistAdded = NeighbourPolishSystem.HistAdded.ToArray(), HistFps = NeighbourPolishSystem.HistFps.ToArray(),
+            };
+            foreach (var kv in st.Zones) v.Zones.Add((kv.Key, kv.Value.Total, kv.Value.Polished));
+            foreach (var kv in st.Looks.OrderByDescending(k => k.Value)) v.Looks.Add((kv.Key, kv.Value));
+            v.Details.Add(("plans", NeighbourPolishSystem.PlansTimed));
+            v.Details.Add(("planAvgMs", NeighbourPolishSystem.PlansTimed > 0 ? NeighbourPolishSystem.PlanWorkerMs / NeighbourPolishSystem.PlansTimed : 0));
+            v.Details.Add(("planWorstMs", NeighbourPolishSystem.PlanWorkerMaxMs));
+            v.Details.Add(("frameWorstMs", NeighbourPolishSystem.UpdateMaxMs));
+            v.Details.Add(("taken", NeighbourPolishSystem.TotalTaken));
+            v.Details.Add(("newFlagged", NeighbourPolishSystem.TotalFlaggedNew));
+            v.Details.Add(("fencesMoved", NeighbourPolishSystem.TotalMoved));
+            v.Details.Add(("objectsMade", NeighbourObjectSystem.TotalMade));
+            v.Details.Add(("surfacesMade", NeighbourAreaSystem.TotalMade));
+            v.Details.Add(("lawnsWritten", NeighbourLawnSystem.TotalWritten));
+            v.Details.Add(("paintStamps", NeighbourPaintSystem.TotalStamps));
+            v.Details.Add(("lookAreas", NeighbourPolishSystem.LookAreaCount));
+            return v;
+        }
+
         private PainterView PainterState()
         {
             var (lots, yes) = PainterCount;
@@ -396,9 +513,18 @@ namespace Placemaker.Game.Tool
             v.Values = new Dictionary<string, float>(_lookValues);
             v.LookValues = current != null ? current.Values() : new Dictionary<string, float>(PolishLooks.Defaults);
             v.LookSavedTheme = current?.Theme ?? "garden";
-            foreach (var l in NeighbourPolishSystem.Looks) v.Looks.Add((l.Id, l.Name, l.Custom, l.Theme, l.Edited, l.Knobs));
+            foreach (var l in NeighbourPolishSystem.Looks) v.Looks.Add((l.Id, l.Name, l.Custom, l.Theme, l.Edited, l.Knobs, PolishLooks.ColorOf(l)));
+            v.Swatches = PolishLooks.Swatches.ToArray();
             v.Defaults = new Dictionary<string, float>(PolishLooks.Defaults);
             v.TypeLook = _recipe != null ? Placemaker.Core.Layers.Types.Zoning.PolishLookLayer.Of(_recipe.Root.Layer)?.LookId : null;
+            v.Lens = OutgrowLens;
+            v.LensWanted = _lensWanted;
+            v.LensCounts = (int[])NeighbourPolishSystem.LensCounts.Clone();
+            v.LensMode = _lensMode;
+            foreach (var kv in NeighbourPolishSystem.LensTypeCounts.OrderByDescending(k => k.Value)) v.LensTypes.Add((kv.Key, kv.Value));
+            v.Brush = _brush > 0 ? "paint" : _brush < 0 ? "erase" : "";
+            v.BrushLook = _brushLook ?? "";
+            if (NeighbourPolishSystem.StatusInCity) v.Stats = StatsView();
             v.AreaZones.AddRange(_areaZones);
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
             if (polish != null)

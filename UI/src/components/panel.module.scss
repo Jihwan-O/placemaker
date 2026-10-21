@@ -633,6 +633,11 @@
     pointer-events: none;
 }
 
+// Global outgrow: wider than the picker that shares the flyout
+.flyoutWide {
+    width: 440rem;
+}
+
 .flyoutLeft {
     right: 100%;
     margin-right: 10rem;

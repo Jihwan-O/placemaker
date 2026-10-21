@@ -1025,12 +1025,15 @@ namespace Placemaker.Tests
         [Fact]
         public void A_built_in_look_the_player_changed_is_kept_beside_their_own_looks()
         {
-            var mine = new PolishLook { Id = "my-big", Name = "Big", Custom = true, Theme = "tidy", Knobs = { ["sideReach"] = 200f } };
+            var mine = new PolishLook { Id = "my-big", Name = "Big", Custom = true, Theme = "tidy", Color = "#123456", Knobs = { ["sideReach"] = 200f } };
             var garden = new PolishLook { Id = "garden", Name = "Placemaker.UI.Painter.Theme.garden", Edited = true, Theme = "natural", Knobs = { ["fill"] = PolishLooks.FillCarPark, ["waterGap"] = 60f } };
             var json = PolishLooks.Write(new[] { mine }, new[] { garden });
             var own = PolishLooks.Read(json);
             Assert.Single(own);
             Assert.Equal("my-big", own[0].Id);
+            Assert.Equal("#123456", own[0].Color);
+            Assert.Equal("#123456", PolishLooks.ColorOf(own[0]));
+            Assert.Equal(PolishLooks.DefaultColors["houses"], PolishLooks.ColorOf(PolishLooks.BuiltIn.Single(l => l.Id == "houses")));
             var edits = PolishLooks.ReadEdits(json);
             Assert.Single(edits);
             Assert.True(edits[0].Edited && !edits[0].Custom);

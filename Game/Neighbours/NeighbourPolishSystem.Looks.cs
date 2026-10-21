@@ -88,8 +88,8 @@ namespace Placemaker.Game.Neighbours
             if (builtIn != null)
             {
                 // a built-in look changed: what that look is from now on, wherever it is used (the same as the built-in: no edit)
-                var edit = new PolishLook { Id = id, Name = builtIn.Name, Edited = true, Theme = Array.IndexOf(PolishLooks.Themes, theme) >= 0 ? theme : builtIn.Theme, Knobs = PolishLooks.Diff(values, PolishLooks.Defaults) };
-                bool same = edit.Theme == builtIn.Theme && PolishLooks.Diff(edit.Values(), builtIn.Values()).Count == 0;
+                var edit = new PolishLook { Id = id, Name = builtIn.Name, Edited = true, Theme = Array.IndexOf(PolishLooks.Themes, theme) >= 0 ? theme : builtIn.Theme, Knobs = PolishLooks.Diff(values, PolishLooks.Defaults), Color = s_edits.TryGetValue(id, out var was) ? was.Color : "" };
+                bool same = edit.Theme == builtIn.Theme && string.IsNullOrEmpty(edit.Color) && PolishLooks.Diff(edit.Values(), builtIn.Values()).Count == 0;
                 if (same) s_edits.Remove(id); else s_edits[id] = edit;
                 SettingsChanged = true;
                 PersistLooks();
@@ -102,7 +102,9 @@ namespace Placemaker.Game.Neighbours
                 string baseId = "my-" + new string((name ?? "look").ToLowerInvariant().Where(char.IsLetterOrDigit).Take(24).ToArray());
                 string newId = baseId;
                 for (int k = 2; Looks.Any(l => l.Id == newId); k++) newId = baseId + "-" + k;
-                look = new PolishLook { Id = newId, Custom = true };
+                // a new look takes the first colour no look has yet
+                var used = new HashSet<string>(Looks.Select(PolishLooks.ColorOf));
+                look = new PolishLook { Id = newId, Custom = true, Color = PolishLooks.Swatches.FirstOrDefault(c => !used.Contains(c)) ?? PolishLooks.Swatches[s_custom.Count % PolishLooks.Swatches.Length] };
                 s_custom.Add(look);
             }
             if (!string.IsNullOrWhiteSpace(name)) look.Name = name.Trim();
@@ -112,6 +114,25 @@ namespace Placemaker.Game.Neighbours
             PersistLooks();
             Mod.Log.Info($"Placemaker polish: look '{look.Name}' ({look.Id}) saved, {look.Knobs.Count} settings of its own");
             return look.Id;
+        }
+
+        /// <summary>A look's colour on Global outgrow's map and charts (a built-in look: kept with the player's changes to it).</summary>
+        public static bool SetLookColor(string id, string color)
+        {
+            EnsureLooks();
+            if (string.IsNullOrEmpty(color) || color.Length != 7 || color[0] != '#') return false;
+            var custom = s_custom.FirstOrDefault(l => l.Id == id);
+            if (custom != null) custom.Color = color;
+            else
+            {
+                var builtIn = PolishLooks.BuiltIn.FirstOrDefault(l => l.Id == id);
+                if (builtIn == null) return false;
+                if (!s_edits.TryGetValue(id, out var edit))
+                    s_edits[id] = edit = new PolishLook { Id = id, Name = builtIn.Name, Edited = true, Theme = builtIn.Theme, Knobs = new Dictionary<string, float>(builtIn.Knobs) };
+                edit.Color = color;
+            }
+            PersistLooks();
+            return true;
         }
 
         /// <summary>A built-in look back as it ships (the player's changes to it dropped).</summary>

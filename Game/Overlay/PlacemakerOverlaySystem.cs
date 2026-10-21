@@ -89,7 +89,8 @@ namespace Placemaker.Game.Overlay
                 if (_tool.Stage == ToolStage.Manage) DrawManage(buffer, w);
                 else
                 {
-                    if (_tool.Painter) DrawPolishedLots();
+                    if (_tool.OutgrowLens) DrawOutgrowLens();
+                    else if (_tool.Painter) DrawPolishedLots();
                     if (_tool.Stage == ToolStage.Design || _tool.Stage == ToolStage.Review || _tool.Stage == ToolStage.Building)
                         DrawPlan(buffer, w, detail);
                     DrawSelection(buffer, w);

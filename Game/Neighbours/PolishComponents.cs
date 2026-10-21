@@ -11,6 +11,8 @@
 //   * PolishLawnOriginal on one of the house's own lawns the polish reshaped: its nodes as the game made them, so Unpolish
 //     (and a later plan) gives the lawn back exactly, also after a load.
 //   * PolishGarden on a polished house: its garden's outline as its last plan wrote it (neighbours planned later keep to it).
+//   * PolishCitySettings on one headless entity: Outgrow's settings kept with the city ("Outgrow new buildings"; a new city
+//     has none: off).
 
 using Colossal.Serialization.Entities;
 using Unity.Entities;
@@ -107,6 +109,26 @@ namespace Placemaker.Game.Neighbours
         {
             reader.Read(out Knob);
             reader.Read(out Value);
+        }
+    }
+
+    /// <summary>Outgrow's settings kept with the city (one headless entity; a city without one: the defaults).</summary>
+    public struct PolishCitySettings : IComponentData, IQueryTypeParameter, ISerializable
+    {
+        public const int CurrentVersion = 1;
+        /// <summary>"Outgrow new buildings": buildings that grow from now on are outgrown (a new city: off).</summary>
+        public bool NewBuildings;
+
+        public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
+        {
+            writer.Write(CurrentVersion);
+            writer.Write(NewBuildings);
+        }
+
+        public void Deserialize<TReader>(TReader reader) where TReader : IReader
+        {
+            reader.Read(out int version);
+            reader.Read(out NewBuildings);
         }
     }
 

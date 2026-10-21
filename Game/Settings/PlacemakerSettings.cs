@@ -376,8 +376,9 @@ namespace Placemaker.Game.Settings
 
         /// <summary>Neighbourhood polish on: polished gardens keep fitting as the city changes (off: nothing changes). NeighbourPolishSystem.</summary>
         [SettingsUIHidden] public bool NeighbourhoodPolish { get; set; }
-        /// <summary>Buildings that grow are polished, each with its kind's theme and the look below.</summary>
-        [SettingsUIHidden] public bool PolishNewHouses { get; set; }
+        /// <summary>"Outgrow new buildings": kept with each city (NeighbourPolishSystem.PolishNew, PolishCitySettings; a new
+        /// city: off), not in this file; the property stays for the panel and the game runner's "setting" step.</summary>
+        [SettingsUIHidden] public bool PolishNewHouses { get => global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PolishNew; set => global::Placemaker.Game.Neighbours.NeighbourPolishSystem.SetNewBuildings(value); }
         /// <summary>The look for each kind of building: "auto" (each zone type its own look), a look id, or off (new ones of that
         /// kind not polished).</summary>
         [SettingsUIHidden] public string PolishThemeHomes { get; set; }
@@ -456,7 +457,6 @@ namespace Placemaker.Game.Settings
                 global::Placemaker.Game.Economy.ParkingEconomySystem.DefaultFee = DefaultParkingFee;
                 global::Placemaker.Game.Economy.ParkingCompanionSystem.CompanionEnabled = ExperimentalParkingCompanion;
                 global::Placemaker.Game.Economy.ParkingCompanionUpkeepSystem.UpkeepFactor = CompanionUpkeepFactor;
-                global::Placemaker.Game.Neighbours.NeighbourPolishSystem.PolishNew = PolishNewHouses;
                 // always on: what is polished keeps fitting as the city changes; only new buildings (Polish new buildings) and
                 // what the player polishes are ever polished, buildings standing before are left as they are
                 global::Placemaker.Game.Neighbours.NeighbourPolishSystem.FeatureEnabled = true;
@@ -528,7 +528,6 @@ namespace Placemaker.Game.Settings
             OverlayPavedSurfaces = true;
             DecalsNeverCollide = true;
             NeighbourhoodPolish = true;
-            PolishNewHouses = true;
             PolishThemeHomes = "auto";
             PolishThemeShops = "auto";
             PolishThemeOffices = "auto";

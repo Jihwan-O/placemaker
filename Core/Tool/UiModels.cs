@@ -97,17 +97,46 @@ namespace Placemaker.Core.Tool
         public Dictionary<string, float> Values = new Dictionary<string, float>(), LookValues = new Dictionary<string, float>();
         /// <summary>Every look: id, name (a key for the built-in ones), the player's own, base theme, a built-in one the player
         /// changed, its settings that differ from Defaults.</summary>
-        public List<(string Id, string Name, bool Custom, string Theme, bool Edited, Dictionary<string, float> Knobs)> Looks = new List<(string, string, bool, string, bool, Dictionary<string, float>)>();
+        public List<(string Id, string Name, bool Custom, string Theme, bool Edited, Dictionary<string, float> Knobs, string Color)> Looks = new List<(string, string, bool, string, bool, Dictionary<string, float>, string)>();
+        /// <summary>The colours a look can be given.</summary>
+        public string[] Swatches = new string[0];
         /// <summary>Every look setting's default (a look's values: these, then its Knobs).</summary>
         public Dictionary<string, float> Defaults = new Dictionary<string, float>();
         /// <summary>A Zoning type picked: the look its zones take unless one picks its own (null: none picked).</summary>
         public string TypeLook;
+        /// <summary>Global outgrow's numbers (null: no city).</summary>
+        public PainterStats Stats;
+        /// <summary>The status lens is on (Global outgrow open and its switch on), and what it shows by layer.</summary>
+        public bool Lens, LensWanted;
+        public int[] LensCounts = new int[0];
+        /// <summary>The lens's map: "status" (the line's heat map) or "types" (each building its outgrow type's colour), and in
+        /// "types" how many buildings in view have each type.</summary>
+        public string LensMode = "status";
+        public List<(string Look, int Count)> LensTypes = new List<(string, int)>();
+        /// <summary>Global outgrow's brush: "" off, "paint" (the type picked) or "erase"; the type it paints.</summary>
+        public string Brush = "", BrushLook = "";
         /// <summary>Every zone type: prefab name, kind (home, shop, office, industry), its look ("off"), set for it (not its kind's),
         /// its icon, its own built-in look (what it gets with no pick of its own nor of its kind).</summary>
         public List<(string Id, string Kind, string Look, bool Own, string Icon, string Default)> Zones = new List<(string, string, string, bool, string, string)>();
         /// <summary>The zone types of the buildings in the selection (a Zoning type's Only edit existing): key (the zone's name
         /// without EU / NA, lower case), a zone prefab of it, its icon, how many buildings.</summary>
         public List<(string Key, string Zone, string Icon, int Count)> AreaZones = new List<(string, string, string, int)>();
+    }
+
+    /// <summary>What Global outgrow shows (NeighbourPolishSystem.Stats and its last two minutes).</summary>
+    public sealed class PainterStats
+    {
+        /// <summary>By kind (homes, shops, offices, industry): growable buildings and how many are outgrown.</summary>
+        public int[] KindTotal = new int[4], KindPolished = new int[4];
+        /// <summary>By zone prefab name: growable buildings and how many are outgrown.</summary>
+        public List<(string Zone, int Total, int Polished)> Zones = new List<(string, int, int)>();
+        /// <summary>Outgrown buildings by look id ("" none or deleted).</summary>
+        public List<(string Look, int Count)> Looks = new List<(string, int)>();
+        public int ToFit, Stamps, Planning, PuttingBack, Pieces;
+        public float FittedPerSecond, AddedPerSecond, Fps, MsPerFrame;
+        public float[] HistLine = new float[0], HistFitted = new float[0], HistAdded = new float[0], HistFps = new float[0];
+        /// <summary>More numbers, by name (the panel's Details).</summary>
+        public List<(string Name, double Value)> Details = new List<(string, double)>();
     }
 
     public sealed class RecipeListEntry
@@ -248,12 +277,36 @@ namespace Placemaker.Core.Tool
                         .Set("polished", p.CityPolished).Set("total", p.CityTotal).Set("waiting", p.Waiting).Set("restoring", p.Restoring))
                     .Set("lookTheme", p.LookTheme ?? "garden").Set("lookSavedTheme", p.LookSavedTheme ?? "garden").Set("modified", p.Modified).Set("tool", p.Tool).Set("live", p.Live)
                     .Set("values", Knobs(p.Values)).Set("lookValues", Knobs(p.LookValues))
-                    .Set("looks", Arr(p.Looks.Select(l => JsonValue.Obj().Set("id", l.Id).Set("name", l.Name).Set("custom", l.Custom).Set("theme", l.Theme).Set("edited", l.Edited).Set("knobs", Knobs(l.Knobs ?? new Dictionary<string, float>())))))
+                    .Set("looks", Arr(p.Looks.Select(l => JsonValue.Obj().Set("id", l.Id).Set("name", l.Name).Set("custom", l.Custom).Set("theme", l.Theme).Set("edited", l.Edited).Set("knobs", Knobs(l.Knobs ?? new Dictionary<string, float>())).Set("color", l.Color ?? ""))))
+                    .Set("swatches", Arr(p.Swatches.Select(JsonValue.Str)))
                     .Set("defaults", Knobs(p.Defaults)).Set("typeLook", p.TypeLook ?? "")
+                    .Set("lens", p.Lens).Set("lensWanted", p.LensWanted).Set("lensCounts", Arr(p.LensCounts.Select(n => JsonValue.Num(n))))
+                    .Set("lensMode", p.LensMode ?? "status").Set("lensTypes", Arr(p.LensTypes.Select(x => JsonValue.Obj().Set("id", x.Look).Set("count", x.Count))))
+                    .Set("brush", p.Brush ?? "").Set("brushLook", p.BrushLook ?? "")
+                    .Set("stats", p.Stats == null ? JsonValue.Null : StatsJson(p.Stats))
                     .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own).Set("icon", z.Icon ?? "").Set("def", z.Default ?? ""))))
                     .Set("areaZones", Arr(p.AreaZones.Select(z => JsonValue.Obj().Set("key", z.Key).Set("zone", z.Zone).Set("icon", z.Icon ?? "").Set("count", z.Count)))));
             }
             return o;
+        }
+
+        private static JsonValue StatsJson(PainterStats s)
+        {
+            JsonValue Floats(float[] a) => Arr(a.Select(v => JsonValue.Num(Math.Round(v, 2))));
+            var zones = JsonValue.Obj();
+            foreach (var z in s.Zones) zones.Set(z.Zone, Arr(new[] { JsonValue.Num(z.Total), JsonValue.Num(z.Polished) }));
+            var looks = JsonValue.Obj();
+            foreach (var l in s.Looks) looks.Set(l.Look, l.Count);
+            var details = JsonValue.Obj();
+            foreach (var d in s.Details) details.Set(d.Name, Math.Round(d.Value, 2));
+            return JsonValue.Obj()
+                .Set("kindTotal", Arr(s.KindTotal.Select(n => JsonValue.Num(n)))).Set("kindPolished", Arr(s.KindPolished.Select(n => JsonValue.Num(n))))
+                .Set("zones", zones).Set("looks", looks)
+                .Set("toFit", s.ToFit).Set("stamps", s.Stamps).Set("planning", s.Planning).Set("puttingBack", s.PuttingBack).Set("pieces", s.Pieces)
+                .Set("fittedPerSecond", Math.Round(s.FittedPerSecond, 2)).Set("addedPerSecond", Math.Round(s.AddedPerSecond, 2))
+                .Set("fps", Math.Round(s.Fps, 1)).Set("msPerFrame", Math.Round(s.MsPerFrame, 2))
+                .Set("histLine", Floats(s.HistLine)).Set("histFitted", Floats(s.HistFitted)).Set("histAdded", Floats(s.HistAdded)).Set("histFps", Floats(s.HistFps))
+                .Set("details", details);
         }
 
         private static JsonValue Knobs(Dictionary<string, float> d)

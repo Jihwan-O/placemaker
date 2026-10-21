@@ -500,14 +500,11 @@ const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: Lay
         setOn: (key, on) => write({ ...map, [key]: { ...(map[key] ?? {}), on } }),
         summary: () => "",
         body: (key) => {
-            // the rows of its look (the type's, or the one it picked), showing this zone type's changes over them; a row set
-            // writes into its changes
+            // which outgrow type it gets, and Edit (Global outgrow's editor): the settings live with the outgrow type
             const own = map[key]?.v ?? {};
             const picked = map[key]?.look ?? "";
             const p = state.painter;
-            const lookVals = picked && p ? lookValuesOf(p, picked) : {};
-            const view: StepView = { ...step, values: { ...step.values, ...lookVals, ...own }, locked: [] };
-            const sink = { set: (id: string, v: SettingValue) => write({ ...map, [key]: { ...(map[key] ?? {}), v: { ...own, [id]: v } } }) };
+            const changes = Object.keys(own).length;
             return (
                 <>
                     {p ? (
@@ -519,9 +516,12 @@ const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: Lay
                             onPick={(id) => write({ ...map, [key]: { on: map[key]?.on, look: id || undefined, v: {} } })}
                         />
                     ) : null}
-                    <ValueSinkContext.Provider value={sink}>
-                        <ControlList step={view} layer={layer} state={state} scope={scope + ":zone:" + key} exclude={new Set([...featureOptionIds(step), ...zoningIds])} />
-                    </ValueSinkContext.Provider>
+                    {changes > 0 ? (
+                        <div className={s.zoneOwnNote} data-testid={"zonemix-own-" + key.replace(/\s+/g, "-")}>
+                            <div className={s.zoneOwnText}>{t("Placemaker.UI.ZoneMix.OwnChanges2", "{0} settings changed here before", [changes])}</div>
+                            <Btn icon="reset" iconSize={11} label={t("Placemaker.UI.ZoneMix.ClearOwn", "Clear")} onClick={() => write({ ...map, [key]: { on: map[key]?.on, look: map[key]?.look, v: {} } })} testId={"zonemix-own-clear-" + key.replace(/\s+/g, "-")} />
+                        </div>
+                    ) : null}
                 </>
             );
         },

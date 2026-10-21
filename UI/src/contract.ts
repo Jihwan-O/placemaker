@@ -151,7 +151,7 @@ export interface PainterState {
   polished: number;
   /** The master switch "Stitch neighbouring houses" (off: the flags are kept, gardens change once it is on). */
   featureOn: boolean;
-  /** "Polish new houses". */
+  /** "Outgrow new buildings" (kept with the city; a new city: off). */
   newHouses: boolean;
   /** The theme Polish gives: "zone" (each house by its zone's setting), "garden", "natural", "tidy", "yard". */
   theme: string;
@@ -171,8 +171,22 @@ export interface PainterState {
   lookValues?: Record<string, number>;
   /** Every look: the built-in ones (name is a key; edited: the player changed it) and the player's own, each with the
    *  settings that differ from `defaults` (a look's values: defaults, then knobs). */
-  looks?: { id: string; name: string; custom: boolean; theme: string; edited?: boolean; knobs?: Record<string, number> }[];
+  looks?: { id: string; name: string; custom: boolean; theme: string; edited?: boolean; knobs?: Record<string, number>; color?: string }[];
   defaults?: Record<string, number>;
+  /** The colours an outgrow type can be given. */
+  swatches?: string[];
+  /** Global outgrow's numbers (absent: no city). */
+  stats?: PainterStats | null;
+  /** The status lens: drawn now (window open, switch on), its switch, its map ("status" | "types"), what it shows: by layer
+   *  (outgrown, not, being fitted, just added, waiting < 10 s, < 30 s, < 90 s, longer) or by outgrow type ("-": not outgrown). */
+  lens?: boolean;
+  lensWanted?: boolean;
+  lensMode?: string;
+  lensCounts?: number[];
+  lensTypes?: { id: string; count: number }[];
+  /** Global outgrow's brush: "" off, "paint" (brushLook) or "erase". */
+  brush?: string;
+  brushLook?: string;
   /** A Zoning type picked: the look its zones take unless one picks its own. */
   typeLook?: string;
   /** Every zone type of the game: its look ("off": not polished) and whether it has its own (else its kind's). */
@@ -191,6 +205,31 @@ export interface PolishZone {
   icon: string;
   /** The zone type's own built-in look (what it gets with no pick of its own nor of its kind). */
   def?: string;
+}
+
+/** Global outgrow's numbers (NeighbourPolishSystem.Stats), with their last two minutes (one sample a second). */
+export interface PainterStats {
+  /** By kind: homes, shops, offices, industry. */
+  kindTotal: number[];
+  kindPolished: number[];
+  /** Zone prefab name → [buildings, outgrown]. */
+  zones: Record<string, [number, number]>;
+  /** Outgrown buildings by outgrow type id ("" none). */
+  looks: Record<string, number>;
+  toFit: number;
+  stamps: number;
+  planning: number;
+  puttingBack: number;
+  pieces: number;
+  fittedPerSecond: number;
+  addedPerSecond: number;
+  fps: number;
+  msPerFrame: number;
+  histLine: number[];
+  histFitted: number[];
+  histAdded: number[];
+  histFps: number[];
+  details: Record<string, number>;
 }
 
 export interface PolishLook {

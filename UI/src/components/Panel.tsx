@@ -996,7 +996,7 @@ export const PlacemakerPanel = () => {
                             </div>
                         </div>
                         {cityAvailable && cityOpen && !collapsed ? (
-                            <div className={classNames(s.flyout, position.side === "left" ? s.flyoutLeft : s.flyoutRight)} data-testid="polish-city-flyout">
+                            <div className={classNames(s.flyout, s.flyoutWide, position.side === "left" ? s.flyoutLeft : s.flyoutRight)} data-testid="polish-city-flyout">
                                 <ErrorBoundary name="polish-city">
                                     <PolishCityCard state={state} onClose={() => setCityOpen(false)} />
                                 </ErrorBoundary>

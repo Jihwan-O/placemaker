@@ -33,6 +33,9 @@ namespace Placemaker.Game.Neighbours
         private static readonly List<(Entity Lot, bool Yes, string Look, IReadOnlyDictionary<string, float> Changes)> s_stamps = new List<(Entity, bool, string, IReadOnlyDictionary<string, float>)>();
         private static bool s_removeAll, s_polishAll, s_retheme;
         private static byte s_polishAllTheme;
+        /// <summary>What Polish everything / Remove all act on: the whole city (null), "kind:home" (shop, office, industry) or
+        /// "zone:&lt;zone prefab&gt;" (that zone type, EU and NA alike).</summary>
+        private static string s_polishScope, s_removeScope;
 
         /// <summary>Bumped whenever a lot's flag changes (the painter's overlay redraws).</summary>
         public static int FlagsVersion { get; private set; }
@@ -51,14 +54,28 @@ namespace Placemaker.Game.Neighbours
         }
 
         /// <summary>Setting "Remove all polish": every lot to no, everything put back (a few hundred lots a frame).</summary>
-        public static void RemoveAll() => s_removeAll = true;
+        public static void RemoveAll(string scope = null)
+        {
+            s_removeAll = true;
+            s_removeScope = scope;
+        }
 
         /// <summary>The panel's "Polish the whole city": every growable lot standing to yes with this theme (0: each by its
         /// kind, the kinds set to Off left out) and the look now; stamped 2000 a frame, planned a patch of town a frame.</summary>
-        public static void PolishEverything(byte theme = 0)
+        public static void PolishEverything(byte theme = 0, string scope = null)
         {
             s_polishAll = true;
             s_polishAllTheme = theme;
+            s_polishScope = scope;
+        }
+
+        /// <summary>A building prefab is in a scope (PolishEverything, RemoveAll).</summary>
+        private bool InScope(Entity prefab, string scope)
+        {
+            if (string.IsNullOrEmpty(scope)) return true;
+            if (scope.StartsWith("kind:")) return ZoneKind(prefab) == scope.Substring(5);
+            if (scope.StartsWith("zone:")) return ZoneKey(ZoneName(prefab)) == ZoneKey(scope.Substring(5));
+            return true;
         }
 
         /// <summary>Setting "Redo polished buildings": polished lots get their kind's theme again (not the ones the painter
@@ -104,6 +121,7 @@ namespace Placemaker.Game.Neighbours
                 StatusInCity = true;
                 StatusVersion++;
             }
+            UpdateStats();
         }
 
         /// <summary>Pieces the surface and object systems just asked the game to make: tagged ours when they appear.</summary>
@@ -226,12 +244,12 @@ namespace Placemaker.Game.Neighbours
             using (var all = _growables.ToEntityArray(Allocator.Temp))
                 foreach (var e in all)
                 {
-                    if (!IsGrowable(e)) continue;
+                    if (!IsGrowable(e) || !InScope(EntityManager.GetComponentData<PrefabRef>(e).m_Prefab, s_polishScope)) continue;
                     if (s_polishAllTheme == 0 && LookOfZone(EntityManager.GetComponentData<PrefabRef>(e).m_Prefab) == "off") { off++; continue; }
                     s_stamps.Add((e, true, s_polishAllTheme > 0 && s_polishAllTheme < ThemeNames.Length ? ThemeNames[s_polishAllTheme] : "zone", null));
                     n++;
                 }
-            Mod.Log.Info($"Placemaker neighbourhood polish: polish the whole city, {n} lots to polish{(s_polishAllTheme > 0 ? " (" + ThemeNames[s_polishAllTheme] + ")" : "")} ({off} left out: their kind is Off).");
+            Mod.Log.Info($"Placemaker neighbourhood polish: outgrow {(s_polishScope == null ? "the whole city" : s_polishScope)}, {n} lots to outgrow{(s_polishAllTheme > 0 ? " (" + ThemeNames[s_polishAllTheme] + ")" : "")} ({off} left out: their zone is Off).");
         }
 
         /// <summary>A growable building (a house, shop, office or works the game grew on zoned land).</summary>
@@ -459,20 +477,25 @@ namespace Placemaker.Game.Neighbours
         private void StartRemoveAll()
         {
             s_removeAll = false;
+            string scope = s_removeScope;
             int was = 0;
             using (var all = _growables.ToEntityArray(Allocator.Temp))
                 foreach (var e in all)
                 {
-                    if (!IsGrowable(e)) continue;
+                    if (!IsGrowable(e) || !InScope(EntityManager.GetComponentData<PrefabRef>(e).m_Prefab, scope)) continue;
                     if (IsYes(e)) was++;
                     if (EntityManager.HasComponent<PolishedLot>(e)) SetFlag(e, false);
                     _restoreQueue.Add(e);
+                    if (scope != null) { _dirty.Remove(e); _first.Remove(e); _described.Remove(e); }
                 }
-            _dirty.Clear();
-            _first.Clear();
-            _described.Clear();
+            if (scope == null)
+            {
+                _dirty.Clear();
+                _first.Clear();
+                _described.Clear();
+            }
             _removeAllCount = 0;
-            Mod.Log.Info($"Placemaker neighbourhood polish: remove all polish: {was} polished lots set to no, {_restoreQueue.Count} lots to put back.");
+            Mod.Log.Info($"Placemaker neighbourhood polish: remove outgrow from {(scope == null ? "the whole city" : scope)}: {was} outgrown lots set to no, {_restoreQueue.Count} lots to put back.");
         }
 
         private void DrainRestores()
@@ -661,6 +684,9 @@ namespace Placemaker.Game.Neighbours
             _sweepThemes = true;
             StatusInCity = false;
             StatusVersion++;
+            ForgetStats();
+            _lineSince.Clear();
+            _statAt = -1f;
             _houseOf.Clear();
             _lawnPrefabOf.Clear();
             _grid = null;

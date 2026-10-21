@@ -15,8 +15,12 @@
 //   * clean: a wider grass strip, trees in planters at the ends of the rows, fewer cars, a tidy service corner (bins; an
 //     office's generator);
 //   * everyday: as above;
-//   * industrial: concrete, no grass strip or street trees, more vans, a fuller service corner (pallets, crates, barrels, a
-//     skip, a container, a shed), and dry worn ground further out instead of green.
+//   * industrial: concrete, no grass strip or trees, more vans, a fuller service corner (pallets, crates, barrels, a skip, a
+//     container, a shed), and waste ground further out (dirt, dry grass, rubble, barrels, weeds).
+// The edge of the paving: worn (as the strip malls': the ground painted, dirt fading into dry grass out from the paving; a
+// works always, any other yard by chance, knob "parkWorn") or a grass strip with a faint dry halo.
+// The land further out (past "parkReach" of the lot) follows the outgrow type: its ground layers, patches, rocks and its
+// planting style's things (natural: logs; tidy: benches and flower beds; garden: bushes; yard: stock and rubble).
 
 using System;
 using System.Collections.Generic;
@@ -88,7 +92,9 @@ namespace Placemaker.Core.Neighbours
             uint seed = Hash((ulong)h.Id * 0x51F15EEDUL ^ 0x5409UL);
             int style = ParkStyleOf(h, s);
             bool clean = style == PolishLooks.ParkClean, works = style == PolishLooks.ParkIndustrial;
-            float greenW = K(h, s, "shopGreen", clean ? 4f : works ? 0f : 3f), farD = K(h, s, "shopFar", 32f);
+            // a worn edge (painted ground, no grass strip): a works always, any other yard by its chance
+            bool worn = works || Hash(seed ^ 0x3A9Du) % 100 < (uint)math.clamp(K(h, s, "parkWorn", 50f), 0f, 100f);
+            float greenW = K(h, s, "shopGreen", worn ? 0f : clean ? 4f : 3f), farD = K(h, s, "parkReach", 60f);
             string paving = works && string.IsNullOrEmpty(h.MainSurface) ? "Concrete Surface 01" : PavingOf(h);
             var built = new Obstacle(houses);
             var lot = Ccw(Lot(h));
@@ -141,10 +147,11 @@ namespace Placemaker.Core.Neighbours
             int service = features ? ServiceCorner(h, near, built, taken, plan, seed, style) : 0;
             int stalls = 0, cars = 0, planters = 0;
             if (features)
-                foreach (var r in near.OrderByDescending(r => r.Area)) Parking(h, r, built, taken, plan, seed, style, planting, ref stalls, ref cars, ref planters);
-            int farTrees = GreenEnd(h, far, built, taken, plan, s, seed, planting && !works, paint, works);
+                foreach (var r in near.OrderByDescending(r => r.Area)) Parking(h, r, built, taken, plan, s, seed, style, planting, ref stalls, ref cars, ref planters);
+            if (paint) EdgeWear(h, near, plan, s, seed, worn, works);
+            int farTrees = FarLand(h, far, built, taken, plan, s, seed, planting && !works, paint, works, features, out int farThings);
             string[] styleName = { "auto", "clean", "everyday", "industrial" };
-            plan.Notes.Add($"{h.Id}: shop yard ({styleName[style]}): {paved} paved pieces ({near.Sum(r => r.Area):F0} m², {paving}), {grass} grass strips with {trees} trees, a service corner of {service}, {stalls} parking bays ({cars} cars, {planters} planters), {far.Sum(r => r.Area):F0} m² {(works ? "worn ground" : "green")} further out ({farTrees} trees)");
+            plan.Notes.Add($"{h.Id}: shop yard ({styleName[style]}, {(worn ? "worn edge" : "grass edge")}): {paved} paved pieces ({near.Sum(r => r.Area):F0} m², {paving}), {grass} grass strips with {trees} trees, a service corner of {service}, {stalls} parking bays ({cars} cars, {planters} planters), {far.Sum(r => r.Area):F0} m² {(works ? "waste ground" : ThemeOf(h))} further out ({farTrees} trees, {farThings} things)");
         }
 
         /// <summary>Trees along the grass strip (one slim kind per shop, every 13.5 m: big crowns hid the parked cars in the game),
@@ -312,10 +319,10 @@ namespace Placemaker.Core.Neighbours
         /// <summary>An overflow car park in marked rows (3.3 m bays, 6 m deep, 6.5 m aisles) over one piece of paved land; most bays
         /// with a parked car or van (industrial: more vans, fewer cars; clean: fewer, and a tree in a planter at both ends of a
         /// row of six or more). At least four bays, else none.</summary>
-        private static void Parking(StitchHouse h, Region land, Obstacle built, List<float2[]> taken, StitchPlan plan, uint seed, int style, bool planting, ref int stalls, ref int cars, ref int planters)
+        private static void Parking(StitchHouse h, Region land, Obstacle built, List<float2[]> taken, StitchPlan plan, StitchSettings s, uint seed, int style, bool planting, ref int stalls, ref int cars, ref int planters)
         {
             bool clean = style == PolishLooks.ParkClean, works = style == PolishLooks.ParkIndustrial;
-            uint carShare = clean ? 55u : works ? 50u : 65u, vanShare = works ? 45u : 15u;
+            uint carShare = (uint)math.clamp(K(h, s, "parkCars", 60f), 0f, 100f), vanShare = works ? 45u : 15u;
             if (land.Area < 80f) return;
             const float W = 3.3f, D = 6f, Aisle = 6.5f;
             // rows along the land's longer side (in the house's frame)
@@ -380,12 +387,50 @@ namespace Placemaker.Core.Neighbours
             }
         }
 
-        /// <summary>The land further out: green ground (painted, lush with dry patches), a few trees with bushes round them.</summary>
-        private static int GreenEnd(StitchHouse h, List<Region> far, Obstacle built, List<float2[]> taken, StitchPlan plan, StitchSettings s, uint seed, bool planting, bool paint, bool worn = false)
+        /// <summary>
+        /// The paving's edge, painted as the strip malls' is. Worn: dirt full at the paving, fading over a few metres, dry grass
+        /// further (a works wider and stronger; sand when the type's ground is sand). Not worn: a faint dry halo only.
+        /// </summary>
+        private static void EdgeWear(StitchHouse h, List<Region> near, StitchPlan plan, StitchSettings s, uint seed, bool worn, bool works)
         {
-            // industrial: dry worn ground (dirt, dry grass) rather than lush green
-            int layer = worn ? (int)K(h, s, "yardLayer", 3f) : (int)s.Knob("lushLayer", 2f);
-            float strength = worn ? 0.7f : K(h, s, "gardenPaint", 0.85f);
+            int gardenLayer = (int)K(h, s, "gardenLayer", 2f);
+            int edge = works ? 3 : gardenLayer == 4 ? 4 : (int)K(h, s, "edgeLayer", 3f);
+            if (edge <= 0) edge = 3;
+            int k = 0;
+            foreach (var r in near)
+            {
+                if (r.Area < 20f) continue;
+                var ring = Poly.Simplify(r.Outer, 0.5f);
+                uint sd = seed ^ (uint)(k++ * 7919);
+                if (worn)
+                {
+                    float w = works ? 7f : 5f;
+                    foreach (var o in Poly.Offset(ring, -w, OffsetJoin.Round, 4f, 0.5f))
+                        Paint(plan, o.Outer, edge, works ? 0.85f : 0.7f, w * 0.85f, w * 0.4f, 4f, sd);
+                    foreach (var o in Poly.Offset(ring, -(w + 6f), OffsetJoin.Round, 4f, 0.5f))
+                        Paint(plan, o.Outer, 1, works ? 0.6f : 0.45f, 6f, 2.5f, 6f, sd ^ 0x51u);
+                }
+                else
+                    foreach (var o in Poly.Offset(ring, -3f, OffsetJoin.Round, 4f, 0.5f))
+                        Paint(plan, o.Outer, 1, 0.3f, 2.6f, 1.2f, 4f, sd);
+            }
+        }
+
+        /// <summary>
+        /// The land further out, in the outgrow type's own ground and things: its garden ground painted (a works: dirt, waste
+        /// ground), patches of its meadow and patch grounds, rocks by its rock chance, and its planting style's things (natural:
+        /// logs and stones; tidy: benches and flower beds; garden: bushes; yard or a works: rubble, barrels, pallets, weeds);
+        /// a few trees with bushes round them (a works none).
+        /// </summary>
+        private static int FarLand(StitchHouse h, List<Region> far, Obstacle built, List<float2[]> taken, StitchPlan plan, StitchSettings s, uint seed, bool planting, bool paint, bool works, bool features, out int things)
+        {
+            things = 0;
+            string theme = works ? "yard" : ThemeOf(h);
+            int layer = works ? (int)K(h, s, "yardLayer", 3f) : (int)K(h, s, "gardenLayer", 2f);
+            if (layer <= 0) layer = (int)s.Knob("lushLayer", 2f);
+            float strength = works ? 0.75f : K(h, s, "gardenPaint", 0.85f);
+            int meadow = (int)K(h, s, "meadowLayer", 1f), patchLayer = (int)K(h, s, "patchLayer", 3f), rockLayer = (int)K(h, s, "rockLayer", 3f);
+            float meadowStrength = K(h, s, "meadowStrength", 0.6f), patchChance = works ? 90f : K(h, s, "patchChance", 25f), rockChance = works ? 20f : K(h, s, "rockChance", 12f);
             int trees = 0;
             foreach (var r in far)
             {
@@ -408,7 +453,59 @@ namespace Placemaker.Core.Neighbours
                         spots.Add(p);
                     }
                 int kind = FirstStreetTree + (int)((seed >> 4) % StreetTreeCount);
-                foreach (var p in spots.OrderBy(q => Hash(seed ^ (uint)(int)math.round(q.x * 7f) ^ (uint)(int)math.round(q.y * 13f) * 31u)))
+                var order = spots.OrderBy(q => Hash(seed ^ (uint)(int)math.round(q.x * 7f) ^ (uint)(int)math.round(q.y * 13f) * 31u)).ToList();
+                // the type's ground: patches of its meadow and patch grounds (a works: dirt and dry grass all over)
+                if (paint && r.Area > 120f && order.Count > 0)
+                {
+                    int blobs = (int)math.clamp(r.Area / 260f, 1f, 8f);
+                    for (int b = 0; b < blobs && b < order.Count; b++)
+                    {
+                        uint hb = Hash(seed ^ 0xB10Bu ^ (uint)b * 2654435761u);
+                        var c = order[(int)(hb % (uint)order.Count)];
+                        bool patch = hb % 100 < patchChance;
+                        int pl = patch ? patchLayer : meadow;
+                        if (pl <= 0) continue;
+                        Paint(plan, Blob(c, 3.5f + (hb >> 8) % 5, hb, 10), pl, patch ? 0.65f : meadowStrength, 2f, 1.4f, 3.5f, hb);
+                    }
+                }
+                // rocks by the type's rock chance, painted round with its rock ground
+                if (features && rockChance > 0f && order.Count > 0)
+                {
+                    int rocks = (int)math.round(r.Area / 350f * rockChance / 100f * 3f);
+                    for (int q = 0; q < rocks && q < order.Count; q++)
+                    {
+                        uint hq = Hash(seed ^ 0x5070u ^ (uint)q * 40503u);
+                        var p = order[order.Count - 1 - (int)(hq % (uint)order.Count)];
+                        int rk = q % 3 == 0 ? FirstRock + (int)(hq % 3) : FirstStone + (int)(hq % 5);
+                        var fp = Footprint(p, new float2(1.4f, 1.4f), 0f, 0.4f);
+                        if (built.Near(fp).Any(o => Overlaps(fp, o.Outer)) || taken.Any(x => Overlaps(fp, x))) continue;
+                        plan.Bushes.Add((h.Id, p, (hq & 1023) / 1023f * 2f * math.PI, rk));
+                        if (paint && rockLayer > 0) Paint(plan, Blob(p, 2.6f, hq, 8), rockLayer, 0.55f, 1.4f, 0.8f, 2.5f, hq);
+                        taken.Add(fp);
+                        things++;
+                    }
+                }
+                // the planting style's things
+                if (features && order.Count > 0)
+                {
+                    var kinds = theme == "natural" ? new[] { FirstLog, FirstLog + 1, FirstLog + 2, FirstStone + 1 }
+                        : theme == "tidy" ? new[] { FirstBench, FirstBench + 1, Flowerbed, Flowerbed }
+                        : theme == "yard" ? new[] { FirstRubble, FirstRubble + 1, FirstRubble + 2, FirstRubble + 3, 21, 22, 17, 19, 0, 1 }
+                        : new[] { 0, 1, 2, 3, 4 };
+                    int count = (int)math.clamp(r.Area / (theme == "yard" ? 140f : 220f), 0f, 14f);
+                    for (int q = 0; q < count && q < order.Count; q++)
+                    {
+                        uint hq = Hash(seed ^ 0x7417u ^ (uint)q * 69069u);
+                        var p = order[(int)((hq >> 3) % (uint)order.Count)] + new float2(((hq >> 12) & 15) / 15f - 0.5f, ((hq >> 16) & 15) / 15f - 0.5f) * 2f;
+                        int kd = kinds[(int)(hq % (uint)kinds.Length)];
+                        var fp = Footprint(p, new float2(1f, 1f), 0f, 0.3f);
+                        if (!InLand(new List<Region> { r }, p) || built.Near(fp).Any(o => Overlaps(fp, o.Outer)) || taken.Any(x => Overlaps(fp, x))) continue;
+                        plan.Bushes.Add((h.Id, p, (hq & 1023) / 1023f * 2f * math.PI, kd));
+                        taken.Add(fp);
+                        things++;
+                    }
+                }
+                foreach (var p in order)
                 {
                     if (trees >= want) break;
                     if (plan.Bushes.Any(b => b.House == h.Id && b.Kind >= FirstStreetTree && math.distance(b.Position, p) < 9f)) continue;

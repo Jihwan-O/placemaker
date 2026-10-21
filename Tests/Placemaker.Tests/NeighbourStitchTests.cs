@@ -887,7 +887,7 @@ namespace Placemaker.Tests
             var a = new StitchHouse { Id = 1, Position = new float2(0f, 0f), Forward = new float2(0f, 1f), HalfLot = new float2(20f, 16f), MainSurface = "Concrete Surface 01", Zone = "shop" };
             a.Footprint = new[] { a.ToWorld(new float2(-14f, -14f)), a.ToWorld(new float2(14f, -14f)), a.ToWorld(new float2(14f, 2f)), a.ToWorld(new float2(-14f, 2f)) };
             a.Hard.Add(new[] { a.ToWorld(new float2(-19f, 3f)), a.ToWorld(new float2(19f, 3f)), a.ToWorld(new float2(19f, 15.5f)), a.ToWorld(new float2(-19f, 15.5f)) });
-            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 50f };
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 50f, ["parkWorn"] = 0f, ["parkReach"] = 32f };
             var plan = YardStitch.Plan(new[] { a }, MiddleLine());
             Assert.True(plan.Plots.TryGetValue(1, out var plot), "the yard grows");
             var lot = new[] { a.BackLeft, a.BackRight, a.FrontRight, a.FrontLeft };
@@ -998,19 +998,67 @@ namespace Placemaker.Tests
                 return (plan, plan.Notes.FirstOrDefault(n => n.Contains("shop yard")) ?? "");
             }
             var works = Yard("industry");
-            Assert.Contains("(industrial)", works.Note);
+            Assert.Contains("(industrial,", works.Note);
             Assert.Contains(works.Plan.Paths, p => p.House == 1 && p.Surface == "Concrete Surface 01");
             Assert.DoesNotContain(works.Plan.Paths, p => p.Surface == "Grass Surface 01");
             Assert.DoesNotContain(works.Plan.Bushes, b => Name(b.Kind).EndsWith("Tree01"));
-            Assert.Contains("(clean)", Yard("office").Note);
-            Assert.Contains("(clean)", Yard("home").Note);
-            Assert.Contains("(everyday)", Yard("shop").Note);
-            Assert.Contains("(industrial)", Yard("shop", PolishLooks.ParkIndustrial).Note);
-            Assert.Contains(Yard("office").Plan.Paths, p => p.Surface == "Grass Surface 01");
+            Assert.Contains("(clean,", Yard("office").Note);
+            Assert.Contains("(clean,", Yard("home").Note);
+            Assert.Contains("(everyday,", Yard("shop").Note);
+            Assert.Contains("(industrial,", Yard("shop", PolishLooks.ParkIndustrial).Note);
             // the bigger homes, offices and works park by default
             foreach (var id in new[] { "apartments", "towers", "mixed", "offices", "officeTowers", "industry", "shops", "bigShops" })
                 Assert.Equal(PolishLooks.FillCarPark, PolishLooks.BuiltIn.Single(l => l.Id == id).Values()["fill"]);
             Assert.Equal(PolishLooks.FillGarden, PolishLooks.BuiltIn.Single(l => l.Id == "houses").Values()["fill"]);
+        }
+
+        [Fact]
+        public void A_car_park_yards_edge_and_land_further_out_follow_its_type()
+        {
+            string Name(int k) => YardStitch.BushKinds[k];
+            StitchPlan Yard(string zone, Dictionary<string, float> extra)
+            {
+                var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+                a.Zone = zone;
+                a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 120f, ["fill"] = PolishLooks.FillCarPark, ["parkReach"] = 20f };
+                foreach (var kv in extra) a.Options[kv.Key] = kv.Value;
+                return YardStitch.Plan(new[] { a }, MiddleLine());
+            }
+            // a works: worn edge (dirt painted out from the paving), waste ground further out, no trees at all
+            var works = Yard("industry", new Dictionary<string, float>());
+            string note = works.Notes.First(n => n.Contains("shop yard"));
+            Assert.Contains("worn edge", note);
+            Assert.Contains("waste ground", note);
+            Assert.Contains(works.Paints, p => p.Layer == 3);
+            Assert.DoesNotContain(works.Bushes, b => Name(b.Kind).EndsWith("Tree01"));
+            Assert.Contains(works.Bushes, b => Name(b.Kind).StartsWith("RubblePile") || Name(b.Kind).StartsWith("Barrel"));
+            // no worn edge: a grass strip
+            var grassy = Yard("shop", new Dictionary<string, float> { ["parkWorn"] = 0f });
+            Assert.Contains("grass edge", grassy.Notes.First(n => n.Contains("shop yard")));
+            Assert.Contains(grassy.Paths, p => p.Surface == "Grass Surface 01");
+            // always worn: no grass strip
+            var worn = Yard("shop", new Dictionary<string, float> { ["parkWorn"] = 100f });
+            Assert.Contains("worn edge", worn.Notes.First(n => n.Contains("shop yard")));
+            Assert.DoesNotContain(worn.Paths, p => p.Surface == "Grass Surface 01");
+            // the land further out takes the planting style's things: tidy benches and flower beds, natural logs
+            var tidy = YardStitch.Plan(new[] { WithTheme(Yard("office", new Dictionary<string, float>()), "tidy") }, MiddleLine());
+            Assert.Contains(tidy.Bushes, b => Name(b.Kind).StartsWith("GardenBench") || Name(b.Kind) == "Flowerbed01");
+            var natural = YardStitch.Plan(new[] { WithTheme(Yard("office", new Dictionary<string, float>()), "natural") }, MiddleLine());
+            Assert.Contains(natural.Bushes, b => Name(b.Kind).StartsWith("Log"));
+            // no cars at 0 %
+            var empty = Yard("shop", new Dictionary<string, float> { ["parkCars"] = 0f, ["parkReach"] = 200f });
+            Assert.Contains(empty.Bushes, b => Name(b.Kind) == "ParkingLotDecal01");
+            Assert.DoesNotContain(empty.Bushes, b => Name(b.Kind).StartsWith("Placemaker Vehicle"));
+        }
+
+        /// <summary>The house the last plan was made for, again, with this planting style.</summary>
+        private static StitchHouse WithTheme(StitchPlan _, string theme)
+        {
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            a.Zone = "office";
+            a.Theme = theme;
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 120f, ["fill"] = PolishLooks.FillCarPark, ["parkReach"] = 20f };
+            return a;
         }
 
         [Fact]

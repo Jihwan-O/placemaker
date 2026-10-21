@@ -51,6 +51,9 @@ namespace Placemaker.Core.Neighbours
             // a car park yard's look: 0 by the building (an office or a home clean, a shop everyday, a works industrial), 1 clean,
             // 2 everyday, 3 industrial (YardStitch.ParkStyleOf)
             ["parkStyle"] = 0f,
+            // a car park yard: how far from the lot it is paved and parked (further out: the type's own land), the share of
+            // bays with a car or van (%), the chance of a worn painted edge instead of a grass strip (%; a works always)
+            ["parkReach"] = 60f, ["parkCars"] = 60f, ["parkWorn"] = 50f,
             // reach and joining
             ["sideReach"] = 100f, ["maxFrontGap"] = 100f, ["maxBackGap"] = 150f, ["maxRearGap"] = 60f, ["maxFacingGap"] = 50f,
             ["maxDeepen"] = 60f, ["hug"] = 1f, ["hugReach"] = 80f, ["openReach"] = 20f, ["wrap"] = 1f, ["closeBacks"] = 1f,
@@ -113,6 +116,9 @@ namespace Placemaker.Core.Neighbours
         {
             new Knob("fill", "land", KnobKind.Choice, ControlTier.Essential, options: new[] { "0", "1", "2", "3" }),
             new Knob("parkStyle", "land", KnobKind.Choice, ControlTier.Essential, options: new[] { "0", "1", "2", "3" }),
+            new Knob("parkReach", "land", KnobKind.Slider, ControlTier.Essential, 0, 300, 5, "m"),
+            new Knob("parkCars", "land", KnobKind.Slider, ControlTier.Essential, 0, 100, 5, "%"),
+            new Knob("parkWorn", "land", KnobKind.Slider, ControlTier.Essential, 0, 100, 5, "%"),
             new Knob("waterGap", "land", KnobKind.Slider, ControlTier.Essential, 0, 200, 1, "m"),
             new Knob("sideReach", "reach", KnobKind.Slider, ControlTier.Essential, 0, 500, 1, "m"),
             new Knob("maxFrontGap", "reach", KnobKind.Slider, ControlTier.More, 0, 500, 1, "m"),
@@ -201,15 +207,15 @@ namespace Placemaker.Core.Neighbours
         {
             ["houses"] = "#9be07a", ["rows"] = "#7fcf62", ["apartments"] = "#5fb84a", ["towers"] = "#3f9a3a", ["mixed"] = "#52c7a6",
             ["shops"] = "#71b9ff", ["bigShops"] = "#3d86e6", ["offices"] = "#b896ff", ["officeTowers"] = "#8c66e6", ["industry"] = "#f2b84b",
-            ["garden"] = "#b9c0c9", ["natural"] = "#a89c86", ["tidy"] = "#8d9db2", ["yard"] = "#8f857b", ["meadow"] = "#cbbf93",
-            ["rustic"] = "#a88b6e", ["coastal"] = "#8fb6c6", ["manicured"] = "#7e8792",
+            ["garden"] = "#9aa3ad", ["natural"] = "#c9a66b", ["tidy"] = "#6f84c9", ["yard"] = "#7a5c45", ["meadow"] = "#e3d27a",
+            ["rustic"] = "#c0703a", ["coastal"] = "#5fc3e4", ["manicured"] = "#d4d9df",
         };
 
         /// <summary>The colours the player picks from (a new look of theirs takes the first one no look has).</summary>
         public static readonly string[] Swatches =
         {
             "#9be07a", "#5fb84a", "#52c7a6", "#71b9ff", "#3d86e6", "#b896ff", "#8c66e6", "#f2b84b",
-            "#d9a03a", "#b9c0c9", "#8d9db2", "#a89c86", "#8fb6c6", "#cbbf93", "#e0e0e0", "#7e8792",
+            "#c0703a", "#c9a66b", "#6f84c9", "#7a5c45", "#5fc3e4", "#e3d27a", "#d4d9df", "#9aa3ad",
         };
 
         /// <summary>A look's colour: its own, else its built-in one, else grey.</summary>

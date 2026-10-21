@@ -9,6 +9,13 @@ namespace Placemaker.Game.Neighbours
 {
     public sealed partial class NeighbourPolishSystem
     {
+        /// <summary>A stroke starts: the buildings are looked up fresh when the list is more than half a second old (buildings
+        /// grown or rebuilt since were missed: "it doesn't always work").</summary>
+        public void BrushStart()
+        {
+            if (_grid == null || _frame - _gridBuilt > 30) _gridStale = true;
+        }
+
         /// <summary>
         /// Every growable building whose lot the stroke from <paramref name="a"/> to <paramref name="b"/> touches (the brush
         /// <paramref name="r"/> each side), into <paramref name="into"/>, and its lot ring into <paramref name="rings"/> the

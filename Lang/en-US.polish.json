@@ -351,6 +351,12 @@
   "Placemaker.Polish.parkStyle.1": "Clean",
   "Placemaker.Polish.parkStyle.2": "Everyday",
   "Placemaker.Polish.parkStyle.3": "Industrial",
+  "Placemaker.Polish.parkReach": "Car park reach",
+  "Placemaker.Polish.parkReach.Tooltip": "How far out from the building its car park yard is paved and parked. Further out, the land is the outgrow type's own: its ground, patches, rocks and things.",
+  "Placemaker.Polish.parkCars": "Parked cars",
+  "Placemaker.Polish.parkCars.Tooltip": "The share of parking bays with a car or van in them.",
+  "Placemaker.Polish.parkWorn": "Worn edge",
+  "Placemaker.Polish.parkWorn.Tooltip": "The chance a car park's edge is worn, as the strip malls' are: the ground painted, dirt fading into dry grass out from the paving, no grass strip. Otherwise a grass strip with trees. Industrial car parks are always worn.",
   "Placemaker.Polish.waterGap": "Water gap",
   "Placemaker.Polish.waterGap.Tooltip": "How far the land keeps from water: gardens, yards and car parks stop this far from the shore, along a smooth line. The building's own lot is never cut."
 }

@@ -421,6 +421,7 @@ namespace Placemaker.Game.Tool
                 if (!_in.LeftPressed || !_cursorValid) return;
                 _brushDown = true;
                 ClearBrushHits();
+                polish.BrushStart();
                 _brushLast = _in.Hit.xz;
                 if (polish.BrushTouch(_brushLast, _brushLast, r, _brushHits, _brushRings) > 0) OutgrowBrushVersion++;
                 return;

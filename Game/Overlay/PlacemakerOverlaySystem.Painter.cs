@@ -112,7 +112,8 @@ namespace Placemaker.Game.Overlay
         private void DrawOutgrowBrush(global::Game.Rendering.OverlayRenderSystem.Buffer buffer, float w)
         {
             Color c = Color.white;
-            if (_tool.OutgrowBrushPainting && ColorUtility.TryParseHtmlString(PolishLooksColor(_tool.OutgrowBrushLook), out var lc)) c = lc;
+            // (the default-type brush, "zone": white, each building takes its own zone's type)
+            if (_tool.OutgrowBrushPainting && _tool.OutgrowBrushLook != "zone" && ColorUtility.TryParseHtmlString(PolishLooksColor(_tool.OutgrowBrushLook), out var lc)) c = lc;
             if (_brushVersion != _tool.OutgrowBrushVersion)
             {
                 _brushVersion = _tool.OutgrowBrushVersion;

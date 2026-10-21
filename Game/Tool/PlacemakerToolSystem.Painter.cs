@@ -380,7 +380,8 @@ namespace Placemaker.Game.Tool
             _brush = mode == "paint" ? 1 : mode == "erase" ? -1 : 0;
             if (_brush > 0)
             {
-                if (NeighbourPolishSystem.LookById(look) == null) { _brush = 0; Touch(); return; }
+                // "zone": every building painted gets its zone type's default outgrow type
+                if (look != "zone" && NeighbourPolishSystem.LookById(look) == null) { _brush = 0; Touch(); return; }
                 _brushLook = look;
             }
             _brushDown = false;

@@ -533,11 +533,17 @@ export const PolishDesign = ({ state }: { state: ToolState }) => {
 };
 
 /** The outgrow types to pick from as a list (a dropdown's content): each with its colour; Off; back to its default. */
-const LookChips = ({ p, value, testId, onPick, inherit, off = true }: { p: PainterState; value: string; testId: string; onPick: (v: string) => void; inherit?: string; off?: boolean }) => {
+const LookChips = ({ p, value, testId, onPick, inherit, off = true, zoneDefault = false }: { p: PainterState; value: string; testId: string; onPick: (v: string) => void; inherit?: string; off?: boolean; zoneDefault?: boolean }) => {
     const { t } = useT();
     const options = [...orderedLooks(p).map((l) => l.id), ...(off ? ["off"] : [])];
     return (
         <div className={s.choiceList} data-testid={testId}>
+            {zoneDefault ? (
+                <button type="button" className={classNames(s.choiceItem, { [s.choiceItemOn]: value === "zone" })} data-testid={testId + "-zone"} onClick={(e) => { e.stopPropagation(); onPick("zone"); }}>
+                    <Icon name="star" size={10} tint="warn" />
+                    <div className={s.choiceText}>{t("Placemaker.UI.Polish.SetDefaultType", "Set to default type")}</div>
+                </button>
+            ) : null}
             {inherit ? (
                 <button type="button" className={s.choiceItem} data-testid={testId + "-inherit"} onClick={(e) => { e.stopPropagation(); onPick(""); }}>
                     <Icon name="undo" size={10} tint="dim" />
@@ -579,8 +585,8 @@ const TypeButton = ({ p, id, label, on, onClick, testId }: { p: PainterState; id
                 onClick();
             }}
         >
-            {id === "off" ? <Icon name="eyeOff" size={10} tint="dim" /> : <div className={s.dot} style={{ backgroundColor: lookColor(p, id) }} />}
-            <div className={s.choiceText}>{label ?? lookName(t, p, id)}</div>
+            {id === "off" ? <Icon name="eyeOff" size={10} tint="dim" /> : id === "zone" ? <Icon name="star" size={10} tint="warn" /> : <div className={s.dot} style={{ backgroundColor: lookColor(p, id) }} />}
+            <div className={s.choiceText}>{label ?? (id === "zone" ? t("Placemaker.UI.Polish.SetDefaultType", "Set to default type") : lookName(t, p, id))}</div>
             <Icon name="chevronDown" size={9} tint="dim" />
         </button>
     );
@@ -751,7 +757,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                             <TypeButton p={p} id={brushType} on={picking === "brush"} onClick={() => setPicking(picking === "brush" ? null : "brush")} testId="polish-brush-type" />
                         </div>
                         <div className={s.toolRow}>
-                            <Btn icon="brush" iconSize={11} label={L("BrushPaint", "Paint")} selected={p.brush === "paint"} title={L("BrushPaintTip3", "Drag over buildings: every one the brush touches lights up; let go and they all get this outgrow type, first in the queue. Right-click drops the stroke.")} onClick={() => act.polishCity("brush", p.brush === "paint" ? "off" : "paint:" + brushType)} testId="polish-brush-paint" />
+                            <Btn icon="brush" iconSize={11} label={L("BrushPaint", "Paint")} selected={p.brush === "paint"} title={brushType === "zone" ? L("BrushDefaultTip", "Drag over buildings: every one the brush touches lights up; let go and each gets its own zone type's default outgrow type again, first in the queue. Right-click drops the stroke.") : L("BrushPaintTip3", "Drag over buildings: every one the brush touches lights up; let go and they all get this outgrow type, first in the queue. Right-click drops the stroke.")} onClick={() => act.polishCity("brush", p.brush === "paint" ? "off" : "paint:" + brushType)} testId="polish-brush-paint" />
                             <Btn icon="trash" iconSize={11} label={L("BrushErase", "Erase")} selected={p.brush === "erase"} title={L("BrushEraseTip2", "Drag over buildings: every one the brush touches lights up; let go and their outgrow is removed")} onClick={() => act.polishCity("brush", p.brush === "erase" ? "off" : "erase")} testId="polish-brush-erase" />
                         </div>
                         {p.brush ? (
@@ -787,6 +793,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                             p={p}
                             value={brushType}
                             off={false}
+                            zoneDefault
                             testId="polish-brush-pick"
                             onPick={(v) => {
                                 setBrushLook(v);

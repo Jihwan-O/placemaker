@@ -244,6 +244,7 @@
   "Placemaker.UI.Polish.Save": "Save",
   "Placemaker.UI.Polish.SaveBuiltIn": "Save: this is what {0} is from now on, everywhere it is used",
   "Placemaker.UI.Polish.SaveName": "Save",
+  "Placemaker.UI.Polish.SetDefaultType": "Set to default type",
   "Placemaker.UI.Polish.StagePolish": "Outgrow",
   "Placemaker.UI.Polish.UnpolishAll.Message2": "The outgrown buildings go back to how the game made them: fences, hedges and lawns back, the beds, paths, bushes and paving taken away (ground paint stays). It runs in the background a few hundred at a time.",
   "Placemaker.UI.Polish.YourType": "Yours, planted like {0}",

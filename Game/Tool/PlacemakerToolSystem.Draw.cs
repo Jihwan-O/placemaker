@@ -278,6 +278,13 @@ namespace Placemaker.Game.Tool
                     if (s != null) RestoreSelectionOnly(s);
                     break;
             }
+            // a click waiting for its fill (bucket) or a Paint area stroke waiting to start
+            _bucketClick = null;
+            if (_bpStart != null)
+            {
+                _bpStart = null;
+                if (_history.Current != null) RestoreSelectionOnly(_history.Current);
+            }
             _gesture = Gesture.None;
             _dragIndex = -1;
             _pendingEdge = -1;

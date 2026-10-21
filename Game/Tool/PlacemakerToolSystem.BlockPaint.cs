@@ -46,6 +46,8 @@ namespace Placemaker.Game.Tool
             public BrushRules Rules;
             public int IgnoreGroup;
             public float BuiltAt;
+            /// <summary>Open: the work box it was built over.</summary>
+            public float2 BoxMin, BoxMax;
         }
 
         /// <summary>Largest side (m) the open work box grows to.</summary>
@@ -94,7 +96,6 @@ namespace Placemaker.Game.Tool
             {
                 _fills?.Invalidate();
                 _hoverFace = null;
-                _hoverFaceAt = new float2(float.MaxValue);
                 if (_mode == SelectionMode.Block) RepickBlocks();
                 else if (_mode == SelectionMode.Draw && _draw.Closed) ShapeChanged();
             }
@@ -115,7 +116,9 @@ namespace Placemaker.Game.Tool
             _cursorValid = _in.HasHit;
             if (_in.HasHit) _cursor = _in.Hit;
             Fills.Pump();
+            PumpFence();
             float radius = _brushSize * 0.5f;
+            if (_bpStart != null) { PumpStrokeStart(radius); return; }
 
             // A rule / Smart edges change re-fences once from the cached walls (shading + fence); no outline rebuild.
             if (_gesture != Gesture.Paint && _gesture != Gesture.Erase && _bpCtx != null && BlockPaintHasTarget && IsCurrentTarget(_bpCtx) && !BrushRules.Equals(_bpCtx.Rules))
@@ -153,13 +156,8 @@ namespace Placemaker.Game.Tool
                 return;
             }
 
-            // Hover: the fill a new stroke would paint in (asked in the background when the cursor leaves it).
-            if (_in.HasHit && BrushRules.LockOn)
-            {
-                if (Continues(BlockPaintCurrent, _in.Hit.xz)) _hoverFace = null;
-                else HoverFill(_in.Hit.xz);
-            }
-            else _hoverFace = null;
+            // No fill on hover (2026-10-21, lag spikes): the fill a stroke paints in is worked out when it starts.
+            _hoverFace = null;
 
             // Shift + mouse movement turns a square brush (as in Paint).
             if (_in.Shift && _brushSquare && !_in.LeftHeld && !_in.RightHeld)
@@ -174,68 +172,123 @@ namespace Placemaker.Game.Tool
 
             if (!_in.HasHit || !(_in.LeftPressed || _in.RightPressed)) return;
             bool erase = _in.RightPressed || _in.Shift;
-            if (!erase && !StartBlockPaintStroke(_in.Hit.xz)) return;
-            if (erase && _bpMask.IsEmpty) return;
+            if (erase)
+            {
+                if (_bpMask.IsEmpty) return;
+                BeginBlockPaintGesture(_in.Hit.xz, radius, true, !_in.RightPressed);
+                return;
+            }
+            // A paint stroke waits (a few frames) for the fill and the fence it paints in, worked out in the background;
+            // the mouse path meanwhile is painted when it starts.
+            _bpStart = new StrokeStart { At = _in.Hit.xz };
+            _bpStart.Path.Add(_in.Hit.xz);
+            PumpStrokeStart(radius);
+        }
 
+        private void BeginBlockPaintGesture(float2 p, float radius, bool erase, bool eraseWithLeft)
+        {
             _gesture = erase ? Gesture.Erase : Gesture.Paint;
             _bpStrokeFrames = 0;
-            _bpEraseWithLeft = erase && !_in.RightPressed;
-            _lastStroke = _in.Hit.xz;
-            _bpMask.Stamp(_in.Hit.xz, radius, erase, _brushSquare, _brushAngle);
-            _bpBrushed.Add((_in.Hit.xz, _in.Hit.xz, radius, erase));
+            _bpEraseWithLeft = eraseWithLeft;
+            _lastStroke = p;
+            _bpMask.Stamp(p, radius, erase, _brushSquare, _brushAngle);
+            _bpBrushed.Add((p, p, radius, erase));
             ShapeChanged(throttled: true);
+        }
+
+        /// <summary>A paint stroke pressed, waiting for its fill and fence (lag spikes, 2026-10-21: both used to be worked out on the press, 0.1–0.3 s).</summary>
+        private sealed class StrokeStart
+        {
+            public float2 At;
+            /// <summary>Where the mouse went while it waited.</summary>
+            public List<float2> Path = new List<float2>();
+            /// <summary>The target is chosen (the current selection, or a new one at At).</summary>
+            public bool Decided;
+        }
+
+        private StrokeStart _bpStart;
+
+        private void PumpStrokeStart(float radius)
+        {
+            var s = _bpStart;
+            if (_in.HasHit && _in.LeftHeld && math.distance(_in.Hit.xz, s.Path[s.Path.Count - 1]) > 0.5f) s.Path.Add(_in.Hit.xz);
+            if (!s.Decided)
+            {
+                if (!DecideStrokeTarget(s.At)) return;
+                s.Decided = true;
+            }
+            var cur = EnsureBlockPaintContext(false);
+            if (cur == null && _bpFence != null) return;
+            _bpStart = null;
+            LocText refused = cur == null ? new LocText("Placemaker.Problem.NoBlockHere")
+                            : cur.Brush.Full || !cur.Brush.CanPaintAt(s.At) && cur.Open ? new LocText(cur.Open ? "Placemaker.Problem.CannotPaintHere" : "Placemaker.Problem.BlockFull") : null;
+            if (refused != null)
+            {
+                // Nothing was painted: go back to the committed selection.
+                if (_history.Current != null) RestoreSelectionOnly(_history.Current);
+                Flash(refused);
+                return;
+            }
+            cur.Brush.Attach(_bpMask);
+            BeginBlockPaintGesture(s.At, radius, false, false);
+            for (int i = 1; i < s.Path.Count; i++)
+                if (_bpMask.Stroke(_lastStroke, s.Path[i], radius, false, _brushSquare, _brushAngle))
+                {
+                    _bpBrushed.Add((_lastStroke, s.Path[i], radius, false));
+                    _lastStroke = s.Path[i];
+                }
+            // released already: the next frame ends the stroke as usual
         }
 
         /// <summary>
         /// Makes the fill (or, with One block off or no fill here, the road side) under p the painted one — a new
-        /// selection if it is another one. False = nothing can be painted here.
+        /// selection if it is another one. False = not yet (the fill or the current fence is still being worked out).
         /// </summary>
-        private bool StartBlockPaintStroke(float2 p)
+        private bool DecideStrokeTarget(float2 p)
         {
             var cur = EnsureBlockPaintContext(false);
-            if (!Continues(cur, p))
+            // the current selection's fence is being built (after an undo): wait for it to know if p is in it
+            if (cur == null && BlockPaintHasTarget && _bpFence != null && IsCurrentTarget(_bpFence.Ctx)) return false;
+            if (Continues(cur, p))
             {
-                FillResult fill = null;
-                if (BrushRules.LockOn)
+                // the city keeps growing: the fence is read again in the background, the stroke goes on with this one
+                if (UnityEngine.Time.realtimeSinceStartup - cur.BuiltAt > BlockPaintRefresh) EnsureBlockPaintContext(true);
+                return true;
+            }
+            FillResult fill = null;
+            if (BrushRules.LockOn)
+            {
+                fill = Fills.Ready(p, BrushRules, _editingGroup);
+                if (fill == null)
                 {
-                    var pick = PickAt(p, out _hoverFaceProblem);
-                    fill = pick?.Fill;
-                }
-                _bpMask.Clear();
-                _bpBrushed.Clear();
-                // a fill that ran into the reach is open land, not a block: no disc fence (the open box, below)
-                if (fill != null && fill.Status == FillStatus.Ok && !fill.HitReach)
-                {
-                    _bpRing = fill.Ring;
-                    _bpOpen = false;
-                    _bpDoors = fill.Doors;
-                }
-                else
-                {
-                    // One block off, or nothing to fill here (on a wall's edge): free painting fenced by the stops.
-                    _bpRing = null;
-                    _bpOpen = true;
-                    _bpDoors = null;
-                    _bpBoxMin = p - BlockBrush.OpenHalfSize;
-                    _bpBoxMax = p + BlockBrush.OpenHalfSize;
-                }
-                _bpSeed = p;
-                _hoverFace = null;
-                cur = EnsureBlockPaintContext(true);
-                LocText refused = cur == null ? new LocText("Placemaker.Problem.NoBlockHere")
-                                : cur.Brush.Full || !cur.Brush.CanPaintAt(p) && cur.Open ? new LocText(cur.Open ? "Placemaker.Problem.CannotPaintHere" : "Placemaker.Problem.BlockFull") : null;
-                if (refused != null)
-                {
-                    // Nothing was painted: go back to the committed selection.
-                    if (_history.Current != null) RestoreSelectionOnly(_history.Current);
-                    Flash(refused);
+                    if (!Fills.Busy) Fills.Request(p, BrushRules, _editingGroup);
                     return false;
                 }
+                LogFill("stroke", fill);
+                _hoverFaceProblem = Problem(fill);
             }
-            else if (UnityEngine.Time.realtimeSinceStartup - cur.BuiltAt > BlockPaintRefresh) cur = EnsureBlockPaintContext(true) ?? cur;
-
-            if (cur.Brush.Full) { Flash(new LocText(cur.Open ? "Placemaker.Problem.CannotPaintHere" : "Placemaker.Problem.BlockFull")); return false; }
-            cur.Brush.Attach(_bpMask);
+            _bpMask.Clear();
+            _bpBrushed.Clear();
+            // a fill that ran into the reach is open land, not a block: no disc fence (the open box, below)
+            if (fill != null && fill.Status == FillStatus.Ok && !fill.HitReach)
+            {
+                _bpRing = fill.Ring;
+                _bpOpen = false;
+                _bpDoors = fill.Doors;
+            }
+            else
+            {
+                // One block off, or nothing to fill here (on a wall's edge): free painting fenced by the stops.
+                _bpRing = null;
+                _bpOpen = true;
+                _bpDoors = null;
+                _bpBoxMin = p - BlockBrush.OpenHalfSize;
+                _bpBoxMax = p + BlockBrush.OpenHalfSize;
+            }
+            _bpSeed = p;
+            _hoverFace = null;
+            // its fence, built in the background (PumpStrokeStart waits for it)
+            EnsureBlockPaintContext(true);
             return true;
         }
 
@@ -287,52 +340,135 @@ namespace Placemaker.Game.Tool
         /// Fence + stops for the current target; rebuilt when the target, the rules or the edited group changed (or when
         /// forced). Null when there is no target.
         /// </summary>
-        private BlockPaintContext EnsureBlockPaintContext(bool refresh)
+        // Lag spikes (2026-10-21, the user: "a lot of lag spikes ... when I'm dragging the paint area tool"): a fence took
+        // 0.1–0.3 s on the game's thread (the open box's grid of every stop, more as the box grows), at the press, every
+        // time the box grew during the drag and every 5 s. The walls are still read here; the fence itself is made on a
+        // worker, and the one in use stays until the new one is back.
+        private sealed class FenceJob
+        {
+            public BlockPaintContext Ctx;
+            public System.Threading.Tasks.Task<(BlockBrush Brush, List<float2[]> Shown)> Task;
+            public System.Diagnostics.Stopwatch Clock;
+        }
+
+        private FenceJob _bpFence;
+        /// <summary>The last fence that could not be made (not asked again until the target or the rules change).</summary>
+        private BlockPaintContext _bpFenceFailed;
+
+        private bool UpToDate(BlockPaintContext c, BrushRules rules) =>
+            rules.Equals(c.Rules) && c.IgnoreGroup == _editingGroup && (!c.Open || math.all(c.BoxMin == _bpBoxMin) && math.all(c.BoxMax == _bpBoxMax));
+
+        /// <summary>
+        /// Fence + stops for the current target, or null when there is none yet. When the target, the rules, the edited
+        /// group or the open box changed (or <paramref name="refresh"/>) a new one is built in the background and the one in
+        /// use (same target) is returned meanwhile; <paramref name="now"/> builds it here instead.
+        /// </summary>
+        private BlockPaintContext EnsureBlockPaintContext(bool refresh, bool now = false)
         {
             if (!BlockPaintHasTarget) return null;
             var rules = BrushRules;
             var c = _bpCtx;
-            if (!refresh && c != null && IsCurrentTarget(c) && rules.Equals(c.Rules) && c.IgnoreGroup == _editingGroup)
+            bool current = c != null && IsCurrentTarget(c);
+            if (!refresh && current && UpToDate(c, rules))
             {
                 if (_bpMask.Limit != c.Brush.Allowed) c.Brush.Attach(_bpMask);
                 return c;
             }
-            if (refresh) _areaWalls?.Invalidate();
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            try { c = _bpOpen ? BuildOpenContext(rules) : BuildFillContext(rules); }
-            catch (Exception e) { Mod.Log.Warn("Placemaker: Paint area fence failed: " + e.Message); c = null; }
-            if (c == null) return null;
-            Mod.Log.Info("Placemaker: Paint area fence built in " + sw.Elapsed.TotalMilliseconds.ToString("0.0") + " ms (" + (c.Open ? "open box" : "one block") + "), "
-                + c.Obstacles.Count + " shaded, rules " + RulesLine(rules) + "; walls " + (_areaWalls?.LastStats ?? ""));
-            c.Rules = rules;
-            c.IgnoreGroup = _editingGroup;
-            c.BuiltAt = UnityEngine.Time.realtimeSinceStartup;
-            _bpCtx = c;
-            c.Brush.Attach(_bpMask);
-            return c;
+            var job = _bpFence;
+            bool asked = job != null && IsCurrentTarget(job.Ctx) && UpToDate(job.Ctx, rules);
+            if (now)
+            {
+                if (asked) { try { job.Task.Wait(); } catch (Exception) { } PumpFence(); }
+                else
+                {
+                    var built = StartFence(rules, refresh, false);
+                    if (built != null) Land(built);
+                }
+                c = _bpCtx;
+                return c != null && IsCurrentTarget(c) ? c : null;
+            }
+            bool failed = !refresh && _bpFenceFailed != null && IsCurrentTarget(_bpFenceFailed) && UpToDate(_bpFenceFailed, rules);
+            if (!asked && !failed) _bpFence = StartFence(rules, refresh, true);
+            return current ? c : null;
         }
 
-        /// <summary>One block: paint only inside the fill (it already keeps off every stop, closes gaps, skips cracks).</summary>
-        private BlockPaintContext BuildFillContext(BrushRules rules)
+        /// <summary>Reads the walls (here) and makes the fence (on a worker when <paramref name="background"/>, else now).</summary>
+        private FenceJob StartFence(BrushRules rules, bool refresh, bool background)
         {
+            if (refresh) _areaWalls?.Invalidate();
+            var job = new FenceJob { Clock = System.Diagnostics.Stopwatch.StartNew() };
+            Func<(BlockBrush, List<float2[]>)> make;
+            try { make = _bpOpen ? OpenFence(rules, out job.Ctx) : FillFence(rules, out job.Ctx); }
+            catch (Exception e) { Mod.Log.Warn("Placemaker: Paint area fence failed: " + e.Message); make = null; }
+            if (make == null) return null;
+            job.Ctx.Rules = rules;
+            job.Ctx.IgnoreGroup = _editingGroup;
+            _bpFenceFailed = null;
+            job.Task = System.Threading.Tasks.Task.Run(make);
+            if (!background) { try { job.Task.Wait(); } catch (Exception) { } }
+            return job;
+        }
+
+        /// <summary>Takes a finished fence when it is still for the current target.</summary>
+        private void PumpFence()
+        {
+            var job = _bpFence;
+            if (job == null || !job.Task.IsCompleted) return;
+            _bpFence = null;
+            if (!BlockPaintHasTarget || !IsCurrentTarget(job.Ctx)) return;
+            Land(job);
+        }
+
+        private void Land(FenceJob job)
+        {
+            var c = job.Ctx;
+            if (job.Task.Status != System.Threading.Tasks.TaskStatus.RanToCompletion || job.Task.Result.Brush == null)
+            {
+                Mod.Log.Warn("Placemaker: Paint area fence failed: " + job.Task.Exception?.GetBaseException().Message);
+                _bpFenceFailed = c;
+                return;
+            }
+            c.Brush = job.Task.Result.Brush;
+            foreach (var r in job.Task.Result.Shown) c.Obstacles.Add(Poly.To3D(r, q => _site.SampleHeight(q)));
+            Mod.Log.Info("Placemaker: Paint area fence built in " + job.Clock.Elapsed.TotalMilliseconds.ToString("0.0") + " ms (" + (c.Open ? "open box" : "one block") + ", in the background), "
+                + c.Obstacles.Count + " shaded, rules " + RulesLine(c.Rules) + "; walls " + (_areaWalls?.LastStats ?? ""));
+            c.BuiltAt = UnityEngine.Time.realtimeSinceStartup;
+            bool had = _bpCtx != null && IsCurrentTarget(_bpCtx);
+            _bpCtx = c;
+            c.Brush.Attach(_bpMask);
+            // a selection restored (undo) before its fence was back: its outline now
+            if (!had && !_bpMask.IsEmpty && !Painting && _bpStart == null) ShapeChanged();
+        }
+
+        private static bool IsNetKind(BrushObstacleKind k) => k == BrushObstacleKind.Road || k == BrushObstacleKind.Path || k == BrushObstacleKind.Bike || k == BrushObstacleKind.Track;
+
+        /// <summary>One block: paint only inside the fill (it already keeps off every stop, closes gaps, skips cracks).</summary>
+        private Func<(BlockBrush, List<float2[]>)> FillFence(BrushRules rules, out BlockPaintContext c)
+        {
+            c = null;
             var ring = _bpRing;
             if (ring == null || ring.Length < 3) return null;
-            var brush = new BlockBrush(ring, null, _bpMask.CellSize) { SnapDistance = rules.Snap, Smoothing = rules.Smoothing };
-            var c = new BlockPaintContext { Ring = ring, Block = Poly.To3D(ring, q => _site.SampleHeight(q)), Brush = brush, Seed = _bpSeed };
+            c = new BlockPaintContext { Ring = ring, Block = Poly.To3D(ring, q => _site.SampleHeight(q)), Seed = _bpSeed };
             if (_bpDoors != null) foreach (var d in _bpDoors) if (d != null && d.Length >= 2) c.Doors.Add(Poly.To3D(d, q => _site.SampleHeight(q)));
             // Shown as "won't paint here": the stops along the fill's edge.
             Poly.Bounds(ring, out var mn, out var mx);
             var walls = new List<BrushObstacle>();
             Walls.Counted(mn - 2f, mx + 2f, _editingGroup, rules, walls);
-            foreach (var w in walls)
-                if (w.Kind != BrushObstacleKind.Road && w.Kind != BrushObstacleKind.Path && w.Kind != BrushObstacleKind.Bike && w.Kind != BrushObstacleKind.Track && ShowsInBlock(w.Ring, ring))
-                    c.Obstacles.Add(Poly.To3D(w.Ring, q => _site.SampleHeight(q)));
-            return c;
+            float cell = _bpMask.CellSize;
+            return () =>
+            {
+                var brush = new BlockBrush(ring, null, cell) { SnapDistance = rules.Snap, Smoothing = rules.Smoothing };
+                var shown = new List<float2[]>();
+                foreach (var w in walls)
+                    if (!IsNetKind(w.Kind) && ShowsInBlock(w.Ring, ring)) shown.Add(w.Ring);
+                return (brush, shown);
+            };
         }
 
         /// <summary>
         /// The open work box reaches the brush: grown by OpenHalfSize past the brush on the side it neared (up to
-        /// MaxOpenSize a side), the fence rebuilt over it from the cached walls; the painted cells stay.
+        /// MaxOpenSize a side), the fence rebuilt over it from the cached walls (in the background: the brush paints in
+        /// the old box until it is back); the painted cells stay.
         /// </summary>
         private void GrowOpenBox(float2 at, float radius)
         {
@@ -342,14 +478,12 @@ namespace Placemaker.Game.Tool
             if (math.cmax(max - min) > MaxOpenSize) return;
             _bpBoxMin = min;
             _bpBoxMax = max;
-            _bpCtx = null;
-            var c = EnsureBlockPaintContext(false);
-            c?.Brush.Attach(_bpMask);
+            EnsureBlockPaintContext(false);
             Mod.Log.Info($"Placemaker: Paint area box grown to {max.x - min.x:0} x {max.y - min.y:0} m");
         }
 
         /// <summary>Open land / One block off: a work box around the start with every stop fenced out.</summary>
-        private BlockPaintContext BuildOpenContext(BrushRules rules)
+        private Func<(BlockBrush, List<float2[]>)> OpenFence(BrushRules rules, out BlockPaintContext c)
         {
             // the box laid out at the stroke's start, as far as it has grown since (old selections: around the start)
             float2 min = _bpBoxMin, max = _bpBoxMax;
@@ -363,12 +497,16 @@ namespace Placemaker.Game.Tool
             var walls = new List<BrushObstacle>();
             if (!rules.Anything) Walls.Counted(min, max, _editingGroup, rules, walls);
             var water = Walls.Water(min, max, _bpMask.CellSize, rules.ForOutline());
-            var brush = rules.Build(_bpSeed, null, walls, rules.WaterOn ? water : null, _bpMask.CellSize, min, max);
-            var c = new BlockPaintContext { Ring = null, Open = true, Seed = _bpSeed, Block = null, Brush = brush };
-            foreach (var w in walls)
-                if (w.Kind != BrushObstacleKind.Road && w.Kind != BrushObstacleKind.Path && w.Kind != BrushObstacleKind.Bike && w.Kind != BrushObstacleKind.Track)
-                    c.Obstacles.Add(Poly.To3D(w.Ring, q => _site.SampleHeight(q)));
-            return c;
+            var seed = _bpSeed;
+            float cell = _bpMask.CellSize;
+            c = new BlockPaintContext { Ring = null, Open = true, Seed = seed, Block = null, BoxMin = min, BoxMax = max };
+            return () =>
+            {
+                var brush = rules.Build(seed, null, walls, rules.WaterOn ? water : null, cell, min, max);
+                var shown = new List<float2[]>();
+                foreach (var w in walls) if (!IsNetKind(w.Kind)) shown.Add(w.Ring);
+                return (brush, shown);
+            };
         }
 
         private static string RulesLine(BrushRules r) =>
@@ -450,7 +588,8 @@ namespace Placemaker.Game.Tool
         private AreaShape BuildBlockPaintShape()
         {
             if (_bpMask.IsEmpty || !BlockPaintHasTarget) return null;
-            var ctx = EnsureBlockPaintContext(false);
+            // the fence in use (a newer one may still be on its way); none for this selection yet (an undo): made now
+            var ctx = BlockPaintCurrent ?? EnsureBlockPaintContext(false, now: true);
             if (ctx == null) return null;
             var sw = System.Diagnostics.Stopwatch.StartNew();
             BlockBrushOutline o;

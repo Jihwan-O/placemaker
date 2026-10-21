@@ -320,7 +320,13 @@ namespace Placemaker.Game.Tool
                     Flash(new LocText("Placemaker.Painter.CityUnpolishing"));
                     Touch();
                     return;
-                case "cityOpen": _cityOpen = on; if (!on && _brush != 0) { _brush = 0; } Touch(); return;
+                case "cityOpen":
+                    // Global outgrow opening: the panel's area goes (an undo step), its window is a tool of its own
+                    if (on && !_cityOpen && !_building) ClearArea();
+                    _cityOpen = on;
+                    if (!on && _brush != 0) { _brush = 0; _brushDown = false; ClearBrushHits(); }
+                    Touch();
+                    return;
                 case "lens": _lensWanted = on; Touch(); return;
                 case "lensMode": _lensMode = value == "types" ? "types" : "status"; Touch(); return;
                 case "brushSize":
@@ -381,8 +387,9 @@ namespace Placemaker.Game.Tool
             ClearBrushHits();
             if (_brush != 0)
             {
-                // the tool takes the mouse (the brush's strokes), nothing else changes
+                // the tool takes the mouse (the brush's strokes); the panel's area goes (an undo step), its stage stays
                 if (m_ToolSystem != null && m_ToolSystem.activeTool != this) { _closeAfterGhost = 0; m_ToolSystem.activeTool = this; }
+                if (!_building) ClearArea();
                 // the map lens shows what the brush changes: outgrow types while painting, outgrown or not while erasing
                 _lensWanted = true;
                 _lensMode = _brush > 0 ? "types" : "status";

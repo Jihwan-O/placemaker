@@ -95,7 +95,7 @@ namespace Placemaker.Game.Overlay
                     else PolishedShown = 0;
                     if (_tool.Stage == ToolStage.Design || _tool.Stage == ToolStage.Review || _tool.Stage == ToolStage.Building)
                         DrawPlan(buffer, w, detail);
-                    DrawSelection(buffer, w);
+                    if (!_tool.OutgrowBrushOn) DrawSelection(buffer, w);   // the brush: no area tool's cursor or hover
                     DrawMarkers(buffer, w);
                     DrawErrors(buffer, w);
                 }

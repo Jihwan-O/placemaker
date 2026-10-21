@@ -105,7 +105,7 @@ namespace Placemaker.Game.Overlay
                 _brushLots.AddRange(_tool.OutgrowBrushRings);
                 _brushSig = FilledPreviewSystem.Signature(_brushLots) ^ ((long)_brushVersion << 20);
             }
-            if (_brushLots.Count > 0) _fill.SetLayer("outgrowBrush", _brushLots, new Color(c.r, c.g, c.b, 0.8f), -94.0f, _brushSig);
+            if (_brushLots.Count > 0) _fill.SetLayer("outgrowBrush", _brushLots, new Color(c.r, c.g, c.b, 0.38f), -94.0f, _brushSig);
             if (_tool.CursorValid) buffer.DrawCircle(new Color(c.r, c.g, c.b, 0.95f), new Color(c.r, c.g, c.b, 0.12f), w * 0.6f, 0, new float2(0, 1), _tool.Cursor, _tool.OutgrowBrushWidth);
         }
 

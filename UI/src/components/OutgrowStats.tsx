@@ -18,12 +18,12 @@ const OTHER = "#8a93a3";
 export const LENS = [
     { color: "#78e054", key: "polished", en: "Outgrown" },
     { color: "#c2c8d0", key: "not", en: "Not outgrown" },
-    { color: "#3888f2", key: "planning", en: "Being fitted now" },
-    { color: "#fff273", key: "added", en: "Just added" },
-    { color: "#ffc76b", key: "wait0", en: "Waiting < 10 s" },
-    { color: "#ff9438", key: "wait1", en: "Waiting < 30 s" },
-    { color: "#ed5c21", key: "wait2", en: "Waiting < 90 s" },
-    { color: "#d12121", key: "wait3", en: "Waiting longer" },
+    { color: "#3888f2", key: "planning", en: "Fitting now" },
+    { color: "#fff273", key: "added", en: "Just queued" },
+    { color: "#ffc76b", key: "wait0", en: "Queued <10s" },
+    { color: "#ff9438", key: "wait1", en: "Queued <30s" },
+    { color: "#ed5c21", key: "wait2", en: "Queued <90s" },
+    { color: "#d12121", key: "wait3", en: "Queued longer" },
 ];
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -218,16 +218,15 @@ export const OutgrowStats = ({ p, st, typeName, typeColor }: { p: PainterState; 
     ];
     const line = st.toFit + st.stamps;
     const net = st.fittedPerSecond - st.addedPerSecond;
-    const pace = line === 0 ? L("PaceIdle", "Nothing waiting") : net > 0.05 ? L("PaceDone", "Done in {0}", [eta(t, line / net)]) : L("PaceGrowing", "Growing faster than it is fitted");
+    const pace = line === 0 ? L("PaceIdle2", "Empty") : net > 0.05 ? L("PaceDone2", "Clears in {0}", [eta(t, line / net)]) : L("PaceGrowing2", "Growing");
     const work = [
-        { key: "toFit", en: "To fit", value: st.toFit + st.stamps, color: LENS[5].color },
-        { key: "planning", en: "Being fitted", value: st.planning, color: LENS[2].color },
-        { key: "puttingBack", en: "Putting back", value: st.puttingBack, color: LENS[1].color },
+        { key: "planning", en: "Fitting now", value: st.planning, color: LENS[2].color },
+        { key: "puttingBack", en: "Being removed", value: st.puttingBack, color: LENS[1].color },
         { key: "pieces", en: "Pieces to place", value: st.pieces, color: "#9aa4b2" },
     ];
     return (
         <div className={s.stats} data-testid="outgrow-stats">
-            <Card title={L("Outgrown", "Outgrown")} right={L("OfAll", "{0} of {1}", [fmt(polished), fmt(total)])} testId="outgrow-card-types">
+            <Card title={L("OutgrownByType", "Outgrown, by outgrow type")} right={L("OfAll", "{0} of {1}", [fmt(polished), fmt(total)])} testId="outgrow-card-types">
                 <div className={s.typesRow}>
                     <Ring slices={slices} center={pct(polished, total)} sub={L("RingSub", "outgrown")} hover={hover} setHover={setHover} />
                     <div className={s.legend}>
@@ -242,36 +241,38 @@ export const OutgrowStats = ({ p, st, typeName, typeColor }: { p: PainterState; 
                     </div>
                 </div>
             </Card>
-            <Card title={L("ByKind", "By kind")} testId="outgrow-card-kinds">
-                {KIND_NAMES.map((k, i) => {
-                    const tot = st.kindTotal[i] ?? 0;
-                    const pol = st.kindPolished[i] ?? 0;
-                    if (tot === 0) return null;
-                    return (
-                        <div key={k.key} className={s.kindRow}>
-                            <div className={s.kindName}>{t("Placemaker.UI.Polish.Kind." + k.key, k.en)}</div>
-                            <div className={s.bar}>
-                                <div className={s.barFill} style={{ width: `${(pol / tot) * 100}%` }} />
+            <div className={s.pair}>
+                <Card title={L("ByKind", "By kind")} testId="outgrow-card-kinds">
+                    {KIND_NAMES.map((k, i) => {
+                        const tot = st.kindTotal[i] ?? 0;
+                        const pol = st.kindPolished[i] ?? 0;
+                        if (tot === 0) return null;
+                        return (
+                            <div key={k.key} className={s.kindRow}>
+                                <div className={s.kindName}>{t("Placemaker.UI.Polish.Kind." + k.key, k.en)}</div>
+                                <div className={s.bar}>
+                                    <div className={s.barFill} style={{ width: `${(pol / tot) * 100}%` }} />
+                                </div>
+                                <div className={s.kindValue}>{`${fmt(pol)} / ${fmt(tot)}`}</div>
                             </div>
-                            <div className={s.kindValue}>{`${fmt(pol)} / ${fmt(tot)}`}</div>
-                        </div>
-                    );
-                })}
-                {st.kindTotal.every((n) => n === 0) ? <div className={s.muted}>{L("NoBuildings", "No buildings yet")}</div> : null}
-            </Card>
-            <Card title={L("WorkLine", "Working through")} right={pace} testId="outgrow-card-work">
-                <div className={s.cells}>
+                        );
+                    })}
+                    {st.kindTotal.every((n) => n === 0) ? <div className={s.muted}>{L("NoBuildings", "No buildings yet")}</div> : null}
+                </Card>
+                <Card title={L("Queue", "Queue")} right={pace} testId="outgrow-card-work">
+                    <div className={s.queueBig}>
+                        <div className={s.queueValue}>{fmt(line)}</div>
+                        <div className={s.queueLabel}>{L("QueueWaiting", "buildings waiting")}</div>
+                    </div>
                     {work.map((w) => (
-                        <div key={w.key} className={classNames(s.cell, { [s.cellZero]: w.value === 0 })} data-testid={"outgrow-work-" + w.key}>
-                            <div className={s.cellValue}>{fmt(w.value)}</div>
-                            <div className={s.cellLabelRow}>
-                                <div className={s.dot} style={{ backgroundColor: w.color }} />
-                                <div className={s.cellLabel}>{L("Work." + w.key, w.en)}</div>
-                            </div>
+                        <div key={w.key} className={classNames(s.queueRow, { [s.cellZero]: w.value === 0 })} data-testid={"outgrow-work-" + w.key}>
+                            <div className={s.dot} style={{ backgroundColor: w.color }} />
+                            <div className={s.queueRowName}>{L("Work." + w.key, w.en)}</div>
+                            <div className={s.queueRowValue}>{fmt(w.value)}</div>
                         </div>
                     ))}
-                </div>
-            </Card>
+                </Card>
+            </div>
             <Card title={L("Activity", "Activity")} right={L("Last2", "last 2 minutes")} testId="outgrow-card-activity">
                 <div className={s.chartPick}>
                     <Segmented
@@ -281,7 +282,7 @@ export const OutgrowStats = ({ p, st, typeName, typeColor }: { p: PainterState; 
                         onChange={(v) => setChart(v as "speed" | "line" | "fps")}
                         options={[
                             { value: "speed", label: L("ChartSpeed", "Speed"), description: L("ChartSpeedTip", "Buildings fitted and put in line, per second") },
-                            { value: "line", label: L("ChartLine", "Line"), description: L("ChartLineTip", "Buildings waiting to be fitted") },
+                            { value: "line", label: L("ChartQueue", "Queue"), description: L("ChartLineTip", "Buildings waiting to be fitted") },
                             { value: "fps", label: L("ChartFps", "FPS"), description: L("ChartFpsTip", "The game's frames per second") },
                         ]}
                     />
@@ -292,7 +293,7 @@ export const OutgrowStats = ({ p, st, typeName, typeColor }: { p: PainterState; 
                         unit="/s"
                         series={[
                             { label: L("Fitted", "Fitted"), color: SERIES[0], values: st.histFitted },
-                            { label: L("Added", "Put in line"), color: SERIES[1], values: st.histAdded },
+                            { label: L("Added2", "Queued"), color: SERIES[1], values: st.histAdded },
                         ]}
                     />
                 ) : chart === "line" ? (

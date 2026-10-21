@@ -11,8 +11,8 @@
 .card {
     @include col;
     min-width: 0;
-    margin: 0 0 8rem 0;
-    padding: 8rem 10rem 9rem 10rem;
+    margin: 0 0 6rem 0;
+    padding: 6rem 8rem 7rem 8rem;
     border-radius: $radius-l;
     background-color: $c-surface;
 }
@@ -20,7 +20,61 @@
 .cardHead {
     @include row;
     min-width: 0;
-    margin-bottom: 7rem;
+    margin-bottom: 5rem;
+}
+
+// two cards side by side
+.pair {
+    @include row(stretch);
+    min-width: 0;
+}
+
+.pair > .card {
+    flex: 1 1 0;
+}
+
+.pair > :first-child {
+    margin-right: 6rem;
+}
+
+.queueBig {
+    @include row(baseline);
+    min-width: 0;
+    margin-bottom: 3rem;
+}
+
+.queueValue {
+    font-size: 18rem;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.queueLabel {
+    margin-left: 6rem;
+    font-size: 11rem;
+    color: $c-text-dim;
+    white-space: nowrap;
+}
+
+.queueRow {
+    @include row;
+    min-width: 0;
+    height: 16rem;
+    font-size: 11rem;
+}
+
+.queueRowName {
+    @include ellipsis;
+    flex: 1 1 auto;
+    min-width: 0;
+    color: $c-text-dim;
+}
+
+.queueRowValue {
+    flex: 0 0 auto;
+    margin-left: 6rem;
+    font-weight: bold;
+    white-space: nowrap;
 }
 
 .cardTitle {
@@ -56,8 +110,8 @@
 .ring {
     position: relative;
     flex: 0 0 auto;
-    width: 96rem;
-    height: 96rem;
+    width: 80rem;
+    height: 80rem;
     margin-right: 12rem;
 }
 
@@ -65,13 +119,13 @@
     @include col;
     position: absolute;
     left: 0;
-    top: 30rem;
-    width: 96rem;
+    top: 24rem;
+    width: 80rem;
     align-items: center;
 }
 
 .ringBig {
-    font-size: 19rem;
+    font-size: 16rem;
     font-weight: bold;
     white-space: nowrap;
 }
@@ -153,7 +207,7 @@
 
 .kindName {
     flex: 0 0 auto;
-    width: 64rem;
+    width: 52rem;
     color: $c-text-dim;
 }
 
@@ -174,50 +228,15 @@
 
 .kindValue {
     flex: 0 0 auto;
-    min-width: 86rem;
-    margin-left: 10rem;
+    min-width: 64rem;
+    margin-left: 8rem;
     text-align: right;
     font-weight: bold;
     white-space: nowrap;
 }
 
-// ── working through ──
-.cells {
-    @include row(stretch);
-    min-width: 0;
-}
-
-.cell {
-    @include col;
-    flex: 1 1 0;
-    min-width: 0;
-    margin-right: 6rem;
-    padding: 5rem 6rem;
-    border-radius: $radius;
-    background-color: rgba(0, 0, 0, 0.18);
-}
-
 .cellZero {
     opacity: 0.55;
-}
-
-.cellValue {
-    font-size: 17rem;
-    font-weight: bold;
-    white-space: nowrap;
-}
-
-.cellLabelRow {
-    @include row;
-    min-width: 0;
-    margin-top: 2rem;
-}
-
-.cellLabel {
-    @include ellipsis;
-    min-width: 0;
-    font-size: 10rem;
-    color: $c-text-dim;
 }
 
 // ── activity ──
@@ -268,7 +287,7 @@
 .plot {
     position: relative;
     min-width: 0;
-    height: 92rem;
+    height: 66rem;
     border-radius: $radius;
     background-color: rgba(0, 0, 0, 0.18);
     overflow: hidden;
@@ -286,7 +305,7 @@
 .plotEmpty {
     position: absolute;
     left: 0;
-    top: 38rem;
+    top: 26rem;
     width: 100%;
     text-align: center;
     font-size: 11rem;
@@ -370,12 +389,18 @@
     @include row;
     flex-wrap: wrap;
     min-width: 0;
-    margin-top: 5rem;
 }
 
 .lensItem {
-    width: 50%;
-    padding-right: 10rem;
+    flex: 0 0 auto;
+    height: 16rem;
+    margin-right: 12rem;
+    font-size: 11rem;
+}
+
+.lensItem .legendName {
+    flex: 0 0 auto;
+    overflow: visible;
 }
 
 .lensItemNone {

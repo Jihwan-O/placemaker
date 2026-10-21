@@ -181,7 +181,7 @@
 }
 
 .cityBody {
-    padding-top: 6rem;
+    padding-top: 5rem;
 }
 
 .cityFoot {
@@ -193,62 +193,201 @@
     border-top-color: rgba(255, 255, 255, 0.08);
 }
 
-.kindLook {
-    @include row;
-    max-width: 130rem;
-    padding: 1rem 6rem;
-    border-radius: 4rem;
-    background-color: rgba(255, 255, 255, 0.06);
-    @include border(1rem, rgba(255, 255, 255, 0.14));
-    color: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the text colour
-    font-size: $fs-s;
-    cursor: pointer;
-}
-
-.kindLookOn {
-    @include border(1rem, rgba(143, 209, 255, 0.75));
-}
-
 // Global outgrow: the whole city's buttons, under the header
 .cityActions {
     @include row;
     flex-shrink: 0;
-    padding: 6rem 8rem 6rem 8rem;
+    padding: 6rem 8rem 3rem 8rem;
+}
+
+// "Outgrow new buildings": right under the whole city's buttons
+.newRow {
+    @include row;
+    flex-shrink: 0;
+    min-width: 0;
+    height: 24rem;
+    padding: 0 10rem 0 10rem;
+}
+
+.newLabel {
+    min-width: 0;
+    font-size: $fs;
+}
+
+.newRow > :first-child {
+    flex: 1 1 auto;
+}
+
+// the brush and the map lens, side by side
+.tools {
+    @include row(stretch);
+    flex-shrink: 0;
+    min-width: 0;
+    padding: 5rem 8rem 0 8rem;
+}
+
+.toolCol {
+    @include col;
+    flex: 1 1 0;
+    min-width: 0;
+    margin-right: 6rem;
+    padding: 5rem 6rem 6rem 7rem;
+    border-radius: $radius;
+    background-color: $c-surface;
+}
+
+.toolHead {
+    @include row;
+    min-width: 0;
+    height: 20rem;
+}
+
+.toolTitle {
+    margin-left: 5rem;
+    font-size: $fs;
+    font-weight: bold;
+}
+
+.toolRow {
+    @include row;
+    min-width: 0;
+    margin-top: 4rem;
+}
+
+.toolRow > * {
+    flex: 1 1 0;
+    margin-right: 4rem;
+}
+
+.topPick {
+    flex-shrink: 0;
+    margin: 4rem 8rem 0 8rem;
+    padding: 6rem 6rem 2rem 6rem;
+    border-radius: 4rem;
+    background-color: rgba(143, 209, 255, 0.07);
+}
+
+.legendStrip {
+    flex-shrink: 0;
+    padding: 5rem 10rem 4rem 10rem;
     border-bottom-width: 1rem;
     border-bottom-style: solid;
     border-bottom-color: $c-line;
 }
 
-.cityActions > * {
-    flex: 1 1 0;
-    margin-right: 6rem;
+.legendGrid {
+    @include row;
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
-// a boxed block (the brush, the lens)
-.block {
-    @include col;
+.legendCell {
+    @include row;
+    width: 33.333%;
     min-width: 0;
-    margin: 4rem 0 6rem 0;
-    padding: 6rem 7rem;
-    border-radius: $radius;
+    height: 16rem;
+    padding-right: 8rem;
+    font-size: 11rem;
+}
+
+.legendCellName {
+    @include ellipsis;
+    flex: 1 1 auto;
+    min-width: 0;
+    color: $c-text-dim;
+}
+
+.legendCellCount {
+    flex: 0 0 auto;
+    margin-left: 4rem;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+// the zones list: one line per zone type
+.zhead {
+    @include row;
+    min-width: 0;
+    height: 16rem;
+    padding: 0 4rem 0 22rem;
+    font-size: 10rem;
+    text-transform: uppercase;
+    color: $c-text-faint;
+}
+
+.zheadName {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.zheadCount {
+    flex: 0 0 auto;
+    width: 64rem;
+    text-align: right;
+}
+
+.zheadType {
+    flex: 0 0 auto;
+    width: 130rem;
+    padding-left: 10rem;
+}
+
+.kindBtns {
+    @include row;
+}
+
+.zrow {
+    @include row;
+    min-width: 0;
+    height: 22rem;
+    padding: 0 2rem 0 6rem;
+    border-radius: 3rem;
+}
+
+.zrow:hover {
     background-color: $c-surface;
 }
 
-.blockHead {
-    @include row;
+.zrowOn {
+    background-color: rgba(143, 209, 255, 0.12);
+}
+
+.zrowEmpty {
+    opacity: 0.6;
+}
+
+.zrowName {
+    @include ellipsis;
+    flex: 1 1 auto;
     min-width: 0;
+    margin-left: 5rem;
+    font-size: $fs-s;
 }
 
-.blockTitle {
-    margin: 0 8rem 0 6rem;
-    font-size: $fs;
-    font-weight: bold;
-}
-
-.blockHint {
-    margin-top: 4rem;
-    font-size: 11rem;
+.zrowCount {
+    flex: 0 0 auto;
+    width: 64rem;
+    font-size: $fs-s;
+    text-align: right;
+    white-space: nowrap;
     color: $c-text-dim;
+}
+
+.zrow .typeBtn {
+    flex: 0 0 auto;
+    width: 104rem;
+    max-width: 104rem;
+    margin-left: 10rem;
+}
+
+.zrowEditGap {
+    flex: 0 0 auto;
+    width: 22rem;
+}
+
+.cityActions > * {
+    flex: 1 1 0;
+    margin-right: 6rem;
 }
 
 .dot {
@@ -297,104 +436,6 @@
     @include border(2rem, #ffffff);
 }
 
-.typeLegend {
-    @include row;
-    flex-wrap: wrap;
-    min-width: 0;
-    margin-top: 4rem;
-}
-
-.typeLegendItem {
-    @include row;
-    width: 50%;
-    min-width: 0;
-    padding-right: 8rem;
-    margin: 1rem 0;
-    font-size: $fs-s;
-}
-
-.typeLegendCount {
-    flex: 0 0 auto;
-    margin-left: 6rem;
-    font-weight: bold;
-    white-space: nowrap;
-}
-
-
-
-.kindActions {
-    @include row;
-    min-width: 0;
-    margin: 2rem 0 4rem 0;
-}
-
-.kindActions > * {
-    margin-right: 6rem;
-}
-
-// zone types two to a row
-.zoneGrid {
-    @include row(flex-start);
-    flex-wrap: wrap;
-    min-width: 0;
-}
-
-.zoneCell {
-    width: 50%;
-    min-width: 0;
-    padding: 0 4rem 4rem 0;
-}
-
-.zoneCard {
-    @include col;
-    min-width: 0;
-    padding: 5rem 6rem;
-    border-radius: $radius;
-    background-color: $c-surface;
-}
-
-.zoneCardOn {
-    background-color: rgba(143, 209, 255, 0.12);
-}
-
-.zoneCardHead {
-    @include row;
-    min-width: 0;
-}
-
-.zoneCounts {
-    margin: 2rem 0 4rem 0;
-    font-size: 11rem;
-    color: $c-text-dim;
-}
-
-.zoneCardFoot {
-    @include row;
-    min-width: 0;
-}
-
-.zoneBar {
-    height: 4rem;
-    margin: 0 0 5rem 0;
-    border-radius: 2rem;
-    background-color: rgba(255, 255, 255, 0.08);
-    overflow: hidden;
-}
-
-.zoneBarFill {
-    height: 100%;
-    border-radius: 2rem;
-    background-color: #78e054;
-}
-
-.zoneCardName {
-    flex: 1 1 auto;
-    min-width: 0;
-    margin-left: 5rem;
-    font-size: $fs-s;
-    font-weight: bold;
-}
-
 .zonePick {
     @include col;
     width: 100%;
@@ -406,7 +447,7 @@
 }
 
 .cityTabs {
-    margin: 2rem 0 6rem 0;
+    margin: 0 0 5rem 0;
 }
 
 .pickFoot {
@@ -447,65 +488,3 @@
     color: $c-text-dim;
 }
 
-// zone types, one line each (EU and NA alike share a line)
-.zoneList {
-    @include col;
-    min-width: 0;
-    margin: 0 0 4rem 0;
-}
-
-.zoneRow {
-    @include row;
-    min-width: 0;
-    height: 22rem;
-    padding: 0 4rem;
-    border-radius: 3rem;
-    color: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the text colour
-    text-align: left;
-    cursor: pointer;
-}
-
-.zoneRow:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-}
-
-.zoneRowOn {
-    background-color: rgba(143, 209, 255, 0.12);
-}
-
-.zoneRowName {
-    flex: 1 1 auto;
-    min-width: 0;
-    margin: 0 4rem 0 6rem;
-    font-size: 11rem;
-    @include ellipsis;
-}
-
-.regionTag {
-    flex: 0 0 auto;
-    margin-right: 3rem;
-    padding: 0 3rem;
-    border-radius: 3rem;
-    font-size: 9rem;
-    font-weight: bold;
-    color: $c-text-dim;
-    background-color: rgba(255, 255, 255, 0.08);
-}
-
-.zoneLook {
-    @include row;
-    flex: 0 0 auto;
-    width: 74rem;
-    margin-left: 4rem;
-    font-size: 10rem;
-    color: $c-text-dim;
-}
-
-.zoneLookOwn {
-    color: #ffffff;
-}
-
-.zoneLookText {
-    margin-left: 3rem;
-    @include ellipsis;
-}

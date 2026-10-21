@@ -8,7 +8,6 @@
 // While drawing, C# may collapse it to a slim header + primary button (state.panelCollapsed); it then
 // shows an obvious "Show options" button.
 import { Legend } from "./Legend";
-import { LeftOut } from "./LeftOut";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import classNames from "classnames";
 import { PROTOCOL, Stage, StepView, Summary, ToolState } from "../contract";
@@ -651,30 +650,6 @@ const VersionNotice = ({ state }: { state: ToolState }) => {
     );
 };
 
-const MarkerBanner = ({ state, root }: { state: ToolState; root: StepView | null }) => {
-    const { t, tl } = useT();
-    if (!state.markerMode) return null;
-    const mm = state.markerMode;
-    let kindLabel = tl(mm.label, mm.kind);
-    walk(root, (st) => {
-        if (st.path !== mm.stepPath) return;
-        const k = st.markerKinds?.find((x) => x.kind === mm.kind);
-        if (k) kindLabel = markerLabel(t, k);
-    });
-    return (
-        <div className={s.banner} data-testid="marker-banner">
-            <Icon name="marker" size={14} tint="warn" />
-            <div className={s.bannerText}>
-                <div className={s.bannerTitle}>{t("Placemaker.UI.Markers.BannerTitle", "Placing: {0}", [kindLabel])}</div>
-                <div className={s.bannerSub}>
-                    {t("Placemaker.UI.Markers.BannerHint", "Click the outline by a road · right-click removes")}
-                </div>
-            </div>
-            <Btn variant="accent" label={t("Placemaker.UI.Done", "Done")} onClick={act.endMarkers} testId="marker-done" />
-        </div>
-    );
-};
-
 // ───────────── panel ─────────────
 
 export const PlacemakerPanel = () => {
@@ -762,11 +737,10 @@ export const PlacemakerPanel = () => {
     const cityAvailable = !!state.painter;
     // the panel's two modes: Placemaker (its stages) or Outgrow (the whole city's), by the switcher under the header
     const outgrow = cityAvailable && !!state.painter?.outgrowMode;
-    const leftOut = !polish && (state.stage === "area" || state.stage === "review") ? <LeftOut audit={summary.audit} /> : null;
     let body: React.ReactNode = null;
     switch (state.stage) {
         case "area":
-            body = <>{leftOut}<AreaStage state={state} /></>;
+            body = <AreaStage state={state} />;
             break;
         case "design":
             body = polish ? <PolishDesign state={state} /> : <DesignStage catalog={catalog} design={design} state={state} />;
@@ -919,7 +893,6 @@ export const PlacemakerPanel = () => {
                                             </ErrorBoundary>
                                         )}
                                         <VersionNotice state={state} />
-                                        <MarkerBanner state={state} root={design.root} />
                                         <div className={s.bodyWrap} data-testid="panel-body">
                                             <div className={s.body} key={state.stage}>
                                                 <ErrorBoundary name={"stage-" + state.stage}>{body}</ErrorBoundary>

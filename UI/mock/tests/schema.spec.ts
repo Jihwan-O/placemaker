@@ -173,7 +173,7 @@ test("entrances: none placed automatically; disabled primary leads to the Entran
         for (let e: HTMLElement | null = el; e; e = e.firstElementChild as HTMLElement | null) e.scrollTop = 100000;
     });
     await primary.click({ force: true }); // aria-disabled: Playwright would refuse a normal click
-    await expect(page.getByTestId("marker-banner")).toBeVisible();
+    await expect(page.getByTestId("marker-kind-entrance")).toHaveAttribute("aria-pressed", "true");
     expect(await page.evaluate(() => (window as any).pm.backend.markerMode)).toEqual({ stepPath: "0", kind: "entrance" });
     await expect(page.getByTestId("entrances-wrap-0")).toHaveAttribute("data-flash", "true");
     await expect(page.getByTestId("marker-kind-entrance")).toBeInViewport();
@@ -185,7 +185,7 @@ test("entrances: none placed automatically; disabled primary leads to the Entran
     await clickWorld(page, (FIELD[0][0] + FIELD[1][0]) / 2, (FIELD[0][1] + FIELD[1][1]) / 2);
     await expect(page.getByTestId("marker-0")).toHaveAttribute("data-kind", "entrance");
     await expect(page.getByTestId("marker-0")).toContainText("2-way 1");
-    await page.getByTestId("marker-done").click();
+    await page.getByTestId("marker-kind-entrance").click();   // the lit type again: placing stops
     await expect(page.getByTestId("entrance-required")).toHaveCount(0);
     await expect(primary).toHaveAttribute("aria-disabled", "false");
     await panelShot(page, "panel-entrances");
@@ -197,7 +197,6 @@ test("entrances: none placed automatically; disabled primary leads to the Entran
 
     // choose "Exit only", click the outline → placed with its type; Build path unblocked
     await page.getByTestId("marker-kind-exit").click();
-    await expect(page.getByTestId("marker-banner")).toContainText("Exit only");
     await expect(page.getByTestId("marker-kind-exit")).toHaveAttribute("aria-pressed", "true");
     await shot(page, "14-placing-entrance");
     await clickWorld(page, (FIELD[1][0] + FIELD[2][0]) / 2, (FIELD[1][1] + FIELD[2][1]) / 2);
@@ -206,8 +205,8 @@ test("entrances: none placed automatically; disabled primary leads to the Entran
     await page.getByTestId("marker-kind-alley").click();
     await clickWorld(page, (FIELD[2][0] + FIELD[3][0]) / 2, (FIELD[2][1] + FIELD[3][1]) / 2);
     await expect(page.getByTestId("marker-1")).toHaveAttribute("data-kind", "alley");
-    await page.getByTestId("marker-done").click();
-    await expect(page.getByTestId("marker-banner")).toHaveCount(0);
+    await page.getByTestId("marker-kind-alley").click();
+    await expect(page.getByTestId("marker-kind-alley")).toHaveAttribute("aria-pressed", "false");
     await expect(page.getByTestId("entrance-required")).toHaveCount(0);
     await expect(primary).toHaveAttribute("aria-disabled", "false");
     await expect(primary).toHaveAttribute("data-action", "toReview");

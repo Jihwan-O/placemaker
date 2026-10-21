@@ -1,58 +1,61 @@
 Placemaker
-Select an area, pick what you want there, preview it, build it.
+Early access. Expect rough edges.
+Pick an area. Pick what goes there. Hit build.
 
 ■ Roads
-Street grids that connect to the roads around them
+Street grids that hook into your roads
 
 ■ Parking
-Lots of any shape, with trees, lamps, fences and marked bays
+Lots of any shape with trees, lamps and fences
 
 ■ Parks
-Parks, gardens, playgrounds, memorial parks, amphitheatres
+Parks, gardens, playgrounds, amphitheatres
 
 ■ Shops & Squares
-Strip malls, mall parks, mall districts, market squares
+Strip malls, mall districts, market squares
 
 ■ Beach, Nature, Farms, Sports, Industrial
-Wetlands, hiking trails, campgrounds, farmsteads, golf, container and car yards, and more
+Wetlands, trails, campgrounds, farms, golf, car yards and more
 
 ■ Zoning
-Zone an area in one go (suburbs, streets and more)
+Zone a whole area at once
 
-■ Outgrow
-Gardens, fences and car parks that grow out of your buildings' lots and join up with the neighbours. Off by default; switch it on per city
+■ Outgrow (beta)
+Customize how your buildings' lots grow into gardens and car parks
+Off by default
 
 ■ Area tools
-Pick the area by clicking a block, clicking corners, painting it with a brush, filling with the paint bucket or clicking road nodes
+Click a block, click corners, brush it, paint bucket it or click road nodes
 
-[Watch the showcase video on YouTube](https://www.youtube.com/watch?v=ghIR5UhFwj4) (3 minutes)
+[Showcase video](https://www.youtube.com/watch?v=ghIR5UhFwj4)
 
 How to use
-1. Click the Placemaker button at the top left, or press Ctrl+Shift+A
+1. Click the Placemaker button top left or press Ctrl+Shift+A
 2. Select an area
-3. Choose a type and a style. The preview updates as you go
-4. Press Build. Undo works if you don't like it
+3. Pick a type and a style
+4. Build it
+Undo works
 
-Not just presets
-* 25+ types and over 100 styles
-* Every style has its own settings: layout, paths, planting, surfaces, extras
-* Change anything and save it as your own style
-* Uses only the game's own assets, so no asset packs are needed
+Make it yours
+* 25+ types and 100+ styles
+* Tweak any setting and save your own style
+* Only uses the game's own assets
+
+Early access
+* Roads, parking and parks are the most finished
+* Shops and squares still need work
+* Strict grid and superblock roads build nothing yet
+* Big builds can freeze the game for a second
+* Back up your save first
+
+Found a bug?
+Send a screenshot and your Placemaker.log
+https://github.com/jackwrichards/placemaker/issues
 
 Compatibility
-* Version 1.6.*
-* Safe to update from earlier versions. Your old builds stay as they are
-* Outgrow stores a little data in your save; it is off until you turn it on
-
-Known issues
-* The strict grid and superblock road presets build nothing yet
-* Big builds can freeze the game for a second or two
-* Shops in plazas and market squares face the city street
-
-Bugs
-Please report with a screenshot and your Placemaker.log (in the game's Logs folder): https://github.com/jackwrichards/placemaker/issues
+* Game version 1.6.*
 
 Credits
 Based on similar concepts to ParkingLotTool (KruemelGames), ParkManager (tomkpunkt) and Grid Road Generator (Ti4goc)
 Includes Harmony by Andreas Pardeike (MIT)
-Licensed GPL-3.0, source code: https://github.com/jackwrichards/placemaker
+GPL-3.0, source on GitHub: https://github.com/jackwrichards/placemaker

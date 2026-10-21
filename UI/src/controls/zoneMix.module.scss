@@ -223,9 +223,38 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 
 .leftCol {
     @include col;
-    flex: 1 1 170rem;
-    min-width: 140rem;
-    max-width: 260rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-right: 10rem;
+}
+
+// the zone's dropdown and its Outgrow (switch, outgrow type, edit) on one row
+.topRow {
+    @include row;
+    min-width: 0;
+}
+
+.topRow .zoneButton {
+    flex: 1 1 auto;
+    width: auto;
+    margin-right: 6rem;
+}
+
+// the allowed road widths: the slider across the whole row, its value after it
+.roadsRow {
+    @include row;
+    min-width: 0;
+    margin-top: 6rem;
+}
+
+.roadsValue {
+    flex: 0 0 auto;
+    min-width: 76rem;
+    margin-left: 8rem;
+    font-size: 10rem;
+    text-align: right;
+    white-space: nowrap;
+    color: $c-text-dim;
 }
 
 .zoneButton {
@@ -380,16 +409,6 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
 
 .outgrowText {
     margin-left: 5rem;
-}
-
-.outgrow {
-    @include col;
-    min-width: 0;
-    margin: 4rem 0 2rem 0;
-    padding: 4rem 0 0 10rem;
-    border-left-width: 2rem;
-    border-left-style: solid;
-    border-left-color: rgba(143, 209, 255, 0.35);
 }
 
 .remove {
@@ -597,113 +616,6 @@ $text: rgba(234, 242, 246, 0.95);   // buttons in the game UI do not inherit the
     flex: 1 1 150rem;
     min-width: 150rem;
     margin: 0 6rem 0 8rem;
-}
-
-.roadsCell {
-    @include row;
-    min-width: 0;
-    margin-top: 6rem;
-}
-
-.roadsCaption {
-    margin-top: 3rem;
-    font-size: 9rem;
-    color: $c-text-faint;
-    @include ellipsis;
-}
-
-.roadsLabel {
-    @include col;
-    flex: 0 0 auto;
-    width: 56rem;
-    margin-right: 2rem;
-    font-size: 10rem;
-    line-height: 1.15;
-    color: $c-text-dim;
-}
-
-.roadsTrack {
-    position: relative;
-    @include col;
-    flex: 1 1 auto;
-    min-width: 0;
-    padding: 0 7rem;
-}
-
-.roadMarks {
-    position: absolute;
-    top: 16rem;
-    left: 7rem;
-    right: 7rem;
-    height: 4rem;
-    pointer-events: none;
-}
-
-
-.roadTick {
-    position: absolute;
-    top: 0;
-    width: 1rem;
-    height: 4rem;
-    background-color: rgba(255, 255, 255, 0.45);
-}
-
-
-// ── a zone type's Outgrow: one chip, its switch and the button that folds its settings out ──
-.rightCol {
-    @include col;
-    align-items: flex-end;
-    flex: 0 1 auto;
-    min-width: 0;
-    margin-left: auto;
-}
-
-.outgrowSummary {
-    max-width: 180rem;
-    margin-top: 5rem;
-    font-size: 10rem;
-    color: $c-text-faint;
-    text-align: right;
-    @include ellipsis;
-}
-
-.outgrowChip {
-    @include row;
-    flex: 0 0 auto;
-    height: 22rem;
-    margin: 0;
-    padding: 0 2rem 0 5rem;
-    border-radius: 11rem;
-    background-color: $c-surface;
-    @include border(1rem, $c-line);
-}
-
-.outgrowChipOpen {
-    background-color: rgba(143, 209, 255, 0.12);
-    @include border(1rem, rgba(143, 209, 255, 0.6));
-}
-
-.outgrowChipOff .outgrowOpen {
-    opacity: 0.45;
-    cursor: default;
-}
-
-.outgrowOpen {
-    @include row;
-    height: 100%;
-    margin-left: 4rem;
-    padding: 0 6rem 0 2rem;
-    color: $text;
-    font-size: $fs-s;
-    cursor: pointer;
-}
-
-.outgrowOpen:hover .outgrowName {
-    color: #ffffff;
-}
-
-.outgrowName {
-    margin-right: 5rem;
 }
 
 .foundName {

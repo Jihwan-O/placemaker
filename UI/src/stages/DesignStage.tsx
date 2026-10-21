@@ -27,7 +27,7 @@ import { ValueSinkContext } from "../controls/Controls";
 import { SettingValue } from "../contract";
 import { ControlEx, valueOf } from "../lib/schema";
 import { useAssetName } from "../components/picker";
-import { lookName, lookValuesOf, ZoneLookRow } from "../components/PainterCard";
+import { ZoneOutgrowInline, ZoneOutgrowPick } from "../components/PainterCard";
 import { BarMode, PresetBar, Tile, TypeBrowser } from "./PresetBrowser";
 import s from "./design.module.scss";
 
@@ -486,7 +486,6 @@ type OutgrowMap = Record<string, { on?: boolean; look?: string; v?: Record<strin
 
 const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: LayerType; state: ToolState; scope: string }) => {
     const { t } = useT();
-    const zoningIds = (layer.controls as ControlEx[]).filter((c) => c.group === "zone" || c.id === "shapeLots").map((c) => c.id);
     const raw = step.values["zoneOutgrow"];
     let map: OutgrowMap = {};
     try {
@@ -498,46 +497,34 @@ const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: Lay
     const outgrow: ZoneOutgrow = {
         isOn: (key) => map[key]?.on !== false,
         setOn: (key, on) => write({ ...map, [key]: { ...(map[key] ?? {}), on } }),
-        summary: () => "",
-        body: (key) => {
-            // which outgrow type it gets, and Edit (Global outgrow's editor): the settings live with the outgrow type
-            const own = map[key]?.v ?? {};
-            const picked = map[key]?.look ?? "";
-            const p = state.painter;
-            const changes = Object.keys(own).length;
-            return (
-                <>
-                    {p ? (
-                        <ZoneLookRow
-                            p={p}
-                            value={picked}
-                            typeLook={p.typeLook || ""}
-                            testId={"zonemix-look-" + key.replace(/\s+/g, "-")}
-                            onPick={(id) => write({ ...map, [key]: { on: map[key]?.on, look: id || undefined, v: {} } })}
-                        />
-                    ) : null}
-                    {changes > 0 ? (
-                        <div className={s.zoneOwnNote} data-testid={"zonemix-own-" + key.replace(/\s+/g, "-")}>
-                            <div className={s.zoneOwnText}>{t("Placemaker.UI.ZoneMix.OwnChanges2", "{0} settings changed here before", [changes])}</div>
-                            <Btn icon="reset" iconSize={11} label={t("Placemaker.UI.ZoneMix.ClearOwn", "Clear")} onClick={() => write({ ...map, [key]: { on: map[key]?.on, look: map[key]?.look, v: {} } })} testId={"zonemix-own-clear-" + key.replace(/\s+/g, "-")} />
-                        </div>
-                    ) : null}
-                </>
-            );
-        },
-    };
-    outgrow.summary = (key) => {
-        const picked = map[key]?.look ?? "";
-        const p = state.painter;
-        const v = { ...step.values, ...(picked && p ? lookValuesOf(p, picked) : {}), ...(map[key]?.v ?? {}) };
-        const num = (id: string) => {
-            const c = (layer.controls as ControlEx[]).find((x) => x.id === id);
-            const val = id in v ? v[id] : c?.default;
-            return Math.round(Number(val) || 0);
-        };
-        const own = Object.keys(map[key]?.v ?? {}).length;
-        const lookPart = p && (picked || p.typeLook) ? lookName(t, p, picked || p.typeLook || "") + " · " : "";
-        return lookPart + t("Placemaker.UI.ZoneMix.OutgrowSummary", "reach {0} m · lawn {1} m", [num("sideReach"), num("lawnReach")]) + (own > 0 ? " · " + t("Placemaker.UI.ZoneMix.OwnChanges", "{0} own", [own]) : "");
+        inline: (key, id, open, toggle) =>
+            state.painter ? (
+                <ZoneOutgrowInline
+                    p={state.painter}
+                    value={map[key]?.look ?? ""}
+                    typeLook={state.painter.typeLook || ""}
+                    on={map[key]?.on !== false}
+                    setOn={(on) => write({ ...map, [key]: { ...(map[key] ?? {}), on } })}
+                    open={open}
+                    toggle={toggle}
+                    testId={"zonemix-look-" + id.replace(/\s+/g, "-")}
+                />
+            ) : null,
+        pick: (key, id, close) =>
+            state.painter ? (
+                <ZoneOutgrowPick
+                    p={state.painter}
+                    value={map[key]?.look ?? ""}
+                    typeLook={state.painter.typeLook || ""}
+                    oldChanges={Object.keys(map[key]?.v ?? {}).length}
+                    onClear={() => write({ ...map, [key]: { on: map[key]?.on, look: map[key]?.look, v: {} } })}
+                    onPick={(id) => {
+                        write({ ...map, [key]: { on: map[key]?.on, look: id || undefined, v: {} } });
+                        close();
+                    }}
+                    testId={"zonemix-look-" + id.replace(/\s+/g, "-") + "-pick"}
+                />
+            ) : null,
     };
     return (
         <div className={s.shape} data-testid="zoning">

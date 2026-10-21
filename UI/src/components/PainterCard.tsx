@@ -1,14 +1,12 @@
-// (PROTOCOL 25) The neighbourhood-polish tool's panel (its own button next to Placemaker's; Placemaker's panel and area tools).
-// Step 2 "Polish" (PolishDesign): what the area holds, the look picker (By zone; the looks made for zone types, the themed
-// ones, the player's own: like Placemaker's Style row), the look's buttons (Save, Save as new, Rename, Delete, Revert) and
-// every setting of the look as rows (label left, control right, reset to the look's value), grouped and folded: first what
-// the land past the lot becomes (a garden, a car park yard, paving: any look on any building) and how far it keeps from
-// water; Save on a built-in look changes what that look is everywhere (Back to default undoes it). Outgrow and Remove
-// outgrow are the footer's buttons. The Global outgrow window (PolishCityCard, beside the panel, its header button, there
-// whatever is picked): new buildings; Zones (a look for each zone type, each starting with its own: Houses, Towers,
-// Shops…, and for each kind: "By zone type" or one look for all its zones) and Looks (the same look editor); Outgrow all
-// / Remove all outgrow (asking first, a few buildings a frame). A Zoning type's zone picks its look with ZoneLookRow, and
-// "Edit" there opens Global outgrow's Looks on it (openLookEditor).
+// (PROTOCOL 25) Outgrow's panels. The Outgrow tool's step 2 (PolishDesign): what the area holds, one row of outgrow types
+// ("looks" in the code; By zone first, each in its colour) and the editor of the one picked (LookEditor: Save, Copy as new,
+// Back to saved, Back to as it ships, Rename, Delete; colour, planting style, then every setting, grouped and folded: what
+// the land past the lot becomes and the water gap first). Save on a built-in type changes it everywhere it is used.
+// The Global outgrow window (PolishCityCard, beside the panel, its header button, there whatever is picked): Outgrow all /
+// Remove all outgrow, Outgrow new buildings (this city), the status strip, the brush and the map lens side by side, then
+// Zones (one line per zone type: outgrown / buildings, its outgrow type, Edit; per kind and per zone Outgrow / Remove),
+// Edit (the editor) and Numbers (OutgrowStats). A Zoning type's zone has its Outgrow on its line (ZoneOutgrowInline:
+// switch, outgrow type, Edit; the list under the line: ZoneOutgrowPick); Edit opens Global outgrow's Edit on it.
 import React, { ReactNode, useCallback, useEffect, useState } from "react";
 import classNames from "classnames";
 import { PainterState, PolishZone, ToolState } from "../contract";
@@ -553,34 +551,35 @@ const TypeButton = ({ p, id, label, on, onClick, testId }: { p: PainterState; id
 };
 
 /**
- * A Zoning type's zone type: which outgrow type its buildings get (the Zoning type's own unless one is picked) and Edit,
- * which opens Global outgrow's editor on it. That is all: the settings live with the outgrow type.
+ * A Zoning type's zone type, on its line: Outgrow on or off, which outgrow type its buildings get (the Zoning type's own
+ * unless one is picked: the dropdown, its list under the line is ZoneOutgrowPick) and Edit (Global outgrow's editor on it).
  */
-export const ZoneLookRow = ({ p, value, typeLook, onPick, testId }: { p: PainterState; value: string; typeLook: string; onPick: (id: string) => void; testId: string }) => {
+export const ZoneOutgrowInline = ({ p, value, typeLook, on, setOn, open, toggle, testId }: { p: PainterState; value: string; typeLook: string; on: boolean; setOn: (on: boolean) => void; open: boolean; toggle: () => void; testId: string }) => {
     const { t } = useT();
-    const [open, setOpen] = useState(false);
     const current = value || typeLook;
     return (
-        <div className={s.zoneLookPick} data-testid={testId}>
-            <div className={s.zoneLookHead}>
-                <div className={s.zoneLookLabel}>{t("Placemaker.UI.Polish.OutgrowType", "Outgrow type")}</div>
-                <TypeButton p={p} id={current} label={value ? undefined : t("Placemaker.UI.Polish.TypeLook", "The type's ({0})", [lookName(t, p, typeLook)])} on={open} onClick={() => setOpen(!open)} testId={testId + "-open"} />
-                <div className={s.flex} />
-                {editable(p, current) ? <Btn icon="edit" iconSize={11} label={t("Placemaker.UI.Polish.EditShort", "Edit")} title={t("Placemaker.UI.Polish.EditLook", "Edit {0}", [lookName(t, p, current)])} onClick={() => openLookEditor(current)} testId={testId + "-edit"} /> : null}
-            </div>
-            {open ? (
-                <div className={s.pickBox}>
-                    <LookChips
-                        p={p}
-                        value={value}
-                        off={false}
-                        inherit={value ? typeLook : undefined}
-                        testId={testId + "-pick"}
-                        onPick={(v) => {
-                            onPick(v);
-                            setOpen(false);
-                        }}
-                    />
+        <div className={classNames(s.zoInline, { [s.zoInlineOff]: !on })} data-testid={testId}>
+            <Tip title={t("Placemaker.UI.ZoneMix.OutgrowOn", "Outgrow")} description={t("Placemaker.UI.ZoneMix.OutgrowOnTip", "On: this zone's buildings outgrow their lots with the outgrow type beside it. Off: they stay as the game makes them.")}>
+                <div className={s.zoSwitch}>
+                    <Switch testId={testId + "-on"} on={on} onChange={setOn} />
+                </div>
+            </Tip>
+            <TypeButton p={p} id={current} on={open} onClick={() => on && toggle()} testId={testId + "-open"} />
+            {editable(p, current) ? <Btn icon="edit" iconSize={11} title={t("Placemaker.UI.Polish.EditLook", "Edit {0}", [lookName(t, p, current)])} onClick={() => openLookEditor(current)} testId={testId + "-edit"} /> : null}
+        </div>
+    );
+};
+
+/** The outgrow types to pick for a Zoning type's zone (under its line): back to the Zoning type's own, and old settings
+ *  changed there before (cleared with a button). */
+export const ZoneOutgrowPick = ({ p, value, typeLook, oldChanges, onClear, onPick, testId }: { p: PainterState; value: string; typeLook: string; oldChanges: number; onClear: () => void; onPick: (id: string) => void; testId: string }) => {
+    const { t } = useT();
+    return (
+        <div className={s.pickBox} data-testid={testId + "-box"}>
+            <LookChips p={p} value={value} off={false} inherit={value ? typeLook : undefined} testId={testId} onPick={onPick} />
+            {oldChanges > 0 ? (
+                <div className={s.pickFoot}>
+                    <Btn icon="reset" iconSize={11} label={t("Placemaker.UI.ZoneMix.ClearOwn2", "Clear {0} settings changed here before", [oldChanges])} onClick={onClear} testId={testId + "-clear"} />
                 </div>
             ) : null}
         </div>

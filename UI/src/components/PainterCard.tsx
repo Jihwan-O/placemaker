@@ -19,6 +19,7 @@ import { act } from "../lib/bindings";
 import { categoryColor, CUSTOM_COLOR } from "../lib/palette";
 import { Chip } from "../stages/PresetBrowser";
 import { LensLegend, NOT_OUTGROWN, OutgrowStats, StatusStrip } from "./OutgrowStats";
+import { ScrollArea } from "./ScrollArea";
 import b from "../stages/browser.module.scss";
 import d from "../stages/design.module.scss";
 import c from "../controls/controls.module.scss";
@@ -808,7 +809,7 @@ export const PolishCityCard = ({ state }: { state: ToolState }) => {
                         )}
                     </div>
                 ) : null}
-                <div className={pn.bodyWrap}>
+                <ScrollArea className={pn.bodyWrap} testId="polish-city-body">
                     <div className={classNames(pn.body, s.cityBody)}>
                         <div className={s.cityTabs}>
                             <Segmented
@@ -926,7 +927,7 @@ export const PolishCityCard = ({ state }: { state: ToolState }) => {
                             </Frozen>
                         )}
                     </div>
-                </div>
+                </ScrollArea>
             {ask ? (
                 <Confirm
                     title={

@@ -28,6 +28,7 @@ import { Btn, Check, Icon, Keys, Segmented, Switch } from "./common";
 import { layoutFor, MAX_SHARE, MIN_REM, NARROW_REM, PanelLayoutContext, WIDE_DEFAULT_REM, WIDE_SCREEN_PX } from "../lib/layout";
 import { AssetPickerCard, PickerContext, PickerRequest } from "./picker";
 import { PolishCityCard, PolishDesign, useLookEditorRequests } from "./PainterCard";
+import { ScrollArea } from "./ScrollArea";
 import s from "./panel.module.scss";
 
 const STAGES: { id: Stage; key: string; en: string }[] = [
@@ -893,11 +894,11 @@ export const PlacemakerPanel = () => {
                                             </ErrorBoundary>
                                         )}
                                         <VersionNotice state={state} />
-                                        <div className={s.bodyWrap} data-testid="panel-body">
+                                        <ScrollArea className={s.bodyWrap} testId="panel-body">
                                             <div className={s.body} key={state.stage}>
                                                 <ErrorBoundary name={"stage-" + state.stage}>{body}</ErrorBoundary>
                                             </div>
-                                        </div>
+                                        </ScrollArea>
                                         <ErrorBoundary name="footer">
                                             <Footer state={state} summary={summary} blockedReason={blockedReason} lead={lead} ack={ackShown ? { on: ack, set: setAckBoth } : null} />
                                         </ErrorBoundary>

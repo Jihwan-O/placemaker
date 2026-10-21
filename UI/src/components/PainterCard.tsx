@@ -18,7 +18,7 @@ import { Confirm } from "./dialog";
 import { act } from "../lib/bindings";
 import { categoryColor, CUSTOM_COLOR } from "../lib/palette";
 import { Chip } from "../stages/PresetBrowser";
-import { LensLegend, OutgrowStats, StatusStrip } from "./OutgrowStats";
+import { LensLegend, NOT_OUTGROWN, OutgrowStats, StatusStrip } from "./OutgrowStats";
 import b from "../stages/browser.module.scss";
 import d from "../stages/design.module.scss";
 import c from "../controls/controls.module.scss";
@@ -640,7 +640,10 @@ type Ask = { what: "polishAll" | "unpolishAll" | "polishSome" | "unpolishSome"; 
 
 /** The Global outgrow window beside the panel: the whole city's buttons, new buildings, the brush, the lens, the numbers,
  *  then Zones (each zone type and its outgrow type) and Edit (every outgrow type and its settings). */
-export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: () => void }) => {
+/** How Global outgrow's window moves: dragged by its header, a double-click puts it back (Panel.tsx). */
+export type WindowMove = { onMouseDown: (e: React.MouseEvent<HTMLElement>) => void; onDoubleClick: (e: React.MouseEvent<HTMLElement>) => void; dragging: boolean };
+
+export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onClose: () => void; move?: WindowMove }) => {
     const { t } = useT();
     const [ask, setAsk] = useState<Ask>(null);
     const [picking, setPicking] = useState<string | null>(null);   // a zone id, or "brush"
@@ -677,8 +680,15 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
     return (
         <div className={classNames(pn.panel, s.cityPanel)} data-testid="polish-city" onMouseDown={(e) => e.stopPropagation()}>
             <div className={pn.panelTint}>
-                <div className={pn.header}>
-                    <div className={pn.logo} style={{ marginLeft: "6rem" }}>
+                <div className={classNames(pn.header, { [pn.headerDragging]: !!move?.dragging })} data-testid="polish-city-header" onMouseDown={move?.onMouseDown} onDoubleClick={move?.onDoubleClick}>
+                    {move ? (
+                        <Tip title={L("Move", "Move the window")} description={L("MoveTip", "Drag to move. Double-click to put it back on the left.")}>
+                            <div className={pn.grip}>
+                                <Icon name="grip" size={12} tint="dim" />
+                            </div>
+                        </Tip>
+                    ) : null}
+                    <div className={pn.logo} style={move ? undefined : { marginLeft: "6rem" }}>
                         <Icon name="building" size={15} tint="accent" />
                     </div>
                     <div className={pn.title}>{L("Global", "Global outgrow")}</div>
@@ -699,9 +709,14 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                             <TypeButton p={p} id={brushType} on={picking === "brush"} onClick={() => setPicking(picking === "brush" ? null : "brush")} testId="polish-brush-type" />
                         </div>
                         <div className={s.toolRow}>
-                            <Btn icon="brush" iconSize={11} label={L("BrushPaint", "Paint")} selected={p.brush === "paint"} title={L("BrushPaintTip2", "Paint over buildings; when you let go they get this outgrow type, first in the queue. Right-drag erases the stroke.")} onClick={() => act.polishCity("brush", p.brush === "paint" ? "off" : "paint:" + brushType)} testId="polish-brush-paint" />
-                            <Btn icon="trash" iconSize={11} label={L("BrushErase", "Erase")} selected={p.brush === "erase"} title={L("BrushEraseTip", "Paint over buildings: when you let go their outgrow is removed")} onClick={() => act.polishCity("brush", p.brush === "erase" ? "off" : "erase")} testId="polish-brush-erase" />
+                            <Btn icon="brush" iconSize={11} label={L("BrushPaint", "Paint")} selected={p.brush === "paint"} title={L("BrushPaintTip3", "Drag over buildings: every one the brush touches lights up; let go and they all get this outgrow type, first in the queue. Right-click drops the stroke.")} onClick={() => act.polishCity("brush", p.brush === "paint" ? "off" : "paint:" + brushType)} testId="polish-brush-paint" />
+                            <Btn icon="trash" iconSize={11} label={L("BrushErase", "Erase")} selected={p.brush === "erase"} title={L("BrushEraseTip2", "Drag over buildings: every one the brush touches lights up; let go and their outgrow is removed")} onClick={() => act.polishCity("brush", p.brush === "erase" ? "off" : "erase")} testId="polish-brush-erase" />
                         </div>
+                        {p.brush ? (
+                            <div className={s.brushSize} data-testid="polish-brush-size">
+                                <Slider testId="polish-brush-size-slider" value={Math.round(p.brushSize ?? 40)} min={8} max={200} step={2} unit=" m" onPreview={() => {}} onCommit={(v) => act.polishCity("brushSize", String(v))} />
+                            </div>
+                        ) : null}
                     </div>
                     <div className={s.toolCol} data-testid="polish-lens">
                         <div className={s.toolHead}>
@@ -745,7 +760,7 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                             <div className={s.legendGrid} data-testid="polish-lens-types">
                                 {(p.lensTypes ?? []).map((x) => (
                                     <div key={x.id} className={s.legendCell}>
-                                        <div className={s.dot} style={{ backgroundColor: x.id === "-" ? "#c2c8d0" : lookColor(p, x.id) }} />
+                                        <div className={s.dot} style={{ backgroundColor: x.id === "-" ? NOT_OUTGROWN : lookColor(p, x.id) }} />
                                         <div className={s.legendCellName}>{x.id === "-" ? L("NotOutgrown", "Not outgrown") : x.id === "" ? L("NoType", "No type") : lookName(t, p, x.id)}</div>
                                         <div className={s.legendCellCount}>{num(x.count)}</div>
                                     </div>

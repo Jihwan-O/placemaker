@@ -12,13 +12,16 @@ import { Collapsible } from "./common";
 import s from "./outgrowStats.module.scss";
 
 /** The categorical steps for a dark surface, in their validated order (the dataviz skill's, checked on #141c24). */
+/** Not outgrown, on the types map and the ring: a dark slate (the planting styles are the light greys). */
+export const NOT_OUTGROWN = "#4b5361";
+
 export const SERIES = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
 const NOT = "rgba(255, 255, 255, 0.14)";
 const OTHER = "#8a93a3";
 /** The status lens's colours (PlacemakerOverlaySystem.LensTints), for its legend. */
 export const LENS = [
     { color: "#78e054", key: "polished", en: "Outgrown" },
-    { color: "#c2c8d0", key: "not", en: "Not outgrown" },
+    { color: NOT_OUTGROWN, key: "not", en: "Not outgrown" },
     { color: "#3888f2", key: "planning", en: "Fitting now" },
     { color: "#fff273", key: "added", en: "Just queued" },
     { color: "#ffc76b", key: "wait0", en: "Queued <10s" },

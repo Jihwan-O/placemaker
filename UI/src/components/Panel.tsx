@@ -51,9 +51,9 @@ const DOCK_BOTTOM = 112;
 /** Floating position as fractions of the viewport (survives resolution / UI-scale changes). */
 type Pos = { fx: number; fy: number } | null;
 
-function loadPos(): Pos {
+function loadPos(key = POS_KEY): Pos {
     try {
-        const raw = window.localStorage?.getItem(POS_KEY);
+        const raw = window.localStorage?.getItem(key);
         if (!raw) return null;
         const v = JSON.parse(raw);
         return v && typeof v.fx === "number" && typeof v.fy === "number" ? { fx: v.fx, fy: v.fy } : null;
@@ -62,10 +62,10 @@ function loadPos(): Pos {
     }
 }
 
-function savePos(p: Pos) {
+function savePos(p: Pos, key = POS_KEY) {
     try {
-        if (p) window.localStorage?.setItem(POS_KEY, JSON.stringify(p));
-        else window.localStorage?.removeItem(POS_KEY);
+        if (p) window.localStorage?.setItem(key, JSON.stringify(p));
+        else window.localStorage?.removeItem(key);
     } catch {
         /* storage unavailable: the position is simply not remembered */
     }
@@ -131,8 +131,74 @@ function remPx() {
     return fs > 0 ? fs : window.innerHeight / 1080;
 }
 
+const CITY_POS_KEY = "placemaker.cityPos.v1";
+/** Global outgrow's window width in rem (keep in sync with .cityWindow). */
+const CITY_WIDTH_REM = 296;
+
+/**
+ * Global outgrow's own window: on the left of the screen until moved by its header (remembered as fractions of the
+ * screen, like the panel); a double-click on the header puts it back.
+ */
+function useCityWindow() {
+    const [pos, setPos] = useState<Pos>(() => loadPos(CITY_POS_KEY));
+    const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
+    const ref = useRef<HTMLDivElement | null>(null);
+    const clamp = (x: number, y: number) => {
+        const r = remPx();
+        return {
+            x: Math.max(0, Math.min(window.innerWidth - CITY_WIDTH_REM * r, x)),
+            y: Math.max(0, Math.min(window.innerHeight - (MIN_HEIGHT_REM + DOCK_BOTTOM) * r, y)),
+        };
+    };
+    const onMouseDown = (e: React.MouseEvent<HTMLElement>) => {
+        if (e.button !== 0 || isInsideButton(e.target as HTMLElement, e.currentTarget)) return;
+        const rect = ref.current?.getBoundingClientRect();
+        if (!rect) return;
+        e.preventDefault();
+        const sx = e.clientX,
+            sy = e.clientY;
+        let moved = false;
+        const move = (ev: MouseEvent) => {
+            const dx = ev.clientX - sx,
+                dy = ev.clientY - sy;
+            if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+            moved = true;
+            setDrag(clamp(rect.left + dx, rect.top + dy));
+        };
+        const up = (ev: MouseEvent) => {
+            window.removeEventListener("mousemove", move);
+            window.removeEventListener("mouseup", up);
+            if (!moved) return;
+            const c = clamp(rect.left + ev.clientX - sx, rect.top + ev.clientY - sy);
+            const p = { fx: c.x / window.innerWidth, fy: c.y / window.innerHeight };
+            savePos(p, CITY_POS_KEY);
+            setPos(p);
+            setDrag(null);
+        };
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", up);
+    };
+    const onDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
+        if (isInsideButton(e.target as HTMLElement, e.currentTarget)) return;
+        savePos(null, CITY_POS_KEY);
+        setPos(null);
+        setDrag(null);
+    };
+    const r = remPx();
+    let style: React.CSSProperties | undefined;
+    let left = 12 * r;
+    if (drag || pos) {
+        const c = drag ?? clamp((pos as { fx: number }).fx * window.innerWidth, (pos as { fy: number }).fy * window.innerHeight);
+        // moved: its top where it was dropped, as tall as the room down to the bottom toolbar (the card itself is only as tall as it needs)
+        style = { left: c.x + "px", top: c.y + "px", bottom: "auto", height: Math.max(MIN_HEIGHT_REM * r, window.innerHeight - c.y - DOCK_BOTTOM * r) + "px" };
+        left = c.x;
+    }
+    const side: TipDirection = left + (CITY_WIDTH_REM * r) / 2 > window.innerWidth / 2 ? "left" : "right";
+    return { ref, style, side, move: { onMouseDown, onDoubleClick, dragging: !!drag } };
+}
+
 function usePanelPosition() {
-    const [pos, setPos] = useState<Pos>(loadPos);
+    const [pos, setPos] = useState<Pos>(() => loadPos());
     const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
     const [chosen, setChosen] = useState<number | null>(loadWidth);
     const [resizing, setResizing] = useState<number | null>(null);
@@ -718,6 +784,7 @@ export const PlacemakerPanel = () => {
     useLookEditorRequests(useCallback(() => setCityOpen(true), []));
     const permKey = useMemo(() => JSON.stringify(summary.permanent), [summary.permanent]);
     const position = usePanelPosition();
+    const city = useCityWindow();
     const layout = useMemo(() => layoutFor(position.width), [position.width]);
 
     useEffect(() => setAck(false), [permKey, state.stage === "review"]);
@@ -995,13 +1062,6 @@ export const PlacemakerPanel = () => {
                                 )}
                             </div>
                         </div>
-                        {cityAvailable && cityOpen && !collapsed ? (
-                            <div className={classNames(s.flyout, s.flyoutWide, position.side === "left" ? s.flyoutLeft : s.flyoutRight)} data-testid="polish-city-flyout">
-                                <ErrorBoundary name="polish-city">
-                                    <PolishCityCard state={state} onClose={() => setCityOpen(false)} />
-                                </ErrorBoundary>
-                            </div>
-                        ) : null}
                         {!picker && !collapsed && !(cityAvailable && cityOpen) ? (
                             <ErrorBoundary name="legend">
                                 <Legend state={state} summary={summary} side={position.side === "left" ? "left" : "right"} />
@@ -1015,6 +1075,15 @@ export const PlacemakerPanel = () => {
                             </div>
                         ) : null}
                     </div>
+                    {cityAvailable && cityOpen && !collapsed ? (
+                        <TipDirectionContext.Provider value={city.side}>
+                            <div ref={city.ref} className={s.cityWindow} style={city.style} data-testid="polish-city-flyout">
+                                <ErrorBoundary name="polish-city">
+                                    <PolishCityCard state={state} onClose={() => setCityOpen(false)} move={city.move} />
+                                </ErrorBoundary>
+                            </div>
+                        </TipDirectionContext.Provider>
+                    ) : null}
                 </div>
                 </PanelLayoutContext.Provider>
             </TipDirectionContext.Provider>

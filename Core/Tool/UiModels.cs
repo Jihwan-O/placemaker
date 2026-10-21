@@ -115,6 +115,7 @@ namespace Placemaker.Core.Tool
         public List<(string Look, int Count)> LensTypes = new List<(string, int)>();
         /// <summary>Global outgrow's brush: "" off, "paint" (the type picked) or "erase"; the type it paints.</summary>
         public string Brush = "", BrushLook = "";
+        public float BrushSize = 40f;
         /// <summary>Every zone type: prefab name, kind (home, shop, office, industry), its look ("off"), set for it (not its kind's),
         /// its icon, its own built-in look (what it gets with no pick of its own nor of its kind).</summary>
         public List<(string Id, string Kind, string Look, bool Own, string Icon, string Default)> Zones = new List<(string, string, string, bool, string, string)>();
@@ -282,7 +283,7 @@ namespace Placemaker.Core.Tool
                     .Set("defaults", Knobs(p.Defaults)).Set("typeLook", p.TypeLook ?? "")
                     .Set("lens", p.Lens).Set("lensWanted", p.LensWanted).Set("lensCounts", Arr(p.LensCounts.Select(n => JsonValue.Num(n))))
                     .Set("lensMode", p.LensMode ?? "status").Set("lensTypes", Arr(p.LensTypes.Select(x => JsonValue.Obj().Set("id", x.Look).Set("count", x.Count))))
-                    .Set("brush", p.Brush ?? "").Set("brushLook", p.BrushLook ?? "")
+                    .Set("brush", p.Brush ?? "").Set("brushLook", p.BrushLook ?? "").Set("brushSize", JsonValue.Num(p.BrushSize))
                     .Set("stats", p.Stats == null ? JsonValue.Null : StatsJson(p.Stats))
                     .Set("zones", Arr(p.Zones.Select(z => JsonValue.Obj().Set("id", z.Id).Set("kind", z.Kind).Set("look", z.Look).Set("own", z.Own).Set("icon", z.Icon ?? "").Set("def", z.Default ?? ""))))
                     .Set("areaZones", Arr(p.AreaZones.Select(z => JsonValue.Obj().Set("key", z.Key).Set("zone", z.Zone).Set("icon", z.Icon ?? "").Set("count", z.Count)))));

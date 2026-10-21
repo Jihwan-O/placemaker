@@ -83,7 +83,6 @@ namespace Placemaker.Game.Tool
         /// <summary>Every frame: the selection polished again once the look or the selection has settled for a moment.</summary>
         private void UpdateLivePolish()
         {
-            UpdateOutgrowBrush();
             if (!_painter || !_polishLive || _building) return;
             if (!ReferenceEquals(_liveShape, _shape)) { _liveShape = _shape; LiveChanged(); }
             if (_shape == null || _liveDone == _liveVersion || _gesture != Gesture.None || UnityEngine.Time.realtimeSinceStartup - _liveAt < LiveDelay) return;
@@ -324,6 +323,9 @@ namespace Placemaker.Game.Tool
                 case "cityOpen": _cityOpen = on; if (!on && _brush != 0) { _brush = 0; } Touch(); return;
                 case "lens": _lensWanted = on; Touch(); return;
                 case "lensMode": _lensMode = value == "types" ? "types" : "status"; Touch(); return;
+                case "brushSize":
+                    if (float.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var bs)) SetOutgrowBrushWidth(bs);
+                    return;
                 case "brush":
                 {
                     // "paint:<look>", "erase" or "off"
@@ -342,14 +344,29 @@ namespace Placemaker.Game.Tool
         private string _lensMode = "status";
         /// <summary>The status lens is drawn (PlacemakerOverlaySystem).</summary>
         public bool OutgrowLens => _cityOpen && _lensWanted;
+        /// <summary>Global outgrow's window is open: its lens switch alone decides what the map shows.</summary>
+        public bool OutgrowCityOpen => _cityOpen;
         public string OutgrowLensMode => _lensMode;
 
-        // Global outgrow's brush: the Outgrow tool with Paint area; every stroke, once let go, stamps the buildings under it
-        // with the outgrow type picked (erase: puts them back) at the front of the line, and the area clears for the next one
+        // Global outgrow's brush: a plain painter of its own, not an area tool (the panel's stage, mode and area are left as
+        // they are). A stroke takes every building it touches (lit on the map); let go, they all get the outgrow type picked
+        // (erase: put back) at the front of the line.
         private int _brush;
         private string _brushLook;
-        private AreaShape _brushShape;
-        private float _brushShapeAt;
+        private readonly HashSet<Entity> _brushHits = new HashSet<Entity>();
+        private readonly List<float3[]> _brushRings = new List<float3[]>();
+        private bool _brushDown;
+        private float2 _brushLast;
+        private float _brushWidth = 40f;
+
+        public bool OutgrowBrushOn => _brush != 0;
+        public bool OutgrowBrushPainting => _brush > 0;
+        public string OutgrowBrushLook => _brushLook;
+        /// <summary>The brush's diameter in metres.</summary>
+        public float OutgrowBrushWidth => _brushWidth;
+        /// <summary>The lots of the buildings the stroke has touched so far (the overlay lights them); bumped when they change.</summary>
+        public IReadOnlyList<float3[]> OutgrowBrushRings => _brushRings;
+        public int OutgrowBrushVersion { get; private set; }
 
         /// <summary>The brush on ("paint" with a look, "erase") or off ("").</summary>
         public void SetOutgrowBrush(string mode, string look)
@@ -360,43 +377,75 @@ namespace Placemaker.Game.Tool
                 if (NeighbourPolishSystem.LookById(look) == null) { _brush = 0; Touch(); return; }
                 _brushLook = look;
             }
+            _brushDown = false;
+            ClearBrushHits();
             if (_brush != 0)
             {
-                if (_stage == ToolStage.Manage) GoToStage(ToolStage.Area);
-                if (!_painter) SetPainter(true);
+                // the tool takes the mouse (the brush's strokes), nothing else changes
                 if (m_ToolSystem != null && m_ToolSystem.activeTool != this) { _closeAfterGhost = 0; m_ToolSystem.activeTool = this; }
-                if (_brush > 0) SelectLook(look, remember: false);
                 // the map lens shows what the brush changes: outgrow types while painting, outgrown or not while erasing
                 _lensWanted = true;
                 _lensMode = _brush > 0 ? "types" : "status";
-                SetAreaMode(SelectionMode.Paint);
-                _brushShape = _shape;
                 Mod.Log.Info($"Placemaker outgrow brush: {(_brush > 0 ? "paint " + look : "erase")}");
             }
             Touch();
         }
 
-        /// <summary>Every frame: a brush stroke let go stamps the buildings under it, then the area clears.</summary>
-        private void UpdateOutgrowBrush()
+        public void SetOutgrowBrushWidth(float metres)
         {
-            if (_brush == 0) return;
-            if (!_painter) { _brush = 0; Touch(); return; }
-            if (_building || _gesture != Gesture.None) return;
-            if (!ReferenceEquals(_brushShape, _shape)) { _brushShape = _shape; _brushShapeAt = UnityEngine.Time.realtimeSinceStartup; return; }
-            if (_shape == null || UnityEngine.Time.realtimeSinceStartup - _brushShapeAt < 0.2f) return;
+            _brushWidth = math.clamp(metres, 4f, 300f);
+            Touch();
+        }
+
+        /// <summary>
+        /// The brush instead of the area tools, every frame while it is on: a press starts a stroke, every building it touches
+        /// is taken (and lit), let go they all get the brush's outgrow type or lose their outgrow; a right-click drops the stroke.
+        /// </summary>
+        private void UpdateOutgrowBrushInput()
+        {
+            _cursorValid = _in.HasHit && _in.OverWorld;
+            if (_cursorValid) _cursor = _in.Hit;
+            if (!_cityOpen) { SetOutgrowBrush("off", null); return; }
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();
             if (polish == null) return;
-            var lots = PainterLots(polish);
-            if (lots.Count > 0)
+            float r = _brushWidth * 0.5f;
+            if (!_brushDown)
+            {
+                if (!_in.LeftPressed || !_cursorValid) return;
+                _brushDown = true;
+                ClearBrushHits();
+                _brushLast = _in.Hit.xz;
+                if (polish.BrushTouch(_brushLast, _brushLast, r, _brushHits, _brushRings) > 0) OutgrowBrushVersion++;
+                return;
+            }
+            if (_in.RightPressed) { _brushDown = false; ClearBrushHits(); return; }
+            if (_in.LeftHeld)
+            {
+                if (_in.HasHit && math.distance(_in.Hit.xz, _brushLast) > math.max(1f, r * 0.2f))
+                {
+                    if (polish.BrushTouch(_brushLast, _in.Hit.xz, r, _brushHits, _brushRings) > 0) OutgrowBrushVersion++;
+                    _brushLast = _in.Hit.xz;
+                }
+                return;
+            }
+            _brushDown = false;
+            if (_brushHits.Count > 0)
             {
                 var settings = global::Placemaker.Game.Tool.ToolRegistration.Settings;
                 if (_brush > 0 && settings != null && !settings.NeighbourhoodPolish) { settings.NeighbourhoodPolish = true; settings.ApplyAndSave(); }
-                NeighbourPolishSystem.Stamp(lots, _brush > 0, _brush > 0 ? _brushLook : "zone", null);
-                LastStamp = (lots.Count, _brush > 0);
-                Mod.Log.Info($"Placemaker outgrow brush: {lots.Count} buildings {(_brush > 0 ? "outgrown as " + _brushLook : "put back")}");
+                NeighbourPolishSystem.Stamp(new List<Entity>(_brushHits), _brush > 0, _brush > 0 ? _brushLook : "zone", null);
+                LastStamp = (_brushHits.Count, _brush > 0);
+                Mod.Log.Info($"Placemaker outgrow brush: {_brushHits.Count} buildings {(_brush > 0 ? "outgrown as " + _brushLook : "put back")}");
             }
-            ClearArea();
-            _brushShape = _shape;
+            ClearBrushHits();
+        }
+
+        private void ClearBrushHits()
+        {
+            if (_brushHits.Count == 0 && _brushRings.Count == 0) return;
+            _brushHits.Clear();
+            _brushRings.Clear();
+            OutgrowBrushVersion++;
         }
 
         /// <summary>Polish (yes) or Unpolish (no) the lots in the area. The selection stays (press it again as often as wanted).</summary>
@@ -527,6 +576,7 @@ namespace Placemaker.Game.Tool
             foreach (var kv in NeighbourPolishSystem.LensTypeCounts.OrderByDescending(k => k.Value)) v.LensTypes.Add((kv.Key, kv.Value));
             v.Brush = _brush > 0 ? "paint" : _brush < 0 ? "erase" : "";
             v.BrushLook = _brushLook ?? "";
+            v.BrushSize = _brushWidth;
             if (NeighbourPolishSystem.StatusInCity) v.Stats = StatsView();
             v.AreaZones.AddRange(_areaZones);
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();

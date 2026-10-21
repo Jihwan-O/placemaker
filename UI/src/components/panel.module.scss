@@ -633,11 +633,6 @@
     pointer-events: none;
 }
 
-// Global outgrow: wider than the picker that shares the flyout
-.flyoutWide {
-    width: 440rem;
-}
-
 .flyoutLeft {
     right: 100%;
     margin-right: 10rem;
@@ -646,6 +641,17 @@
 .flyoutRight {
     left: 100%;
     margin-left: 10rem;
+}
+
+// Global outgrow's own window: on the left of the screen until moved by its header (Panel.tsx, useCityWindow)
+.cityWindow {
+    @include col;
+    position: absolute;
+    top: 64rem;
+    left: 12rem;
+    bottom: 112rem;
+    width: 296rem;
+    pointer-events: none;
 }
 
 // ── crash ──

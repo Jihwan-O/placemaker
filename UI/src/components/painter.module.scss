@@ -238,6 +238,12 @@
     color: $c-text-dim;
 }
 
+// the brush's size, under Paint and Erase while it is on
+.brushSize {
+    min-width: 0;
+    margin-top: 4rem;
+}
+
 // the brush and the map lens, side by side
 .tools {
     @include row(stretch);

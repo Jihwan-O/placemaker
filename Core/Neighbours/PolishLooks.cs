@@ -188,19 +188,21 @@ namespace Placemaker.Core.Neighbours
         };
 
         /// <summary>Each built-in look's colour (the zone ones: the dataviz palette's dark steps, in its validated order).</summary>
+        // The zone types' looks in their zones' colours (the zone tool's: homes greens, shops blues, offices purples,
+        // industry yellow; UI ZoneMix ZONE_COLOR), the planting styles in quiet greys and stones; no red (it reads as an error).
         public static readonly IReadOnlyDictionary<string, string> DefaultColors = new Dictionary<string, string>
         {
-            ["houses"] = "#3987e5", ["shops"] = "#d95926", ["apartments"] = "#199e70", ["offices"] = "#c98500", ["towers"] = "#d55181",
-            ["industry"] = "#008300", ["rows"] = "#9085e9", ["bigShops"] = "#e66767", ["mixed"] = "#4cb8c4", ["officeTowers"] = "#a0782a",
-            ["garden"] = "#6fbf3f", ["natural"] = "#9c8455", ["tidy"] = "#3fa98a", ["yard"] = "#8a7560", ["meadow"] = "#b5b84a",
-            ["rustic"] = "#b07a45", ["coastal"] = "#3fa9d6", ["manicured"] = "#2e9e5e",
+            ["houses"] = "#9be07a", ["rows"] = "#7fcf62", ["apartments"] = "#5fb84a", ["towers"] = "#3f9a3a", ["mixed"] = "#52c7a6",
+            ["shops"] = "#71b9ff", ["bigShops"] = "#3d86e6", ["offices"] = "#b896ff", ["officeTowers"] = "#8c66e6", ["industry"] = "#f2b84b",
+            ["garden"] = "#b9c0c9", ["natural"] = "#a89c86", ["tidy"] = "#8d9db2", ["yard"] = "#8f857b", ["meadow"] = "#cbbf93",
+            ["rustic"] = "#a88b6e", ["coastal"] = "#8fb6c6", ["manicured"] = "#7e8792",
         };
 
         /// <summary>The colours the player picks from (a new look of theirs takes the first one no look has).</summary>
         public static readonly string[] Swatches =
         {
-            "#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767",
-            "#4cb8c4", "#a0782a", "#6fbf3f", "#9c8455", "#3fa9d6", "#b5b84a", "#e0e0e0", "#7d5fb2",
+            "#9be07a", "#5fb84a", "#52c7a6", "#71b9ff", "#3d86e6", "#b896ff", "#8c66e6", "#f2b84b",
+            "#d9a03a", "#b9c0c9", "#8d9db2", "#a89c86", "#8fb6c6", "#cbbf93", "#e0e0e0", "#7e8792",
         };
 
         /// <summary>A look's colour: its own, else its built-in one, else grey.</summary>

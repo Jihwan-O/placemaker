@@ -251,6 +251,7 @@ namespace Placemaker.Game.Tool
 
                 if (HandleKeys()) { /* key handled: no tool input this frame */ }
                 else if (_stage == ToolStage.Building) { /* input ignored while building */ }
+                else if (_brush != 0) UpdateOutgrowBrushInput();   // Global outgrow's brush: the mouse is its own
                 else if (_markerKind != null) UpdateMarkers();
                 else if (_stage == ToolStage.Manage) UpdateManage();
                 else

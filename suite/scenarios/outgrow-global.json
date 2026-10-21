@@ -95,7 +95,7 @@
         },
         {
           "do": "area",
-          "tool": "paint",
+          "tool": "outgrowBrush",
           "stroke": [
             [
               -60,
@@ -132,6 +132,25 @@
         },
         {
           "do": "polish",
+          "click": "polish-lens-on",
+          "shot": "global-lens-off-brushing",
+          "shotMode": "ui",
+          "camera": {
+            "target": "point",
+            "at": [
+              0,
+              0
+            ],
+            "view": "top",
+            "distance": 260
+          }
+        },
+        {
+          "do": "polish",
+          "click": "polish-lens-on"
+        },
+        {
+          "do": "polish",
           "click": "polish-city-tab-numbers",
           "shot": "global-numbers",
           "shotMode": "ui"
@@ -146,6 +165,22 @@
           "do": "polish",
           "click": "polish-city-tab-edit",
           "shot": "global-edit",
+          "shotMode": "ui"
+        },
+        {
+          "do": "polish",
+          "drag": "polish-city-header",
+          "by": [
+            700,
+            60
+          ],
+          "shot": "global-moved",
+          "shotMode": "ui"
+        },
+        {
+          "do": "polish",
+          "doubleClick": "polish-city-header",
+          "shot": "global-back-left",
           "shotMode": "ui"
         }
       ]

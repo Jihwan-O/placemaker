@@ -187,6 +187,8 @@ export interface PainterState {
   /** Global outgrow's brush: "" off, "paint" (brushLook) or "erase". */
   brush?: string;
   brushLook?: string;
+  /** The brush's diameter in metres. */
+  brushSize?: number;
   /** A Zoning type picked: the look its zones take unless one picks its own. */
   typeLook?: string;
   /** Every zone type of the game: its look ("off": not polished) and whether it has its own (else its kind's). */

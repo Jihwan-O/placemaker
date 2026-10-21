@@ -145,6 +145,26 @@ namespace Placemaker.Game.Suite
                 if (reply == null || !((bool?)reply["value"]?["found"] ?? false)) rec["error"] = "polish: nothing to click with data-testid '" + testId + "'";
                 yield return Frames(10);
             }
+            if (step["drag"] != null)
+            {
+                // a window moved by its header: { "drag": testId, "by": [dx, dy] } in screen pixels
+                string testId = (string)step["drag"];
+                var by = step["by"] as JArray;
+                float dx = by != null && by.Count > 0 ? (float)by[0] : 0f, dy = by != null && by.Count > 1 ? (float)by[1] : 0f;
+                JObject reply = null;
+                yield return UiRun(SuiteUiSystem.DragJs(testId, dx, dy), r => reply = r);
+                rec["dragged"] = reply?["value"];
+                if (reply == null || !((bool?)reply["value"]?["found"] ?? false)) rec["error"] = "polish: nothing to drag with data-testid '" + testId + "'";
+                yield return Frames(10);
+            }
+            if (step["doubleClick"] != null)
+            {
+                string testId = (string)step["doubleClick"];
+                JObject reply = null;
+                yield return UiRun(SuiteUiSystem.DoubleClickJs(testId), r => reply = r);
+                if (reply == null || !((bool?)reply["value"]?["found"] ?? false)) rec["error"] = "polish: nothing to double-click with data-testid '" + testId + "'";
+                yield return Frames(10);
+            }
             if (step["clickText"] != null)
             {
                 string text = (string)step["clickText"];

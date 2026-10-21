@@ -281,10 +281,14 @@ namespace Placemaker.Game.Suite
                 }
                 case "paint":
                 case "paintanything":
+                case "outgrowbrush":
                 {
-                    yield return UiSetAreaMode(rec, tool == "paint" ? SelectionMode.BlockPaint : SelectionMode.Paint);
+                    // outgrowBrush: Global outgrow's brush (on already, from its window); the panel's area mode is left alone
+                    bool outgrow = tool == "outgrowbrush";
+                    if (!outgrow) yield return UiSetAreaMode(rec, tool == "paint" ? SelectionMode.BlockPaint : SelectionMode.Paint);
                     float size = (float?)step["size"] ?? math.min(b.X1 - b.X0, b.Z1 - b.Z0) * 0.45f;
-                    _tool.SetBrush((bool?)step["square"] ?? false, size, (float?)step["angle"] ?? 0f);
+                    if (outgrow) _tool.SetOutgrowBrushWidth(size);
+                    else _tool.SetBrush((bool?)step["square"] ?? false, size, (float?)step["angle"] ?? 0f);
                     yield return Frames(2);
                     var path = new List<float3>();
                     if (step["stroke"] is JArray stroke) foreach (var p in stroke) path.Add(P3(Pt(p, b, abs)));

@@ -88,6 +88,27 @@ namespace Placemaker.Game.Overlay
                 if (_lens[k].Count > 0) _fill.SetLayer("outgrowLens" + k, _lens[k], LensTints[k], -94.4f + k * 0.02f, _lensSig[k]);
         }
 
+        private readonly List<float3[]> _brushLots = new List<float3[]>();
+        private int _brushVersion = -1;
+        private long _brushSig;
+
+        /// <summary>Global outgrow's brush: its disc at the cursor and every building the stroke has touched so far, lit in
+        /// the brush's outgrow type colour (erasing: white) until let go.</summary>
+        private void DrawOutgrowBrush(global::Game.Rendering.OverlayRenderSystem.Buffer buffer, float w)
+        {
+            Color c = Color.white;
+            if (_tool.OutgrowBrushPainting && ColorUtility.TryParseHtmlString(PolishLooksColor(_tool.OutgrowBrushLook), out var lc)) c = lc;
+            if (_brushVersion != _tool.OutgrowBrushVersion)
+            {
+                _brushVersion = _tool.OutgrowBrushVersion;
+                _brushLots.Clear();
+                _brushLots.AddRange(_tool.OutgrowBrushRings);
+                _brushSig = FilledPreviewSystem.Signature(_brushLots) ^ ((long)_brushVersion << 20);
+            }
+            if (_brushLots.Count > 0) _fill.SetLayer("outgrowBrush", _brushLots, new Color(c.r, c.g, c.b, 0.8f), -94.0f, _brushSig);
+            if (_tool.CursorValid) buffer.DrawCircle(new Color(c.r, c.g, c.b, 0.95f), new Color(c.r, c.g, c.b, 0.12f), w * 0.6f, 0, new float2(0, 1), _tool.Cursor, _tool.OutgrowBrushWidth);
+        }
+
         private void DrawPolishedLots()
         {
             var polish = World.GetExistingSystemManaged<NeighbourPolishSystem>();

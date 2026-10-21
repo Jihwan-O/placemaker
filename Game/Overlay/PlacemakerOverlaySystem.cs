@@ -89,14 +89,17 @@ namespace Placemaker.Game.Overlay
                 if (_tool.Stage == ToolStage.Manage) DrawManage(buffer, w);
                 else
                 {
+                    // Global outgrow open: its lens or nothing (the lens off shows the plain map, even while brushing)
                     if (_tool.OutgrowLens) DrawOutgrowLens();
-                    else if (_tool.Painter) DrawPolishedLots();
+                    else if (_tool.Painter && !_tool.OutgrowCityOpen) DrawPolishedLots();
+                    else PolishedShown = 0;
                     if (_tool.Stage == ToolStage.Design || _tool.Stage == ToolStage.Review || _tool.Stage == ToolStage.Building)
                         DrawPlan(buffer, w, detail);
                     DrawSelection(buffer, w);
                     DrawMarkers(buffer, w);
                     DrawErrors(buffer, w);
                 }
+                if (_tool.OutgrowBrushOn) DrawOutgrowBrush(buffer, w);
                 _fill.EndFrame();
             }
             catch (Exception e)

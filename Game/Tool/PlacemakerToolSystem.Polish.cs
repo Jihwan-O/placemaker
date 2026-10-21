@@ -178,7 +178,7 @@ namespace Placemaker.Game.Tool
             }
             LastStamp = (stamped, true);
             Mod.Log.Info($"Placemaker zoning: {stamped} buildings outgrown with {layer.LookId} by zone type: {perZone} ({AreaM2:F0} m² picked with {SelectionModes.Id(_mode)})");
-            Flash(new LocText("Placemaker.Polish.Built", stamped), 5f);
+            Flash(NeighbourPolishSystem.Paused ? new LocText("Placemaker.Painter.Paused") : new LocText("Placemaker.Polish.Built", stamped), 5f);
             SuiteNoteBuilt(0);
             _countShape = null;
             Touch();

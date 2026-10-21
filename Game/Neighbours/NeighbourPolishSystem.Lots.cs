@@ -93,7 +93,7 @@ namespace Placemaker.Game.Neighbours
                         _growablePrefab[r.m_Prefab] = g = EntityManager.HasComponent<SpawnableBuildingData>(r.m_Prefab) && EntityManager.HasComponent<BuildingData>(r.m_Prefab);
                     if (g) total++;
                 }
-            int waiting = FeatureEnabled ? _dirty.Count + s_stamps.Count : s_stamps.Count;
+            int waiting = FeatureEnabled && !Paused ? _dirty.Count + s_stamps.Count : s_stamps.Count;
             int restoring = _restoreQueue.Count;
             if (yes != StatusPolished || total != StatusTotal || waiting != StatusWaiting || restoring != StatusRestoring || !StatusInCity)
             {
@@ -305,9 +305,10 @@ namespace Placemaker.Game.Neighbours
                     var half = (float2)EntityManager.GetComponentData<BuildingData>(prefab).m_LotSize * 4f + 2f;
                     var fwd = math.normalizesafe(math.mul(t.m_Rotation, new float3(0f, 0f, 1f)).xz, new float2(0f, 1f));
                     var right = new float2(fwd.y, -fwd.x);
-                    // a new lot: polished when the polish is on and new houses are, unless its zone's look is Off
+                    // a new lot: polished when Outgrow runs and new buildings are on (both this city's), unless its zone's
+                    // look is Off; paused: no new lot outgrows (a replaced building still keeps its flag)
                     var zoneLook = LookOfZone(prefab);
-                    bool yes = FeatureEnabled && PolishNew && zoneLook != "off";
+                    bool yes = FeatureEnabled && !Paused && PolishNew && zoneLook != "off";
                     bool carried = false;
                     for (int k = _goneFlags.Count - 1; k >= 0; k--)
                     {
@@ -319,8 +320,9 @@ namespace Placemaker.Game.Neighbours
                         carried = true;
                         break;
                     }
-                    // grown in an area zoned with a look (a Zoning type): that look and its changes
-                    var area = carried ? null : LookAreaAt(t.m_Position.xz, ZoneName(prefab));
+                    // grown in an area zoned with a look (a Zoning type): that look and its changes, whatever new buildings
+                    // are set to (not while paused)
+                    var area = carried || Paused ? null : LookAreaAt(t.m_Position.xz, ZoneName(prefab));
                     if (area != null) { yes = area.Look != PolishLooks.Hash(LookOff); TotalByArea++; }
                     if (!yes) area = null;
                     var look = yes ? (area != null ? LookByHash(area.Look) : null) ?? LookById(zoneLook) ?? PolishLooks.BuiltIn[0] : null;
@@ -427,7 +429,7 @@ namespace Placemaker.Game.Neighbours
             _stampNo += no;
             _stampRestored += restored;
             if (s_stamps.Count > 0) return;
-            Mod.Log.Info($"Placemaker neighbourhood polish: {_stampYes} lots polished, {_stampNo} unpolished ({_stampRestored} of them put back){(FeatureEnabled ? "" : " (the polish is switched off: gardens change once it is on)")}.");
+            Mod.Log.Info($"Placemaker neighbourhood polish: {_stampYes} lots polished, {_stampNo} unpolished ({_stampRestored} of them put back){(FeatureEnabled && !Paused ? "" : " (Outgrow is paused: gardens change once it runs)")}.");
             _stampYes = _stampNo = _stampRestored = 0;
         }
 

@@ -11,6 +11,7 @@
 //   * PolishLawnOriginal on one of the house's own lawns the polish reshaped: its nodes as the game made them, so Unpolish
 //     (and a later plan) gives the lawn back exactly, also after a load.
 //   * PolishGarden on a polished house: its garden's outline as its last plan wrote it (neighbours planned later keep to it).
+//   * PolishCitySwitches on one headless entity: the city's own Outgrow switches (new buildings, the master switch).
 
 using Colossal.Serialization.Entities;
 using Unity.Entities;
@@ -170,5 +171,30 @@ namespace Placemaker.Game.Neighbours
 
         public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter => writer.Write(Position);
         public void Deserialize<TReader>(TReader reader) where TReader : IReader => reader.Read(out Position);
+    }
+
+    /// <summary>The city's own Outgrow switches (NeighbourPolishSystem.Switches), on one headless entity. A city without it
+    /// (new, or saved before the switches were per city) has new buildings off and Outgrow running.</summary>
+    public struct PolishCitySwitches : IComponentData, IQueryTypeParameter, ISerializable
+    {
+        public const int CurrentVersion = 1;
+        /// <summary>"Outgrow new buildings": buildings that grow get their zone's look.</summary>
+        public bool NewBuildings;
+        /// <summary>The master switch is off: nothing new outgrows and nothing is planned; nothing is put back either.</summary>
+        public bool Paused;
+
+        public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
+        {
+            writer.Write(CurrentVersion);
+            writer.Write(NewBuildings);
+            writer.Write(Paused);
+        }
+
+        public void Deserialize<TReader>(TReader reader) where TReader : IReader
+        {
+            reader.Read(out int version);
+            reader.Read(out NewBuildings);
+            reader.Read(out Paused);
+        }
     }
 }

@@ -505,7 +505,12 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                 </div>
                 <div className={pn.bodyWrap}>
                     <div className={classNames(pn.body, s.cityBody)}>
-                        <Row id="newHouses" label={L("NewHouses", "Polish new buildings")} tip={L("NewHouses.Tip2", "Buildings that grow from now on get their zone's look. Buildings already standing stay as they are until you polish them.")} toggle>
+                        <Row id="on" label={L("Master", "Outgrow")} tip={L("Master.Tip", "This city's master switch. Off: nothing outgrows (new buildings, zoned areas, what you outgrow), and nothing is put back: outgrown buildings stay as they are. Saved with the city.")} toggle>
+                            <div className={c.toggleCell}>
+                                <Switch testId="polish-on" on={p.featureOn} onChange={(v) => act.polishCity("on", v ? "true" : "false")} />
+                            </div>
+                        </Row>
+                        <Row id="newHouses" label={L("NewHouses", "Outgrow new buildings")} tip={L("NewHouses.Tip3", "Buildings that grow from now on get their zone's look. Areas you zoned with Outgrow follow their own setting. Buildings already standing stay as they are. Saved with the city, off in a new one.")} toggle>
                             <div className={c.toggleCell}>
                                 <Switch testId="polish-newHouses" on={p.newHouses} onChange={(v) => act.polishCity("newHouses", v ? "true" : "false")} />
                             </div>

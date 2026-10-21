@@ -64,6 +64,8 @@ namespace Placemaker.Game.Tool
             SetPainter(false);
             layerId = LayerAliases.Canonical(layerId);
             presetId = presetId ?? "";
+            // no style named: the type's Standard (what the old "Default" was), when it has one
+            if (presetId.Length == 0 && _presets.Exists(layerId, PresetStore.StandardId)) presetId = PresetStore.StandardId;
             if (presetId.Length > 0 && !_presets.Exists(layerId, presetId)) { Flash(new LocText("Placemaker.Problem.UnknownPreset")); return; }
 
             bool switched = false;
@@ -125,7 +127,8 @@ namespace Placemaker.Game.Tool
             if (step == null || string.IsNullOrEmpty(presetId) || !_presets.Exists(step.Layer, presetId)) return;
             bool isRoot = step == _recipe.Root;
             if (isRoot) { _presetLayer = step.Layer; _presetId = presetId; }
-            bool user = _presets.Find(step.Layer, presetId) != null;
+            // a player's preset, or a type's own Standard (no preset values: the store resolves it from the type's recipe)
+            bool user = _presets.Find(step.Layer, presetId) != null || _presets.IsTypeStandard(step.Layer, presetId);
             bool edited = user
                 ? Edit(r => _presets.Apply(RecipePaths.Resolve(r, path), presetId, NewSeed), "Placemaker.Undo.ApplyPreset")
                 : Edit(r => _editor.ApplyPreset(r, path, presetId), "Placemaker.Undo.ApplyPreset");
@@ -139,7 +142,7 @@ namespace Placemaker.Game.Tool
             var step = RecipePaths.Resolve(_recipe, path);
             if (step == null) return;
             bool isRoot = step == _recipe.Root;
-            if (string.IsNullOrEmpty(presetId) && isRoot && _presetLayer == step.Layer) presetId = _presetId;
+            if (string.IsNullOrEmpty(presetId) && isRoot) presetId = ActivePreset?.Id ?? "";
             var saved = _presets.Save(step, presetId);
             if (saved == null) { Flash(new LocText("Placemaker.Problem.PresetSaveFailed")); return; }
             if (!Persist()) return;
@@ -154,7 +157,8 @@ namespace Placemaker.Game.Tool
             var step = RecipePaths.Resolve(_recipe, path);
             if (step == null) return;
             bool isRoot = step == _recipe.Root;
-            string basedOn = isRoot && _presetLayer == step.Layer ? _presetId : "";
+            // the style shown as picked (a design that names none is on Standard)
+            string basedOn = isRoot ? ActivePreset?.Id ?? "" : "";
             var saved = _presets.SaveAs(step, name, basedOn);
             if (saved == null) { Flash(new LocText("Placemaker.Problem.PresetSaveFailed")); return; }
             if (!Persist()) return;
@@ -176,8 +180,8 @@ namespace Placemaker.Game.Tool
             if (!_presets.Delete(layerId, presetId)) { Flash(new LocText("Placemaker.Problem.CannotDeletePreset")); return; }
             Persist();
             Flash(new LocText(wasOverride ? "Placemaker.Hint.PresetReset" : "Placemaker.Hint.PresetDeleted"));
-            // A deleted custom that was active leaves the design as it is, just no longer linked to a preset.
-            if (!wasOverride && _presetLayer == LayerAliases.Canonical(layerId) && _presetId == presetId) ActivePresetSaved("", "");
+            // A deleted custom that was active leaves the design as it is, now on the type's Standard (shown changed if it differs).
+            if (!wasOverride && _presetLayer == LayerAliases.Canonical(layerId) && _presetId == presetId) ActivePresetSaved(_presetLayer, PresetStore.StandardId);
             else Touch();
         }
 

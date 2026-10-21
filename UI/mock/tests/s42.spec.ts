@@ -40,7 +40,7 @@ test("s42 design: picker rows, editing bar, two-column Shape and Extras for real
         await pick(page, group, recipe);
         await expect(page.getByTestId(`recipe-${recipe}`)).toHaveAttribute("aria-pressed", "true");
         await expect(page.getByTestId("preset-bar")).toBeVisible();
-        await expect(page.getByTestId("preset-default")).toBeVisible();
+        await expect(page.getByTestId("preset-standard")).toBeVisible();
         await noTextOverflow(page, "design " + recipe);
         await panelShot(page, `s42-design-${recipe}`);
     }

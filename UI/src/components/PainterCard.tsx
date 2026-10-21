@@ -264,8 +264,12 @@ const LookBar = ({ p }: { p: PainterState }) => {
     const [naming, setNaming] = useState<"saveAs" | "rename" | null>(null);
     const [name, setName] = useState("");
     const [asking, setAsking] = useState(false);
+    // Save and Back to as it ships change every building outgrown with this type: asked first (twice past 20 buildings)
+    const [applying, setApplying] = useState<{ what: "save" | "reset"; step: 1 | 2 } | null>(null);
     const look = p.looks?.find((x) => x.id === p.theme);
     if (!look) return null;
+    const using = p.stats?.looks?.[look.id] ?? 0;
+    const apply = (what: "save" | "reset") => (using > 0 ? setApplying({ what, step: 1 }) : act.polishLook(what));
     const submit = () => {
         if (naming && name.trim()) act.polishLook(naming, name.trim());
         setNaming(null);
@@ -306,7 +310,7 @@ const LookBar = ({ p }: { p: PainterState }) => {
                     iconSize={12}
                     label={t("Placemaker.UI.Polish.Save", "Save")}
                     title={look.custom ? t("Placemaker.UI.Polish.Save", "Save") : t("Placemaker.UI.Polish.SaveBuiltIn", "Save: this is what {0} is from now on, everywhere it is used", [display])}
-                    onClick={() => act.polishLook("save")}
+                    onClick={() => apply("save")}
                     testId="polish-look-save"
                 />
             ) : null}
@@ -322,7 +326,7 @@ const LookBar = ({ p }: { p: PainterState }) => {
             />
             {p.modified ? <Btn icon="undo" iconSize={12} title={t("Placemaker.UI.Polish.Revert2", "Back to saved")} onClick={() => act.polishLook("revert")} testId="polish-look-revert" /> : null}
             {!p.modified && look.edited ? (
-                <Btn icon="reset" iconSize={12} title={t("Placemaker.UI.Polish.ResetBuiltIn", "Back to {0} as it ships", [display])} onClick={() => act.polishLook("reset")} testId="polish-look-reset" />
+                <Btn icon="reset" iconSize={12} title={t("Placemaker.UI.Polish.ResetBuiltIn", "Back to {0} as it ships", [display])} onClick={() => apply("reset")} testId="polish-look-reset" />
             ) : null}
             {look.custom ? (
                 <Btn
@@ -337,6 +341,31 @@ const LookBar = ({ p }: { p: PainterState }) => {
                 />
             ) : null}
             {look.custom ? <Btn icon="trash" iconSize={12} title={t("Placemaker.UI.Polish.Delete2", "Delete this outgrow type")} onClick={() => setAsking(true)} testId="polish-look-delete" /> : null}
+            {applying ? (
+                <Confirm
+                    title={
+                        applying.step === 1
+                            ? t("Placemaker.UI.Polish.ApplyTitle", "Change {0} building(s)?", [num(using)])
+                            : t("Placemaker.UI.Polish.ApplyTitle2", "Really change all {0}?", [num(using)])
+                    }
+                    message={
+                        applying.step === 1
+                            ? t("Placemaker.UI.Polish.ApplyMessage", "{0} building(s) in this city are outgrown with “{1}”. They are all outgrown again with its new settings, a few at a time in the background.", [num(using), display])
+                            : t("Placemaker.UI.Polish.ApplyMessage2", "That is {0} buildings: every garden, yard and car park of theirs is planned and built again. It cannot be undone in one step (save the old settings as a copy first if you may want them back).", [num(using)])
+                    }
+                    confirm={applying.step === 1 && using > 20 ? t("Placemaker.UI.Polish.ApplyNext", "Yes, continue") : t("Placemaker.UI.Polish.ApplyOk", "Change {0}", [num(using)])}
+                    danger={applying.step === 2}
+                    onConfirm={() => {
+                        if (applying.step === 1 && using > 20) {
+                            setApplying({ what: applying.what, step: 2 });
+                            return;
+                        }
+                        act.polishLook(applying.what);
+                        setApplying(null);
+                    }}
+                    onCancel={() => setApplying(null)}
+                />
+            ) : null}
             {asking ? (
                 <Confirm
                     title={t("Placemaker.UI.Polish.DeleteTitle2", "Delete this outgrow type?")}

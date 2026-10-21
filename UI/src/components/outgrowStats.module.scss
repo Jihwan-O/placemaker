@@ -239,20 +239,20 @@
     opacity: 0.55;
 }
 
-// ── activity ──
-.chartPick {
-    margin-bottom: 6rem;
-}
-
+// ── activity: three short charts one under the other ──
 .chart {
     @include col;
     min-width: 0;
 }
 
+.chart + .chart {
+    margin-top: 6rem;
+}
+
 .chartKeys {
     @include row;
     min-width: 0;
-    margin-bottom: 4rem;
+    margin-bottom: 2rem;
 }
 
 .chartKey {
@@ -287,7 +287,7 @@
 .plot {
     position: relative;
     min-width: 0;
-    height: 66rem;
+    height: 44rem;
     border-radius: $radius;
     background-color: rgba(0, 0, 0, 0.18);
     overflow: hidden;
@@ -305,7 +305,7 @@
 .plotEmpty {
     position: absolute;
     left: 0;
-    top: 26rem;
+    top: 15rem;
     width: 100%;
     text-align: center;
     font-size: 11rem;

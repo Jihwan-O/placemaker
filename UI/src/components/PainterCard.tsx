@@ -689,12 +689,6 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                     <Btn variant="accent" icon="sparkle" iconSize={13} label={L("OutgrowAllShort", "Outgrow all")} title={L("OutgrowAll", "Outgrow every building in the city")} testId="polish-all" onClick={() => setAsk({ what: "polishAll" })} />
                     <Btn variant="ghost" icon="reset" iconSize={13} label={L("RemoveAllShort", "Remove all outgrow")} title={L("RemoveAll", "Put every outgrown building in the city back as the game made it")} testId="polish-none" disabled={city.polished === 0} onClick={() => setAsk({ what: "unpolishAll" })} />
                 </div>
-                <div className={s.newRow}>
-                    <Tip title={L("NewHouses3", "Outgrow new buildings (this city)")} description={L("NewHouses.Tip4", "Buildings that grow from now on get their zone type's outgrow type. Kept with this city; a new city starts with it off.")}>
-                        <div className={s.newLabel}>{L("NewHouses3", "Outgrow new buildings (this city)")}</div>
-                    </Tip>
-                    <Switch testId="polish-newHouses" on={p.newHouses} onChange={(v) => act.polishCity("newHouses", v ? "true" : "false")} />
-                </div>
                 <StatusStrip polished={city.polished} total={city.total} st={st} />
                 <div className={s.tools}>
                     <div className={s.toolCol} data-testid="polish-brush">
@@ -852,6 +846,15 @@ export const PolishCityCard = ({ state, onClose }: { state: ToolState; onClose: 
                                         </Collapsible>
                                     );
                                 })}
+                                <div className={classNames(s.newCard, { [s.newCardOn]: p.newHouses })} data-testid="polish-new-card">
+                                    <Tip title={L("NewHouses3", "Outgrow new buildings (this city)")} description={L("NewHouses.Tip4", "Buildings that grow from now on get their zone type's outgrow type. Kept with this city; a new city starts with it off.")}>
+                                        <div className={s.newText}>
+                                            <div className={s.newLabel}>{L("NewHouses3", "Outgrow new buildings (this city)")}</div>
+                                            <div className={s.newSub}>{L("NewHousesSub", "New buildings get their zone type's outgrow type, above")}</div>
+                                        </div>
+                                    </Tip>
+                                    <Switch testId="polish-newHouses" on={p.newHouses} onChange={(v) => act.polishCity("newHouses", v ? "true" : "false")} />
+                                </div>
                             </div>
                         ) : (
                             <div data-testid="polish-city-edit">

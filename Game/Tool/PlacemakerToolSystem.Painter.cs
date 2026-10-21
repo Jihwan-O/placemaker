@@ -366,6 +366,9 @@ namespace Placemaker.Game.Tool
                 if (!_painter) SetPainter(true);
                 if (m_ToolSystem != null && m_ToolSystem.activeTool != this) { _closeAfterGhost = 0; m_ToolSystem.activeTool = this; }
                 if (_brush > 0) SelectLook(look, remember: false);
+                // the map lens shows what the brush changes: outgrow types while painting, outgrown or not while erasing
+                _lensWanted = true;
+                _lensMode = _brush > 0 ? "types" : "status";
                 SetAreaMode(SelectionMode.Paint);
                 _brushShape = _shape;
                 Mod.Log.Info($"Placemaker outgrow brush: {(_brush > 0 ? "paint " + look : "erase")}");

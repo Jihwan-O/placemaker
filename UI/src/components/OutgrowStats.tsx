@@ -1,13 +1,14 @@
 // Global outgrow's numbers (state.painter.stats, NeighbourPolishSystem.Stats), as cards: Outgrown (a ring of outgrown
 // buildings by outgrow type, with the ones not outgrown, and its legend), By kind (bars), Working through (the line, its
-// pace, its parts), Activity (one chart of the last two minutes: fitting speed, the line, or frames per second), Details.
+// pace, its parts), Activity (the last two minutes, three short charts one under the other: speed, queue, frames per
+// second, one hover line across them), Details.
 // Gameface rules kept here: one text per element (it puts separate text pieces on lines of their own), SVG sized by its
 // rem box (width and height 100%, a viewBox), flexbox and margins only. Each outgrow type keeps its own colour.
 import React, { useState } from "react";
 import classNames from "classnames";
 import { PainterState, PainterStats } from "../contract";
 import { TFunc, useT } from "../lib/l10n";
-import { Collapsible, Segmented } from "./common";
+import { Collapsible } from "./common";
 import s from "./outgrowStats.module.scss";
 
 /** The categorical steps for a dark surface, in their validated order (the dataviz skill's, checked on #141c24). */
@@ -84,12 +85,11 @@ const Ring = ({ slices, center, sub, hover, setHover }: { slices: Slice[]; cente
     );
 };
 
-/** The last samples of one or two series on one axis: the highest value at the top left, the time along the bottom, a
- *  hover line that reads every series at that moment. */
-const Chart = ({ series, unit, t }: { series: { label: string; color: string; values: number[]; area?: boolean }[]; unit: string; t: TFunc }) => {
-    const [hover, setHover] = useState<number | null>(null);
+/** The last samples of one or two series on one axis, short: the highest value at the top left, a hover line (shared by
+ *  the charts under each other) that reads every series at that moment, the time along the bottom of the last one. */
+const Chart = ({ series, unit, hover, setHover, axis, t }: { series: { label: string; color: string; values: number[]; area?: boolean }[]; unit: string; hover: number | null; setHover: (i: number | null) => void; axis: boolean; t: TFunc }) => {
     const n = Math.max(0, ...series.map((x) => x.values.length));
-    const W = 400, H = 90;
+    const W = 400, H = 60;
     const top = Math.max(1, ...series.flatMap((x) => x.values));
     const max = niceCeil(top);
     const xOf = (i: number) => (n <= 1 ? W : (i / (n - 1)) * W);
@@ -133,10 +133,12 @@ const Chart = ({ series, unit, t }: { series: { label: string; color: string; va
                 <div className={s.plotMax}>{`${fmt1(max)}${unit}`}</div>
                 {n < 2 ? <div className={s.plotEmpty}>{t("Placemaker.UI.Outgrow.Gathering", "Gathering…")}</div> : null}
             </div>
-            <div className={s.axis}>
-                <div className={s.axisText}>{hover != null && n > 1 ? t("Placemaker.UI.Outgrow.Ago", "{0} s ago", [n - 1 - hover]) : t("Placemaker.UI.Outgrow.TwoMin", "2 min ago")}</div>
-                <div className={s.axisText}>{t("Placemaker.UI.Outgrow.Now", "now")}</div>
-            </div>
+            {axis ? (
+                <div className={s.axis}>
+                    <div className={s.axisText}>{hover != null && n > 1 ? t("Placemaker.UI.Outgrow.Ago", "{0} s ago", [n - 1 - hover]) : t("Placemaker.UI.Outgrow.TwoMin", "2 min ago")}</div>
+                    <div className={s.axisText}>{t("Placemaker.UI.Outgrow.Now", "now")}</div>
+                </div>
+            ) : null}
         </div>
     );
 };
@@ -204,7 +206,7 @@ export const OutgrowStats = ({ p, st, typeName, typeColor }: { p: PainterState; 
     const { t } = useT();
     const L = (id: string, en: string, args?: (string | number)[]) => t("Placemaker.UI.Outgrow." + id, en, args);
     const [hover, setHover] = useState<string | null>(null);
-    const [chart, setChart] = useState<"speed" | "line" | "fps">("speed");
+    const [at, setAt] = useState<number | null>(null);   // one hover line across the three charts
     const total = st.kindTotal.reduce((a, b) => a + b, 0);
     const polished = st.kindPolished.reduce((a, b) => a + b, 0);
     // the types most buildings have (each in its own colour), the rest as Other, then the buildings not outgrown
@@ -274,33 +276,19 @@ export const OutgrowStats = ({ p, st, typeName, typeColor }: { p: PainterState; 
                 </Card>
             </div>
             <Card title={L("Activity", "Activity")} right={L("Last2", "last 2 minutes")} testId="outgrow-card-activity">
-                <div className={s.chartPick}>
-                    <Segmented
-                        testId="outgrow-chart"
-                        stretch
-                        value={chart}
-                        onChange={(v) => setChart(v as "speed" | "line" | "fps")}
-                        options={[
-                            { value: "speed", label: L("ChartSpeed", "Speed"), description: L("ChartSpeedTip", "Buildings fitted and put in line, per second") },
-                            { value: "line", label: L("ChartQueue", "Queue"), description: L("ChartLineTip", "Buildings waiting to be fitted") },
-                            { value: "fps", label: L("ChartFps", "FPS"), description: L("ChartFpsTip", "The game's frames per second") },
-                        ]}
-                    />
-                </div>
-                {chart === "speed" ? (
-                    <Chart
-                        t={t}
-                        unit="/s"
-                        series={[
-                            { label: L("Fitted", "Fitted"), color: SERIES[0], values: st.histFitted },
-                            { label: L("Added2", "Queued"), color: SERIES[1], values: st.histAdded },
-                        ]}
-                    />
-                ) : chart === "line" ? (
-                    <Chart t={t} unit="" series={[{ label: L("InLine", "Waiting"), color: SERIES[3], values: st.histLine, area: true }]} />
-                ) : (
-                    <Chart t={t} unit="" series={[{ label: L("Fps", "Frames per second"), color: SERIES[2], values: st.histFps, area: true }]} />
-                )}
+                <Chart
+                    t={t}
+                    unit="/s"
+                    hover={at}
+                    setHover={setAt}
+                    axis={false}
+                    series={[
+                        { label: L("Fitted2", "Speed: fitted"), color: SERIES[0], values: st.histFitted },
+                        { label: L("Added2", "Queued"), color: SERIES[1], values: st.histAdded },
+                    ]}
+                />
+                <Chart t={t} unit="" hover={at} setHover={setAt} axis={false} series={[{ label: L("InLine2", "Queue: waiting"), color: SERIES[3], values: st.histLine, area: true }]} />
+                <Chart t={t} unit="" hover={at} setHover={setAt} axis series={[{ label: L("Fps2", "FPS"), color: SERIES[2], values: st.histFps, area: true }]} />
                 <div className={s.muted}>{L("Cost2", "Outgrow's own work: {0} ms a frame", [st.msPerFrame < 0.01 ? "< 0.01" : st.msPerFrame < 1 ? (Math.round(st.msPerFrame * 100) / 100).toString() : fmt1(st.msPerFrame)])}</div>
             </Card>
             <Collapsible id="outgrow:details" title={L("Details", "Details")} icon="info" defaultOpen={false} testId="outgrow-details">

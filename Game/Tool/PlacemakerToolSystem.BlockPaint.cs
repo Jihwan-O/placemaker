@@ -130,7 +130,9 @@ namespace Placemaker.Game.Tool
                 if (held)
                 {
                     _bpStrokeFrames++;
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
                     if (_in.HasHit && _gesture == Gesture.Paint && _bpOpen) GrowOpenBox(_in.Hit.xz, radius);
+                    double grow = sw.Elapsed.TotalMilliseconds;
                     if (_in.HasHit)
                     {
                         int v = _bpMask.Version;
@@ -143,7 +145,14 @@ namespace Placemaker.Game.Tool
                         // Only a stroke that changed cells is an input change; the outline is rebuilt on mouse-up.
                         if (_bpMask.Version != v) ShapeChanged(throttled: true);
                     }
+                    double stroke = sw.Elapsed.TotalMilliseconds - grow;
                     PumpPaintPreview(BlockPaintCurrent);
+                    double preview = sw.Elapsed.TotalMilliseconds - grow - stroke;
+                    // Lag spikes painting fast (2026-10-21): a slow frame during a stroke says what this tool did in it.
+                    float dt = UnityEngine.Time.unscaledDeltaTime * 1000f;
+                    if (dt > 50f && _bpStrokeFrames > 2)
+                        Mod.Log.Info($"Placemaker: Paint area slow frame {dt:0} ms during a stroke (frame {_bpStrokeFrames}, {_bpMask.PaintedCellCount} cells): "
+                            + $"this frame grow {grow:0.0} ms, brush {stroke:0.0} ms, preview {preview:0.0} ms; last cell edges {Placemaker.Game.Overlay.PlacemakerOverlaySystem.BoundaryMs:0.0} ms");
                     return;
                 }
                 var g = _gesture;
@@ -349,6 +358,8 @@ namespace Placemaker.Game.Tool
             public BlockPaintContext Ctx;
             public System.Threading.Tasks.Task<(BlockBrush Brush, List<float2[]> Shown)> Task;
             public System.Diagnostics.Stopwatch Clock;
+            /// <summary>Time (ms) the walls and water took to read on the game's thread.</summary>
+            public double ReadMs;
         }
 
         private FenceJob _bpFence;
@@ -401,6 +412,7 @@ namespace Placemaker.Game.Tool
             try { make = _bpOpen ? OpenFence(rules, out job.Ctx) : FillFence(rules, out job.Ctx); }
             catch (Exception e) { Mod.Log.Warn("Placemaker: Paint area fence failed: " + e.Message); make = null; }
             if (make == null) return null;
+            job.ReadMs = job.Clock.Elapsed.TotalMilliseconds;
             job.Ctx.Rules = rules;
             job.Ctx.IgnoreGroup = _editingGroup;
             _bpFenceFailed = null;
@@ -430,7 +442,7 @@ namespace Placemaker.Game.Tool
             }
             c.Brush = job.Task.Result.Brush;
             foreach (var r in job.Task.Result.Shown) c.Obstacles.Add(Poly.To3D(r, q => _site.SampleHeight(q)));
-            Mod.Log.Info("Placemaker: Paint area fence built in " + job.Clock.Elapsed.TotalMilliseconds.ToString("0.0") + " ms (" + (c.Open ? "open box" : "one block") + ", in the background), "
+            Mod.Log.Info("Placemaker: Paint area fence built in " + job.Clock.Elapsed.TotalMilliseconds.ToString("0.0") + " ms (" + (c.Open ? "open box" : "one block") + ", in the background; walls and water read in " + job.ReadMs.ToString("0.0") + " ms), "
                 + c.Obstacles.Count + " shaded, rules " + RulesLine(c.Rules) + "; walls " + (_areaWalls?.LastStats ?? ""));
             c.BuiltAt = UnityEngine.Time.realtimeSinceStartup;
             bool had = _bpCtx != null && IsCurrentTarget(_bpCtx);

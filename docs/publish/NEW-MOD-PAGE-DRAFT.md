@@ -27,6 +27,9 @@ Turn it on for certain buildings or use the brush to test it
 
 ■ Area tools
 Click a block, click corners, brush it, paint bucket it or click road nodes
+It won't stop you from building a park in the middle of a road
+Check your selection before you build
+I wanted you free to make whatever you want
 
 [Showcase video](https://www.youtube.com/watch?v=ghIR5UhFwj4)
 

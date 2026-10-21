@@ -69,6 +69,8 @@ namespace Placemaker.Game.Tool
             // It used to run ~7×/s during the drag (tens to hundreds of ms each on big areas).
             if (!force && Painting && (_mode == SelectionMode.Paint || _mode == SelectionMode.BlockPaint)) return;
             if (!force && _shapeThrottled && now - _lastShapeBuild < 0.15f) return;
+            // Paint area: the outline is worked out on a worker first (a big area took 0.2–0.5 s here at mouse-up)
+            if (!force && _mode == SelectionMode.BlockPaint && !BlockPaintOutlineReady()) return;
             _shapeDirty = false;
             _lastShapeBuild = now;
             AreaShape s = null;

@@ -51,9 +51,9 @@ namespace Placemaker.Game.Tool
         }
 
         /// <summary>Largest side (m) the open work box grows to.</summary>
-        public const float MaxOpenSize = 3000f;
+        public const float MaxOpenSize = 5000f;
         /// <summary>The box grows when the brush comes this close (m, beyond its radius) to its edge.</summary>
-        private const float OpenGrowMargin = 80f;
+        private const float OpenGrowMargin = 150f;
         private float2 _bpBoxMin, _bpBoxMax;
 
         /// <summary>Obstacles are re-read at most this often (s) between strokes: the city keeps growing.</summary>
@@ -117,6 +117,7 @@ namespace Placemaker.Game.Tool
             if (_in.HasHit) _cursor = _in.Hit;
             Fills.Pump();
             PumpFence();
+            CommitBlockPaintStroke(false);
             float radius = _brushSize * 0.5f;
             if (_bpStart != null) { PumpStrokeStart(radius); return; }
 
@@ -160,8 +161,9 @@ namespace Placemaker.Game.Tool
                 _bpPreview = null;
                 Mod.Log.Info($"Placemaker: Paint area stroke ended after {_bpStrokeFrames} frames, {_bpMask.PaintedCellCount} cells painted");
                 ShapeChanged();
-                Commit(g == Gesture.Erase ? "Placemaker.Undo.Erase" : "Placemaker.Undo.Paint");
-                if (!_bpMask.IsEmpty && _shape == null) Flash(new LocText("Placemaker.Problem.PaintTooSmall"));
+                // the undo step holds the outline: taken once it is back from the worker
+                _bpCommit = g == Gesture.Erase ? "Placemaker.Undo.Erase" : "Placemaker.Undo.Paint";
+                CommitBlockPaintStroke(false);
                 return;
             }
 
@@ -180,6 +182,8 @@ namespace Placemaker.Game.Tool
             }
 
             if (!_in.HasHit || !(_in.LeftPressed || _in.RightPressed)) return;
+            // a new stroke right after the last one: the last one's undo step first
+            CommitBlockPaintStroke(true);
             bool erase = _in.RightPressed || _in.Shift;
             if (erase)
             {
@@ -192,6 +196,19 @@ namespace Placemaker.Game.Tool
             _bpStart = new StrokeStart { At = _in.Hit.xz };
             _bpStart.Path.Add(_in.Hit.xz);
             PumpStrokeStart(radius);
+        }
+
+        /// <summary>The finished stroke's undo step, waiting for its outline (null: none).</summary>
+        private string _bpCommit;
+
+        /// <summary>Records the finished stroke once its outline is back (or now, worked out here, when <paramref name="now"/>).</summary>
+        private void CommitBlockPaintStroke(bool now)
+        {
+            if (_bpCommit == null || !now && !BlockPaintOutlineReady()) return;
+            var label = _bpCommit;
+            _bpCommit = null;
+            Commit(label);
+            if (!_bpMask.IsEmpty && _shape == null) Flash(new LocText("Placemaker.Problem.PaintTooSmall"));
         }
 
         private void BeginBlockPaintGesture(float2 p, float radius, bool erase, bool eraseWithLeft)
@@ -261,7 +278,9 @@ namespace Placemaker.Game.Tool
             if (Continues(cur, p))
             {
                 // the city keeps growing: the fence is read again in the background, the stroke goes on with this one
-                if (UnityEngine.Time.realtimeSinceStartup - cur.BuiltAt > BlockPaintRefresh) EnsureBlockPaintContext(true);
+                // (a big open box is not: that is a full rebuild, seconds of a worker)
+                if (UnityEngine.Time.realtimeSinceStartup - cur.BuiltAt > BlockPaintRefresh && (!cur.Open || math.cmax(cur.BoxMax - cur.BoxMin) <= 1200f))
+                    EnsureBlockPaintContext(true);
                 return true;
             }
             FillResult fill = null;
@@ -327,7 +346,8 @@ namespace Placemaker.Game.Tool
             }
             if (ctx?.Brush == null || _bpMask.IsEmpty || _bpMask.Version == _bpPreviewJobVersion) return;
             float now = UnityEngine.Time.realtimeSinceStartup;
-            if (now - _bpPreviewAt < 0.1f) return;
+            // at most 10 a second, and never more than about a third of a worker (a big area's outline takes 0.2–0.5 s)
+            if (now - _bpPreviewAt < math.max(0.1f, 3f * _bpPreviewMs / 1000f)) return;
             _bpPreviewAt = now;
             _bpPreviewJobVersion = _bpMask.Version;
             var snap = _bpMask.Save();
@@ -335,6 +355,7 @@ namespace Placemaker.Game.Tool
             float cell = _bpMask.CellSize;
             _bpPreviewJob = System.Threading.Tasks.Task.Run(() =>
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
                     var m = new BrushMask(cell);
@@ -342,7 +363,54 @@ namespace Placemaker.Game.Tool
                     lock (brush) return brush.Outline(m)?.Ring;
                 }
                 catch (Exception) { return null; }
+                finally { _bpPreviewMs = (float)sw.Elapsed.TotalMilliseconds; }
             });
+        }
+
+        private volatile float _bpPreviewMs;
+
+        // The outline at mouse-up (lag spike on release, 2026-10-21: 0.2–0.5 s on the game's thread for a big area) is worked
+        // out on a worker; the selection changes when it is back (RebuildShapeIfDirty waits for it).
+        private System.Threading.Tasks.Task<float2[]> _bpOutlineJob;
+        private int _bpOutlineJobVersion = -1, _bpOutlineVersion = -1;
+        private BlockBrush _bpOutlineJobBrush, _bpOutlineBrush;
+        private float2[] _bpOutlineRing;
+        private System.Diagnostics.Stopwatch _bpOutlineClock;
+
+        /// <summary>False while the painted outline is still being worked out in the background (started here when needed).</summary>
+        private bool BlockPaintOutlineReady()
+        {
+            if (_bpMask.IsEmpty || !BlockPaintHasTarget) return true;
+            var ctx = BlockPaintCurrent;
+            if (ctx?.Brush == null) return true;   // no fence yet (an undo): BuildBlockPaintShape makes both now
+            if (_bpOutlineVersion == _bpMask.Version && ReferenceEquals(_bpOutlineBrush, ctx.Brush)) return true;
+            if (_bpOutlineJob != null)
+            {
+                if (!_bpOutlineJob.IsCompleted) return false;
+                var job = _bpOutlineJob;
+                _bpOutlineJob = null;
+                if (_bpOutlineJobVersion == _bpMask.Version && ReferenceEquals(_bpOutlineJobBrush, ctx.Brush))
+                {
+                    _bpOutlineRing = job.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? job.Result : null;
+                    _bpOutlineVersion = _bpOutlineJobVersion;
+                    _bpOutlineBrush = _bpOutlineJobBrush;
+                    Mod.Log.Info("Placemaker: Paint area outline in " + _bpOutlineClock.Elapsed.TotalMilliseconds.ToString("0.0") + " ms (in the background)");
+                    return true;
+                }
+            }
+            var snap = _bpMask.Save();
+            var brush = ctx.Brush;
+            float cell = _bpMask.CellSize;
+            _bpOutlineJobVersion = _bpMask.Version;
+            _bpOutlineJobBrush = brush;
+            _bpOutlineClock = System.Diagnostics.Stopwatch.StartNew();
+            _bpOutlineJob = System.Threading.Tasks.Task.Run(() =>
+            {
+                var m = new BrushMask(cell);
+                m.Restore(snap);
+                lock (brush) return brush.Outline(m)?.Ring;
+            });
+            return false;
         }
 
         /// <summary>
@@ -409,7 +477,7 @@ namespace Placemaker.Game.Tool
             if (refresh) _areaWalls?.Invalidate();
             var job = new FenceJob { Clock = System.Diagnostics.Stopwatch.StartNew() };
             Func<(BlockBrush, List<float2[]>)> make;
-            try { make = _bpOpen ? OpenFence(rules, out job.Ctx) : FillFence(rules, out job.Ctx); }
+            try { make = _bpOpen ? OpenFence(rules, refresh, out job.Ctx) : FillFence(rules, out job.Ctx); }
             catch (Exception e) { Mod.Log.Warn("Placemaker: Paint area fence failed: " + e.Message); make = null; }
             if (make == null) return null;
             job.ReadMs = job.Clock.Elapsed.TotalMilliseconds;
@@ -484,6 +552,8 @@ namespace Placemaker.Game.Tool
         /// </summary>
         private void GrowOpenBox(float2 at, float radius)
         {
+            // one growth at a time: the next one grows from it (a new one now would rebuild the whole box)
+            if (_bpFence != null) return;
             float m = radius + OpenGrowMargin;
             if (at.x - m > _bpBoxMin.x && at.y - m > _bpBoxMin.y && at.x + m < _bpBoxMax.x && at.y + m < _bpBoxMax.y) return;
             float2 min = math.min(_bpBoxMin, at - BlockBrush.OpenHalfSize), max = math.max(_bpBoxMax, at + BlockBrush.OpenHalfSize);
@@ -495,7 +565,7 @@ namespace Placemaker.Game.Tool
         }
 
         /// <summary>Open land / One block off: a work box around the start with every stop fenced out.</summary>
-        private Func<(BlockBrush, List<float2[]>)> OpenFence(BrushRules rules, out BlockPaintContext c)
+        private Func<(BlockBrush, List<float2[]>)> OpenFence(BrushRules rules, bool refresh, out BlockPaintContext c)
         {
             // the box laid out at the stroke's start, as far as it has grown since (old selections: around the start)
             float2 min = _bpBoxMin, max = _bpBoxMax;
@@ -508,10 +578,34 @@ namespace Placemaker.Game.Tool
             }
             var walls = new List<BrushObstacle>();
             if (!rules.Anything) Walls.Counted(min, max, _editingGroup, rules, walls);
-            var water = Walls.Water(min, max, _bpMask.CellSize, rules.ForOutline());
             var seed = _bpSeed;
             float cell = _bpMask.CellSize;
             c = new BlockPaintContext { Ring = null, Open = true, Seed = seed, Block = null, BoxMin = min, BoxMax = max };
+            // The box grew (same start, rules and group): only its new strips are fenced, from the fence in use.
+            var old = _bpCtx;
+            if (!refresh && old?.Brush != null && old.Open && old.Brush.IsOpen && !old.Brush.Unconstrained && IsCurrentTarget(old) && rules.Equals(old.Rules) && old.IgnoreGroup == _editingGroup
+                && math.all(min <= old.BoxMin) && math.all(max >= old.BoxMax))
+            {
+                var from = old.Brush;
+                float2 omin = old.BoxMin, omax = old.BoxMax;
+                // water read only in the new strips (4 m: a 5 km box stays within what the water reader samples)
+                var wet = new List<Func<float2, bool>>();
+                if (rules.WaterOn)
+                    foreach (var (a, b) in new[] { (min, new float2(omin.x, max.y)), (new float2(omax.x, min.y), max), (new float2(omin.x, min.y), new float2(omax.x, omin.y)), (new float2(omin.x, omax.y), new float2(omax.x, max.y)) })
+                        if (b.x > a.x && b.y > a.y) { var w = Walls.Water(a, b, math.max(cell, 4f), rules.ForOutline()); if (w != null) wet.Add(w); }
+                Func<float2, bool> stripWater = wet.Count == 0 ? null : p => { foreach (var w in wet) if (w(p)) return true; return false; };
+                return () =>
+                {
+                    var rings = new List<IReadOnlyList<float2>>();
+                    var r = rules.Normalized();
+                    foreach (var w in walls) if (w.Ring != null && r.Stops(w.Kind)) rings.Add(w.Ring);
+                    var brush = from.Grow(min, max, rings, stripWater);
+                    var shown = new List<float2[]>();
+                    foreach (var w in walls) if (!IsNetKind(w.Kind)) shown.Add(w.Ring);
+                    return (brush, shown);
+                };
+            }
+            var water = Walls.Water(min, max, cell, rules.ForOutline());
             return () =>
             {
                 var brush = rules.Build(seed, null, walls, rules.WaterOn ? water : null, cell, min, max);
@@ -603,12 +697,17 @@ namespace Placemaker.Game.Tool
             // the fence in use (a newer one may still be on its way); none for this selection yet (an undo): made now
             var ctx = BlockPaintCurrent ?? EnsureBlockPaintContext(false, now: true);
             if (ctx == null) return null;
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            BlockBrushOutline o;
-            lock (ctx.Brush) o = ctx.Brush.Outline(_bpMask);
-            if (sw.Elapsed.TotalMilliseconds > 30) Mod.Log.Info("Placemaker: Paint area outline in " + sw.Elapsed.TotalMilliseconds.ToString("0.0") + " ms");
-            if (o?.Ring == null) return null;
-            var shape = new AreaShape { Ring = Poly.To3D(o.Ring, p => _site.SampleHeight(p)), Source = AreaSource.Painted };
+            float2[] ring;
+            if (_bpOutlineVersion == _bpMask.Version && ReferenceEquals(_bpOutlineBrush, ctx.Brush)) ring = _bpOutlineRing;
+            else
+            {
+                // not worked out in the background (an undo, a build asking for the outline now)
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                lock (ctx.Brush) ring = ctx.Brush.Outline(_bpMask)?.Ring;
+                if (sw.Elapsed.TotalMilliseconds > 30) Mod.Log.Info("Placemaker: Paint area outline in " + sw.Elapsed.TotalMilliseconds.ToString("0.0") + " ms");
+            }
+            if (ring == null) return null;
+            var shape = new AreaShape { Ring = Poly.To3D(ring, p => _site.SampleHeight(p)), Source = AreaSource.Painted };
             WithFoundAttachments(shape);
             return shape;
         }

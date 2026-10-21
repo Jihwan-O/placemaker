@@ -1,9 +1,11 @@
-// Stage 2 — what to make, then how it is built (s42, docs/proposals/s42.md), top to bottom:
-//   1. Picker: 1 Category · 2 Type · 3 Style (PresetBrowser.tsx TypeBrowser).
-//   2. Editing bar: [Category] › [Type] › [Style] + undo changes · shuffle · save as new · save · more.
-//   3. Entrances (types that need them): one line "add one to build" + typed entrance buttons + the placed ones.
-//   4. Shape — how it's built: the type's control groups as one-line heads in two columns; an open one unfolds
-//      full width under its pair (Controls.tsx ControlList).
+// Stage 2 — what to make, then how it is built (s42, docs/proposals/s42.md), top to bottom, one story: every section
+// opens with the same header line (SectionHead.tsx: icon badge · TITLE · note · rule · buttons).
+//   1. Pick what to make: 1 Category · 2 Type · 3 Style (PresetBrowser.tsx TypeBrowser), always open.
+//   2. Editing: [Category] › [Type] › [Style] + undo changes · shuffle · save as new · save · more.
+//   3. Add entrances (types that need them): "add one to build" + typed entrance buttons on the header line, then the
+//      placed ones.
+//   4. Shape — how it's built (Zoning for a zoning type): the type's control groups as one-line heads in two columns;
+//      an open one unfolds full width under its pair (Controls.tsx ControlList).
 //   5. Extras — optional add-ons: the built-in features as one-line rows in two columns (tile · name · fit or
 //      summary · switch), their options under the pair when open, the rest behind "N more".
 //   "Places inside": reserved slot for round 3, hidden for now.
@@ -29,6 +31,7 @@ import { ControlEx, valueOf } from "../lib/schema";
 import { useAssetName } from "../components/picker";
 import { ZoneOutgrowInline, ZoneOutgrowPick } from "../components/PainterCard";
 import { BarMode, PresetBar, Tile, TypeBrowser } from "./PresetBrowser";
+import { SectionHead } from "./SectionHead";
 import s from "./design.module.scss";
 
 export const layerName = (t: TFunc, l: LayerType) => t(l.name, humanize(l.name || l.id));
@@ -106,7 +109,7 @@ const MARKER_TIPS: Record<string, [string, string]> = {
     footpath: ["Placemaker.UI.Marker.FootpathTip", "A footpath joins here."],
 };
 
-/** Compact Entrances block: title · count or "add one to build" · typed buttons, then the placed ones. */
+/** Add entrances: the section header (count or "add one to build" · typed buttons on its line), then the placed ones. */
 const Entrances = ({ step, state }: { step: StepView; state: ToolState }) => {
     const { t } = useT();
     const kinds = step.markerKinds ?? [];
@@ -137,46 +140,49 @@ const Entrances = ({ step, state }: { step: StepView; state: ToolState }) => {
             data-testid={`entrances-wrap-${step.path}`}
             data-flash={flash ? "true" : "false"}
         >
-            <div className={s.entrHead} data-testid={`entrances-${step.path}`}>
-                <Icon name="entrance" size={12} tint={missing ? "warn" : "dim"} />
-                <Tip title={t("Placemaker.UI.Entrances", "Entrances")} description={t("Placemaker.UI.Markers.Note", "Pick a type, then click the outline by a road.")}>
-                    <div className={s.entrTitle}>{t("Placemaker.UI.Entrances", "Entrances")}</div>
-                </Tip>
-                {missing ? (
-                    <div className={s.required} data-testid="entrance-required">
-                        <Icon name="warning" size={11} tint="warn" />
-                        <div className={s.requiredText}>
-                            {need > 1 ? t("Placemaker.UI.Markers.NeedNShort", "Add {0} to build", [need]) : t("Placemaker.UI.Markers.NeedOneShort", "Add one to build")}
+            <SectionHead
+                icon="entrance"
+                title={t("Placemaker.UI.Entrances.Add", "Add entrances")}
+                tip={t("Placemaker.UI.Markers.Note", "Pick a type, then click the outline by a road.")}
+                testId={`entrances-${step.path}`}
+                tone={missing ? "warn" : undefined}
+                count={missing ? undefined : have}
+                sub={
+                    missing ? (
+                        <div className={s.required} data-testid="entrance-required">
+                            <div className={s.requiredText}>
+                                {need > 1 ? t("Placemaker.UI.Markers.NeedNShort", "Add {0} to build", [need]) : t("Placemaker.UI.Markers.NeedOneShort", "Add one to build")}
+                            </div>
                         </div>
+                    ) : undefined
+                }
+                wrap
+                right={
+                    <div className={s.kindRow} data-testid="marker-kinds">
+                        {kinds.map((k) => {
+                            const on = placing === k.kind;
+                            const tip = k.tooltip ? t(k.tooltip, "") : MARKER_TIPS[k.kind] ? t(MARKER_TIPS[k.kind][0], MARKER_TIPS[k.kind][1]) : "";
+                            return (
+                                <Tip key={k.kind} title={markerLabel(t, k)} description={tip || undefined}>
+                                    <button
+                                        type="button"
+                                        data-testid={`marker-kind-${k.kind}`}
+                                        aria-pressed={on ? "true" : "false"}
+                                        className={classNames(s.kindBtn, { [s.kindBtnOn]: on })}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            choose(k.kind);
+                                        }}
+                                    >
+                                        <Icon name={markerIcon(k)} size={12} tint={on ? "dark" : "light"} />
+                                        <div className={s.kindLabel}>{markerShort(t, k)}</div>
+                                    </button>
+                                </Tip>
+                            );
+                        })}
                     </div>
-                ) : (
-                    <div className={s.entrCount}>{have}</div>
-                )}
-                <div className={s.flex} />
-                <div className={s.kindRow} data-testid="marker-kinds">
-                    {kinds.map((k) => {
-                        const on = placing === k.kind;
-                        const tip = k.tooltip ? t(k.tooltip, "") : MARKER_TIPS[k.kind] ? t(MARKER_TIPS[k.kind][0], MARKER_TIPS[k.kind][1]) : "";
-                        return (
-                            <Tip key={k.kind} title={markerLabel(t, k)} description={tip || undefined}>
-                                <button
-                                    type="button"
-                                    data-testid={`marker-kind-${k.kind}`}
-                                    aria-pressed={on ? "true" : "false"}
-                                    className={classNames(s.kindBtn, { [s.kindBtnOn]: on })}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        choose(k.kind);
-                                    }}
-                                >
-                                    <Icon name={markerIcon(k)} size={12} tint={on ? "dark" : "light"} />
-                                    <div className={s.kindLabel}>{markerShort(t, k)}</div>
-                                </button>
-                            </Tip>
-                        );
-                    })}
-                </div>
-            </div>
+                }
+            />
             {list.length ? (
                 <div className={s.markerList} data-testid="marker-list">
                     {list.map((m) => {
@@ -218,17 +224,6 @@ const PlacesInside = () => {
         </Section>
     );
 };
-
-/** Section title: "SHAPE how it's built ──────── [right]". */
-const Heading = ({ title, sub, right, count }: { title: string; sub: string; right?: React.ReactNode; count?: number }) => (
-    <div className={s.heading}>
-        <div className={s.headingTitle}>{title}</div>
-        {count ? <div className={s.headingCount}>{count}</div> : null}
-        <div className={s.headingSub}>{sub}</div>
-        <div className={s.headingRule} />
-        {right}
-    </div>
-);
 
 // ───────────── extras (features) ─────────────
 
@@ -389,7 +384,8 @@ const Extras = ({ catalog, design, state, step }: { catalog: Catalog; design: De
     for (let i = 0; i < shown.length; i += cols) pairs.push(shown.slice(i, i + cols));
     return (
         <div className={s.extras} data-testid="features">
-            <Heading
+            <SectionHead
+                icon="addon"
                 title={t("Placemaker.UI.Extras", "Extras")}
                 sub={t("Placemaker.UI.Extras.Sub", "optional add-ons")}
                 count={on || undefined}
@@ -528,7 +524,7 @@ const ZoningShape = ({ step, layer, state, scope }: { step: StepView; layer: Lay
     };
     return (
         <div className={s.shape} data-testid="zoning">
-            <Heading title={t("Placemaker.UI.Zoning", "Zoning")} sub={t("Placemaker.UI.Zoning.Sub2", "zones, and how their lots outgrow")} />
+            <SectionHead icon="zone" title={t("Placemaker.UI.Zoning", "Zoning")} sub={t("Placemaker.UI.Zoning.Sub2", "zones, and how their lots outgrow")} />
             <ErrorBoundary name="zoning">
                 <ZoneMix
                     step={step}
@@ -584,7 +580,7 @@ const StepOptions = ({ catalog, design, state, step }: { catalog: Catalog; desig
                         <ZoningShape step={step} layer={layer} state={state} scope={scope} />
                     ) : (
                         <div className={s.shape} data-testid="shape">
-                            {parent ? null : <Heading title={t("Placemaker.UI.Shape", "Shape")} sub={t("Placemaker.UI.Shape.Sub", "how it's built")} />}
+                            {parent ? null : <SectionHead icon="cube" title={t("Placemaker.UI.Shape", "Shape")} sub={t("Placemaker.UI.Shape.Sub", "how it's built")} />}
                             <ErrorBoundary name="controls">
                                 <ControlList step={step} layer={layer} state={state} scope={scope} exclude={featureOptionIds(step)} />
                             </ErrorBoundary>

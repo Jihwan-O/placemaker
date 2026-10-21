@@ -31,6 +31,10 @@ function needsAck(permanent: { key: string }[]): boolean {
 const EN: Record<string, string> = { ...FAKE_STRINGS };
 const en = (key: string, fallback?: string) => EN[key] ?? fallback ?? key.split(".").pop() ?? key;
 
+/** (C# PresetStore.StandardId / StandardNameKey) Every fill type's own design, a style like the others. */
+const STANDARD_ID = "standard";
+const STANDARD_KEY = "Placemaker.UI.Preset.Standard";
+
 interface Snapshot {
     ring: V2[];
     closed: boolean;
@@ -344,12 +348,23 @@ export class MockBackend {
         return { values: clone(step.values), features };
     }
 
-    /** Stored data of a preset: own preset, saved-over built-in, or the shipped built-in (its values over the defaults, default features). */
+    /** (C# PresetStore.IsTypeStandard) The "standard" style of a fill type that ships none: the type's own design. */
+    typeStandard(layerId: string, id: string): boolean {
+        const l = this.layer(layerId);
+        return id === STANDARD_ID && !!l && l.kind === "fill" && !l.presets.some((p) => p.id === STANDARD_ID);
+    }
+
+    hasStandard(layerId: string): boolean {
+        return this.typeStandard(layerId, STANDARD_ID) || !!this.layer(layerId)?.presets.some((p) => p.id === STANDARD_ID);
+    }
+
+    /** Stored data of a preset: own preset, saved-over built-in, the type's own Standard, or the shipped built-in (its values over the defaults, default features). */
     presetData(layerId: string, id: string): PresetData | null {
         const own = (this.customPresets[layerId] ?? []).find((p) => p.id === id);
         if (own) return clone(own.data);
         const ov = this.presetOverrides[layerId + "|" + id];
         if (ov) return clone(ov);
+        if (this.typeStandard(layerId, id)) return this.defaultData(layerId);
         const p = this.layer(layerId)?.presets.find((x) => x.id === id);
         if (!p) return null;
         return { values: { ...this.defaults(layerId), ...clone(p.values ?? {}) }, features: this.defaultData(layerId).features };
@@ -358,6 +373,7 @@ export class MockBackend {
     presetName(layerId: string, id: string): string {
         const own = (this.customPresets[layerId] ?? []).find((p) => p.id === id);
         if (own) return own.name;
+        if (this.typeStandard(layerId, id)) return en(STANDARD_KEY, "Standard");
         const p = this.layer(layerId)?.presets.find((x) => x.id === id);
         return p ? en(p.name, id) : id;
     }
@@ -379,9 +395,11 @@ export class MockBackend {
         }
     }
 
-    /** No preset ("Default"): the type's fresh defaults are the baseline, so a loaded build can read "modified". */
+    /** A type picked (or a build loaded): its Standard; the type's fresh defaults are the baseline, so a loaded build can read "modified". */
     resetActive() {
-        this.active = this.root ? { id: "", layer: this.root.layer, base: this.defaultData(this.root.layer) } : null;
+        this.active = this.root
+            ? { id: this.hasStandard(this.root.layer) ? STANDARD_ID : "", layer: this.root.layer, base: this.presetData(this.root.layer, STANDARD_ID) ?? this.defaultData(this.root.layer) }
+            : null;
     }
 
     defaultData(layerId: string): PresetData {
@@ -390,10 +408,13 @@ export class MockBackend {
     }
 
     presetViews(l: MockLayer): PresetView[] {
-        const built: PresetView[] = l.presets.map((p) => ({
+        const list = this.typeStandard(l.id, STANDARD_ID) ? [{ id: STANDARD_ID, name: STANDARD_KEY } as MockLayer["presets"][number], ...l.presets] : l.presets;
+        const built: PresetView[] = list.map((p) => ({
             id: p.id, name: p.name, icon: p.icon, overridden: this.presetOverrides[l.id + "|" + p.id] ? true : undefined,
             shelved: (p as PresetView).shelved || styleShelved(l.id, (l as { group?: string }).group, p.id) || undefined,
         }));
+        // Standard first, also one the type ships
+        built.sort((a, b) => (a.id === STANDARD_ID ? -1 : b.id === STANDARD_ID ? 1 : 0));
         const own: PresetView[] = (this.customPresets[l.id] ?? []).map((p) => ({ id: p.id, name: p.name, custom: true, basedOn: p.basedOn }));
         return [...built, ...own];
     }
@@ -654,6 +675,9 @@ export class MockBackend {
                 this.edit({ key: "Placemaker.Undo.SelectRecipe", args: [r.info.custom ? r.info.name : en(r.info.name)] }, () => {
                     this.recipeId = r.info.id;
                     this.root = this.instantiate(r.root);
+                    // a type starts on its Standard: one the player saved over is applied (C# SwitchRecipe)
+                    const ov = this.presetOverrides[this.root.layer + "|" + STANDARD_ID];
+                    if (ov) this.applyData(this.root, clone(ov));
                     this.focus = "0";
                     this.modified = false;
                     this.resetActive();
@@ -822,7 +846,7 @@ export class MockBackend {
             }
             case "selectPreset": {
                 const layerId = String(a[0]);
-                const id = String(a[1] ?? "");
+                const id = String(a[1] ?? "") || (this.hasStandard(layerId) ? STANDARD_ID : "");
                 const r =
                     this.recipes.find((x) => !x.info.custom && x.root.layer === layerId && !(x.root.children ?? []).length) ??
                     this.recipes.find((x) => x.info.id === layerId);
@@ -846,7 +870,7 @@ export class MockBackend {
                 const data = this.capture(step);
                 const own = (this.customPresets[step.layer] ?? []).find((p) => p.id === id);
                 if (own) own.data = data;
-                else if (this.layer(step.layer)?.presets.some((p) => p.id === id)) this.presetOverrides[step.layer + "|" + id] = data;
+                else if (this.layer(step.layer)?.presets.some((p) => p.id === id) || this.typeStandard(step.layer, id)) this.presetOverrides[step.layer + "|" + id] = data;
                 else break;
                 if (a[0] === "0") this.active = { id, layer: step.layer, base: clone(data) };
                 this.toast = `Saved “${this.presetName(step.layer, id)}”`;
@@ -879,7 +903,8 @@ export class MockBackend {
                 const isActive = !!this.active && this.active.layer === layerId && this.active.id === id;
                 if (list.some((p) => p.id === id)) {
                     this.customPresets[layerId] = list.filter((p) => p.id !== id);
-                    if (isActive) this.active = { id: "", layer: layerId, base: this.defaultData(layerId) };
+                    // the design stays, now on the type's Standard (changed if it differs)
+                    if (isActive) this.active = { id: this.hasStandard(layerId) ? STANDARD_ID : "", layer: layerId, base: this.presetData(layerId, STANDARD_ID) ?? this.defaultData(layerId) };
                     break;
                 }
                 const key = layerId + "|" + id;

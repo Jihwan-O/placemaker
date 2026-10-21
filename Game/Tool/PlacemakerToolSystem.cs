@@ -98,7 +98,8 @@ namespace Placemaker.Game.Tool
             _defaults = ToolRegistration.Defaults ?? new LayerDefaultsStore();
             _editor = new DesignEditor(GeneratorRegistry.Get, id => _defaults.Get(id));
             _recipes = new RecipeStore(() => _editor);
-            _presets = new PresetStore(_editor);
+            // a type's Standard style is its own design: the root of its recipe, as picking the type gives it
+            _presets = new PresetStore(_editor, null, layer => { var id = RecipeFor(layer); return id != null ? _recipes.Find(id)?.Recipe?.Root : null; });
             PresetFile.Load(_presets);
             _roads = new RoadNetwork(EntityManager, World.GetOrCreateSystemManaged<global::Game.Net.SearchSystem>());
             _snapCollector = new SnapCollector(EntityManager, World);

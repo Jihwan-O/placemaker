@@ -98,7 +98,7 @@ namespace Placemaker.Game.Tool
 
         /// <summary>
         /// Replaces the design with recipe <paramref name="id"/> (area kept): the player's last design of that type this session
-        /// (new seeds, no entrances), else a fresh copy. No undo step.
+        /// (new seeds, no entrances, its style), else a fresh copy on the type's Standard style. No undo step.
         /// </summary>
         private bool SwitchRecipe(string id)
         {
@@ -116,6 +116,12 @@ namespace Placemaker.Game.Tool
                 r = _recipes.Instantiate(id, NewSeed());
                 if (r == null) { Flash(new LocText("Placemaker.Problem.UnknownRecipe")); return false; }
                 _editor.AddDefaultFeatures(r, NewSeed);
+                // A type starts on its Standard style (its own design). A Standard the player saved over, or one the type ships
+                // that differs from its recipe, is applied, so the panel shows it picked and unchanged.
+                presetLayer = r.Root.Layer;
+                presetId = _presets.Exists(presetLayer, PresetStore.StandardId) ? PresetStore.StandardId : "";
+                if (presetId.Length > 0 && RecipeFor(presetLayer) == id && _presets.IsModified(r.Root, presetId))
+                    _presets.Apply(r.Root, presetId, NewSeed);
             }
             RememberDesign();   // the design being left
             // Markers the player placed for the same root layer stay (switching park ↔ park+playground keeps entrances).

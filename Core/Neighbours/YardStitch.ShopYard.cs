@@ -10,8 +10,8 @@
 //   * further out (past shopFar of the lot): no concrete, the ground painted green with a few trees and bushes.
 // Pieces are the house's own (StitchPlan.Paths and Bushes), made and kept like every garden piece.
 //
-// Three styles (knob "parkStyle", YardStitch.ParkStyleOf; by the building: offices and homes clean, shops everyday, works
-// industrial):
+// Three styles (the outgrow type's "parkStyle", whatever the building is; the built-in types: offices, apartments and towers
+// clean, shops and mixed housing everyday, industry industrial):
 //   * clean: a wider grass strip, trees in planters at the ends of the rows, fewer cars, a tidy service corner (bins; an
 //     office's generator);
 //   * everyday: as above;
@@ -240,11 +240,11 @@ namespace Placemaker.Core.Neighbours
                     if (LineCross(e1.A, d1, edges[i2].A, d2, out var cross) && math.distance(cross, best) < 8f) { legs.Add((edges[i2].A, d2)); corner = cross; }
                 }
 
-                // homes: their bins only (no stock, no gas cage); clean: bins (an office's generator on a big lot); industrial:
-                // a fuller corner of stock (pallets, crates, barrels, a skip, a container, a shed)
-                bool homeBins = h.Zone == null || h.Zone == "home";
+                // by the type's car park style, whatever the building is: clean, its bins (a backup generator on a big lot);
+                // everyday, bins and a gas cage, stock (pallets, crates, cardboard; a skip, a shed or a container on a bigger
+                // lot); industrial, a fuller corner of stock (pallets, crates, barrels, a skip, a container, a shed)
                 bool clean = style == PolishLooks.ParkClean, works = style == PolishLooks.ParkIndustrial;
-                var bins = homeBins ? new List<int> { Dumpster3, Dumpster2 } : new List<int> { GasCage, Dumpster3, Dumpster2 };
+                var bins = clean ? new List<int> { Dumpster3, Dumpster2 } : new List<int> { GasCage, Dumpster3, Dumpster2 };
                 var stock = new List<int>();
                 if (works)
                 {
@@ -253,12 +253,12 @@ namespace Placemaker.Core.Neighbours
                     if (area >= 400f) stock.Add(Container);
                     if (area >= 900f) stock.Add(ShedBig);
                 }
-                else if (clean) { if (!homeBins && h.Zone == "office" && area >= 700f) stock.Add(Generator); }
-                else if (!homeBins)
+                else if (clean) { if (area >= 700f) stock.Add(Generator); }
+                else
                 {
                     stock.AddRange(new[] { 17 + (int)(seed % 2), CratePile3, Cardboard3 });
                     if (area >= 400f) stock.Add(Skip);
-                    if (area >= 700f) stock.Add(h.Zone == "office" ? Generator : (seed >> 8) % 2 == 0 ? ShedBig : Container);
+                    if (area >= 700f) stock.Add((seed >> 8) % 2 == 0 ? ShedBig : Container);
                 }
                 var placed = new List<(float2 At, float Yaw, int Kind, float2[] Fp)>();
                 var groups = legs.Count == 2 && stock.Count > 0 ? new[] { bins, stock } : new[] { bins.Concat(stock).ToList() };
@@ -292,7 +292,7 @@ namespace Placemaker.Core.Neighbours
                         }
                     }
                 }
-                if (placed.Count < (homeBins ? 2 : 3)) continue;
+                if (placed.Count < (clean ? 2 : 3)) continue;
                 foreach (var (at, yaw, kind, _) in placed)
                 {
                     plan.Bushes.Add((h.Id, at, yaw, kind));

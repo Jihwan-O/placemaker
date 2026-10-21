@@ -64,12 +64,12 @@ const GROUPS: { id: string; en: string; icon: string; open?: boolean; knobs: Kno
         id: "land", en: "What the land becomes", icon: "layers", open: true,
         knobs: [
             {
-                id: "fill", en: "Land past the lot", tip: "What a building's land past its own lot becomes, whatever the building is: a garden (lawn, fences, beds), a car park yard (green edges, bins, marked bays with parked cars), or paving. Auto: by the building, homes get gardens, shops, offices and industry car park yards (each in its own style).", kind: "choice",
-                options: [{ value: 0, en: "Auto" }, { value: 1, en: "Garden" }, { value: 2, en: "Car park" }, { value: 3, en: "Paved" }],
+                id: "fill", en: "Land past the lot", tip: "What a building's land past its own lot becomes, whatever the building is: a garden (lawn, fences, beds), a car park yard (green edges, bins, marked bays with parked cars), or paving. The outgrow type alone decides: whatever the building is (a house given a car park type gets a car park).", kind: "choice",
+                options: [{ value: 1, en: "Garden" }, { value: 2, en: "Car park" }, { value: 3, en: "Paved" }],
             },
             {
-                id: "parkStyle", en: "Car park style", tip: "How a car park yard looks. Clean: a wide grass edge, trees in planters at the ends of the rows, a tidy bin corner. Everyday: grass edges, bins and stock, most bays taken. Industrial: concrete, no grass, more vans, pallets, barrels, skips and containers, dry worn ground further out. Auto: offices and homes clean, shops everyday, industry industrial.", kind: "choice",
-                options: [{ value: 0, en: "Auto" }, { value: 1, en: "Clean" }, { value: 2, en: "Everyday" }, { value: 3, en: "Industrial" }],
+                id: "parkStyle", en: "Car park style", tip: "How a car park yard looks. Clean: a wide grass edge, trees in planters at the ends of the rows, a tidy bin corner. Everyday: grass edges, bins and stock, most bays taken. Industrial: concrete, no grass, more vans, pallets, barrels, skips and containers, dry worn ground further out.", kind: "choice",
+                options: [{ value: 1, en: "Clean" }, { value: 2, en: "Everyday" }, { value: 3, en: "Industrial" }],
             },
             { id: "parkReach", en: "Car park reach", tip: "How far out from the building its car park yard is paved and parked. Further out, the land is the outgrow type's own: its ground, patches, rocks and things.", kind: "slider", min: 0, max: 300, step: 5, unit: "m" },
             { id: "parkCars", en: "Parked cars", tip: "The share of parking bays with a car or van in them.", kind: "slider", min: 0, max: 100, step: 5, unit: "%" },

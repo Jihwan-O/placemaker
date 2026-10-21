@@ -58,7 +58,7 @@ namespace Placemaker.Core.Neighbours
         public static Func<long> AllocatedBytes;
 
         public static string ThemeOf(StitchHouse h) =>
-            !string.IsNullOrEmpty(h.Theme) && Array.IndexOf(Themes, h.Theme) >= 0 ? h.Theme : h.Zone == "industry" ? "yard" : "garden";
+            !string.IsNullOrEmpty(h.Theme) && Array.IndexOf(Themes, h.Theme) >= 0 ? h.Theme : "garden";
 
         /// <summary>Both face one point in front of them, within <paramref name="reach"/> of their street edges (a turning circle,
         /// a tight bend): their front middles' forward rays meet ahead of both.</summary>
@@ -78,25 +78,20 @@ namespace Placemaker.Core.Neighbours
         private static float K(StitchHouse h, StitchSettings s, string name, float fallback) =>
             h?.Options != null && h.Options.TryGetValue(name, out var v) ? v : s.Knob(name, fallback);
 
-        /// <summary>What a house's land past its lot becomes (its look's "fill": PolishLooks.FillGarden, FillCarPark, FillPaved),
-        /// whatever the building is. By the building (FillAuto): a home a garden; a shop, office or works a car park yard (in its
-        /// own style: ParkStyleOf), on the paving most of its ground already is ("Shops keep paving" off, or no paving of its
-        /// own: a garden; "shopYard" off: the paving alone).</summary>
+        /// <summary>What a house's land past its lot becomes: its outgrow type's "fill" (PolishLooks.FillGarden, FillCarPark,
+        /// FillPaved), whatever the building is (the type alone decides; an old "by the building" is a garden).</summary>
         private static int FillOf(StitchHouse h, StitchSettings s)
         {
-            int f = (int)math.round(K(h, s, "fill", 0f));
-            if (f >= PolishLooks.FillGarden && f <= PolishLooks.FillPaved) return f;
-            if (string.IsNullOrEmpty(h.MainSurface) || K(h, s, "pavedFill", 1f) < 0.5f) return PolishLooks.FillGarden;
-            return K(h, s, "shopYard", 1f) > 0.5f ? PolishLooks.FillCarPark : PolishLooks.FillPaved;
+            int f = (int)math.round(K(h, s, "fill", PolishLooks.FillGarden));
+            return f >= PolishLooks.FillGarden && f <= PolishLooks.FillPaved ? f : PolishLooks.FillGarden;
         }
 
-        /// <summary>A car park yard's style (its look's "parkStyle"); by the building (ParkAuto): an office or a home clean, a shop
-        /// everyday, a works industrial.</summary>
+        /// <summary>A car park yard's style: its outgrow type's "parkStyle", whatever the building is (an old "by the building":
+        /// everyday).</summary>
         private static int ParkStyleOf(StitchHouse h, StitchSettings s)
         {
-            int p = (int)math.round(K(h, s, "parkStyle", 0f));
-            if (p >= PolishLooks.ParkClean && p <= PolishLooks.ParkIndustrial) return p;
-            return h.Zone == "industry" ? PolishLooks.ParkIndustrial : h.Zone == "shop" ? PolishLooks.ParkEveryday : PolishLooks.ParkClean;
+            int p = (int)math.round(K(h, s, "parkStyle", PolishLooks.ParkEveryday));
+            return p >= PolishLooks.ParkClean && p <= PolishLooks.ParkIndustrial ? p : PolishLooks.ParkEveryday;
         }
 
         /// <summary>Its land past the lot is hard ground (a car park yard or paving), not a garden.</summary>

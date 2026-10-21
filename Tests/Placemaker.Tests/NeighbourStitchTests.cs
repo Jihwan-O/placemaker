@@ -854,10 +854,10 @@ namespace Placemaker.Tests
         }
 
         [Fact]
-        public void A_shops_paving_fills_its_ground_up_to_the_fence_whatever_its_lawn_reach()
+        public void A_paved_type_fills_its_ground_up_to_the_fence_whatever_its_lawn_reach()
         {
-            // without a shop yard (a shop or a works): one slab to the fence
-            foreach (var (zone, options) in new[] { ("shop", new Dictionary<string, float> { ["shopYard"] = 0f }), ("industry", new Dictionary<string, float> { ["shopYard"] = 0f }) })
+            // a type that paves (a shop or a works alike): one slab to the fence
+            foreach (var (zone, options) in new[] { ("shop", new Dictionary<string, float> { ["fill"] = PolishLooks.FillPaved }), ("industry", new Dictionary<string, float> { ["fill"] = PolishLooks.FillPaved }) })
             {
                 var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
                 a.MainSurface = "Concrete Surface 01";
@@ -887,7 +887,7 @@ namespace Placemaker.Tests
             var a = new StitchHouse { Id = 1, Position = new float2(0f, 0f), Forward = new float2(0f, 1f), HalfLot = new float2(20f, 16f), MainSurface = "Concrete Surface 01", Zone = "shop" };
             a.Footprint = new[] { a.ToWorld(new float2(-14f, -14f)), a.ToWorld(new float2(14f, -14f)), a.ToWorld(new float2(14f, 2f)), a.ToWorld(new float2(-14f, 2f)) };
             a.Hard.Add(new[] { a.ToWorld(new float2(-19f, 3f)), a.ToWorld(new float2(19f, 3f)), a.ToWorld(new float2(19f, 15.5f)), a.ToWorld(new float2(-19f, 15.5f)) });
-            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 50f, ["parkWorn"] = 0f, ["parkReach"] = 32f };
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 50f, ["fill"] = PolishLooks.FillCarPark, ["parkWorn"] = 0f, ["parkReach"] = 32f };
             var plan = YardStitch.Plan(new[] { a }, MiddleLine());
             Assert.True(plan.Plots.TryGetValue(1, out var plot), "the yard grows");
             var lot = new[] { a.BackLeft, a.BackRight, a.FrontRight, a.FrontLeft };
@@ -1044,7 +1044,7 @@ namespace Placemaker.Tests
         }
 
         [Fact]
-        public void A_car_park_yard_takes_its_style_from_the_building_clean_everyday_or_industrial()
+        public void A_car_park_yard_takes_its_style_from_its_type_whatever_the_building()
         {
             string Name(int k) => YardStitch.BushKinds[k];
             (StitchPlan Plan, string Note) Yard(string zone, float style = 0f)
@@ -1055,19 +1055,31 @@ namespace Placemaker.Tests
                 var plan = YardStitch.Plan(new[] { a }, MiddleLine());
                 return (plan, plan.Notes.FirstOrDefault(n => n.Contains("shop yard")) ?? "");
             }
-            var works = Yard("industry");
+            var works = Yard("industry", PolishLooks.ParkIndustrial);
             Assert.Contains("(industrial,", works.Note);
             Assert.Contains(works.Plan.Paths, p => p.House == 1 && p.Surface == "Concrete Surface 01");
             Assert.DoesNotContain(works.Plan.Paths, p => p.Surface == "Grass Surface 01");
             Assert.DoesNotContain(works.Plan.Bushes, b => Name(b.Kind).EndsWith("Tree01"));
-            Assert.Contains("(clean,", Yard("office").Note);
-            Assert.Contains("(clean,", Yard("home").Note);
-            Assert.Contains("(everyday,", Yard("shop").Note);
-            Assert.Contains("(industrial,", Yard("shop", PolishLooks.ParkIndustrial).Note);
+            // the same style on any building; an old "by the building" (0) is everyday
+            Assert.Contains("(clean,", Yard("industry", PolishLooks.ParkClean).Note);
+            Assert.Contains("(clean,", Yard("home", PolishLooks.ParkClean).Note);
+            Assert.Contains("(industrial,", Yard("home", PolishLooks.ParkIndustrial).Note);
+            Assert.Contains("(everyday,", Yard("office").Note);
+            Assert.Contains("(everyday,", Yard("industry").Note);
             // the bigger homes, offices and works park by default
             foreach (var id in new[] { "apartments", "towers", "mixed", "offices", "officeTowers", "industry", "shops", "bigShops" })
                 Assert.Equal(PolishLooks.FillCarPark, PolishLooks.BuiltIn.Single(l => l.Id == id).Values()["fill"]);
             Assert.Equal(PolishLooks.FillGarden, PolishLooks.BuiltIn.Single(l => l.Id == "houses").Values()["fill"]);
+            // the planting styles are gardens, whatever building they are given to; each car park type names its style
+            foreach (var id in new[] { "garden", "natural", "tidy", "yard", "meadow", "rustic", "coastal", "manicured" })
+                Assert.Equal(PolishLooks.FillGarden, PolishLooks.BuiltIn.Single(l => l.Id == id).Values()["fill"]);
+            Assert.Equal(PolishLooks.ParkIndustrial, PolishLooks.BuiltIn.Single(l => l.Id == "industry").Values()["parkStyle"]);
+            Assert.Equal(PolishLooks.ParkClean, PolishLooks.BuiltIn.Single(l => l.Id == "offices").Values()["parkStyle"]);
+            Assert.Equal(PolishLooks.ParkEveryday, PolishLooks.BuiltIn.Single(l => l.Id == "shops").Values()["parkStyle"]);
+            // an old type saved with "by the building" reads as a garden and an everyday car park
+            var old = new PolishLook { Id = "my-old", Custom = true, Theme = "garden", Knobs = { ["fill"] = PolishLooks.FillAuto, ["parkStyle"] = PolishLooks.ParkAuto } };
+            Assert.Equal(PolishLooks.FillGarden, old.Values()["fill"]);
+            Assert.Equal(PolishLooks.ParkEveryday, old.Values()["parkStyle"]);
         }
 
         [Fact]
@@ -1083,7 +1095,7 @@ namespace Placemaker.Tests
                 return YardStitch.Plan(new[] { a }, MiddleLine());
             }
             // a works: worn edge (dirt painted out from the paving), waste ground further out, no trees at all
-            var works = Yard("industry", new Dictionary<string, float>());
+            var works = Yard("industry", new Dictionary<string, float> { ["parkStyle"] = PolishLooks.ParkIndustrial });
             string note = works.Notes.First(n => n.Contains("shop yard"));
             Assert.Contains("worn edge", note);
             Assert.Contains("waste ground", note);
@@ -1123,10 +1135,10 @@ namespace Placemaker.Tests
         public void Any_look_goes_on_any_building_a_house_can_have_a_car_park_and_a_shop_a_garden()
         {
             string Name(int k) => YardStitch.BushKinds[k];
-            // a house whose look makes its land a car park yard: paving, marked bays, parked cars; only bins in its corner
+            // a house whose type makes its land a clean car park yard: paving, marked bays, parked cars; only bins in its corner
             var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
             a.Zone = "home";
-            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 50f, ["fill"] = PolishLooks.FillCarPark };
+            a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 50f, ["fill"] = PolishLooks.FillCarPark, ["parkStyle"] = PolishLooks.ParkClean };
             var plan = YardStitch.Plan(new[] { a }, MiddleLine());
             Assert.Contains(plan.Paths, p => p.House == 1 && p.Surface == "Pavement Surface 01");
             Assert.Contains(plan.Bushes, b => b.House == 1 && Name(b.Kind) == "ParkingLotDecal01");
@@ -1150,10 +1162,10 @@ namespace Placemaker.Tests
             Assert.DoesNotContain(garden.Paths, p => p.House == 2 && p.Surface == "Concrete Surface 01");
             Assert.True(garden.Lawns.ContainsKey(25L) || garden.NewLawns.Any(l => l.House == 2), "the shop's land is a lawn: " + string.Join(" | ", garden.Notes));
             Assert.DoesNotContain(garden.Bushes, x => x.Kind >= 29);
-            // by the building (fill 0) a shop still gets its car park yard
+            // an old "by the building" (fill 0) is a garden now: the type alone decides, never the building
             b2.Options["fill"] = PolishLooks.FillAuto;
             var auto = YardStitch.Plan(new[] { b2 }, MiddleLine());
-            Assert.Contains(auto.Bushes, x => Name(x.Kind) == "ParkingLotDecal01");
+            Assert.DoesNotContain(auto.Bushes, x => x.Kind >= 29);
         }
 
         [Fact]

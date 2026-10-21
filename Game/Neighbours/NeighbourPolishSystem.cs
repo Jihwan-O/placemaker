@@ -240,6 +240,8 @@ namespace Placemaker.Game.Neighbours
             /// <summary>Lane and lawn id → the id of the house they belong to (a house unpolished meanwhile is left alone).</summary>
             public Dictionary<long, long> OwnerOf;
             public HashSet<long> CoreIds;
+            /// <summary>The houses this pass was asked for (the rest of the core are neighbours it re-plans).</summary>
+            public HashSet<long> DoneIds;
             public Dictionary<long, Entity> HouseOf;
             public Dictionary<long, Entity> LawnPrefabOf;
             public int Asked, Cluster;
@@ -295,6 +297,7 @@ namespace Placemaker.Game.Neighbours
             CreateAreaQueries();
             CreateNearbyQuery();
             CreateHiddenQuery();
+            CreateRebuiltQueries();
         }
 
         [Preserve]
@@ -309,7 +312,9 @@ namespace Placemaker.Game.Neighbours
             using (var kept = _citySettings.ToComponentDataArray<PolishCitySettings>(Allocator.Temp))
                 if (kept.Length > 0) PolishNew = kept[0].NewBuildings;
             Mod.Log.Info($"Placemaker neighbourhood polish: city loaded, outgrow new buildings {(PolishNew ? "on" : "off")}");
-            // a loaded city is as it was saved: nothing to plan until something changes
+            // a loaded city is as it was saved: nothing to plan until something changes, but the outgrown buildings an older
+            // build left empty (NeighbourPolishSystem.Rebuilt)
+            StartHeal();
         }
 
         [Preserve]
@@ -359,8 +364,9 @@ namespace Placemaker.Game.Neighbours
                     Mod.Log.Info($"Placemaker neighbourhood polish: every polished lot again, {yes} to look at.");
                 }
                 CollectChanged();
+                HealEmpty();
                 ++_frame;
-                Busy = _dirty.Count > 0 || _inFlight.Count > 0 || _restoreQueue.Count > 0 || s_stamps.Count > 0 || NeighbourObjectSystem.Queue.Count > 0 || NeighbourAreaSystem.Queue.Count > 0;
+                Busy = _dirty.Count > 0 || _inFlight.Count > 0 || _healPending || _restoreQueue.Count > 0 || s_stamps.Count > 0 || NeighbourObjectSystem.Queue.Count > 0 || NeighbourAreaSystem.Queue.Count > 0;
                 Waiting = _dirty.Count;
                 // one finished plan written per frame (writing is the part on the frame), one new patch started per frame
                 StartSampledPlans();
@@ -402,7 +408,7 @@ namespace Placemaker.Game.Neighbours
                     }
                     _gridStale = true;
                 }
-            if (_changedFences.IsEmptyIgnoreFilter) return;
+            if (!_changedFences.IsEmptyIgnoreFilter)
             using (var lanes = _changedFences.ToEntityArray(Allocator.Temp))
                 foreach (var lane in lanes)
                 {
@@ -421,6 +427,10 @@ namespace Placemaker.Game.Neighbours
                     _written.Remove(lane);
                     if (_dirty.Add(owner)) DirtyBy[0]++;
                 }
+            // buildings the game finished or rebuilt (fences or not) and pieces it took away (after the lanes: a house planned
+            // again anyway is not refilled piece by piece)
+            try { CollectRebuilt(); }
+            catch (Exception e) { if (_errors++ < 5) Mod.Log.Error(e, "Placemaker neighbourhood polish (rebuilt buildings) failed"); }
         }
 
         // ───────────── one pass: a batch of dirty houses with their neighbourhoods ─────────────
@@ -543,6 +553,7 @@ namespace Placemaker.Game.Neighbours
                     if (Clear(houses[i].T.m_Position.xz)) { seed = i; break; }
                 }
             foreach (var e in unknown) _dirty.Remove(e);
+            TotalDropped += unknown.Count;
             if (seed < 0) return;
             var seedAt = houses[seed].T.m_Position.xz;
             for (int dx = -1; dx <= 1; dx++)
@@ -646,7 +657,7 @@ namespace Placemaker.Game.Neighbours
             // they are done (StartSampledPlans)
             var pend = new Pending
             {
-                Stitch = stitch, LanesOf = lanesOf, LawnsOf = lawnsOf, OwnerOf = ownerOf, CoreIds = coreIds, HouseOf = new Dictionary<long, Entity>(_houseOf),
+                Stitch = stitch, LanesOf = lanesOf, LawnsOf = lawnsOf, OwnerOf = ownerOf, CoreIds = coreIds, DoneIds = new HashSet<long>(done.Select(Id)), HouseOf = new Dictionary<long, Entity>(_houseOf),
                 LawnPrefabOf = new Dictionary<long, Entity>(_lawnPrefabOf), Asked = done.Count, Cluster = cluster.Count, Clock = sw, First = first, Seed = seedAt,
                 Settings = settings, Planner = planner, Samples = StartSampling(lo, hi, math.clamp(wetGap, 0f, 300f) + 4f),
             };
@@ -853,7 +864,9 @@ namespace Placemaker.Game.Neighbours
                 {
                     if (skip.Contains(id) || !_houseOf.TryGetValue(id, out var house)) continue;
                     var now = want.TryGetValue(id, out var w) ? w : new List<PieceIdentity.Wish>();
-                    foreach (var have in OwnPieceShapes(house, PolishPieceKind.Garden))
+                    var haves = OwnPieceShapes(house, PolishPieceKind.Garden);
+                    if (haves.Count > 0 && now.Count == 0) NoteEmptied(id, house, pend.DoneIds != null && pend.DoneIds.Contains(id), plan.Plots.ContainsKey(id), haves.Count, stitch.Find(h => h.Id == id)?.Zone);
+                    foreach (var have in haves)
                         if (!now.Exists(x => PieceIdentity.Same(x, have))) NeighbourDeleteSystem.Queue.Add(have.Entity);
                 }
                 foreach (var (house, ring, prefab) in newLawns)

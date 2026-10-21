@@ -18,10 +18,14 @@ namespace Placemaker.Game.Neighbours
     {
         public static readonly List<Entity> Queue = new List<Entity>();
         public static int TotalDeleted;
+        /// <summary>What this system marked Deleted this frame: the polish tells its own deletions from the game's
+        /// (NeighbourPolishSystem.Rebuilt: pieces the game took away are planned or made again).</summary>
+        public static readonly HashSet<Entity> Marked = new HashSet<Entity>();
 
         [Preserve]
         protected override void OnUpdate()
         {
+            Marked.Clear();
             if (Queue.Count == 0) return;
             try
             {
@@ -29,6 +33,7 @@ namespace Placemaker.Game.Neighbours
                 {
                     if (!EntityManager.Exists(e) || EntityManager.HasComponent<Deleted>(e)) continue;
                     EntityManager.AddComponent<Deleted>(e);
+                    Marked.Add(e);
                     TotalDeleted++;
                 }
             }

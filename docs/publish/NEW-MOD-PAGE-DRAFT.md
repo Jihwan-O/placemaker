@@ -1,5 +1,5 @@
 Placemaker
-Early access. Expect rough edges.
+Early access. Give it a try.
 Pick an area. Pick what goes there. Hit build.
 
 ■ Roads
@@ -21,8 +21,9 @@ Wetlands, trails, campgrounds, farms, golf, car yards and more
 Zone a whole area at once
 
 ■ Outgrow (beta)
-Customize how your buildings' lots grow into gardens and car parks
-Off by default
+Customize how your buildings grow into gardens and car parks
+Global Outgrow is off by default
+Turn it on for certain buildings or use the brush to test it
 
 ■ Area tools
 Click a block, click corners, brush it, paint bucket it or click road nodes
@@ -42,10 +43,10 @@ Make it yours
 * Only uses the game's own assets
 
 Early access
-* Roads, parking and parks are the most finished
-* Shops and squares still need work
+* Parks, parking and industrial are the most finished
+* Roads and shops still need work
 * Strict grid and superblock roads build nothing yet
-* Big builds can freeze the game for a second
+* Outgrow all on a massive save means a long lag until it catches up
 * Back up your save first
 
 Found a bug?

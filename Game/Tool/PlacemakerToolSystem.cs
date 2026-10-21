@@ -200,6 +200,7 @@ namespace Placemaker.Game.Tool
             _legendHover = "";
             EndValuePreview(true);      // hovers revert, drags commit
             HideGhost();
+            UpdateGhostOutline(false);
             _closeAfterGhost = 0;
             EnableActions(false);
             // While the build service holds the tool slot for our build, Anarchy must stay in effect.
@@ -293,6 +294,7 @@ namespace Placemaker.Game.Tool
             ResolveAssets();
             if (_markerKind != null && (_shape == null || RecipePaths.Resolve(_recipe, _markerPath) == null)) ExitMarkerMode();
             UpdateHintActions();
+            UpdateGhostOutline(PreviewModeEffective == PreviewMode.Ghost && !_outgrowMode);
         }
 
         // ───────────── stage ─────────────

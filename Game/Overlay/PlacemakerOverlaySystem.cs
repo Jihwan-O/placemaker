@@ -226,6 +226,8 @@ namespace Placemaker.Game.Overlay
                 case SelectionMode.BlockPaint: DrawBlockPaintMode(buffer, w, shape); break;
             }
             if ((clipped || cutBack) && shape != null && _tool.Mode == SelectionMode.Draw) Ring(buffer, shape.Ring, Outline, w);
+            // the Real preview: what will be built, its outline thick (the game's outlines on every piece are hidden meanwhile)
+            if (_tool.PreviewModeEffective == PreviewMode.Ghost && shape != null && shape.Ring.Length >= 3 && !stroke) Ring(buffer, shape.Ring, Outline, w * 3f);
         }
 
         private void Ring(OverlayRenderSystem.Buffer buffer, float3[] ring, Color c, float w, bool dashed = false)

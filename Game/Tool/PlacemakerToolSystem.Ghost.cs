@@ -5,6 +5,7 @@
 // never Apply (the build applies through its own BuildToolSystem).
 
 using System;
+using Unity.Entities;
 using Game.Tools;
 using Placemaker.Core.Tool;
 using Placemaker.Game.Preview;
@@ -54,6 +55,36 @@ namespace Placemaker.Game.Tool
         public Placemaker.Core.PlanIssue GhostDroppedIssue => _ghostDropped > 0
             ? new Placemaker.Core.PlanIssue { Severity = Placemaker.Core.IssueSeverity.Warning, Key = "Placemaker.Issue.GhostObjectsDropped", Args = new object[] { _ghostDropped } }
             : null;
+
+        // The game outlines every temporary a tool places in its hover colour (BatchInstanceSystem: TempFlags.Create gives
+        // the mesh an outline; BatchDataSystem colours it RenderingSettingsData.m_HoveredColor, m_OwnerColor for a parent).
+        // The Real preview is all temporaries, so the whole build was drawn in blue outlines ("I just want to actually see
+        // it"): while it shows, those two colours are see-through (errors and warnings keep theirs), and they are put back
+        // the moment it goes (Sketch, Outgrow, the tool closed). The build's own outline is drawn thick instead (the overlay).
+        private EntityQuery _renderingSettings;
+        private (UnityEngine.Color Hovered, UnityEngine.Color Owner)? _savedOutline;
+
+        private void UpdateGhostOutline(bool hide)
+        {
+            if (hide == (_savedOutline != null)) return;
+            if (_renderingSettings == default) _renderingSettings = EntityManager.CreateEntityQuery(ComponentType.ReadWrite<global::Game.Prefabs.RenderingSettingsData>());
+            if (_renderingSettings.IsEmptyIgnoreFilter) return;
+            var e = _renderingSettings.GetSingletonEntity();
+            var d = EntityManager.GetComponentData<global::Game.Prefabs.RenderingSettingsData>(e);
+            if (hide)
+            {
+                _savedOutline = (d.m_HoveredColor, d.m_OwnerColor);
+                d.m_HoveredColor = new UnityEngine.Color(0f, 0f, 0f, 0f);
+                d.m_OwnerColor = new UnityEngine.Color(0f, 0f, 0f, 0f);
+            }
+            else
+            {
+                d.m_HoveredColor = _savedOutline.Value.Hovered;
+                d.m_OwnerColor = _savedOutline.Value.Owner;
+                _savedOutline = null;
+            }
+            EntityManager.SetComponentData(e, d);
+        }
 
         /// <summary>UI: setPreviewMode("sketch" | "ghost") — for the current stage, sticks for the session.</summary>
         public void SetPreviewMode(string id)

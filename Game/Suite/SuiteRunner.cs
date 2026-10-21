@@ -326,14 +326,14 @@ namespace Placemaker.Game.Suite
             _windowOpen = false;
             var net = _window.Select(f => math.max(0f, f.Ms - f.Suite)).ToList();
             var (max, p95, n) = SuiteStats.FrameStats(net);
-            int over250 = net.Count(f => f > 250f), over1000 = net.Count(f => f > 1000f);
+            int over50 = net.Count(f => f > 50f), over100 = net.Count(f => f > 100f), over250 = net.Count(f => f > 250f), over1000 = net.Count(f => f > 1000f);
             int maxFrame = -1;
             float maxSuite = 0f;
             for (int i = 0; i < _window.Count; i++) if (net[i] >= max - 1e-3f) { maxFrame = _window[i].Frame; maxSuite = _window[i].Suite; break; }
             var top = new JArray(_window.Select((f, i) => (f, net[i])).OrderByDescending(x => x.Item2).Take(3).Select(x => new JArray(x.f.Frame, Math.Round(x.f.Ms, 1), Math.Round(x.f.Suite, 1))));
             return new JObject
             {
-                ["frames"] = n, ["maxMs"] = Math.Round(max, 1), ["p95Ms"] = Math.Round(p95, 1), ["over250"] = over250, ["over1000"] = over1000,
+                ["frames"] = n, ["maxMs"] = Math.Round(max, 1), ["p95Ms"] = Math.Round(p95, 1), ["over50"] = over50, ["over100"] = over100, ["over250"] = over250, ["over1000"] = over1000,
                 ["maxFrame"] = maxFrame, ["maxSuiteMs"] = Math.Round(maxSuite, 1), ["suiteMsTotal"] = Math.Round(_window.Sum(f => f.Suite)), ["top"] = top,
             };
         }

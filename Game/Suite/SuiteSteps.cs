@@ -179,7 +179,7 @@ namespace Placemaker.Game.Suite
                     if (srec["error"] != null && rec["error"] == null) rec["shotError"] = srec["error"];
                 }
                 rec["frames"] = CloseWindow();
-                Say($"step {i} {what}: {rec["ms"]} ms, worst frame {rec["frames"]?["maxMs"]} ms" + (rec["planComputeMs"] != null ? $", plan {rec["planComputeMs"]} ms" : "")
+                Say($"step {i} {what}: {rec["ms"]} ms, worst frame {rec["frames"]?["maxMs"]} ms, over 50 ms: {rec["frames"]?["over50"]}, over 100: {rec["frames"]?["over100"]} of {rec["frames"]?["frames"]}" + (rec["planComputeMs"] != null ? $", plan {rec["planComputeMs"]} ms" : "")
                     + (rec["shot"] != null ? $", shot {rec["shot"]}" : rec["shotRecord"]?["shot"] != null ? $", shot {rec["shotRecord"]["shot"]}" : "") + (rec["error"] != null ? " — " + rec["error"] : ""));
                 if (rec["error"] != null && IsHard(what) && !((bool?)rec["suiteError"] ?? false)) st.Stop = true;
             }

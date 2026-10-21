@@ -677,6 +677,10 @@ type Ask = { what: "polishAll" | "unpolishAll" | "polishSome" | "unpolishSome"; 
 /** The Global outgrow window beside the panel: the whole city's buttons, new buildings, the brush, the lens, the numbers,
  *  then Defaults (Outgrow new buildings, each zone type's default outgrow type), Edit (every outgrow type and its
  *  settings) and Numbers. */
+/** Its children drawn again only when <fp> changes: the panel's state comes twice a second, the long lists need not be
+ *  laid out again each time (Gameface: a quarter-second hitch every half second with the window open). */
+const Frozen = React.memo(({ children }: { fp: string; children: ReactNode }) => <>{children}</>, (a, b) => a.fp === b.fp);
+
 /** How Global outgrow's window moves: dragged by its header, a double-click puts it back (Panel.tsx). */
 export type WindowMove = { onMouseDown: (e: React.MouseEvent<HTMLElement>) => void; onDoubleClick: (e: React.MouseEvent<HTMLElement>) => void; dragging: boolean };
 
@@ -714,6 +718,10 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
         act.polishTheme(id);
     };
     const kindName = (k: (typeof KINDS)[number]) => t("Placemaker.UI.Polish.Kind." + k.city, k.en);
+    // what the long tabs show (they are drawn again only when it changes)
+    const looksFp = JSON.stringify((p.looks ?? []).map((l) => [l.id, l.name, l.color, l.edited, l.theme]));
+    const zonesFp = tab === "zones" ? JSON.stringify([p.zones, looksFp, st?.zones, st?.kindTotal, st?.kindPolished, picking, p.newHouses]) : "";
+    const editFp = tab === "edit" ? JSON.stringify([p.theme, p.looks, p.values, p.lookValues, p.lookTheme, p.lookSavedTheme, p.modified, p.swatches, st?.looks?.[p.theme ?? ""]]) : "";
     return (
         <div className={classNames(pn.panel, s.cityPanel)} data-testid="polish-city" onMouseDown={(e) => e.stopPropagation()}>
             <div className={pn.panelTint}>
@@ -830,6 +838,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                                 </div>
                             )
                         ) : tab === "zones" ? (
+                            <Frozen fp={zonesFp}>
                             <div data-testid="polish-city-zones">
                                 <div className={classNames(s.newCard, { [s.newCardOn]: p.newHouses })} data-testid="polish-new-card">
                                     <Tip title={L("NewHouses3", "Outgrow new buildings (this city)")} description={L("NewHouses.Tip4", "Buildings that grow from now on get their zone type's outgrow type. Kept with this city; a new city starts with it off.")}>
@@ -901,7 +910,9 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                                     );
                                 })}
                             </div>
+                            </Frozen>
                         ) : (
+                            <Frozen fp={editFp}>
                             <div data-testid="polish-city-edit">
                                 <div className={b.picker} data-open="true">
                                     <div className={b.browser}>
@@ -917,6 +928,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                                     </div>
                                 )}
                             </div>
+                            </Frozen>
                         )}
                     </div>
                 </div>

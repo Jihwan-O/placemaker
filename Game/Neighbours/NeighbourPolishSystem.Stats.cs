@@ -125,6 +125,31 @@ namespace Placemaker.Game.Neighbours
             HistFps.Clear();
         }
 
+        // ───────────── the lens's lot rings ─────────────
+
+        // a lot's ring as the lens draws it, kept per building (buildings do not move): the lens refreshing a few times a
+        // second used to make thousands of new rings each time, garbage the game paused to collect ("a big lag spike every
+        // half second")
+        private readonly Dictionary<Entity, (float3 At, float3[] Ring)> _lensRing = new Dictionary<Entity, (float3, float3[])>();
+        private readonly HashSet<Entity> _lensStamping = new HashSet<Entity>(), _lensPlanning = new HashSet<Entity>();
+
+        private float3[] LensRing(Entity e, global::Game.Objects.Transform t, Entity prefab)
+        {
+            if (_lensRing.TryGetValue(e, out var c) && math.all(c.At == t.m_Position)) return c.Ring;
+            if (_lensRing.Count > 100000) _lensRing.Clear();
+            var half = (float2)EntityManager.GetComponentData<BuildingData>(prefab).m_LotSize * 4f - 0.4f;
+            var ring = new[]
+            {
+                global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(-half.x, 0f, -half.y)), global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(half.x, 0f, -half.y)),
+                global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(half.x, 0f, half.y)), global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(-half.x, 0f, half.y)),
+            };
+            _lensRing[e] = (t.m_Position, ring);
+            return ring;
+        }
+
+        /// <summary>Work in line (houses to fit, stamps, plans): the status lens's waiting colours change while there is.</summary>
+        public bool LensBusy => _dirty.Count > 0 || s_stamps.Count > 0 || _inFlight.Count > 0;
+
         // ───────────── the types map ─────────────
 
         /// <summary>Buildings the types map showed last time, by look id ("" outgrown with no look; "-" not outgrown).</summary>
@@ -151,12 +176,7 @@ namespace Placemaker.Game.Neighbours
                         if (f.Yes) key = f.Look != 0 ? LookByHash(f.Look)?.Id ?? "" : "";
                     }
                     if (!into.TryGetValue(key, out var list)) into[key] = list = new List<float3[]>();
-                    var half = (float2)EntityManager.GetComponentData<BuildingData>(prefab).m_LotSize * 4f - 0.4f;
-                    list.Add(new[]
-                    {
-                        global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(-half.x, 0f, -half.y)), global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(half.x, 0f, -half.y)),
-                        global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(half.x, 0f, half.y)), global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(-half.x, 0f, half.y)),
-                    });
+                    list.Add(LensRing(e, t, prefab));
                     LensTypeCounts[key] = LensTypeCounts.TryGetValue(key, out var n) ? n + 1 : 1;
                     shown++;
                 }
@@ -183,8 +203,11 @@ namespace Placemaker.Game.Neighbours
             // when each house in line came in (one gone from it is forgotten)
             foreach (var e in _dirty) if (!_lineSince.ContainsKey(e)) _lineSince[e] = now;
             if (_lineSince.Count > _dirty.Count) foreach (var e in _lineSince.Keys.Where(k => !_dirty.Contains(k)).ToList()) _lineSince.Remove(e);
-            var stamping = new HashSet<Entity>(s_stamps.Select(s => s.Lot));
-            var planning = new HashSet<Entity>();
+            var stamping = _lensStamping;
+            var planning = _lensPlanning;
+            stamping.Clear();
+            planning.Clear();
+            foreach (var st in s_stamps) stamping.Add(st.Lot);
             foreach (var pend in _inFlight)
                 if (pend.CoreIds != null && pend.HouseOf != null)
                     foreach (var id in pend.CoreIds) if (pend.HouseOf.TryGetValue(id, out var he)) planning.Add(he);
@@ -210,12 +233,7 @@ namespace Placemaker.Game.Neighbours
                         }
                     }
                     else layer = IsYes(e) ? LensPolished : LensNot;
-                    var half = (float2)EntityManager.GetComponentData<BuildingData>(prefab).m_LotSize * 4f - 0.4f;
-                    into[layer].Add(new[]
-                    {
-                        global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(-half.x, 0f, -half.y)), global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(half.x, 0f, -half.y)),
-                        global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(half.x, 0f, half.y)), global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(-half.x, 0f, half.y)),
-                    });
+                    into[layer].Add(LensRing(e, t, prefab));
                     LensCounts[layer]++;
                     shown++;
                 }

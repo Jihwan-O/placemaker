@@ -39,6 +39,23 @@ namespace Placemaker.Game.Overlay
 
         private readonly Dictionary<string, List<float3[]>> _types = new Dictionary<string, List<float3[]>>();
         private readonly Dictionary<string, long> _typeSig = new Dictionary<string, long>();
+        // the lens's rings are read again only when something they show changed: the flags, the camera's spot, the line (the
+        // status map's waiting colours, while there is work in line); else now and then
+        private int _lensFlags = -1;
+        private float2 _lensAt = new float2(float.MaxValue);
+        private string _lensKind = "";
+
+        private bool LensStale(string kind, float2 at, float radius, bool busy)
+        {
+            bool stale = kind != _lensKind || _lensFlags != NeighbourPolishSystem.FlagsVersion || math.distance(at, _lensAt) > radius * 0.15f
+                || _lensFrame >= (busy ? 30 : 600);
+            if (!stale) { _lensFrame++; return false; }
+            _lensKind = kind;
+            _lensFlags = NeighbourPolishSystem.FlagsVersion;
+            _lensAt = at;
+            _lensFrame = 0;
+            return true;
+        }
 
         /// <summary>The types map: every building its outgrow type's colour (not outgrown: faint grey).</summary>
         private void DrawOutgrowTypes()
@@ -50,9 +67,8 @@ namespace Placemaker.Game.Overlay
             float3 fw = cam.transform.forward;
             float2 at = cp.xz + (fw.y < -0.05f ? fw.xz * math.min(cp.y / -fw.y, 3000f) : float2.zero);
             float radius = math.clamp(cp.y * 3f, 500f, 3000f);
-            if (++_lensFrame >= 20)
+            if (LensStale("types", at, radius, false))
             {
-                _lensFrame = 0;
                 polish.TypeRingsNear(at, radius * 1.3f, _types);
                 foreach (var kv in _types) _typeSig[kv.Key] = FilledPreviewSystem.Signature(kv.Value) ^ kv.Key.GetHashCode();
             }
@@ -77,10 +93,9 @@ namespace Placemaker.Game.Overlay
             float3 fw = cam.transform.forward;
             float2 at = cp.xz + (fw.y < -0.05f ? fw.xz * math.min(cp.y / -fw.y, 3000f) : float2.zero);
             float radius = math.clamp(cp.y * 3f, 500f, 3000f);
-            // a few times a second: the line moves quickly
-            if (++_lensFrame >= 15)
+            // twice a second while there is work in line (its waiting colours move), else when something changed
+            if (LensStale("status", at, radius, polish.LensBusy))
             {
-                _lensFrame = 0;
                 polish.LensRingsNear(at, radius * 1.3f, _lens);
                 for (int k = 0; k < _lens.Length; k++) _lensSig[k] = FilledPreviewSystem.Signature(_lens[k]) ^ (k * 7919L);
             }

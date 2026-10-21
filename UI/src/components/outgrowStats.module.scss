@@ -207,13 +207,13 @@
 
 .kindName {
     flex: 0 0 auto;
-    width: 52rem;
+    width: 46rem;
     color: $c-text-dim;
 }
 
 .bar {
     flex: 1 1 auto;
-    min-width: 40rem;
+    min-width: 16rem;
     height: 7rem;
     border-radius: 4rem;
     background-color: rgba(255, 255, 255, 0.08);
@@ -228,8 +228,7 @@
 
 .kindValue {
     flex: 0 0 auto;
-    min-width: 64rem;
-    margin-left: 8rem;
+    margin-left: 6rem;
     text-align: right;
     font-weight: bold;
     white-space: nowrap;

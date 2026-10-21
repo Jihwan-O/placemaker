@@ -697,15 +697,12 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                 </div>
                 <div className={s.cityActions}>
                     <Btn variant="accent" icon="sparkle" iconSize={13} label={L("OutgrowAllShort", "Outgrow all")} title={L("OutgrowAll", "Outgrow every building in the city")} testId="polish-all" onClick={() => setAsk({ what: "polishAll" })} />
-                    <Btn variant="ghost" icon="reset" iconSize={13} label={L("RemoveAllShort", "Remove all outgrow")} title={L("RemoveAll", "Put every outgrown building in the city back as the game made it")} testId="polish-none" disabled={city.polished === 0} onClick={() => setAsk({ what: "unpolishAll" })} />
+                    <Btn variant="ghost" icon="reset" iconSize={13} label={L("RemoveAllShort2", "Remove all")} title={L("RemoveAll", "Put every outgrown building in the city back as the game made it")} testId="polish-none" disabled={city.polished === 0} onClick={() => setAsk({ what: "unpolishAll" })} />
                 </div>
                 <StatusStrip polished={city.polished} total={city.total} st={st} />
                 <div className={s.tools}>
                     <div className={s.toolCol} data-testid="polish-brush">
-                        <div className={s.toolHead}>
-                            <Icon name="brush" size={12} tint="light" />
-                            <div className={s.toolTitle}>{L("Brush", "Brush")}</div>
-                            <div className={s.flex} />
+                        <div className={classNames(s.toolHead, s.brushHead)}>
                             <TypeButton p={p} id={brushType} on={picking === "brush"} onClick={() => setPicking(picking === "brush" ? null : "brush")} testId="polish-brush-type" />
                         </div>
                         <div className={s.toolRow}>
@@ -797,11 +794,7 @@ export const PolishCityCard = ({ state, onClose, move }: { state: ToolState; onC
                             )
                         ) : tab === "zones" ? (
                             <div data-testid="polish-city-zones">
-                                <div className={s.zhead}>
-                                    <div className={s.zheadName}>{L("ColZone", "Zone type")}</div>
-                                    <div className={s.zheadCount}>{L("ColOutgrown", "Outgrown")}</div>
-                                    <div className={s.zheadType}>{L("ColType", "Outgrow type")}</div>
-                                </div>
+                                <div className={s.zhead}>{L("ZonesHead", "Each zone type: outgrown of its buildings, and the outgrow type it gets (open a group)")}</div>
                                 {KINDS.map((k, ki) => {
                                     const list = zones.filter((z) => z.kind === k.id);
                                     if (!list.length) return null;

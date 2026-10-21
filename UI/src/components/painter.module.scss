@@ -269,9 +269,22 @@
 }
 
 .toolTitle {
+    flex: 0 0 auto;
     margin-left: 5rem;
     font-size: $fs;
     font-weight: bold;
+}
+
+// the brush's column: its outgrow type across the top (no title), Paint and Erase under it
+.brushHead .typeBtn {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+}
+
+.brushHead .typeBtn .choiceText {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .toolRow {
@@ -331,31 +344,12 @@
 }
 
 // the zones list: one line per zone type
+// one line over the zone types saying what their numbers and dropdowns are (no columns: the groups and their rows differ)
 .zhead {
-    @include row;
     min-width: 0;
-    height: 16rem;
-    padding: 0 4rem 0 22rem;
+    padding: 0 4rem 4rem 4rem;
     font-size: 10rem;
-    text-transform: uppercase;
     color: $c-text-faint;
-}
-
-.zheadName {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.zheadCount {
-    flex: 0 0 auto;
-    width: 64rem;
-    text-align: right;
-}
-
-.zheadType {
-    flex: 0 0 auto;
-    width: 130rem;
-    padding-left: 10rem;
 }
 
 .kindBtns {
@@ -413,6 +407,7 @@
 
 .cityActions > * {
     flex: 1 1 0;
+    min-width: 0;
     margin-right: 6rem;
 }
 

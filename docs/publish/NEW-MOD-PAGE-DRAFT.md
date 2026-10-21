@@ -6,30 +6,35 @@ Pick an area. Pick what goes there. Hit build.
 Street grids that hook into your roads
 
 ■ Parking
-Lots of any shape with trees, lamps and fences
+Lots of any shape
 
 ■ Parks
-Parks, gardens, playgrounds, amphitheatres
+Parks and gardens
+Playgrounds and amphitheatres
 
 ■ Shops & Squares
-Strip malls, mall districts, market squares
+Strip malls and mall districts
+Market squares
 
 ■ Beach, Nature, Farms, Sports, Industrial
-Wetlands, trails, campgrounds, farms, golf, car yards and more
+Wetlands and trails
+Farms and golf
+Car yards and more
 
 ■ Zoning
 Zone a whole area at once
 
 ■ Outgrow (beta)
-Customize how your buildings grow into gardens and car parks
+Customize how buildings grow into gardens and car parks
 Global Outgrow is off by default
-Turn it on for certain buildings or use the brush to test it
+Turn it on for certain buildings or use the brush
 
 ■ Area tools
-Click a block, click corners, brush it, paint bucket it or click road nodes
-It won't stop you from building a park in the middle of a road
-Check your selection before you build
-I wanted you free to make whatever you want
+Click a block
+Click corners
+Brush it
+Paint bucket it
+Click road nodes
 
 [Showcase video](https://www.youtube.com/watch?v=ghIR5UhFwj4)
 
@@ -42,15 +47,21 @@ Undo works
 
 Make it yours
 * 25+ types and 100+ styles
-* Tweak any setting and save your own style
+* Tweak any setting
+* Save your own styles
 * Only uses the game's own assets
 
 Early access
-* Parks, parking and industrial are the most finished
+* Parks and parking are the most finished
+* Industrial is too
 * Roads and shops still need work
 * Strict grid and superblock roads build nothing yet
-* Outgrow all on a massive save means a long lag until it catches up
+* It lets you build anywhere
+* A park in the middle of a road? Sure
+* Check your selection first
+* Outgrow all on a huge save lags a long time
 * Back up your save first
+Use at your own risk
 
 Found a bug?
 Send a screenshot and your Placemaker.log
@@ -60,6 +71,8 @@ Compatibility
 * Game version 1.6.*
 
 Credits
-Based on similar concepts to ParkingLotTool (KruemelGames), ParkManager (tomkpunkt) and Grid Road Generator (Ti4goc)
+Based on similar concepts to ParkingLotTool (KruemelGames)
+ParkManager (tomkpunkt)
+and Grid Road Generator (Ti4goc)
 Includes Harmony by Andreas Pardeike (MIT)
-GPL-3.0, source on GitHub: https://github.com/jackwrichards/placemaker
+GPL-3.0 source: https://github.com/jackwrichards/placemaker

@@ -343,6 +343,7 @@ namespace Placemaker.Game.Neighbours
                 }
                 CollectChanged();
                 HealEmpty();
+                SinkOldPieces();
                 ++_frame;
                 Busy = _dirty.Count > 0 || _inFlight.Count > 0 || _healPending || _restoreQueue.Count > 0 || s_stamps.Count > 0 || NeighbourObjectSystem.Queue.Count > 0 || NeighbourAreaSystem.Queue.Count > 0;
                 Waiting = _dirty.Count;

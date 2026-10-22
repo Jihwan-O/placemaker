@@ -495,7 +495,13 @@ namespace Placemaker.Core.Neighbours
                 float xl = -h.HalfLot.x - (left[i] >= 0 ? reachH : extra[i, 0]);
                 float xr = h.HalfLot.x + (right[i] >= 0 ? reachH : extra[i, 1]);
                 float zb = -h.HalfLot.y - math.max(math.max(deepen[i] ? K(h, s, "maxRearGap", 60f) : 0f, extra[i, 2]), rowDeepen[i]);
-                var poly = new List<float2> { h.ToWorld(new float2(xl, zb)), h.ToWorld(new float2(xr, zb)), h.ToWorld(new float2(xr, h.HalfLot.y)), h.ToWorld(new float2(xl, h.HalfLot.y)) };
+                // in front of the lot as far as its street: where the street curves away from the lot's front line, the
+                // triangles between the lot's front corners and the kerb were nobody's (the user: "it kind of has to play to its
+                // back"). Only for a lot whose street lies right in front of it: the street, cut back below, ends it. Only paved
+                // land (a car park, a yard): a garden's side fences carried in front of the lot met the neighbours' fences there
+                // with gaps (replay of a test town's passes: 18 gaps, 32 with gardens reaching forward)
+                float zf = h.HalfLot.y + (HardLand(h, s) && FacesStreet(h) ? K(h, s, "frontReach", 15f) : 0f);
+                var poly = new List<float2> { h.ToWorld(new float2(xl, zb)), h.ToWorld(new float2(xr, zb)), h.ToWorld(new float2(xr, zf)), h.ToWorld(new float2(xl, zf)) };
                 foreach (var c in cuts[i]) poly = ClipHalfPlane(poly, c.P, c.D, c.Keep ?? FrontMid(h));
                 raw[i] = poly;
             }
@@ -3374,6 +3380,18 @@ namespace Placemaker.Core.Neighbours
                 }
             }
             return t <= maxT;
+        }
+
+        /// <summary>A road, path or track lies right in front of the lot (its street, within 4 m of its front middle).</summary>
+        private static bool FacesStreet(StitchHouse h)
+        {
+            if (s_barriers == null || s_barriers.Count == 0) return false;
+            var from = h.Position + h.Forward * (h.HalfLot.y - 0.5f);
+            if (!RayToBarrier(from, h.Forward, 4.5f, null, out _)) return false;
+            // a road, not another building's lot
+            var at = from + h.Forward * 2.5f;
+            foreach (int k in BarriersIn(at - 2.5f, at + 2.5f)) if (s_barrierKind[k] == 0 && Overlaps(new[] { from, from + h.Forward * 4.5f + h.Right * 0.1f, from + h.Forward * 4.5f - h.Right * 0.1f }, s_barriers[k].Ring)) return true;
+            return false;
         }
 
         /// <summary>

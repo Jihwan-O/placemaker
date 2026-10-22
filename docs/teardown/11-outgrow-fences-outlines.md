@@ -57,7 +57,27 @@ against a house's side buildings). Left to do: a few short zig-zag pieces where 
 at a turning circle; existing cities keep the fences an older build saved until their buildings are planned again (the
 options' Redo outgrown buildings).
 
-## 4. Tools
+## 4. Zoning under a car park never grew (22 Oct)
+
+The user: "I'm zoning new areas inside of outgrown areas, and they don't spawn in". **[P]** Every zoned cell under an Outgrow
+car park was taken: the stall marks (`ParkingLotDecal01`) have a parking lane of their own, so the game gives the prefab
+`OccupyZone` instead of `Overridable` (`ObjectInitializeSystem`, objects with sub-lanes), and `CellOccupyJobs` marks every cell
+under it taken. Fences, hedges, trees and props are overridable: a new building hides them. Not a regression of this round:
+car parks have had stall marks since 20 Oct. Fix: a piece whose prefab takes zone cells is laid with the game's negative
+`Elevation` (−0.01 m; `CellOccupyJobs` skips objects below the ground, the mark is drawn the same), and a loaded city's are
+sunk once after the load (`NeighbourPolishSystem.SinkOldPieces`). A building that grows there is planned around like any
+other: the car park shrinks back behind it.
+
+| runner (`outgrow-zone-inside.json`), 108 cells zoned inside shop car parks | free | houses grown |
+|---|---|---|
+| before | 0 (108 under `ParkingLotDecal01`) | 0 (9 on the same zoning outside) |
+| after, car parks laid now | 108 | 9 |
+| after, car parks laid the old way, saved and loaded (427 marks sunk) | 108 | 9 |
+
+Car parks also reach in front of their lots now where the street curves away (`frontReach`, 15 m, car parks and paved yards
+only: gardens' side fences carried forward met the neighbours' with gaps, 18 → 32 in a replay).
+
+## 5. Tools
 
 * `{"do":"lab","op":"fenceMap"}` (`Game/Suite/SuiteLab.FenceMap.cs`): every fence and hedge, garden, road and building near the
   build (or `"street"`, or `"box": "gardens"` in a loaded city); gaps, crossings, doubles, fences inside a garden, gardens over

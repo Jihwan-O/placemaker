@@ -66,6 +66,9 @@ namespace Placemaker.Game.Build
             // ModificationEnd: deleted members of this frame still exist (CleanUp is at frame end), so
             // carrier SubNet links are dropped before anything reads them next frame; runs while paused.
             updateSystem.UpdateAt<GroupRegistrySystem>(SystemUpdatePhase.ModificationEnd);
+            // Before every load: our headless records go with the city before, as the game's ClearSystem does with its own
+            // entities (issue #6: the records outlived the load and showed up twice).
+            updateSystem.UpdateBefore<OwnEntityClearSystem, global::Game.Serialization.ClearSystem>(SystemUpdatePhase.Deserialize);
 
             // ── Economy (isolated; failures disable it, never the build) ───────────────
             // Fee/comfort must be written AFTER ParkingLaneDataSystem, which zeroes them for lanes whose

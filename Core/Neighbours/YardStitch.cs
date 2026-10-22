@@ -619,6 +619,25 @@ namespace Placemaker.Core.Neighbours
                 plots[l] = Grow(plots, l, leftHalf);
                 plots[r] = Grow(plots, r, rightHalf);
             }
+            // a walkway runs from the street to the shallower lot's back; behind it the two gardens meet on the middle line, as
+            // side neighbours do (the user, 22 Oct: their hedges ran on side by side down to the back street, a grass strip
+            // between, "who would want two fences running parallel to each other?")
+            var walkwayEnds = new List<(int I, int J, float Hz)>();
+            foreach (var (ai, bi) in s.Knob("walkwayMeet", 1f) > 0.5f ? alleys : new List<(int, int)>())
+            {
+                var a = houses[ai];
+                var b = houses[bi];
+                float hz = math.min(a.HalfLot.y, b.HalfLot.y);
+                var ea = BackAt(a, +1, hz);
+                var eb = BackAt(b, -1, hz);
+                if (!SideBack(plots[ai], a, +1, out var ba) || !SideBack(plots[bi], b, -1, out var bb)) continue;
+                if (math.dot(ea - ba, a.Forward) < 1f || math.dot(eb - bb, b.Forward) < 1f) continue;   // neither reaches past it
+                var m0 = (ea + eb) * 0.5f;
+                var m1 = (ba + bb) * 0.5f;
+                plots[ai] = Grow(plots, ai, new[] { ea, m0, m1, ba });
+                plots[bi] = Grow(plots, bi, new[] { m0, eb, bb, m1 });
+                walkwayEnds.Add((ai, bi, hz));
+            }
 
             // gardens never reach onto a road, path or track, nor another building's lot: cut back just clear of them (the
             // house's own lot is never cut), the part that holds the house kept
@@ -774,6 +793,28 @@ namespace Placemaker.Core.Neighbours
                 }
                 plan.Notes.Add($"{houses[l].Id} and {houses[r].Id} meet behind {h.Id}");
             }
+            // the walkway's own fences stop where it ends (the gardens close the rest: across its end, down the middle)
+            var stay = new HashSet<long>();
+            foreach (var (ai, bi, hz) in walkwayEnds)
+            {
+                plan.Notes.Add($"{houses[ai].Id}/{houses[bi].Id}: their gardens meet behind the walkway");
+                foreach (var (k, side) in new[] { (ai, +1), (bi, -1) })
+                {
+                    var h = houses[k];
+                    float zEnd = h.HalfLot.y - 2f * hz;
+                    foreach (var l in SideLines(h, side, s).ToList())
+                    {
+                        if (plan.HideLines.Contains(l.Id)) continue;
+                        var (p, q) = moved.TryGetValue(l.Id, out var mv) ? mv : (l.A, l.B);
+                        var lp = h.ToLocal(p);
+                        var lq = h.ToLocal(q);
+                        if (math.max(lp.y, lq.y) < zEnd + 0.5f) { plan.HideLines.Add(l.Id); continue; }
+                        stay.Add(l.Id);
+                        if (math.min(lp.y, lq.y) >= zEnd - 0.05f) continue;
+                        moved[l.Id] = (lp.y < zEnd ? h.ToWorld(new float2(lp.x, zEnd)) : p, lq.y < zEnd ? h.ToWorld(new float2(lq.x, zEnd)) : q);
+                    }
+                }
+            }
             // a side facing another house's side or back: its line onto the plot's edge on the middle line (overlaps go below)
             foreach (var c in facing)
                 foreach (var (k, e) in new[] { (c.I, c.EI), (c.J, c.EJ) })
@@ -824,7 +865,7 @@ namespace Placemaker.Core.Neighbours
                 var h = houses[i];
                 foreach (var l in h.Lines)
                 {
-                    if (moved.ContainsKey(l.Id) || plan.HideLines.Contains(l.Id)) continue;
+                    if (moved.ContainsKey(l.Id) || plan.HideLines.Contains(l.Id) || stay.Contains(l.Id)) continue;
                     var next = (l.A, l.B);
                     foreach (bool atA in new[] { true, false })
                     {
@@ -2199,6 +2240,21 @@ namespace Placemaker.Core.Neighbours
                 t1 = math.max(t1, t);
             }
             return t1 - t0 > 0.5f;
+        }
+
+        /// <summary>How far back the plot runs along the house's side line (+1 right, -1 left): its corner there furthest back.</summary>
+        private static bool SideBack(float2[] plot, StitchHouse h, int side, out float2 corner)
+        {
+            corner = default;
+            float best = float.MaxValue;
+            foreach (var p in plot)
+            {
+                var l = h.ToLocal(p);
+                if (math.abs(l.x - side * h.HalfLot.x) > 0.3f || l.y >= best) continue;
+                best = l.y;
+                corner = p;
+            }
+            return best < float.MaxValue;
         }
 
         /// <summary>The plot's edge across the house's back: the edge running side to side, behind the lot's middle, furthest back

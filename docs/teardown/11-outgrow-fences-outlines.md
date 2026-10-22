@@ -88,7 +88,24 @@ there. The part past the cut was nobody's: one triangle per lot. Fix: the spike 
 backs onto were not there (that hug line, and a free side hugging the same street: a row's end lot meets it twice), no further
 back than the garden really reaches; its sides still count, so the inside of a curve keeps its rule. Knob `streetEnd` (1; 0 is
 the old cut, for comparisons). Test: `NeighbourStitchTests.Back_gardens_reach_a_street_behind_them_at_an_angle_...` (20°,
-30°, 40°: the kerb within 1 m of a garden all along, fences along it, no gaps or crossings). Runner: `outgrow-back-street.json`.
+30°, 40°: the kerb within 1 m of a garden all along, fences along it, no gaps or crossings). Runner: `outgrow-back-street.json`
+(houses on one street, a second at 25° laid behind them after the growth):
+
+| runner | right after the back street: the polish says | `streetEnd` 0 / 1 in the same town |
+|---|---|---|
+| before the fix (`send-outgrow-back-street-1022-151925`) | "3 gardens end where they get narrow" (3 passes) | a grass triangle at every lot's back corner, both |
+| after (`send-outgrow-back-street-1022-152503`) | no garden ends narrow | 0: three triangles; 1: fences along the sidewalk all the way, none |
+
+Fence map, 0 → 1: 0 gaps, 0 crossings, 0 gardens over each other both times; doubles 8 → 5.
+
+Then the user, on that picture: two hedges side by side from the houses down to the back street, a grass strip between ("who
+would want two fences running parallel to each other?"). A walkway (`alleys`, 45% of the neighbours with an even 3–9 m gap):
+each garden kept to its own lot line all the way back, the paved walkway only reaching the shallower lot's back. Now the walkway
+runs from the street to the shallower lot's back and stops there; behind it the two gardens grow into the strip and meet on its
+middle line (`walkwayMeet`, 1; 0 the old way): a fence across the walkway's end, one down the middle, the walkway's own fences
+end with it. Test: `NeighbourStitchTests.Behind_a_walkway_two_gardens_meet_on_one_fence_...` (equal and different depths). **Not
+seen in the game yet**: the runner's towns (`send-outgrow-back-street-1022-155634`) grew no walkway; the scenario needs a way to
+leave an 8 m gap between lots (a dezone strip) to show one every time.
 
 ## 6. Tools
 

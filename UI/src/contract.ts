@@ -126,6 +126,8 @@ export interface ToolState {
   grouping?: { separate: boolean };
   /** The entrances placed next come with a crosswalk across the street (walking entrance kinds only). */
   entranceCrosswalk?: boolean;
+  /** Review's "Keep area" switch: Build keeps the area and the panel (true, default) or closes Placemaker. */
+  keepArea?: boolean;
   panelCollapsed: boolean;
   /** "sketch" = fast overlay lines/dots; "ghost" = real translucent game models + surfaces (Review uses ghost by default). */
   previewMode?: "sketch" | "ghost";
@@ -709,6 +711,7 @@ export const Triggers = {
   setMarkerCrosswalk: "setMarkerCrosswalk", // (path: string, index: number, on: boolean) — index -1: the entrances placed next
   ungroupGroup: "ungroupGroup",             // (groupId: number, ungroup: boolean) — false: group again
   setBuildUngrouped: "setBuildUngrouped",   // (on: boolean) — the next build is born ungrouped (separate pieces)
+  setKeepArea: "setKeepArea",               // (on: boolean) — Build keeps the area (true) or closes Placemaker (false)
   setFeature: "setFeature",                 // (path: string, featureLayerId: string, enabled: boolean)
   setPreviewMode: "setPreviewMode",         // (mode: "sketch" | "ghost")
   selectPreset: "selectPreset",             // (layerId: string, presetId: string) — select type (single-layer recipe) + apply preset; undoable

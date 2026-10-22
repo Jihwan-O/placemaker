@@ -115,6 +115,7 @@ namespace Placemaker.Game.UI
             Trigger<string, double, bool>("setMarkerCrosswalk", (p, i, on) => _tool.SetMarkerCrosswalk(p, (int)Math.Round(i), on));   // i < 0: the entrances placed next
             Trigger<double, bool>("ungroupGroup", (id, on) => _tool.UngroupGroup((int)id, on));   // on = false: group again
             Trigger<bool>("setBuildUngrouped", on => _tool.SetBuildUngrouped(on));
+            Trigger<bool>("setKeepArea", on => _tool.SetKeepArea(on));   // Review: Build keeps the area (on) or closes Placemaker
             Trigger<string>("setPreviewMode", m => _tool.SetPreviewMode(m));
             // s17 park stats (docs/proposals/s17.md)
             Trigger<string, string>("setParkStat", (id, json) => _tool.SetParkStat(id, json));

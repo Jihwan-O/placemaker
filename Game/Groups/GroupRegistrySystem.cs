@@ -37,6 +37,8 @@ namespace Placemaker.Game.Groups
         private readonly List<int> _allIds = new List<int>();
         private readonly Dictionary<int, Entity> _owners = new Dictionary<int, Entity>();
         private readonly HashSet<int> _ungrouped = new HashSet<int>();
+        /// <summary>Ungrouped builds whose props and trees still share the carrier owner (released next update, ReleasePending).</summary>
+        private readonly HashSet<int> _releasePending = new HashSet<int>();
         private readonly HashSet<int> _duplicateWarned = new HashSet<int>();
 
         /// <summary>For Harmony patches (static context, main thread only).</summary>
@@ -142,6 +144,7 @@ namespace Placemaker.Game.Groups
                     Bump();
                 }
                 CheckMissingAssets();
+                if (_releasePending.Count > 0) ReleasePending();
             }
             catch (Exception e)
             {
@@ -247,7 +250,7 @@ namespace Placemaker.Game.Groups
                 rec.Flags = ungrouped ? rec.Flags | GroupFlags.Ungrouped : rec.Flags & ~GroupFlags.Ungrouped;
                 WriteRecord(entity, rec);
             }
-            if (ungrouped) _ungrouped.Add(groupId); else _ungrouped.Remove(groupId);
+            if (ungrouped) { _ungrouped.Add(groupId); _releasePending.Add(groupId); } else _ungrouped.Remove(groupId);
             Mod.Log.Info($"Placemaker: group {groupId} {(ungrouped ? "ungrouped (its parts are picked one by one)" : "grouped again")}.");
             Bump();
             return true;
@@ -278,6 +281,47 @@ namespace Placemaker.Game.Groups
                 e = EntityManager.GetComponentData<Owner>(e).m_Owner;
             }
             return true;
+        }
+
+        /// <summary>
+        /// Ungrouped builds: their props and trees leave the build's bare carrier (the shared owner that keeps the game's
+        /// OverrideSystem from hiding our own pieces against each other) and stand on their own. The bulldozer sends a click on a
+        /// static object with an owner to that owner (BulldozeToolSystem, MainElements), so a carrier-owned bench, bin, lamp or tree
+        /// could be selected but never bulldozed (the user, 22 Oct). Stall markings keep the carrier (their parking lanes need it).
+        /// Runs in ModificationEnd, once the build is applied; the owner's SubObject list is kept in step. Grouping again keeps them
+        /// standalone (the lift to the owner lot does not need the carrier).
+        /// </summary>
+        private void ReleasePending()
+        {
+            EnsureIndex();
+            foreach (var id in new List<int>(_releasePending))
+            {
+                if (!TryGetRecordEntity(id, out var rec) || !_ungrouped.Contains(id) || EntityManager.HasComponent<PlacemakerRemoval>(rec)) { _releasePending.Remove(id); continue; }
+                if (EntityManager.HasComponent<PlacemakerUnderConstruction>(rec)) continue;   // after its build
+                var carrier = EntityManager.GetComponentData<PlacemakerGroup>(rec).Carrier;
+                var free = new HashSet<Entity>();
+                if (carrier != Entity.Null && EntityManager.Exists(carrier) && _members.TryGetValue(id, out var members))
+                    foreach (var e in members)
+                    {
+                        if (!EntityManager.Exists(e) || EntityManager.HasComponent<Temp>(e) || EntityManager.HasComponent<Deleted>(e)) continue;
+                        if (!EntityManager.HasComponent<global::Game.Objects.Object>(e) || !EntityManager.HasComponent<Owner>(e)) continue;
+                        if (EntityManager.GetComponentData<Owner>(e).m_Owner != carrier) continue;
+                        var tag = EntityManager.GetComponentData<PlacemakerMember>(e);
+                        if (tag.Kind == MemberKind.Auxiliary || tag.Role == MemberRole.ParkingBay) continue;
+                        free.Add(e);
+                    }
+                if (free.Count > 0)
+                {
+                    if (EntityManager.HasBuffer<global::Game.Objects.SubObject>(carrier))
+                    {
+                        var subs = EntityManager.GetBuffer<global::Game.Objects.SubObject>(carrier);
+                        for (int i = subs.Length - 1; i >= 0; i--) if (free.Contains(subs[i].m_SubObject)) subs.RemoveAt(i);
+                    }
+                    foreach (var e in free) EntityManager.RemoveComponent<Owner>(e);
+                }
+                _releasePending.Remove(id);
+                Mod.Log.Info($"Placemaker: ungrouped group {id}: {free.Count} prop(s) and tree(s) now stand on their own, so the bulldozer takes them one by one.");
+            }
         }
 
         public void Rename(int groupId, string name)
@@ -407,7 +451,8 @@ namespace Placemaker.Game.Groups
             var g = EntityManager.GetComponentData<PlacemakerGroup>(e);
             g.Flags = (int)rec.Flags;
             EntityManager.SetComponentData(e, g);
-            if ((rec.Flags & GroupFlags.Ungrouped) != 0) _ungrouped.Add(rec.GroupId); else _ungrouped.Remove(rec.GroupId);
+            if ((rec.Flags & GroupFlags.Ungrouped) != 0) { if (_ungrouped.Add(rec.GroupId)) _releasePending.Add(rec.GroupId); }
+            else _ungrouped.Remove(rec.GroupId);
             _decoded[rec.GroupId] = rec;
             Bump();
         }
@@ -662,6 +707,7 @@ namespace Placemaker.Game.Groups
             DropStaleRecords();
             _dirty = true;
             EnsureIndex();
+            foreach (var id in _ungrouped) _releasePending.Add(id);   // builds ungrouped before their props were released (or in an older build)
             int orphans = 0;
             var orphanEntities = new List<Entity>();
             foreach (var kv in _members)

@@ -42,8 +42,10 @@ test("full flow: draw → design → review → build, then manage the result", 
     await panelShot(page, "panel-review");
 
     await expect(primary).toContainText("Build");
-    // Build & close: built, then Placemaker closes (the primary, Build & keep area, has its own test)
-    await page.getByTestId("build-close").click();
+    // Keep area off: Build builds, then Placemaker closes (Keep area on, the default, has its own test)
+    await page.getByTestId("build-keep").click();
+    await expect(page.getByTestId("build-keep")).toHaveAttribute("aria-checked", "false");
+    await primary.click();
     await expect(page.getByTestId("stage-building")).toBeVisible();
     await panelShot(page, "panel-building");
     await expect(page.getByTestId("launcher")).toHaveAttribute("data-open", "false", { timeout: 10000 });
@@ -81,7 +83,8 @@ test("Build & keep area: the area stays, back to Design with no type chosen", as
     await page.keyboard.press("Enter");
     expect(await stage(page)).toBe("review");
     await waitPlanned(page);
-    await expect(page.getByTestId("primary")).toContainText("Build & keep area");
+    await expect(page.getByTestId("primary")).toContainText("Build");
+    await expect(page.getByTestId("build-keep")).toHaveAttribute("aria-checked", "true");
     await page.getByTestId("primary").click();
     await expect(page.getByTestId("stage-building")).toBeVisible();
     await expect(page.getByTestId("stage-design")).toBeVisible({ timeout: 10000 });
@@ -108,7 +111,8 @@ test("Review's One group switch; Ungroup (asks first) and Group again in Manage"
     expect(await page.evaluate(() => (window as any).pm.backend.buildSeparate)).toBe(true);
     await panelShot(page, "panel-review-separate");
     await page.getByTestId("build-group").click();
-    await page.getByTestId("build-close").click();
+    await page.getByTestId("build-keep").click();
+    await page.getByTestId("primary").click();
     await expect(page.getByTestId("launcher")).toHaveAttribute("data-open", "false", { timeout: 10000 });
     await page.getByTestId("launcher").locator("button").click();
     await expect(page.getByTestId("stage-area")).toBeVisible();

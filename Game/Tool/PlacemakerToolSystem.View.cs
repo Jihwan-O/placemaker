@@ -171,6 +171,7 @@ namespace Placemaker.Game.Tool
                 AnarchyEnabled = _anarchy,
                 GroupingAvailable = _recipe != null && !Placemaker.Core.GeneratorRegistry.IsLoose(_recipe.Root?.Layer ?? ""),
                 BuildSeparate = _buildUngrouped,
+                KeepArea = _keepArea,
                 PanelCollapsed = _panelCollapsed,
                 PreviewMode = PreviewModeSelected,
                 GhostPending = GhostPending,

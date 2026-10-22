@@ -56,6 +56,8 @@ namespace Placemaker.Core.Tool
         public bool AnarchyAvailable, AnarchyEnabled;
         /// <summary>The build becomes a group (not a loose road grid): the Review switch "One group" applies; BuildSeparate = off.</summary>
         public bool GroupingAvailable, BuildSeparate;
+        /// <summary>Review's "Keep area" switch: Build keeps the area (on) or closes Placemaker (off).</summary>
+        public bool KeepArea = true;
         public bool PanelCollapsed;
         /// <summary>contract: state.previewMode — the player's choice for the current stage.</summary>
         public PreviewMode PreviewMode;
@@ -243,6 +245,7 @@ namespace Placemaker.Core.Tool
             if (s.AnarchyAvailable) o.Set("anarchy", JsonValue.Obj().Set("available", true).Set("enabled", s.AnarchyEnabled));
             if (s.GroupingAvailable) o.Set("grouping", JsonValue.Obj().Set("separate", s.BuildSeparate));
             o.Set("entranceCrosswalk", s.MarkerCrosswalk);
+            o.Set("keepArea", s.KeepArea);
             o.Set("panelCollapsed", s.PanelCollapsed);
             o.Set("previewMode", PreviewModes.Id(s.PreviewMode));
             o.Set("ghostPending", s.GhostPending);

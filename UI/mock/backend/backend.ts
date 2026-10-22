@@ -109,6 +109,8 @@ export class MockBackend {
     entranceCrosswalk = false;
     /** Review's "One group" switch off: the next build is born ungrouped. */
     buildSeparate = false;
+    /** Review's "Keep area" switch: Build keeps the area (C# PlacemakerToolSystem._keepArea). */
+    keepArea = true;
     /** Ungrouped builds (C# GroupFlags.Ungrouped). */
     ungrouped = new Set<number>();
     money = 250000;
@@ -969,6 +971,9 @@ export class MockBackend {
             case "setBuildUngrouped":
                 this.buildSeparate = !!a[0];
                 break;
+            case "setKeepArea":
+                this.keepArea = !!a[0];
+                break;
             case "removeMarker": {
                 const step = this.get(a[0]);
                 const i = Number(a[1]);
@@ -1294,7 +1299,7 @@ export class MockBackend {
             case "build":
             case "finishEdit":
                 if (this.plan && needsAck(this.plan.permanent) && !this.ackPermanent) return;
-                this.afterBuild = p.action === "build" ? "keep" : "fresh";
+                this.afterBuild = p.action === "build" ? (this.keepArea ? "keep" : "close") : "fresh";
                 this.startBuild();
                 break;
             case "cancelBuild":
@@ -1587,6 +1592,7 @@ export class MockBackend {
             anarchy: this.anarchy,
             grouping: { separate: this.buildSeparate },
             entranceCrosswalk: this.entranceCrosswalk,
+            keepArea: this.keepArea,
             panelCollapsed: this.collapsed(),
             previewMode: this.previewMode(),
             planningProgress: this.planning ? this.planProgress : undefined,

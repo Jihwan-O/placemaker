@@ -576,6 +576,10 @@ namespace Placemaker.Game.Overlay
                     DrawNet(buffer, n, w, alpha);
                 }
             }
+            // Entrances with a crosswalk: white zebra stripes across the street where the path will split it, and the path
+            // carried on to the street's centre line, so the plan says which entrances cut the street (shown with the ghost too:
+            // it only shows the crossing once the street is split).
+            if (Shows(PreviewLegend.Entrances) || Shows(PreviewLegend.Paths)) DrawCrosswalks(buffer, plan, w, stale ? 0.45f : 1f);
             // Clutter first, then features; trees last so crowns read as a canopy over the furniture.
             for (int pass = 0; pass < 3 && content; pass++)
                 foreach (var l in plan.Layers)
@@ -832,6 +836,52 @@ namespace Placemaker.Game.Overlay
             }
             float dash = w * 5f;
             buffer.DrawDashedCurve(WithAlpha(col, 0.95f * alpha), curve, w * 0.8f, dash, dash * 0.7f);
+        }
+
+        /// <summary>
+        /// Zebra stripes where a footpath end is attached to a city street (an entrance placed with a crosswalk,
+        /// Core/Layers/Common/StreetJoins): across the carriageway, each stripe along the street, plus a dashed leg from the
+        /// path's end to the street's centre line (the game carries it there).
+        /// </summary>
+        private void DrawCrosswalks(OverlayRenderSystem.Buffer buffer, ComposedPlan plan, float w, float alpha)
+        {
+            if (plan.ExistingNets == null || plan.ExistingNets.Count == 0) return;
+            var white = new Color(1f, 1f, 1f, 0.9f * alpha);
+            foreach (var l in plan.Layers)
+            {
+                if (l?.Nets == null) continue;
+                foreach (var n in l.Nets)
+                {
+                    if (n == null || (n.Role != NetRole.Pathway && n.Role != NetRole.PathwayWide)) continue;
+                    for (int end = 0; end < 2; end++)
+                    {
+                        long id = end == 0 ? n.StartAttach : n.EndAttach;
+                        if (id < 0) continue;
+                        NearbyNet road = default; bool found = false;
+                        foreach (var r in plan.ExistingNets) if (r.ExternalId == id && r.Category == NetCategory.Road) { road = r; found = true; break; }
+                        if (!found) continue;
+                        var tip = end == 0 ? n.A : n.D;
+                        var rc = new Bezier4x3(road.A, road.B, road.C, road.D);
+                        MathUtils.Distance(rc.xz, tip.xz, out float t);
+                        var centre = MathUtils.Position(rc, t);
+                        var along = math.normalizesafe(MathUtils.Tangent(rc, t).xz, new float2(1, 0));
+                        var across = new float2(-along.y, along.x);
+                        // the carriageway: the street's width less the sidewalks (about a quarter of it on each side of a city street)
+                        float half = math.max(2f, road.Width * 0.5f * (road.HasSidewalk ? 0.7f : 0.95f));
+                        int stripes = math.clamp((int)math.round(half * 2f / 1.2f), 3, 30);
+                        float stripe = math.max(0.35f, w * 0.9f), len = 2.6f;
+                        for (int k = 0; k < stripes; k++)
+                        {
+                            float off = -half + (k + 0.5f) * (half * 2f / stripes);
+                            var mid = centre.xz + across * off;
+                            var a = OnGround(mid - along * len * 0.5f);
+                            var b = OnGround(mid + along * len * 0.5f);
+                            buffer.DrawLine(white, new Line3.Segment(a, b), stripe);
+                        }
+                        buffer.DrawDashedLine(WithAlpha(NetColor(n.Role), 0.9f * alpha), new Line3.Segment(OnGround(tip.xz), OnGround(centre.xz)), w * 0.8f, w * 3f, w * 2f);
+                    }
+                }
+            }
         }
 
         /// <summary>Approximate parallel curve: end points and handles shifted along the end normals (fine for road-like curvature).</summary>

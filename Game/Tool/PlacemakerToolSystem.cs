@@ -214,6 +214,9 @@ namespace Placemaker.Game.Tool
             EnableActions(false);
             // While the build service holds the tool slot for our build, Anarchy must stay in effect.
             if (_anarchy && !_building) ApplyAnarchy(false);
+            // An edit of a finished build ends with Placemaker: left open, the next build (on any area) replaced the edited one
+            // (the user, 22 Oct: Edit in the info panel, then a new park elsewhere, and the first park was gone).
+            if (_editingGroup != 0 && !_building) CancelEdit("Placemaker was closed", true);
             LockSnapMask();
             _wasRunning = false;
             Touch();
@@ -351,7 +354,7 @@ namespace Placemaker.Game.Tool
             {
                 case PrimaryKind.ToDesign: SetStage(ToolStage.Design); break;
                 case PrimaryKind.ToReview: SetStage(ToolStage.Review); break;
-                case PrimaryKind.Build: StartBuild(AfterBuild.KeepArea); break;
+                case PrimaryKind.Build: StartBuild(_keepArea ? AfterBuild.KeepArea : AfterBuild.Close); break;
                 case PrimaryKind.FinishEdit: StartBuild(AfterBuild.Fresh); break;
                 case PrimaryKind.PlaceMarkers:
                     if (_markerKind != null) ExitMarkerMode();
@@ -490,12 +493,35 @@ namespace Placemaker.Game.Tool
             if (!HasSelection()) return;
             CancelGesture();
             ExitMarkerMode();
+            CancelEdit("the area was cleared", false);   // a new area is a new build, never the edited one again
             ClearSelectionState();
             // Markers belong to the old outline.
             if (_recipe != null) foreach (var kv in RecipePaths.Walk(_recipe)) kv.Value.Markers.Clear();
             _markersEdited.Clear();
             DesignChanged();
             Commit("Placemaker.Undo.ClearArea");
+            SetStage(ToolStage.Area);
+        }
+
+        /// <summary>
+        /// The edit of a finished build ends without building: the build stays as it was, and nothing built next replaces it.
+        /// <paramref name="forget"/>: the edited build's design and area go too (closing Placemaker; reopening starts fresh).
+        /// </summary>
+        private void CancelEdit(string why, bool forget)
+        {
+            if (_editingGroup == 0) return;
+            Mod.Log.Info($"Placemaker: the edit of group {_editingGroup} ended without building ({why}); the build stays as it was.");
+            _editingGroup = 0;
+            _buildUngrouped = false;
+            if (!forget) { Touch(); return; }
+            ClearSelectionState();
+            _recipe = null;
+            _recipeId = "";
+            _presetLayer = ""; _presetId = "";
+            _focus = RecipePaths.Root;
+            _plan = null;
+            DesignChanged();
+            _history.Reset(Capture());
             SetStage(ToolStage.Area);
         }
 

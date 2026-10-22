@@ -486,6 +486,7 @@ const Footer = ({
         </div>
     ) : null;
     const label = tl(p.label, t("Placemaker.UI.Primary.Next", "Next"));
+    const buildOptions = (p.action === "build" || p.action === "finishEdit") && !compact && (!!ack || !!state.grouping || p.action === "build");
     // s42: a blocked button says what blocks it ("Add an entrance to build"), short enough for one line.
     const shownLabel = !enabled && reason && reason.length <= 34 ? reason : label;
     const button = (
@@ -543,14 +544,44 @@ const Footer = ({
     return (
         <div className={classNames(s.footer, { [s.footerCompact]: compact })}>
             {info ? <div className={s.footInfo}>{info}</div> : null}
+            {buildOptions ? (
+                // Review: what Build does, one switch per line above the one Build button (Enter)
+                <div className={s.footOptions} data-testid="build-options">
+                    {ack ? (
+                        <Tip title={t("Placemaker.UI.Review.AckShort", "OK, permanent")} description={t("Placemaker.UI.Review.AckTip", "Some changes stay after you remove the build (the amber tags). Tick to allow them.")}>
+                            <div className={classNames(s.footOption, s.footOptionWarn)} data-testid="build-ack-wrap">
+                                <Check testId="ack-permanent" checked={ack.on} onChange={ack.set} label={t("Placemaker.UI.Review.AckLong", "OK, some changes are permanent")} />
+                            </div>
+                        </Tip>
+                    ) : null}
+                    {state.grouping ? (
+                        <Tip
+                            title={t("Placemaker.UI.Build.Group", "Group as one asset")}
+                            description={t(
+                                "Placemaker.UI.Build.GroupTip",
+                                "On: it is built as one asset. Click it to select all of it; the bulldozer removes all of it. Off: built as separate pieces you click, change and bulldoze one at a time. Removing all of it then takes Remove in a piece's info panel. You can ungroup or group it again later from there."
+                            )}
+                        >
+                            <div className={s.footOption} data-testid="build-group-wrap" data-on={state.grouping.separate ? "false" : "true"}>
+                                <Switch testId="build-group" on={!state.grouping.separate} onChange={(v) => act.setBuildUngrouped(!v)} />
+                                <div className={s.footOptionLabel}>{t("Placemaker.UI.Build.Group", "Group as one asset")}</div>
+                            </div>
+                        </Tip>
+                    ) : null}
+                    {p.action === "build" ? (
+                        <Tip
+                            title={t("Placemaker.UI.Build.KeepArea", "Keep area")}
+                            description={t("Placemaker.UI.Build.KeepAreaTip", "On: after building, the area stays selected and Placemaker stays open, so you can build something else there. Off: Build closes Placemaker.")}
+                        >
+                            <div className={s.footOption} data-testid="build-keep-wrap" data-on={state.keepArea === false ? "false" : "true"}>
+                                <Switch testId="build-keep" on={state.keepArea !== false} onChange={(v) => act.setKeepArea(v)} />
+                                <div className={s.footOptionLabel}>{t("Placemaker.UI.Build.KeepArea", "Keep area")}</div>
+                            </div>
+                        </Tip>
+                    ) : null}
+                </div>
+            ) : null}
             <div className={s.primaryRow}>
-                {ack ? (
-                    <Tip title={t("Placemaker.UI.Review.AckTip", "Some changes stay after you remove the build (the amber tags). Tick to allow them.")}>
-                        <div className={s.ackChip}>
-                            <Check testId="ack-permanent" checked={ack.on} onChange={ack.set} label={t("Placemaker.UI.Review.AckShort", "OK, permanent")} />
-                        </div>
-                    </Tip>
-                ) : null}
                 {p.action === "polish" && state.painter ? (
                     // Live polish: the selection polished again a moment after every change of the look or the selection
                     <Tip
@@ -577,38 +608,6 @@ const Footer = ({
                     >
                         <div className={s.primaryLabel}>{t("Placemaker.UI.Painter.Unpolish", "Remove outgrow")}</div>
                     </button>
-                ) : null}
-                {(p.action === "build" || p.action === "finishEdit") && state.grouping ? (
-                    // One group (default) or separate pieces: an ungrouped build's parts are clicked and bulldozed one by one
-                    <Tip
-                        title={t("Placemaker.UI.Build.Group", "One group")}
-                        description={t(
-                            "Placemaker.UI.Build.GroupTip",
-                            "On: it is built as one thing. Click it to select all of it; the bulldozer removes all of it. Off: built as separate pieces you click, change and bulldoze one at a time. Removing all of it then takes Remove in a piece's info panel. You can ungroup or group it again later from there."
-                        )}
-                    >
-                        <div className={s.liveChip} data-testid="build-group-wrap" data-on={state.grouping.separate ? "false" : "true"}>
-                            <Switch testId="build-group" on={!state.grouping.separate} onChange={(v) => act.setBuildUngrouped(!v)} />
-                            <div className={s.liveLabel}>{t("Placemaker.UI.Build.Group", "One group")}</div>
-                        </div>
-                    </Tip>
-                ) : null}
-                {p.action === "build" ? (
-                    // Build & close beside the primary (Build & keep area, Enter): builds, then closes Placemaker
-                    <Tip title={t("Placemaker.UI.Build.Close", "Build & close")} description={t("Placemaker.UI.Build.CloseTip", "Builds it, then closes Placemaker.")}>
-                        <button
-                            type="button"
-                            data-testid="build-close"
-                            aria-disabled={enabled ? "false" : "true"}
-                            className={classNames(s.primary, s.primarySecond, { [s.primaryOff]: !enabled })}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (enabled) act.buildAndClose();
-                            }}
-                        >
-                            <div className={s.primaryLabel}>{t("Placemaker.UI.Build.Close", "Build & close")}</div>
-                        </button>
-                    </Tip>
                 ) : null}
                 {!enabled && reason ? (
                     <Tip title={label} description={reason}>
@@ -892,11 +891,6 @@ export const PlacemakerPanel = () => {
                         <div className={s.panel} data-testid="placemaker-panel" data-stage={state.stage}>
                             <div className={s.panelTint}>
                                 {header}
-                                {showPreviewToggle ? (
-                                    <div className={s.subRow} data-testid="panel-preview-row">
-                                        <PreviewToggle state={state} />
-                                    </div>
-                                ) : null}
                                 {outgrow ? (
                                     <ErrorBoundary name="outgrow">
                                         <PolishCityCard state={state} />
@@ -908,6 +902,12 @@ export const PlacemakerPanel = () => {
                                                 <StageBar state={state} />
                                             </ErrorBoundary>
                                         )}
+                                        {showPreviewToggle ? (
+                                            // under the stage bar, so Area / Design / Review never move when it appears
+                                            <div className={s.subRow} data-testid="panel-preview-row">
+                                                <PreviewToggle state={state} />
+                                            </div>
+                                        ) : null}
                                         <VersionNotice state={state} />
                                         <ScrollArea className={s.bodyWrap} testId="panel-body">
                                             <div className={s.body} key={state.stage}>

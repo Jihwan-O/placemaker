@@ -380,6 +380,7 @@ export const act = {
     setMarkerCrosswalk: (path: string, index: number, on: boolean) => fire(Triggers.setMarkerCrosswalk, path, index, on),
     ungroupGroup: (id: number, ungroup: boolean) => fire(Triggers.ungroupGroup, id, ungroup),
     setBuildUngrouped: (on: boolean) => fire(Triggers.setBuildUngrouped, on),
+    setKeepArea: (on: boolean) => fire(Triggers.setKeepArea, on),
     /** Leave marker placement: in marker mode the C# primary action is "placeMarkers" (Done), which toggles it off. */
     endMarkers: () => fire(Triggers.primary),
     /** The player ticked the permanent-effects box (C# also guards Enter with it). */

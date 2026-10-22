@@ -268,7 +268,7 @@ namespace Placemaker.Game.Suite
             else
             {
                 yield return UiAct(st, rec, "info Remove", "info-remove", null, null, null, null, mustChange: false, effectFrames: 4);
-                yield return UiAct(st, rec, "OK (remove)", "confirm-ok", "removeGroup", new object[] { (double)g }, () => Services.Groups?.Get(g) == null, () => _tool.RemoveGroup(g), mustChange: false, effectFrames: 10);
+                yield return UiAct(st, rec, "OK (remove)", "info-confirm-ok", "removeGroup", new object[] { (double)g }, () => Services.Groups?.Get(g) == null, () => _tool.RemoveGroup(g), mustChange: false, effectFrames: 10);
                 yield return AfterDelete(st, rec, g);
                 yield return OpenTool();
             }

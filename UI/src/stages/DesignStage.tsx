@@ -89,6 +89,11 @@ const MARKER_SHORT: Record<string, [string, string]> = {
     exit: ["Placemaker.UI.Marker.ExitShort", "Out"],
     alley: ["Placemaker.UI.Marker.AlleyShort", "Alley"],
     footpath: ["Placemaker.UI.Marker.FootpathShort", "Path"],
+    pedestrian: ["Placemaker.UI.Marker.PedestrianShort", "Walk-in"],
+    bike: ["Placemaker.UI.Marker.BikeShort", "Bike"],
+    main: ["Placemaker.UI.Marker.MainShort", "Main"],
+    service: ["Placemaker.UI.Marker.ServiceShort", "Service"],
+    access: ["Placemaker.UI.Marker.AccessShort", "Access"],
 };
 
 function markerShort(t: TFunc, k: MarkerKind): string {
@@ -109,7 +114,13 @@ const MARKER_TIPS: Record<string, [string, string]> = {
     footpath: ["Placemaker.UI.Marker.FootpathTip", "A footpath joins here."],
 };
 
-/** Add entrances: the section header (count or "add one to build" · typed buttons on its line), then the placed ones. */
+/**
+ * Entrances: the section header (count, or "Add one to build"), then
+ *   Add     one clear button per entrance type (the lit one is being placed; click it again to stop), "With crosswalk"
+ *           for the types people walk in through (the next ones placed cut the street and get a crosswalk), and, while
+ *           placing, what to click;
+ *   Placed  one row per entrance: its type and number, its crosswalk (click to switch), show on the map, remove.
+ */
 const Entrances = ({ step, state }: { step: StepView; state: ToolState }) => {
     const { t } = useT();
     const kinds = step.markerKinds ?? [];
@@ -128,14 +139,9 @@ const Entrances = ({ step, state }: { step: StepView; state: ToolState }) => {
     };
     const missing = need > 0 && have < need;
     const numbers = new Map<string, number>();
-    // Walking entrances come with or without a crosswalk across the street (Core StreetJoins): one switch for the ones
-    // placed next, and each placed one can be changed in the list.
+    // Walking entrances come with or without a crosswalk across the street (Core StreetJoins).
     const walks = kinds.some((k) => !!k.crosswalk);
     const crossing = !!state.entranceCrosswalk;
-    const crosswalkTip = t(
-        "Placemaker.UI.Markers.CrosswalkTip",
-        "On: the entrances you place next get a crosswalk across the street (the path joins the road at a new junction). Off: the path stops at the sidewalk and the game joins it, with no crosswalk and no cut in the road."
-    );
     // The footer's "Add an entrance" leads here: scroll to it and flash.
     const ref = useRef<HTMLDivElement>(null);
     const flash = useReveal("entrances:" + step.path, () => {
@@ -150,7 +156,7 @@ const Entrances = ({ step, state }: { step: StepView; state: ToolState }) => {
         >
             <SectionHead
                 icon="entrance"
-                title={t("Placemaker.UI.Entrances.Add", "Add entrances")}
+                title={t("Placemaker.UI.Entrances.Title", "Entrances")}
                 tip={t("Placemaker.UI.Markers.Note", "Pick a type, then click the outline by a road.")}
                 testId={`entrances-${step.path}`}
                 tone={missing ? "warn" : undefined}
@@ -164,77 +170,102 @@ const Entrances = ({ step, state }: { step: StepView; state: ToolState }) => {
                         </div>
                     ) : undefined
                 }
-                wrap
-                right={
-                    <div className={s.kindRow} data-testid="marker-kinds">
-                        {kinds.map((k) => {
-                            const on = placing === k.kind;
-                            const tip = k.tooltip ? t(k.tooltip, "") : MARKER_TIPS[k.kind] ? t(MARKER_TIPS[k.kind][0], MARKER_TIPS[k.kind][1]) : "";
-                            return (
-                                <Tip key={k.kind} title={markerLabel(t, k)} description={tip || undefined}>
-                                    <button
-                                        type="button"
-                                        data-testid={`marker-kind-${k.kind}`}
-                                        aria-pressed={on ? "true" : "false"}
-                                        className={classNames(s.kindBtn, { [s.kindBtnOn]: on })}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            choose(k.kind);
-                                        }}
-                                    >
-                                        <Icon name={markerIcon(k)} size={12} tint={on ? "dark" : "light"} />
-                                        <div className={s.kindLabel}>{markerShort(t, k)}</div>
-                                    </button>
-                                </Tip>
-                            );
-                        })}
-                        {walks ? (
-                            <Tip title={t("Placemaker.UI.Markers.Crosswalk", "With crosswalk")} description={crosswalkTip}>
+            />
+            <div className={s.entBlock}>
+                <div className={s.entCaption}>{t("Placemaker.UI.Entrances.AddCaption", "Add")}</div>
+                <div className={s.kindGrid} data-testid="marker-kinds">
+                    {kinds.map((k) => {
+                        const on = placing === k.kind;
+                        const tip = k.tooltip ? t(k.tooltip, "") : MARKER_TIPS[k.kind] ? t(MARKER_TIPS[k.kind][0], MARKER_TIPS[k.kind][1]) : "";
+                        return (
+                            <Tip key={k.kind} title={markerLabel(t, k)} description={tip || undefined}>
                                 <button
                                     type="button"
-                                    data-testid="marker-crosswalk"
-                                    aria-pressed={crossing ? "true" : "false"}
-                                    className={classNames(s.kindBtn, s.kindToggle, { [s.kindBtnOn]: crossing })}
+                                    data-testid={`marker-kind-${k.kind}`}
+                                    aria-pressed={on ? "true" : "false"}
+                                    className={classNames(s.kindBtn, { [s.kindBtnOn]: on })}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        act.setMarkerCrosswalk(step.path, -1, !crossing);
+                                        choose(k.kind);
                                     }}
                                 >
-                                    <Icon name="crosswalk" size={12} tint={crossing ? "dark" : "light"} />
-                                    <div className={s.kindLabel}>{t("Placemaker.UI.Markers.CrosswalkShort", "Crosswalk")}</div>
+                                    <Icon name={markerIcon(k)} size={16} tint={on ? "dark" : "light"} />
+                                    <div className={s.kindLabel}>{markerShort(t, k)}</div>
                                 </button>
                             </Tip>
-                        ) : null}
-                    </div>
-                }
-            />
-            {list.length ? (
-                <div className={s.markerList} data-testid="marker-list">
-                    {list.map((m) => {
-                        const k = byKind(m.kind);
-                        const n = (numbers.get(m.kind) ?? 0) + 1;
-                        numbers.set(m.kind, n);
-                        return (
-                            <div key={m.index} className={s.markerItem} data-testid={`marker-${m.index}`} data-kind={m.kind}>
-                                <Icon name={markerIcon(k)} size={11} tint="warn" />
-                                <div className={s.markerName}>{markerShort(t, k) + " " + n}</div>
-                                {k.crosswalk ? (
-                                    <Btn
-                                        icon="crosswalk"
-                                        iconSize={11}
-                                        selected={!!m.crosswalk}
-                                        className={s.markerBtn}
-                                        title={m.crosswalk ? t("Placemaker.UI.Markers.CrosswalkOn", "Crosswalk: on") : t("Placemaker.UI.Markers.CrosswalkOff", "Crosswalk: off")}
-                                        description={t("Placemaker.UI.Markers.CrosswalkItemTip", "Click to switch. On: a crosswalk across the street here. Off: the path stops at the sidewalk.")}
-                                        onClick={() => act.setMarkerCrosswalk(step.path, m.index, !m.crosswalk)}
-                                        testId={`marker-crosswalk-${m.index}`}
-                                    />
-                                ) : null}
-                                <Btn icon="eye" iconSize={11} className={s.markerBtn} title={t("Placemaker.UI.Markers.Show", "Show on map")} onClick={() => act.locate(m.position)} testId={`marker-show-${m.index}`} />
-                                <Btn icon="close" iconSize={11} className={s.markerBtn} title={t("Placemaker.UI.Markers.Remove", "Remove")} onClick={() => act.removeMarker(step.path, m.index)} testId={`marker-remove-${m.index}`} />
-                            </div>
                         );
                     })}
+                </div>
+                {walks ? (
+                    <Tip
+                        title={t("Placemaker.UI.Markers.Crosswalk", "With crosswalk")}
+                        description={t(
+                            "Placemaker.UI.Markers.CrosswalkTip",
+                            "On: the entrances you place next get a crosswalk across the street (the path joins the road at a new junction). Off: the path stops at the sidewalk and the game joins it, with no crosswalk and no cut in the road."
+                        )}
+                    >
+                        <div className={s.crossRow} data-testid="marker-crosswalk-wrap" data-on={crossing ? "true" : "false"}>
+                            <Switch testId="marker-crosswalk" on={crossing} onChange={(v) => act.setMarkerCrosswalk(step.path, -1, v)} />
+                            <div className={s.crossIcon}>
+                                <Icon name="crosswalk" size={14} tint={crossing ? "light" : "dim"} />
+                            </div>
+                            <div className={s.crossLabel}>{t("Placemaker.UI.Markers.Crosswalk", "With crosswalk")}</div>
+                            <div className={s.crossNote}>
+                                {crossing ? t("Placemaker.UI.Markers.CrosswalkOnNote", "cuts the street") : t("Placemaker.UI.Markers.CrosswalkOffNote", "joins the sidewalk")}
+                            </div>
+                        </div>
+                    </Tip>
+                ) : null}
+                {placing ? (
+                    <div className={s.placingHint} data-testid="marker-placing">
+                        <Icon name="info" size={12} tint="warn" />
+                        <div className={s.placingText}>
+                            {t("Placemaker.UI.Markers.Placing", "Click the outline by a road to place one. Right-click removes one. Esc when done.")}
+                        </div>
+                    </div>
+                ) : null}
+            </div>
+            {list.length ? (
+                <div className={s.entBlock}>
+                    <div className={s.entCaption}>{t("Placemaker.UI.Entrances.Placed", "Placed")}</div>
+                    <div className={s.placedList} data-testid="marker-list">
+                        {list.map((m) => {
+                            const k = byKind(m.kind);
+                            const n = (numbers.get(m.kind) ?? 0) + 1;
+                            numbers.set(m.kind, n);
+                            return (
+                                <div key={m.index} className={s.placedRow} data-testid={`marker-${m.index}`} data-kind={m.kind}>
+                                    <Icon name={markerIcon(k)} size={14} tint="warn" />
+                                    <div className={s.placedName}>{markerShort(t, k) + " " + n}</div>
+                                    {k.crosswalk ? (
+                                        <Tip
+                                            title={m.crosswalk ? t("Placemaker.UI.Markers.CrosswalkOn", "Crosswalk: on") : t("Placemaker.UI.Markers.CrosswalkOff", "Crosswalk: off")}
+                                            description={t("Placemaker.UI.Markers.CrosswalkItemTip", "Click to switch. On: a crosswalk across the street here. Off: the path stops at the sidewalk.")}
+                                        >
+                                            <button
+                                                type="button"
+                                                data-testid={`marker-crosswalk-${m.index}`}
+                                                aria-pressed={m.crosswalk ? "true" : "false"}
+                                                className={classNames(s.xwChip, { [s.xwChipOn]: m.crosswalk })}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    act.setMarkerCrosswalk(step.path, m.index, !m.crosswalk);
+                                                }}
+                                            >
+                                                <Icon name="crosswalk" size={12} tint={m.crosswalk ? "dark" : "dim"} />
+                                                <div className={s.xwLabel}>
+                                                    {m.crosswalk ? t("Placemaker.UI.Markers.CrosswalkShort", "Crosswalk") : t("Placemaker.UI.Markers.NoCrosswalk", "No crosswalk")}
+                                                </div>
+                                            </button>
+                                        </Tip>
+                                    ) : null}
+                                    <div className={s.placedGap} />
+                                    <Btn icon="eye" iconSize={13} className={s.markerBtn} title={t("Placemaker.UI.Markers.Show", "Show on map")} onClick={() => act.locate(m.position)} testId={`marker-show-${m.index}`} />
+                                    <Btn icon="close" iconSize={13} className={s.markerBtn} title={t("Placemaker.UI.Markers.Remove", "Remove")} onClick={() => act.removeMarker(step.path, m.index)} testId={`marker-remove-${m.index}`} />
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             ) : null}
         </div>

@@ -149,6 +149,10 @@ namespace Placemaker.Game.Suite
             var r1 = new RaycastResult { m_Owner = top, m_Hit = { m_HitEntity = part, m_Position = em.GetComponentData<global::Game.Objects.Transform>(part).m_Position } };
             Placemaker.Game.Groups.Patches.RaycastLiftPatch.Apply(trs, ref h1, ref r1);
             rec["clickPart"] = What(h1, r1);
+            // what the bulldozer then deletes: it sends a static object with an owner on to that owner (BulldozeToolSystem, MainElements)
+            var dozed = h1 ? r1.m_Owner : Entity.Null;
+            while (dozed != Entity.Null && em.HasComponent<global::Game.Objects.Static>(dozed) && em.HasComponent<Owner>(dozed)) dozed = em.GetComponentData<Owner>(dozed).m_Owner;
+            rec["bulldozerTakes"] = dozed == Entity.Null ? "nothing" : dozed == part ? "the part" : What(true, new RaycastResult { m_Owner = dozed });
             rec["gameHands"] = top == part ? "the part" : _lookup.KindOf(top) + " (its owner)";
             string ground = "no lot";
             if (lot != Entity.Null)
@@ -161,14 +165,14 @@ namespace Placemaker.Game.Suite
             rec["clickGround"] = ground;
             rec["ungrouped"] = Services.Groups?.IsUngrouped(st.Group) ?? false;
             Mod.Log.Info($"Placemaker lab: pick a part ({label}): group {st.Group} (ungrouped: {rec["ungrouped"]}), the game's {rec["tool"]} (mask {rec["mask"]}): "
-                + $"a click on {rec["part"]} (the game hands over {rec["gameHands"]}) picks {rec["clickPart"]}; a click on the ground between its parts picks {ground}.");
+                + $"a click on {rec["part"]} (the game hands over {rec["gameHands"]}) picks {rec["clickPart"]}, the bulldozer there takes {rec["bulldozerTakes"]}; a click on the ground between its parts picks {ground}.");
 
             if ((bool?)step["bulldoze"] ?? false)
             {
-                // The bulldozer on that part: the delete definition it applies for the picked entity.
-                var target = r1.m_Owner;
+                // The bulldozer on that part: the delete definition it applies for what it takes.
+                var target = dozed;
                 int before = Services.Groups is GroupRegistrySystem reg ? reg.CountMembers(st.Group, false) : -1;
-                if (h1 && target != Entity.Null)
+                if (h1 && target != Entity.Null && em.HasComponent<global::Game.Objects.Transform>(target))
                 {
                     yield return ApplyWithFixtureTool(t =>
                     {
@@ -209,7 +213,7 @@ namespace Placemaker.Game.Suite
             if (want)
             {
                 yield return UiAct(st, rec, "info Ungroup", "info-ungroup", null, null, null, null, mustChange: false, effectFrames: 4);
-                yield return UiAct(st, rec, "OK (ungroup)", "confirm-ok", "ungroupGroup", new object[] { (double)g, true }, Done, () => _tool.UngroupGroup(g, true), mustChange: false, effectFrames: 10);
+                yield return UiAct(st, rec, "OK (ungroup)", "info-confirm-ok", "ungroupGroup", new object[] { (double)g, true }, Done, () => _tool.UngroupGroup(g, true), mustChange: false, effectFrames: 10);
             }
             else
                 yield return UiAct(st, rec, "info Group again", "info-ungroup", "ungroupGroup", new object[] { (double)g, false }, Done, () => _tool.UngroupGroup(g, false), mustChange: false, effectFrames: 10);

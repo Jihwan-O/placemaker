@@ -219,11 +219,11 @@ test("footpath entrances come with or without a crosswalk; car entrances never o
     await design(page, "parking");
     const toggle = page.getByTestId("marker-crosswalk");
     await expect(toggle).toBeVisible();
-    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
     // a footpath placed with the switch on is stored as "footpath+crosswalk"
     await page.getByTestId("marker-kind-footpath").click();
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
     await clickWorld(page, (FIELD[0][0] + FIELD[1][0]) / 2, (FIELD[0][1] + FIELD[1][1]) / 2);
     await expect(page.getByTestId("marker-0")).toHaveAttribute("data-kind", "footpath");
     await expect(page.getByTestId("marker-crosswalk-0")).toHaveAttribute("aria-pressed", "true");

@@ -353,6 +353,17 @@ namespace Placemaker.Game.Tool
         private bool _buildUngrouped;
         public bool BuildUngrouped => _buildUngrouped;
 
+        /// <summary>Review's "Keep area" switch (on by default): Build keeps the area and the panel open; off, Build closes Placemaker.</summary>
+        private bool _keepArea = true;
+        public bool KeepArea => _keepArea;
+
+        public void SetKeepArea(bool on)
+        {
+            if (_keepArea == on) return;
+            _keepArea = on;
+            Touch();
+        }
+
         public void SetBuildUngrouped(bool on)
         {
             if (_buildUngrouped == on) return;

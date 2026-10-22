@@ -117,10 +117,13 @@
     min-width: 0;
 }
 
-// ── add entrances: the section header (with the typed buttons on its line), then the placed ones ──
+// ── entrances: the section header, then Add (type buttons, crosswalk switch) and Placed (one row each) ──
 .entrances {
     @include col;
     min-width: 0;
+    // a little room round the content, so the "look here" flash never touches it (content stays aligned with the page)
+    margin: 0 -6rem;
+    padding: 0 6rem 4rem 6rem;
     border-radius: $radius;
     transition-property: background-color;
     transition-duration: $t-med;
@@ -148,29 +151,47 @@
     white-space: nowrap;
 }
 
-// the typed buttons follow the title on one line when they fit, else take the next line (never squeezed)
-.kindRow {
+// one block of the section: a small caption ("Add", "Placed"), then its content
+.entBlock {
+    @include col;
+    min-width: 0;
+    margin-top: 6rem;
+}
+
+.entCaption {
+    margin-bottom: 4rem;
+    font-size: 10rem;
+    font-weight: bold;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: $c-text-dim;
+}
+
+// Add: one real button per entrance type, wrapping onto a second line when they do not fit
+.kindGrid {
     @include row;
-    flex-shrink: 0;
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
 .kindBtn {
     @include row;
     @include button-reset;
     flex-shrink: 0;
-    height: 20rem;
-    margin-left: 3rem;
-    padding: 0 6rem 0 4rem;
-    border-radius: $radius-s;
-    background-color: rgba(255, 255, 255, 0.07);
-    @include border(1rem, rgba(255, 255, 255, 0.1));
+    height: 28rem;
+    margin: 0 5rem 5rem 0;
+    padding: 0 10rem 0 8rem;
+    border-radius: $radius;
+    background-color: rgba(255, 255, 255, 0.08);
+    @include border(1rem, rgba(255, 255, 255, 0.16));
     transition-property: background-color;
     transition-duration: $t-fast;
     &:hover {
-        background-color: rgba(255, 255, 255, 0.14);
+        background-color: rgba(255, 255, 255, 0.16);
     }
 }
 
+// the type being placed
 .kindBtnOn {
     background-color: #ffb547;
     @include border-color(#ffb547);
@@ -184,52 +205,125 @@
 }
 
 .kindLabel {
-    margin-left: 3rem;
+    margin-left: 6rem;
+    font-size: $fs;
+    color: #eaf2f6;
+    white-space: nowrap;
+}
+
+// "With crosswalk": a switch, plainly a setting and not one more type
+.crossRow {
+    @include row;
+    min-width: 0;
+    margin-top: 1rem;
+    padding: 2rem 0;
+}
+
+.crossIcon {
+    @include row;
+    flex-shrink: 0;
+    margin-left: 8rem;
+}
+
+.crossLabel {
+    margin-left: 5rem;
     font-size: $fs-s;
     color: var(--menuText1Normal);
     white-space: nowrap;
 }
 
-// "Crosswalk": a switch for the entrances placed next, set apart from the kind buttons, white like road markings when on
-.kindToggle {
-    margin-left: 8rem;
-    &.kindBtnOn {
-        background-color: #e4ecf1;
-        @include border-color(#e4ecf1);
-        &:hover {
-            background-color: #ffffff;
-        }
+.crossNote {
+    margin-left: 6rem;
+    font-size: $fs-s;
+    color: $c-text-dim;
+    @include ellipsis;
+}
+
+// while placing: what to click
+.placingHint {
+    @include row;
+    min-width: 0;
+    margin-top: 5rem;
+    padding: 4rem 8rem;
+    border-radius: $radius-s;
+    background-color: rgba(255, 181, 71, 0.12);
+}
+
+.placingText {
+    margin-left: 6rem;
+    font-size: $fs-s;
+    color: #ffe2b3;
+    white-space: normal;
+}
+
+// Placed: one row per entrance
+.placedList {
+    @include col;
+    min-width: 0;
+}
+
+.placedRow {
+    @include row;
+    min-width: 0;
+    height: 26rem;
+    margin-bottom: 3rem;
+    padding: 0 3rem 0 8rem;
+    border-radius: $radius-s;
+    background-color: rgba(0, 0, 0, 0.22);
+}
+
+.placedName {
+    flex-shrink: 0;
+    margin-left: 7rem;
+    margin-right: 8rem;
+    font-size: $fs-s;
+    color: #eaf2f6;
+    white-space: nowrap;
+}
+
+.placedGap {
+    flex: 1 1 auto;
+}
+
+// a placed entrance's crosswalk, clicked to switch: white like road markings when on
+.xwChip {
+    @include row;
+    @include button-reset;
+    flex-shrink: 0;
+    height: 20rem;
+    padding: 0 7rem 0 5rem;
+    border-radius: $radius-s;
+    background-color: rgba(255, 255, 255, 0.06);
+    @include border(1rem, rgba(255, 255, 255, 0.12));
+    transition-property: background-color;
+    transition-duration: $t-fast;
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.14);
     }
 }
 
-.markerList {
-    @include row;
-    flex-wrap: wrap;
-    min-width: 0;
-    padding-bottom: 4rem;
+.xwChipOn {
+    background-color: #e4ecf1;
+    @include border-color(#e4ecf1);
+    &:hover {
+        background-color: #ffffff;
+    }
+    .xwLabel {
+        color: #0b1d26;
+        font-weight: bold;
+    }
 }
 
-.markerItem {
-    @include row;
-    flex-shrink: 0;
-    height: 20rem;
-    margin: 0 4rem 2rem 0;
-    padding: 0 0 0 5rem;
-    border-radius: $radius-s;
-    background-color: rgba(0, 0, 0, 0.2);
-}
-
-.markerName {
+.xwLabel {
     margin-left: 4rem;
-    margin-right: 2rem;
-    font-size: $fs-s;
-    color: var(--menuText1Normal);
+    font-size: 11rem;
+    color: $c-text-dim;
     white-space: nowrap;
 }
 
 .markerBtn {
-    width: 18rem;
-    height: 18rem;
+    width: 22rem;
+    height: 22rem;
 }
 
 // ── extras ──

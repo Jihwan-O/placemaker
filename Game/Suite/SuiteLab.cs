@@ -30,6 +30,12 @@ namespace Placemaker.Game.Suite
                 case "street": yield return LabStreet(st, step, rec); yield break;
                 case "streetjoins": LabStreetJoins(st, step, rec); yield break;
                 case "pickpart": yield return LabPickPart(st, step, rec); yield break;
+                case "toolstate":
+                    rec["editingGroup"] = _tool.EditingGroup;
+                    rec["stage"] = _tool.Stage.ToString();
+                    rec["hasArea"] = _tool.Shape != null;
+                    Mod.Log.Info($"Placemaker lab: tool state ({(string)step["label"] ?? ""}): editing group {_tool.EditingGroup}, stage {_tool.Stage}, area {(_tool.Shape != null ? "kept" : "none")}.");
+                    yield break;
                 case "yards": yield return LabYards(st, step, rec); yield break;
                 case "outgrowcheck": yield return LabOutgrowCheck(st, step, rec); yield break;
                 case "fencemap": yield return LabFenceMap(st, step, rec); yield break;

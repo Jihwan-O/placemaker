@@ -10,7 +10,6 @@ Early access. Back up your save.
 - Bugs: [Issues](https://github.com/jackwrichards/placemaker/issues) (a screenshot and your Placemaker.log help a ton)
 
 Some code is ported from [Parking Lot Tool](https://github.com/KruemelGames/ParkingLotTool),
-[ParkManager](https://github.com/tomkpunkt/ParkManager) and
-[Grid Road Generator](https://github.com/Ti4goc/GridRoadGenerator). Uses [Harmony](https://github.com/pardeike/Harmony) (MIT).
+[ParkManager](https://github.com/tomkpunkt/ParkManager) and Uses [Harmony](https://github.com/pardeike/Harmony) (MIT).
 
 GPL-3.0.

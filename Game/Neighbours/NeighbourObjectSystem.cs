@@ -47,8 +47,13 @@ namespace Placemaker.Game.Neighbours
         private Dictionary<string, Entity> _byName;
         private static HashSet<string> _pieces;
 
-        /// <summary>A piece the game has (its fence kind's), else a low hedge piece.</summary>
-        public static string PieceName(string name) => _pieces == null || _pieces.Contains(name) ? name : "HedgePieceLow01";
+        /// <summary>A piece the game has (its fence kind's; a 2 m piece the kind lacks: its 4 m one), else a low hedge piece.</summary>
+        public static string PieceName(string name)
+        {
+            if (_pieces == null || _pieces.Contains(name)) return name;
+            var full = name?.Replace("Short", "");
+            return full != null && _pieces.Contains(full) ? full : "HedgePieceLow01";
+        }
         private EntityArchetype _definition;
 
         [Preserve]

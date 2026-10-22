@@ -170,7 +170,7 @@ namespace Placemaker.Game.Neighbours
                 NeighbourObjectSystem.Queue.Add(new NeighbourObjectSystem.Request
                 {
                     Name = name, Prefab = prefab, Position = at, Yaw = yaw, Owner = owner,
-                    Seed = piece ? (int)math.hash(new int2(owner.Index, name.GetHashCode())) | 1 : 0,
+                    Seed = piece ? PieceSeed(owner, name) : 0,
                 });
                 remade++;
             }

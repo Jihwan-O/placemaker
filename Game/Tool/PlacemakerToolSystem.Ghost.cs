@@ -59,22 +59,40 @@ namespace Placemaker.Game.Tool
         // The game outlines every temporary a tool places (BatchInstanceSystem: TempFlags.Create puts the mesh on the
         // outline layer too, ManagedBatchSystem draws that on Unity's "Outline" layer). The Real preview is all temporaries,
         // so the whole build was drawn in blue outlines ("I just want to actually see it"). Making the hover colour
-        // see-through did not work (the outline ignores alpha: black lines). While it shows, the camera leaves the Outline
-        // layer out instead, every frame; put back the moment it goes (Sketch, Outgrow, the tool closed). The build's own
-        // outline is drawn thick meanwhile (the overlay).
-        private int _outlineLayer = -2;
+        // see-through did not work (the outline ignores alpha: black lines). Leaving the Outline layer out of the camera did
+        // not either: the game's outline pass asks for that layer (OutlinesWorldUIPass.AggregateCullingParameters), so HDRP
+        // culled the whole scene a second time every frame for it (CustomPassVolume.Cull) and outlines everywhere flickered
+        // while the camera moved. While the Real preview shows, the outline pass itself draws no layer (it culls nothing
+        // extra and its buffer stays empty); its layer is put back the moment the preview goes (Sketch, Outgrow, another
+        // stage, the tool closed). The build's own outline is drawn thick meanwhile (the overlay).
+        private global::Game.Rendering.OutlinesWorldUIPass _outlinePass;
+        private UnityEngine.LayerMask _outlineLayerSaved;
         private bool _outlineHidden;
 
         private void UpdateGhostOutline(bool hide)
         {
-            if (!hide && !_outlineHidden) return;
-            if (_outlineLayer == -2) _outlineLayer = UnityEngine.LayerMask.NameToLayer("Outline");
-            var cam = UnityEngine.Camera.main;
-            if (_outlineLayer < 0 || cam == null) return;
-            int bit = 1 << _outlineLayer;
-            if (hide) cam.cullingMask &= ~bit;
-            else cam.cullingMask |= bit;
+            if (hide == _outlineHidden) return;
+            var pass = OutlinePass();
+            if (pass == null) return;
+            if (hide)
+            {
+                _outlineLayerSaved = pass.m_OutlineLayer;
+                pass.m_OutlineLayer = 0;
+            }
+            else pass.m_OutlineLayer = _outlineLayerSaved;
             _outlineHidden = hide;
+        }
+
+        /// <summary>The game's outline pass (DebugCustomPass finds it the same way: by name, after post-processing).</summary>
+        private global::Game.Rendering.OutlinesWorldUIPass OutlinePass()
+        {
+            if (_outlinePass != null) return _outlinePass;
+            var volumes = new System.Collections.Generic.List<UnityEngine.Rendering.HighDefinition.CustomPassVolume>();
+            UnityEngine.Rendering.HighDefinition.CustomPassVolume.GetActivePassVolumes(UnityEngine.Rendering.HighDefinition.CustomPassInjectionPoint.AfterPostProcess, volumes);
+            foreach (var v in volumes)
+                foreach (var p in v.customPasses)
+                    if (p is global::Game.Rendering.OutlinesWorldUIPass o) return _outlinePass = o;
+            return null;
         }
 
         /// <summary>UI: setPreviewMode("sketch" | "ghost") — for the current stage, sticks for the session.</summary>

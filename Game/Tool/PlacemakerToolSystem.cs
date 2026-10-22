@@ -122,8 +122,16 @@ namespace Placemaker.Game.Tool
         [Preserve]
         protected override void OnDestroy()
         {
+            UpdateGhostOutline(false);
             _worker?.Dispose();
             base.OnDestroy();
+        }
+
+        [Preserve]
+        protected override void OnGamePreload(Colossal.Serialization.Entities.Purpose purpose, global::Game.GameMode mode)
+        {
+            base.OnGamePreload(purpose, mode);
+            UpdateGhostOutline(false);   // a city loading (or the menu) with the Real preview on: the game's outlines back
         }
 
         /// <summary>First open: load recipes (generators register by then). No type is chosen until the player picks one.</summary>

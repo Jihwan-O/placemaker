@@ -315,6 +315,7 @@ namespace Placemaker.Game.Suite
             // gaps: two loose ends close to each other
             var gaps = new List<JObject>();
             var gapSpots = new List<(float2 At, float Len, string Kind)>();
+            int houseGaps = 0;
             var used = new HashSet<int>();
             var looseGrid = loose.Select((l, i) => (l, i)).ToList();
             for (int i = 0; i < loose.Count; i++)
@@ -356,6 +357,8 @@ namespace Placemaker.Game.Suite
                     ["a"] = $"{f.Name}{(f.Ours ? " (Outgrow)" : f.Lane ? " lane" : "")} of {f.Owner.Index}", ["b"] = $"{g.Name}{(g.Ours ? " (Outgrow)" : g.Lane ? " lane" : "")} of {g.Owner.Index}",
                     ["sameHouse"] = sameOwner, ["in"] = what.Count > 0 ? string.Join("; ", what) : "nothing",
                 };
+                // two of a house's own fence lanes: the game's design (a gate, the driveway's opening), counted apart
+                if (f.Lane && g.Lane && sameOwner && bestD >= 0.5f) { houseGaps++; continue; }
                 if (bestD >= 0.5f)
                 {
                     gaps.Add(j0);
@@ -465,6 +468,7 @@ namespace Placemaker.Game.Suite
             rec["hiddenOutgrowPieces"] = hiddenOurs;
             rec["hiddenLanes"] = hiddenLanes;
             rec["gaps"] = gaps.Count;
+            rec["houseOwnGaps"] = houseGaps;
             rec["gapsByKind"] = new JObject(gaps.GroupBy(g => (string)g["kind"]).Select(g => new JProperty(g.Key, g.Count())));
             rec["gapsOverHidden"] = gaps.Count(g => ((string)g["in"]).StartsWith("hidden"));
             rec["crossings"] = crossings.Count;
@@ -478,7 +482,7 @@ namespace Placemaker.Game.Suite
             rec["overlapList"] = new JArray(overlaps.OrderByDescending(o => (double)o["m2"]).Take(20));
             Mod.Log.Info($"Placemaker lab: fence map ({label}): {bits.Count} fences ({drawn.Count} drawn, {hiddenOurs} of Outgrow's pieces and {hiddenLanes} lanes hidden by the game); "
                 + $"{gaps.Count} gaps ({string.Join(", ", gaps.GroupBy(g => (string)g["kind"]).Select(g => $"{g.Count()} {g.Key}"))}; {rec["gapsOverHidden"]} over a hidden piece), "
-                + $"{crossings.Count} crossings, {doubles.Count} doubles, {inside.Count} fences inside a garden, {overlaps.Count} gardens over each other, {openEnds.Count} other open ends");
+                + $"{crossings.Count} crossings, {doubles.Count} doubles, {houseGaps} gaps between a house's own lanes (its design), {inside.Count} fences inside a garden, {overlaps.Count} gardens over each other, {openEnds.Count} other open ends");
             foreach (var g in gaps.OrderByDescending(x => (double)x["len"]).Take(25)) Mod.Log.Info("Placemaker lab: fence map: gap " + g.ToString(Formatting.None));
             foreach (var c in crossings.Take(25)) Mod.Log.Info("Placemaker lab: fence map: crossing " + c.ToString(Formatting.None));
             foreach (var x in inside.Take(15)) Mod.Log.Info("Placemaker lab: fence map: inside " + x.ToString(Formatting.None));

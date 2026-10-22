@@ -2457,7 +2457,7 @@ namespace Placemaker.Core.Neighbours
                     if (loop) { run.Add(run[0]); runCorner.Add(true); }
                     else
                     {
-                        // the run ends half a step into what stops it; against a line, on that line's end
+                        // the run ends on the first point of what stops it (25 cm on); against a line, on that line's end
                         run.Add(pts[idx]);
                         runCorner.Add(corner[idx]);
                         SnapEnd(run, runCorner, true, before);
@@ -2521,6 +2521,9 @@ namespace Placemaker.Core.Neighbours
                 isCorner.Add(runCorner[k]);
             }
             if (pts.Count < 2) return;
+            // notches of a few centimetres in the outline (where a straight road edge meets its turning circle) smoothed away:
+            // they hid the bend there, and one piece cut across it into the fence beside
+            Unnotch(pts, isCorner, 0.15f);
             // where it turns: split into straight parts (a corner closer than a metre to the last one is passed over)
             var parts = new List<List<float2>>();
             var cur = new List<float2> { pts[0] };
@@ -2597,6 +2600,43 @@ namespace Placemaker.Core.Neighbours
                 else if (laid > 0) Add(end - dir * PieceLong, end, piece);
                 else { var mid = (at + end) * 0.5f; Add(mid - dir * (PieceLong * 0.5f), mid + dir * (PieceLong * 0.5f), piece); }
             }
+        }
+
+        /// <summary>A run's points without the ones that stray less than <paramref name="tol"/> from the line between their
+        /// neighbours kept (Douglas-Peucker; its ends always stay); what stays is a corner.</summary>
+        private static void Unnotch(List<float2> pts, List<bool> isCorner, float tol)
+        {
+            if (pts.Count < 3) return;
+            var keep = new bool[pts.Count];
+            keep[0] = keep[pts.Count - 1] = true;
+            var stack = new Stack<(int A, int B)>();
+            stack.Push((0, pts.Count - 1));
+            while (stack.Count > 0)
+            {
+                var (a, b) = stack.Pop();
+                if (b - a < 2) continue;
+                int far = -1;
+                float worst = tol;
+                for (int k = a + 1; k < b; k++)
+                {
+                    float d = DistanceToSegment(pts[k], pts[a], pts[b]);
+                    if (d > worst) { worst = d; far = k; }
+                }
+                if (far < 0) continue;
+                keep[far] = true;
+                stack.Push((a, far));
+                stack.Push((far, b));
+            }
+            int w = 0;
+            for (int k = 0; k < pts.Count; k++)
+            {
+                if (!keep[k]) continue;
+                pts[w] = pts[k];
+                isCorner[w] = true;
+                w++;
+            }
+            pts.RemoveRange(w, pts.Count - w);
+            isCorner.RemoveRange(w, isCorner.Count - w);
         }
 
         /// <summary>

@@ -4,7 +4,9 @@
 //   * a garden edge with no fence or hedge along it (its street front left out), and fences that stand there but the game
 //     hides (Overridden: drawn only when hovered);
 //   * a garden whose lawn or paving stops short of its fence (bare land inside the garden past the lot; a painted garden,
-//     with no surface of its own, is left out).
+//     with no surface of its own, is left out);
+//   * a garden, or any of Outgrow's pieces, under a deck overhead (an elevated road, path or track: an overpass) too low to
+//     grow under (lower than the look's "deckClearance": a crack), and any of its trees under or beside any deck.
 //   {"do":"lab","op":"outgrowCheck","closeups":6}
 // The record has the totals, the worst houses and a close-up of the worst spots (shot names outgrow-<kind>-<n>).
 
@@ -57,6 +59,12 @@ namespace Placemaker.Game.Suite
 
             // road, path and track surfaces (exact: the round ends too)
             var roads = new List<(float2[] Ring, bool Round, float2 Lo, float2 Hi)>();
+            // and the decks overhead (elevated roads, paths and tracks; a tunnel is no deck) in slices, each with its height
+            // above the ground: lower than the room Outgrow leaves under a deck it is a crack
+            var decks = new List<(float2[] Ring, float2 Lo, float2 Hi, float Height)>();
+            var deckPieces = new List<(float2[] Ring, float Height)>();
+            float room = NeighbourPolishSystem.Settings.Knob("deckClearance", Placemaker.Core.Neighbours.PolishLooks.Defaults["deckClearance"]);
+            var terrainHeights = _world.GetOrCreateSystemManaged<global::Game.Simulation.TerrainSystem>().GetHeightData(true);
             var pieces = new List<(float2[] Ring, bool Round)>();
             using (var q = em.CreateEntityQuery(ComponentType.ReadOnly<Edge>(), ComponentType.ReadOnly<EdgeGeometry>(), ComponentType.ReadOnly<Curve>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>()))
             using (var all = q.ToEntityArray(Allocator.Temp))
@@ -72,7 +80,18 @@ namespace Placemaker.Game.Suite
                     var comp = em.GetComponentData<Composition>(e).m_Edge;
                     if (comp == Entity.Null || !em.HasComponent<NetCompositionData>(comp)) continue;
                     var cd = em.GetComponentData<NetCompositionData>(comp);
-                    if ((cd.m_Flags.m_General & (CompositionFlags.General.Elevated | CompositionFlags.General.Tunnel)) != 0 || cd.m_Width < 1f) continue;
+                    if ((cd.m_Flags.m_General & CompositionFlags.General.Tunnel) != 0 || cd.m_Width < 1f) continue;
+                    if ((cd.m_Flags.m_General & CompositionFlags.General.Elevated) != 0)
+                    {
+                        deckPieces.Clear();
+                        RoadSurfaces.DeckPieces(em, e, p => global::Game.Simulation.TerrainUtils.SampleHeight(ref terrainHeights, p), deckPieces);
+                        foreach (var (ring, h) in deckPieces)
+                        {
+                            Poly.Bounds(ring, out var a, out var c);
+                            decks.Add((ring, a, c, h));
+                        }
+                        continue;
+                    }
                     pieces.Clear();
                     RoadSurfaces.Pieces(em, e, pieces);
                     foreach (var (ring, round) in pieces)
@@ -143,6 +162,40 @@ namespace Placemaker.Game.Suite
                     fences.Add(new OutgrowFence { Pts = new[] { a, c }, Hidden = hidden, Lo = math.min(a, c), Hi = math.max(a, c) });
                 }
 
+            // Outgrow's pieces (bushes, trees, rocks, props, fence pieces) standing in a crack (under a deck too low to grow
+            // under), under a high deck (allowed), and its trees under or within 3 m of any deck (never allowed)
+            int piecesUnderDecks = 0, piecesUnderHighDecks = 0, treesByDecks = 0;
+            var underDeckSpots = new List<(float2 At, float Area)>();
+            var underDeckNames = new Dictionary<string, int>();
+            var underHighNames = new Dictionary<string, int>();
+            bool Near((float2[] Ring, float2 Lo, float2 Hi, float Height) d, float2 p, float r) =>
+                p.x >= d.Lo.x - r && p.y >= d.Lo.y - r && p.x <= d.Hi.x + r && p.y <= d.Hi.y + r && (Poly.Contains(d.Ring, p) || (r > 0f && DistanceToRing(d.Ring, p) < r));
+            if (decks.Count > 0)
+                using (var q = em.CreateEntityQuery(ComponentType.ReadOnly<PolishPiece>(), ComponentType.ReadOnly<global::Game.Objects.Transform>(), ComponentType.ReadOnly<PrefabRef>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>()))
+                using (var all = q.ToEntityArray(Allocator.Temp))
+                    foreach (var e in all)
+                    {
+                        var p = em.GetComponentData<global::Game.Objects.Transform>(e).m_Position.xz;
+                        if (!InBox(p, p)) continue;
+                        var n = NameOf(em.GetComponentData<PrefabRef>(e).m_Prefab);
+                        if (n.IndexOf("Tree", StringComparison.OrdinalIgnoreCase) >= 0 && decks.Any(d => Near(d, p, 3f)))
+                        {
+                            treesByDecks++;
+                            if (underDeckSpots.Count < 200) underDeckSpots.Add((p, 2f));
+                        }
+                        if (decks.Any(d => d.Height < room && Near(d, p, 0f)))
+                        {
+                            piecesUnderDecks++;
+                            underDeckNames[n] = (underDeckNames.TryGetValue(n, out var c) ? c : 0) + 1;
+                            if (underDeckSpots.Count < 200) underDeckSpots.Add((p, 1f));
+                        }
+                        else if (decks.Any(d => Near(d, p, 0f)))
+                        {
+                            piecesUnderHighDecks++;
+                            underHighNames[n] = (underHighNames.TryGetValue(n, out var c) ? c : 0) + 1;
+                        }
+                    }
+
             float FenceDistance(float2 p, bool hidden)
             {
                 float best = float.MaxValue;
@@ -157,8 +210,8 @@ namespace Placemaker.Game.Suite
             // each polished house's garden
             var gardens = sys.Gardens.Where(kv => em.Exists(kv.Key) && !em.HasComponent<Deleted>(kv.Key) && sys.IsYes(kv.Key) && kv.Value != null && kv.Value.Length >= 3).ToList();
             var houses = new JArray();
-            float overRoad = 0f, overRound = 0f, open = 0f, hiddenFence = 0f, edge = 0f, bare = 0f, covered = 0f, landPastLot = 0f;
-            int overCount = 0, roundCount = 0, misfits = 0, painted = 0, considered = 0;
+            float overRoad = 0f, overRound = 0f, open = 0f, hiddenFence = 0f, edge = 0f, bare = 0f, covered = 0f, landPastLot = 0f, underDeck = 0f, underHigh = 0f;
+            int overCount = 0, roundCount = 0, misfits = 0, painted = 0, considered = 0, deckCount = 0, highCount = 0;
             var roadSpots = new List<(float2 At, float Area, bool Round)>();
             var gapSpots = new List<(float2 At, float Len)>();
             var bareSpots = new List<(float2 At, float Area)>();
@@ -191,6 +244,21 @@ namespace Placemaker.Game.Suite
                 }
                 if (hr > 0f) { overCount++; overRoad += hr; }
                 if (hrRound > 0f) { roundCount++; overRound += hrRound; }
+
+                // under decks: in a crack (too low), under a high one (allowed)
+                float hd = 0f, hh = 0f;
+                foreach (var d in decks)
+                {
+                    if (d.Hi.x < glo.x || d.Lo.x > ghi.x || d.Hi.y < glo.y || d.Lo.y > ghi.y) continue;
+                    var inter = Poly.Boolean(new[] { (IReadOnlyList<float2>)ring }, new[] { (IReadOnlyList<float2>)d.Ring }, BoolOp.Intersection, FillRule.NonZero);
+                    float area = inter.Sum(x => x.Area);
+                    if (area < 0.5f) continue;
+                    if (d.Height >= room) { hh += area; continue; }
+                    hd += area;
+                    underDeckSpots.Insert(0, (Poly.Centroid(inter.OrderByDescending(x => x.Area).First().Outer), area));
+                }
+                if (hd > 0f) { deckCount++; underDeck += hd; }
+                if (hh > 0f) { highCount++; underHigh += hh; }
 
                 // fence along every garden edge but its street front
                 float hOpen = 0f, hHidden = 0f, hEdge = 0f;
@@ -248,11 +316,11 @@ namespace Placemaker.Game.Suite
                     covered += cov;
                     if (bareCells >= 10) { misfits++; bareSpots.Add((bareSum / bareCells, bareCells)); }
                 }
-                if (hr > 0f || hOpen >= 2f || hHidden >= 2f || (!isPainted && bareCells >= 10))
+                if (hr > 0f || hd > 0f || hOpen >= 2f || hHidden >= 2f || (!isPainted && bareCells >= 10))
                     houses.Add(new JObject
                     {
                         ["house"] = $"{house.Index}:{house.Version}", ["at"] = new JArray(Math.Round(t.m_Position.x, 1), Math.Round(t.m_Position.z, 1)),
-                        ["overRoadM2"] = Math.Round(hr, 1), ["overRoundM2"] = Math.Round(hrRound, 1), ["openFenceM"] = Math.Round(hOpen, 1), ["hiddenFenceM"] = Math.Round(hHidden, 1),
+                        ["overRoadM2"] = Math.Round(hr, 1), ["overRoundM2"] = Math.Round(hrRound, 1), ["underDeckM2"] = Math.Round(hd, 1), ["underHighDeckM2"] = Math.Round(hh, 1), ["openFenceM"] = Math.Round(hOpen, 1), ["hiddenFenceM"] = Math.Round(hHidden, 1),
                         ["landPastLotM2"] = land, ["coveredM2"] = cov, ["bareM2"] = isPainted ? 0 : bareCells, ["painted"] = isPainted,
                     });
             }
@@ -261,6 +329,19 @@ namespace Placemaker.Game.Suite
             rec["overRoadM2"] = Math.Round(overRoad, 1);
             rec["gardensOverRoundEnds"] = roundCount;
             rec["overRoundEndM2"] = Math.Round(overRound, 1);
+            rec["decks"] = decks.Count;
+            rec["lowDecks"] = decks.Count(d => d.Height < room);
+            rec["deckClearance"] = room;
+            rec["deckHeights"] = decks.Count > 0 ? $"{decks.Min(d => d.Height):F1}-{decks.Max(d => d.Height):F1} m" : "";
+            rec["gardensUnderDecks"] = deckCount;
+            rec["underDeckM2"] = Math.Round(underDeck, 1);
+            rec["outgrowPiecesUnderDecks"] = piecesUnderDecks;
+            rec["outgrowPiecesUnderDecksByName"] = new JObject(underDeckNames.OrderByDescending(kv => kv.Value).Select(kv => new JProperty(kv.Key, kv.Value)));
+            rec["gardensUnderHighDecks"] = highCount;
+            rec["underHighDeckM2"] = Math.Round(underHigh, 1);
+            rec["outgrowPiecesUnderHighDecks"] = piecesUnderHighDecks;
+            rec["outgrowPiecesUnderHighDecksByName"] = new JObject(underHighNames.OrderByDescending(kv => kv.Value).Select(kv => new JProperty(kv.Key, kv.Value)));
+            rec["outgrowTreesByDecks"] = treesByDecks;
             rec["fenceEdgeM"] = Math.Round(edge, 0);
             rec["openFenceM"] = Math.Round(open, 1);
             rec["hiddenFenceM"] = Math.Round(hiddenFence, 1);
@@ -275,10 +356,17 @@ namespace Placemaker.Game.Suite
             rec["bareInsideFenceM2"] = Math.Round(bare, 0);
             rec["coveredPastLotM2"] = Math.Round(covered, 0);
             rec["landPastLotM2"] = Math.Round(landPastLot, 0);
-            rec["worst"] = new JArray(houses.OrderByDescending(h => (double)h["overRoadM2"] * 4 + (double)h["openFenceM"] + (double)h["hiddenFenceM"] + (int)h["bareM2"] * 0.2).Take(12));
+            rec["worst"] = new JArray(houses.OrderByDescending(h => ((double)h["overRoadM2"] + (double)h["underDeckM2"]) * 4 + (double)h["openFenceM"] + (double)h["hiddenFenceM"] + (int)h["bareM2"] * 0.2).Take(12));
             Mod.Log.Info($"Placemaker lab: outgrow check: {considered} gardens; {overCount} over roads ({overRoad:F1} m², {roundCount} over round ends {overRound:F1} m²); "
                 + $"fence {edge:F0} m of edges, {open:F1} m open, {hiddenFence:F1} m hidden by the game; fence lanes {lanes} ({lanesHidden} hidden), fence pieces {piecesAll} ({piecesHidden} hidden; Outgrow's {ourPieces}, {ourPiecesHidden} hidden); "
                 + $"{painted} painted gardens, {misfits} with lawn or paving short of the fence ({bare:F0} m² bare inside, {covered:F0} m² covered past the lot)");
+            if (decks.Count > 0)
+                Mod.Log.Info($"Placemaker lab: outgrow check: {decks.Count} deck pieces overhead ({decks.Min(d => d.Height):F1}-{decks.Max(d => d.Height):F1} m up; {decks.Count(d => d.Height < room)} lower than {room:F1} m: cracks); "
+                    + $"in cracks: {deckCount} gardens ({underDeck:F1} m²), {piecesUnderDecks} Outgrow pieces"
+                    + (underDeckNames.Count > 0 ? " (" + string.Join(", ", underDeckNames.OrderByDescending(kv => kv.Value).Take(8).Select(kv => $"{kv.Key} x{kv.Value}")) + ")" : "")
+                    + $"; under high decks: {highCount} gardens ({underHigh:F1} m²), {piecesUnderHighDecks} Outgrow pieces"
+                    + (underHighNames.Count > 0 ? " (" + string.Join(", ", underHighNames.OrderByDescending(kv => kv.Value).Take(8).Select(kv => $"{kv.Key} x{kv.Value}")) + ")" : "")
+                    + $"; {treesByDecks} Outgrow trees under or within 3 m of a deck");
             foreach (var h in rec["worst"]) Mod.Log.Info("Placemaker lab: outgrow check: " + h.ToString(Newtonsoft.Json.Formatting.None));
             foreach (var w in whyHidden) Mod.Log.Info("Placemaker lab: outgrow check: hidden " + w);
             rec["whyHidden"] = new JArray(whyHidden);
@@ -299,6 +387,7 @@ namespace Placemaker.Game.Suite
             }
             // "hiddenFirst": close-ups of hidden fences before anything else
             if ((bool?)step["hiddenFirst"] == true) Pick("hidden", hiddenAt, 3);
+            Pick("deck", underDeckSpots.OrderByDescending(x => x.Area).Select(x => x.At), 2);
             Pick("road", roadSpots.OrderByDescending(r => r.Round ? 1 : 0).ThenByDescending(r => r.Area).Select(r => r.At), 2);
             Pick("gap", gapSpots.OrderByDescending(g => g.Len).Select(g => g.At), 2);
             Pick("hidden", hiddenAt, 1);

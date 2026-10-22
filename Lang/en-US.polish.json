@@ -33,6 +33,8 @@
   "Placemaker.Polish.maxSlope.Tooltip": "A garden stops growing where the land gets steeper than this, so it never climbs a cliff. 80 %: only real cliffs and walls stop it. 0: no limit.",
   "Placemaker.Polish.maxRise": "Highest climb",
   "Placemaker.Polish.maxRise.Tooltip": "A garden stops growing where the land is more than this above or below its house (m). 0: no limit (the default).",
+  "Placemaker.Polish.deckClearance": "Room under overpasses",
+  "Placemaker.Polish.deckClearance.Tooltip": "A garden grows under an elevated road or a bridge only where its road is at least this high above the ground (m). Lower, it is a crack and nothing grows there. Trees never grow under one.",
   "Placemaker.Polish.wrap": "Wrap shallow lots",
   "Placemaker.Polish.wrap.Tooltip": "Two deep gardens meet behind a shallow one between them.",
   "Placemaker.Polish.closeBacks": "Close open backs",

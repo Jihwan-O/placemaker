@@ -1,6 +1,6 @@
 {
   "generatedBy": "the in-game suite from GeneratorRegistry",
-  "assembly": "0.1.1+296c26d-dirty",
+  "assembly": "0.2.0+577aa4eb-dirty",
   "categories": [
     {
       "id": "zoning",
@@ -445,12 +445,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -555,6 +591,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -1239,12 +1284,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -1349,6 +1430,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -2033,12 +2123,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -2143,6 +2269,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -2827,12 +2962,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -2937,6 +3108,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -3621,12 +3801,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -3731,6 +3947,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -4415,12 +4640,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -4525,6 +4786,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -5209,12 +5479,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -5319,6 +5625,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -6003,12 +6318,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -6113,6 +6464,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -6797,12 +7157,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -6907,6 +7303,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -7591,12 +7996,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -7701,6 +8142,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -8672,12 +9122,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -8782,6 +9268,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -9467,12 +9962,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -9577,6 +10108,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -10262,12 +10802,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -10372,6 +10948,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -11057,12 +11642,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -11167,6 +11788,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -11852,12 +12482,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -11962,6 +12628,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -12914,12 +13589,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -13024,6 +13735,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",
@@ -13874,12 +14594,48 @@
           "id": "fill",
           "kind": "Choice",
           "options": [
-            "0",
             "1",
             "2",
             "3"
           ],
-          "default": "0"
+          "default": "1"
+        },
+        {
+          "id": "parkStyle",
+          "kind": "Choice",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ],
+          "default": "2"
+        },
+        {
+          "id": "parkReach",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 300.0,
+          "step": 5.0,
+          "unit": "m",
+          "default": 60.0
+        },
+        {
+          "id": "parkCars",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 60.0
+        },
+        {
+          "id": "parkWorn",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 100.0,
+          "step": 5.0,
+          "unit": "%",
+          "default": 50.0
         },
         {
           "id": "waterGap",
@@ -13984,6 +14740,15 @@
           "step": 0.5,
           "unit": "m",
           "default": 0.0
+        },
+        {
+          "id": "deckClearance",
+          "kind": "Slider",
+          "min": 0.0,
+          "max": 40.0,
+          "step": 0.5,
+          "unit": "m",
+          "default": 7.0
         },
         {
           "id": "wrap",

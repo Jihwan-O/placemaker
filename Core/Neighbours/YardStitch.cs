@@ -143,7 +143,7 @@ namespace Placemaker.Core.Neighbours
             houses = houses.OrderBy(h => h.Id).ToArray();
             var plan = new StitchPlan();
             Feature.Clear();
-            SetBarriers(s);
+            SetBarriers(s, houses);
             var clock = System.Diagnostics.Stopwatch.StartNew();
             var stages = new List<string>();
             var allocs = new List<string>();
@@ -649,7 +649,7 @@ namespace Placemaker.Core.Neighbours
                     if (!touched[i] || plots[i] == null) continue;
                     // a garden another pass wrote is its garden (FixedGardens): what this plan would have made of it is never used
                     if (IsFixed(houses[i])) continue;
-                    var clear = ClearOfBarriers(plots[i], Lot(houses[i]), houses[i].Position, s.Knob("barrierMargin", 0.8f), WaterGap(houses[i], s));
+                    var clear = ClearOfBarriers(plots[i], Lot(houses[i]), houses[i].Position, s.Knob("barrierMargin", 0.8f), WaterGap(houses[i], s), DeckMargin(s));
                     if (clear == null) continue;
                     plots[i] = clear;
                     clipped++;
@@ -1153,6 +1153,7 @@ namespace Placemaker.Core.Neighbours
             GroundPatches(houses, plots, touched, plan, s);
             foreach (var kv in moved) if (!plan.HideLines.Contains(kv.Key)) plan.MoveLines[kv.Key] = kv.Value;
             KeepUnpolished(houses, plan);
+            TreesOffDecks(plan);
             plan.Notes.Add($"{touched.Count(t => t)} plots: {borders.Count} shared sides, {rearPairs.Count} back to back, {plan.MoveLines.Count} lines moved, {plan.HideLines.Count} hidden, {plan.Lawns.Count} lawns fitted, {plan.NewLawns.Count} new lawns, {plan.Beds.Count} beds, {plan.Bushes.Count} bushes and rocks, {plan.Paths.Count} paths");
             if (plan.Paints.Count > 0 || s.Knob("paint", 1f) > 0.5f) PlanPaint(plan, s, houses.Where(h => !h.Polished).Select(h => new Region(Ccw(Lot(h)))).ToList());
             Stage("rest");
@@ -2861,7 +2862,7 @@ namespace Placemaker.Core.Neighbours
                 if (own != null) { var c = Ccw(own); if (Meets(c)) taken.Add(c); }
                 if (kept[i] != null) { var c = Ccw(kept[i]); if (Meets(c)) taken.Add(c); }
             }
-            float margin = s.Knob("barrierMargin", 0.8f);
+            float margin = s.Knob("barrierMargin", 0.8f), deck = DeckMargin(s);
             // water: kept the widest water gap of these gardens off
             float wet = math.max(margin, want.Max(i => WaterGap(houses[i], s)));
             if (s_barriers != null)
@@ -2869,10 +2870,11 @@ namespace Placemaker.Core.Neighbours
                 {
                     var (blo, bhi, ring) = s_barriers[k];
                     bool water = s_barrierKind[k] == WaterKind;
+                    float m = s_barrierKind[k] == DeckKind ? deck : margin;
                     // grown by the margin (a sharp corner's miter reaches out up to four times it), water by its gap
-                    float grow = water ? wet + 0.5f : margin * 4f + 0.5f;
+                    float grow = water ? wet + 0.5f : m * 4f + 0.5f;
                     if (bhi.x + grow < rlo.x || blo.x - grow > rhi.x || bhi.y + grow < rlo.y || blo.y - grow > rhi.y) continue;
-                    foreach (var g in water ? GrownWater(ring, wet) : Grown(ring, margin)) { var c = Ccw(g); if (Meets(c)) taken.Add(c); }
+                    foreach (var g in water ? GrownWater(ring, wet) : Grown(ring, m)) { var c = Ccw(g); if (Meets(c)) taken.Add(c); }
                 }
             var gaps = Poly.Boolean(RingsOf(reached), taken, BoolOp.Difference, FillRule.NonZero);
             int filled = 0;
@@ -3204,6 +3206,34 @@ namespace Placemaker.Core.Neighbours
         [ThreadStatic] private static Dictionary<(float2[] Ring, float Gap), List<float2[]>> s_grownWater;
         /// <summary>StitchSettings.BarrierKinds: water.</summary>
         private const int WaterKind = 2;
+        /// <summary>StitchSettings.BarrierKinds: a deck overhead (an elevated road, path or track, a bridge) or a pillar under
+        /// one. Where it is lower than the knob "deckClearance" (StitchSettings.BarrierHeights) the ground under it is a crack:
+        /// never grown onto nor joined across, like a lot, and kept a deck gap further off than a road; no garden faces it as
+        /// its street nor paints a road band along it. Higher, gardens grow under it as if it were not there (but no tree).</summary>
+        public const int DeckKind = 3;
+
+        /// <summary>How far a garden keeps off a deck overhead too low to grow under: the barrier margin and the deck gap.</summary>
+        private static float DeckMargin(StitchSettings s) => s.Knob("barrierMargin", 0.8f) + math.max(0f, s.Knob("deckGap", 1.5f));
+
+        // every deck overhead of the plan, high or low (a tree keeps off all of them); per plan, on its thread
+        [ThreadStatic] private static List<(float2 Min, float2 Max, float2[] Ring)> s_decks;
+        /// <summary>How far a tree keeps off a deck overhead (its crown never reaches under it, m).</summary>
+        private const float TreeOffDeck = 3f;
+
+        private static bool IsTree(int kind) => kind >= FirstStreetTree && kind < FirstStreetTree + StreetTreeCount;
+
+        /// <summary>
+        /// No tree under a deck overhead nor within a crown of one, however high it is ("a huge tree doesn't belong under a
+        /// highway, even if it's a really tall highway"): the ground under a high deck is a garden's, its trees go.
+        /// </summary>
+        private static void TreesOffDecks(StitchPlan plan)
+        {
+            if (s_decks == null || s_decks.Count == 0) return;
+            int removed = plan.Bushes.RemoveAll(b => IsTree(b.Kind) && s_decks.Any(d =>
+                b.Position.x >= d.Min.x - TreeOffDeck && b.Position.x <= d.Max.x + TreeOffDeck && b.Position.y >= d.Min.y - TreeOffDeck && b.Position.y <= d.Max.y + TreeOffDeck
+                && (Poly.Contains(d.Ring, b.Position) || DistanceToRing(d.Ring, b.Position) < TreeOffDeck)));
+            if (removed > 0) plan.Notes.Add($"{removed} trees left out under decks overhead");
+        }
 
         /// <summary>Water grown by <paramref name="gap"/> with round corners (a smooth line however the water was sampled).</summary>
         private static List<float2[]> GrownWater(float2[] ring, float gap)
@@ -3317,20 +3347,33 @@ namespace Placemaker.Core.Neighbours
             return math.min(math.min(PointSeg(p, r, s), PointSeg(q, r, s)), math.min(PointSeg(r, p, q), PointSeg(s, p, q)));
         }
 
-        private static void SetBarriers(StitchSettings s)
+        private static void SetBarriers(StitchSettings s, IReadOnlyList<StitchHouse> houses)
         {
             s_barriers = new List<(float2, float2, float2[])>();
             s_barrierKind = new List<int>();
             s_barrierGroup = new List<long>();
+            s_decks = new List<(float2, float2, float2[])>();
             s_grown = new Dictionary<float2[], (float, List<float2[]>)>(SameRing.Instance);
             s_grownWater = new Dictionary<(float2[], float), List<float2[]>>();
             if (s.Barriers == null) return;
+            // the room a deck must leave to be grown under: the strictest look of the plan's houses (one rule for a patch of
+            // town: a garden never gets land under a deck its neighbour's look calls a crack)
+            float room = s.Knob("deckClearance", PolishLooks.Defaults["deckClearance"]);
+            foreach (var h in houses) room = math.max(room, K(h, s, "deckClearance", room));
             for (int k = 0; k < s.Barriers.Count; k++)
             {
                 var r = s.Barriers[k];
                 if (r == null || r.Length < 3 || Poly.Area(r) < 0.5f) continue;
                 var ring = Ccw(r);
-                s_barriers.Add((ring.Aggregate(new float2(float.MaxValue), math.min), ring.Aggregate(new float2(float.MinValue), math.max), ring));
+                var lo = ring.Aggregate(new float2(float.MaxValue), math.min);
+                var hi = ring.Aggregate(new float2(float.MinValue), math.max);
+                if (s.BarrierKinds != null && k < s.BarrierKinds.Count && s.BarrierKinds[k] == DeckKind)
+                {
+                    s_decks.Add((lo, hi, ring));
+                    // high enough: the ground under it is open land
+                    if (s.BarrierHeights != null && k < s.BarrierHeights.Count && s.BarrierHeights[k] >= room) continue;
+                }
+                s_barriers.Add((lo, hi, ring));
                 s_barrierKind.Add(s.BarrierKinds != null && k < s.BarrierKinds.Count ? s.BarrierKinds[k] : 0);
                 // a barrier with no group is one of its own (a negative number no group uses)
                 s_barrierGroup.Add(s.BarrierGroups != null && k < s.BarrierGroups.Count ? s.BarrierGroups[k] : -1L - k);
@@ -3525,17 +3568,16 @@ namespace Placemaker.Core.Neighbours
         }
 
         /// <summary>
-        /// The plot minus every road, path, track and other building near it (grown by <paramref name="margin"/>) and the water
-        /// (grown by <paramref name="waterGap"/>, round: a smooth line), never cutting the house's own lot; the part that holds the
-        /// house. Null when nothing is in the way.
+        /// The plot minus every road, path, track and other building near it (grown by <paramref name="margin"/>), every deck
+        /// overhead (grown by <paramref name="deckMargin"/>) and the water (grown by <paramref name="waterGap"/>, round: a smooth
+        /// line), never cutting the house's own lot; the part that holds the house. Null when nothing is in the way.
         /// </summary>
-        private static float2[] ClearOfBarriers(float2[] plot, float2[] lot, float2 house, float margin, float waterGap)
+        private static float2[] ClearOfBarriers(float2[] plot, float2[] lot, float2 house, float margin, float waterGap, float deckMargin)
         {
-            // (grown by the margin a barrier reaches at most four margins out, a miter's limit: one further away is never grown)
-            float reach = margin * 4f + 0.01f, wet = math.max(margin, waterGap);
+            float wet = math.max(margin, waterGap), far = math.max(math.max(margin, deckMargin), wet);
             Poly.Bounds(plot, out var plo, out var phi);
             var grown = new List<IReadOnlyList<float2>>();
-            foreach (int k in BarriersIn(plo - (math.max(margin, wet) + 0.5f), phi + (math.max(margin, wet) + 0.5f)))
+            foreach (int k in BarriersIn(plo - (far + 0.5f), phi + (far + 0.5f)))
             {
                 var (blo, bhi, b) = s_barriers[k];
                 if (s_barrierKind[k] == WaterKind)
@@ -3543,10 +3585,12 @@ namespace Placemaker.Core.Neighbours
                     foreach (var g in GrownWater(b, wet)) if (Overlaps(plot, g)) grown.Add(Ccw(g));
                     continue;
                 }
-                float m = margin + 0.5f;
+                float bm = s_barrierKind[k] == DeckKind ? deckMargin : margin;
+                // (grown by the margin a barrier reaches at most four margins out, a miter's limit: one further away is never grown)
+                float reach = bm * 4f + 0.01f, m = bm + 0.5f;
                 if (bhi.x < plo.x - m || blo.x > phi.x + m || bhi.y < plo.y - m || blo.y > phi.y + m) continue;
-                if (!Overlaps(plot, b) && !(Within(plot, b, reach) && Grown(b, margin).Any(g => Overlaps(plot, g)))) continue;
-                foreach (var g in Grown(b, margin)) grown.Add(Ccw(g));
+                if (!Overlaps(plot, b) && !(Within(plot, b, reach) && Grown(b, bm).Any(g => Overlaps(plot, g)))) continue;
+                foreach (var g in Grown(b, bm)) grown.Add(Ccw(g));
             }
             if (grown.Count == 0) return null;
             var left = Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(plot) }, grown, BoolOp.Difference, FillRule.NonZero);

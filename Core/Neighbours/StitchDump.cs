@@ -75,6 +75,7 @@ namespace Placemaker.Core.Neighbours
                 set.Set("barriers", bs);
                 if (s.BarrierKinds != null) { var ks = JsonValue.Arr(); foreach (var k in s.BarrierKinds) ks.Add(k); set.Set("kinds", ks); }
                 if (s.BarrierGroups != null) { var gs = JsonValue.Arr(); foreach (var g in s.BarrierGroups) gs.Add(g.ToString(CultureInfo.InvariantCulture)); set.Set("groups", gs); }
+                if (s.BarrierHeights != null) { var hts = JsonValue.Arr(); foreach (var h in s.BarrierHeights) hts.Add(h); set.Set("heights", hts); }
             }
             var doc = JsonValue.Obj().Set("houses", hs).Set("settings", set);
             if (ground != null)
@@ -124,6 +125,7 @@ namespace Placemaker.Core.Neighbours
                 s.Barriers = set["barriers"].Items.Select(Ring).ToList();
                 if (set.Has("kinds")) s.BarrierKinds = set["kinds"].Items.Select(k => (int)k.AsNumber()).ToList();
                 if (set.Has("groups")) s.BarrierGroups = set["groups"].Items.Select(L).ToList();
+                if (set.Has("heights")) s.BarrierHeights = set["heights"].Items.Select(F).ToList();
             }
             if (doc.Has("ground"))
             {

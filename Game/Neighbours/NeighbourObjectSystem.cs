@@ -56,6 +56,19 @@ namespace Placemaker.Game.Neighbours
         }
         private EntityArchetype _definition;
 
+        /// <summary>A hair under the ground for a piece whose prefab takes zone cells: a car park's stall marks (the game
+        /// gives an object with lanes of its own OccupyZone) kept land zoned under a car park from ever growing a building
+        /// (the user, 22 Oct; the game runner: 108 of 108 cells zoned inside shop yards taken by ParkingLotDecal01). The game
+        /// skips an object below the ground when it marks cells taken (CellOccupyJobs); it is drawn the same
+        /// (BuildService.DecalSink).</summary>
+        public const float ZoneSink = -0.01f;
+        /// <summary>Off: such pieces laid on the ground as before (the game runner's lab op zoneSink: a city saved before).</summary>
+        public static bool SinkZonePieces = true;
+
+        public static bool TakesZone(EntityManager em, Entity prefab) =>
+            em.HasComponent<ObjectGeometryData>(prefab) && !em.HasComponent<BuildingData>(prefab)
+            && (em.GetComponentData<ObjectGeometryData>(prefab).m_Flags & global::Game.Objects.GeometryFlags.OccupyZone) != 0;
+
         [Preserve]
         protected override void OnCreate()
         {
@@ -96,6 +109,7 @@ namespace Placemaker.Game.Neighbours
                         m_ParentMesh = -1, m_Position = pos, m_Rotation = rot, m_LocalPosition = pos, m_LocalRotation = rot,
                         m_Scale = new float3(1f), m_Intensity = 1f, m_Probability = 100, m_PrefabSubIndex = -1,
                         m_Age = 0.425f,   // grown, not a sapling (ToolUtils.GetRandomAge stage 2)
+                        m_Elevation = SinkZonePieces && TakesZone(EntityManager, prefab) ? ZoneSink : 0f,
                     });
                     NeighbourPolishSystem.PendingTags.Add(new NeighbourPolishSystem.PendingTag { Owner = r.Owner, Prefab = prefab, At = r.Position, Kind = PolishPieceKind.Garden, Frame = NeighbourPolishSystem.LotFrame });
                     TotalMade++;

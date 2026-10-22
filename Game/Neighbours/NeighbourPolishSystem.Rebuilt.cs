@@ -30,7 +30,8 @@ namespace Placemaker.Game.Neighbours
 {
     public sealed partial class NeighbourPolishSystem
     {
-        private EntityQuery _rebuiltLots, _lostPieces;
+        private EntityQuery _rebuiltLots, _lostPieces, _standingPieces;
+        private bool _sinkPending;
         // how often a house was refilled lately (frames in which the game took pieces of it): one whose pieces the game takes
         // away frame after frame (it never should: renters come and go a few times) stops being refilled for a while, so it
         // can never cost every frame
@@ -56,6 +57,38 @@ namespace Placemaker.Game.Neighbours
             _healPending = true;
             _healQueue = null;
             _healLooked = _healFound = 0;
+            _sinkPending = true;
+        }
+
+        /// <summary>After a load: our pieces an older build laid on the ground that take zone cells (a car park's stall marks)
+        /// set a hair under it, as new ones are (NeighbourObjectSystem.ZoneSink), so land zoned under them grows buildings.</summary>
+        public void SinkOldPiecesSoon() => _sinkPending = true;
+
+        private void SinkOldPieces()
+        {
+            if (!_sinkPending) return;
+            _sinkPending = false;
+            int sunk = 0;
+            var takes = new Dictionary<Entity, bool>();
+            using (var all = _standingPieces.ToEntityArray(Allocator.Temp))
+                foreach (var e in all)
+                {
+                    var prefab = EntityManager.GetComponentData<PrefabRef>(e).m_Prefab;
+                    if (!takes.TryGetValue(prefab, out var t)) takes[prefab] = t = NeighbourObjectSystem.TakesZone(EntityManager, prefab);
+                    if (!t) continue;
+                    if (EntityManager.HasComponent<global::Game.Objects.Elevation>(e))
+                    {
+                        var el = EntityManager.GetComponentData<global::Game.Objects.Elevation>(e);
+                        if (el.m_Elevation < 0f) continue;
+                        el.m_Elevation = NeighbourObjectSystem.ZoneSink;
+                        EntityManager.SetComponentData(e, el);
+                    }
+                    else EntityManager.AddComponentData(e, new global::Game.Objects.Elevation(NeighbourObjectSystem.ZoneSink, 0));
+                    // the game reads the cells under it again (CellCheckSystem: updated objects' bounds)
+                    EntityManager.AddComponent<Updated>(e);
+                    sunk++;
+                }
+            if (sunk > 0) Mod.Log.Info($"Placemaker neighbourhood polish: {sunk} car park marks and other pieces that kept zoned land from growing set a hair under the ground");
         }
 
         /// <summary>A few hundred outgrown buildings of the city just loaded: the ones with nothing they should have
@@ -91,6 +124,11 @@ namespace Placemaker.Game.Neighbours
         private void CreateRebuiltQueries()
         {
             // a polished building the game changed this frame (built, levelled up, moved, rebuilt)
+            _standingPieces = GetEntityQuery(new EntityQueryDesc
+            {
+                All = new[] { ComponentType.ReadOnly<PolishPiece>(), ComponentType.ReadOnly<PrefabRef>(), ComponentType.ReadOnly<global::Game.Objects.Transform>() },
+                None = new[] { ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<Deleted>() },
+            });
             _rebuiltLots = GetEntityQuery(new EntityQueryDesc
             {
                 All = new[] { ComponentType.ReadOnly<global::Game.Buildings.Building>(), ComponentType.ReadOnly<PolishedLot>(), ComponentType.ReadOnly<PrefabRef>(), ComponentType.ReadOnly<Updated>() },

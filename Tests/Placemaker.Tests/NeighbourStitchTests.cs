@@ -228,6 +228,86 @@ namespace Placemaker.Tests
             Assert.False(Overlap(pa, road), "the garden overlaps the road");
         }
 
+        [Theory]
+        [InlineData(20f)]
+        [InlineData(30f)]
+        [InlineData(40f)]
+        public void Back_gardens_reach_a_street_behind_them_at_an_angle_with_no_grass_triangle_left(float degrees)
+        {
+            // the user's row (22 Oct): long back gardens down to a second street at an angle. Each garden narrows toward its
+            // slanted end and was cut square there as a spike: a grass triangle between every back fence and the sidewalk
+            float tan = math.tan(math.radians(degrees));
+            var row = new[] { -24f, -8f, 8f, 24f }.Select((x, k) => House(k + 1, new float2(x, 0f), new float2(0f, 1f))).ToArray();
+            // the near kerb 6 m behind the left lot's back, falling away to the right; the street 14 m wide
+            float2 Kerb(float x) => new float2(x, -30f - (x + 32f) * tan);
+            var down = new float2(0f, -14f / math.cos(math.radians(degrees)));
+            var road = new[] { Kerb(-80f) + down, Kerb(80f) + down, Kerb(80f), Kerb(-80f) };
+            var s = MiddleLine().WithBarriers(new List<float2[]> { road });
+            var plan = YardStitch.Plan(row, s);
+            foreach (var h in row)
+            {
+                Assert.True(plan.Plots.TryGetValue(h.Id, out var plot), $"{h.Id} is given a garden");
+                Assert.False(Overlap(plot, road), $"{h.Id}'s garden lies on the street");
+                foreach (var o in row.Where(o => o.Id > h.Id && plan.Plots.ContainsKey(o.Id)))
+                    Assert.False(Overlap(plot, plan.Plots[o.Id]), $"the gardens of {h.Id} and {o.Id} overlap");
+            }
+            // every bit of the kerb behind the row has a garden right beside it (the street's margin, 0.8 m, nothing more)
+            for (float x = -31.5f; x <= 31.5f; x += 0.5f)
+            {
+                var p = Kerb(x);
+                float d = plan.Plots.Values.Min(r => Poly.Contains(r, p) ? 0f : DistanceToRing(r, p));
+                Assert.True(d < 1f, $"{degrees}°: the kerb at x {x:F1} is {d:F1} m from the nearest garden ({string.Join(" | ", plan.Notes)})");
+            }
+            var r = FenceCheck.Of(row, plan, s);
+            Assert.True(r.Gaps.Count == 0 && r.Crossings.Count == 0, $"{degrees}°: " + r + ": " + string.Join("; ", r.Gaps.Select(g => $"{g.Kind} {g.Len:F1} at {g.At}")));
+            // and the gardens' fences run along the sidewalk, all the way
+            var drawn = FenceCheck.Drawn(row, plan);
+            for (float x = -30f; x <= 30f; x += 1f)
+            {
+                var p = Kerb(x);
+                Assert.True(drawn.Any(b => DistanceToSegment(p, b.A, b.B) < 1.5f), $"{degrees}°: no fence along the kerb at x {x:F0}");
+            }
+        }
+
+        [Theory]
+        [InlineData(24f)]
+        [InlineData(16f)]
+        public void Behind_a_walkway_two_gardens_meet_on_one_fence_instead_of_running_side_by_side(float bHalfDepth)
+        {
+            // the user (22 Oct, the back street): a walkway between two houses, and behind it the two gardens' hedges ran on side
+            // by side down to the street, a grass strip between ("who would want two fences running parallel to each other?")
+            var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+            var b = House(2, new float2(21f, 24f - bHalfDepth), new float2(0f, 1f));
+            b.HalfLot = new float2(8f, bHalfDepth);
+            var s = MiddleLine();
+            s.Extra["alleys"] = 1f;
+            s.Extra["alleyChance"] = 100f;
+            // their street, and a street behind them both: their gardens reach it
+            s = s.WithBarriers(new List<float2[]> { Strip(-60f, 24.5f, 80f, 38f), Strip(-60f, -74f, 80f, -60f) });
+            var houses = new[] { a, b };
+            var plan = YardStitch.Plan(houses, s);
+            Assert.Contains(plan.Notes, x => x.Contains("a walkway between them"));
+            float end = 24f - 2f * bHalfDepth;   // the walkway ends at the shallower lot's back
+            // the walkway beside the houses stays (the strip between the lots, x 8 to 13)
+            Assert.DoesNotContain(plan.Plots.Values, r => Poly.Contains(r, new float2(10.5f, end + 4f)));
+            // behind it the strip is the two gardens', split down the middle
+            Assert.True(Poly.Contains(plan.Plots[1], new float2(9.5f, end - 6f)), "the left half behind the walkway is not 1's");
+            Assert.True(Poly.Contains(plan.Plots[2], new float2(11.5f, end - 6f)), "the right half behind the walkway is not 2's");
+            var drawn = FenceCheck.Drawn(houses, plan);
+            // no fence runs on along either lot's edge behind the walkway: one fence down the middle
+            foreach (var bit in drawn)
+                foreach (float x in new[] { 8f, 13f })
+                    if (math.abs(bit.A.x - x) < 0.8f && math.abs(bit.B.x - x) < 0.8f && math.abs(bit.A.y - bit.B.y) > 0.5f)
+                        Assert.True(math.min(bit.A.y, bit.B.y) > end - 1.5f, $"a fence on x {x} runs on behind the walkway: {bit.A} {bit.B} ({bit.Name})");
+            for (float y = end - 3f; y > -55f; y -= 1f)
+                Assert.True(drawn.Any(bit => DistanceToSegment(new float2(10.5f, y), bit.A, bit.B) < 0.8f), $"no fence on the middle line at y {y:F0}");
+            // and one across the walkway's end
+            for (float x = 9f; x <= 12f; x += 1f)
+                Assert.True(drawn.Any(bit => DistanceToSegment(new float2(x, end), bit.A, bit.B) < 0.8f), $"the walkway's end is open at x {x:F0}");
+            var r = FenceCheck.Of(houses, plan, s);
+            Assert.True(r.Gaps.Count == 0 && r.Crossings.Count == 0, r + ": " + string.Join("; ", r.Gaps.Select(g => $"{g.Kind} {g.Len:F1} at {g.At}")));
+        }
+
         [Fact]
         public void A_lone_garden_balloons_into_open_land_as_far_as_its_look_lets_it_but_never_onto_a_road()
         {

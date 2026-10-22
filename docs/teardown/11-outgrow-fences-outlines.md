@@ -77,7 +77,20 @@ other: the car park shrinks back behind it.
 Car parks also reach in front of their lots now where the street curves away (`frontReach`, 15 m, car parks and paved yards
 only: gardens' side fences carried forward met the neighbours' with gaps, 18 → 32 in a replay).
 
-## 5. Tools
+## 5. Grass triangles where back gardens meet a street at an angle (22 Oct)
+
+The user, a row of long back gardens running down to a second street at about 40°: "WHERE DO THESE COME FROM?", a triangle of
+plain grass between every back fence and the sidewalk, the back fences stepping in a sawtooth. **[P]** The gardens did reach
+the street (the back hugs it, `Hug`, e 2: a line along the kerb). Then the no-spikes rule (`NarrowsAt`, made for the inside of
+a curve, where a garden's sides close in behind it) measured each garden's width across its depth: a garden ending along a
+slanted street gets narrower toward that end, under half its lot's width before it reaches the far corner, and was cut square
+there. The part past the cut was nobody's: one triangle per lot. Fix: the spike test measures the garden as if the street it
+backs onto were not there (that hug line, and a free side hugging the same street: a row's end lot meets it twice), no further
+back than the garden really reaches; its sides still count, so the inside of a curve keeps its rule. Knob `streetEnd` (1; 0 is
+the old cut, for comparisons). Test: `NeighbourStitchTests.Back_gardens_reach_a_street_behind_them_at_an_angle_...` (20°,
+30°, 40°: the kerb within 1 m of a garden all along, fences along it, no gaps or crossings). Runner: `outgrow-back-street.json`.
+
+## 6. Tools
 
 * `{"do":"lab","op":"fenceMap"}` (`Game/Suite/SuiteLab.FenceMap.cs`): every fence and hedge, garden, road and building near the
   build (or `"street"`, or `"box": "gardens"` in a loaded city); gaps, crossings, doubles, fences inside a garden, gardens over

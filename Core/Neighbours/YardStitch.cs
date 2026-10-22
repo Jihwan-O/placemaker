@@ -447,6 +447,7 @@ namespace Placemaker.Core.Neighbours
             // a polished garden with a side or back nobody else's: it reaches out to a road, path, track or building this near
             // and hugs it (the line of its edge, just clear of it); its own lines on that side follow (fences, below)
             var hugs = new List<(int I, int E, Cut Cut)>();
+            var backHug = new Cut[n];   // the street (road, path, track) a garden's back reaches and ends along
             for (int i = 0; i < n; i++)
                 {
                     if (!Pol(i)) continue;
@@ -470,6 +471,7 @@ namespace Placemaker.Core.Neighbours
                         extra[i, e] = reach + 2f;
                         cuts[i].Add(hcut);
                         hugs.Add((i, e, hcut));
+                        if (e == 2) backHug[i] = hcut;
                         touched[i] = true;
                     }
                 }
@@ -487,6 +489,10 @@ namespace Placemaker.Core.Neighbours
             var plots = new float2[n][];
             // first every garden as far as it reaches (its neighbours' middle lines cut it already)
             var raw = new List<float2>[n];
+            // the same garden not ended by the street behind it: what the spike test below measures (a street at an angle to the
+            // lot's back narrows the garden toward its end, which is no spike)
+            var unended = new List<float2>[n];
+            bool streetEnd = s.Knob("streetEnd", 1f) > 0.5f;
             for (int i = 0; i < n; i++)
             {
                 var h = houses[i];
@@ -501,10 +507,18 @@ namespace Placemaker.Core.Neighbours
                 // land (a car park, a yard): a garden's side fences carried in front of the lot met the neighbours' fences there
                 // with gaps (replay of a test town's passes: 18 gaps, 32 with gardens reaching forward)
                 float zf = h.HalfLot.y + (HardLand(h, s) && FacesStreet(h) ? K(h, s, "frontReach", 15f) : 0f);
-                var poly = new List<float2> { h.ToWorld(new float2(xl, zb)), h.ToWorld(new float2(xr, zb)), h.ToWorld(new float2(xr, zf)), h.ToWorld(new float2(xl, zf)) };
+                var rect = new List<float2> { h.ToWorld(new float2(xl, zb)), h.ToWorld(new float2(xr, zb)), h.ToWorld(new float2(xr, zf)), h.ToWorld(new float2(xl, zf)) };
+                var poly = rect;
                 foreach (var c in cuts[i]) poly = ClipHalfPlane(poly, c.P, c.D, c.Keep ?? FrontMid(h));
                 raw[i] = poly;
+                if (!streetEnd || backHug[i] == null) continue;
+                // (a free side hugging the same street: a row's end lot meets it with its side and its back)
+                var o = rect;
+                foreach (var c in cuts[i]) if (!AlongStreet(c, backHug[i])) o = ClipHalfPlane(o, c.P, c.D, c.Keep ?? FrontMid(h));
+                unended[i] = o;
             }
+            static bool AlongStreet(Cut c, Cut street) =>
+                c == street || math.abs(c.D.x * street.D.y - c.D.y * street.D.x) < 0.09f && math.abs(street.D.x * (c.P.y - street.P.y) - street.D.y * (c.P.x - street.P.x)) < 2f;
             var rawLo = new float2[n];
             var rawHi = new float2[n];
             for (int i = 0; i < n; i++)
@@ -533,18 +547,22 @@ namespace Placemaker.Core.Neighbours
                     var nrm = math.distance(pa, pb) > 0.05f ? math.normalize(pb - pa) : math.normalizesafe(o.Position - h.Position);
                     if (math.distance(pa, pb) <= 0.05f) mid = (h.Position + o.Position) * 0.5f;
                     poly = ClipHalfPlane(poly, mid, new float2(-nrm.y, nrm.x), h.Position);
+                    if (unended[i] != null) unended[i] = ClipHalfPlane(unended[i], mid, new float2(-nrm.y, nrm.x), h.Position);
                 }
                 plots[i] = poly.Count >= 3 && Poly.Area(poly) > 1f ? poly.ToArray() : lot;
             }
             // a garden never runs out into a spike (on the inside of a curve its sides close in behind it): it ends where it has
-            // become narrower than half its lot (at least minGardenWidth); the land past that is nobody's (FillGaps never sees it)
+            // become narrower than half its lot (at least minGardenWidth); the land past that is nobody's (FillGaps never sees it).
+            // Only its sides count: a garden that ends along a street behind it at an angle narrows toward that end too, and was
+            // cut square there, a grass triangle left between every back fence and the sidewalk (the user, 22 Oct: "WHERE DO
+            // THESE COME FROM?"). Its end is the street: measured as if the street were not there, as far back as it reaches
             int narrowed = 0;
             for (int i = 0; i < n; i++)
             {
                 if (!touched[i] || plots[i] == null || raw[i] == null) continue;
                 var h = houses[i];
                 float minW = math.max(K(h, s, "minGardenWidth", 8f), h.HalfLot.x);
-                float? z = NarrowsAt(plots[i], h, minW);
+                float? z = unended[i] != null && unended[i].Count >= 3 ? NarrowsAt(unended[i], h, minW, plots[i].Min(p => math.dot(p - h.Position, h.Forward))) : NarrowsAt(plots[i], h, minW);
                 if (z == null) continue;
                 var p = h.ToWorld(new float2(0f, z.Value));
                 var cutPlot = ClipHalfPlane(plots[i].ToList(), p, h.Right, h.Position);
@@ -2116,8 +2134,9 @@ namespace Placemaker.Core.Neighbours
         /// Going back from the back of the house's lot, the first depth (local z) where the garden is narrower than minW across
         /// (and stays so for 3 m: a fence corner is no spike); null when it never gets that narrow.
         /// </summary>
-        private static float? NarrowsAt(IReadOnlyList<float2> plot, StitchHouse h, float minW)
+        private static float? NarrowsAt(IReadOnlyList<float2> plot, StitchHouse h, float minW, float until = float.MinValue)
         {
+            // (until: no further back than this, the house's local z: where the garden really ends)
             float zMin = float.MaxValue;
             var local = new float2[plot.Count];
             for (int k = 0; k < plot.Count; k++)
@@ -2126,6 +2145,7 @@ namespace Placemaker.Core.Neighbours
                 local[k] = new float2(math.dot(d, h.Right), math.dot(d, h.Forward));
                 zMin = math.min(zMin, local[k].y);
             }
+            zMin = math.max(zMin, until);
             float z0 = -h.HalfLot.y;
             if (zMin > z0 - 4f) return null;
             float? start = null;

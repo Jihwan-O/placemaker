@@ -36,7 +36,6 @@
       "id": "yard-rebuild",
       "on": "yard",
       "steps": [
-        { "do": "camera", "target": "build", "view": "oblique", "shot": "yard-loaded" },
         { "do": "edit", "build": true },
         { "do": "preset", "preset": "depot" },
         { "do": "build" },

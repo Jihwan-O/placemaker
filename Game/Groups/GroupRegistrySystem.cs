@@ -36,6 +36,7 @@ namespace Placemaker.Game.Groups
         private readonly Dictionary<int, List<string>> _missing = new Dictionary<int, List<string>>();
         private readonly List<int> _allIds = new List<int>();
         private readonly Dictionary<int, Entity> _owners = new Dictionary<int, Entity>();
+        private readonly HashSet<int> _duplicateWarned = new HashSet<int>();
 
         /// <summary>For Harmony patches (static context, main thread only).</summary>
         internal static GroupRegistrySystem Instance { get; private set; }
@@ -117,7 +118,7 @@ namespace Placemaker.Game.Groups
 
         private void ClearCaches()
         {
-            _records.Clear(); _decoded.Clear(); _members.Clear(); _missing.Clear(); _allIds.Clear(); _owners.Clear();
+            _records.Clear(); _decoded.Clear(); _members.Clear(); _missing.Clear(); _allIds.Clear(); _owners.Clear(); _duplicateWarned.Clear();
             _dirty = true;
             _missingCheckedCatalogVersion = -1;
             Bump();
@@ -412,7 +413,8 @@ namespace Placemaker.Game.Groups
                     if (g.GroupId <= 0) continue;
                     if (_records.ContainsKey(g.GroupId))
                     {
-                        Mod.Log.Warn($"Placemaker: duplicate group id {g.GroupId}; keeping the first record.");
+                        // once per id: the index is rebuilt every frame something changes (issue #6: thousands of lines)
+                        if (_duplicateWarned.Add(g.GroupId)) Mod.Log.Warn($"Placemaker: duplicate group id {g.GroupId}; keeping the first record.");
                         continue;
                     }
                     _records[g.GroupId] = records[i];
@@ -587,6 +589,7 @@ namespace Placemaker.Game.Groups
         /// </summary>
         private void PostLoadRepair()
         {
+            DropStaleRecords();
             _dirty = true;
             EnsureIndex();
             int orphans = 0;
@@ -645,6 +648,92 @@ namespace Placemaker.Game.Groups
             SyncParkStats();
             Mod.Log.Info($"Placemaker loaded {_records.Count} groups.");
             Bump();
+        }
+
+        /// <summary>
+        /// (GitHub issue #6) A city saved after it was loaded a second time in one game (builds before OwnEntityClearSystem)
+        /// holds two records of each of its groups; one saved after another city was loaded holds that city's records too.
+        /// The copies point at nothing (their owner lot, carrier and companion were the earlier load's) and every member tag
+        /// fits both. Per id the record with live references stays (on a tie, the one whose outline holds more of the
+        /// members); the others go, and so does every record no member carries. Destroyed outright, never removed: a
+        /// removal would take the members with it.
+        /// </summary>
+        private void DropStaleRecords()
+        {
+            var byId = new Dictionary<int, List<Entity>>();
+            using (var records = _recordQuery.ToEntityArray(Allocator.Temp))
+                for (int i = 0; i < records.Length; i++)
+                {
+                    int id = EntityManager.GetComponentData<PlacemakerGroup>(records[i]).GroupId;
+                    if (!byId.TryGetValue(id, out var list)) byId[id] = list = new List<Entity>();
+                    list.Add(records[i]);
+                }
+            if (byId.Count == 0) return;
+            var members = new Dictionary<int, List<Entity>>();
+            using (var entities = _memberQuery.ToEntityArray(Allocator.Temp))
+            using (var tags = _memberQuery.ToComponentDataArray<PlacemakerMember>(Allocator.Temp))
+                for (int i = 0; i < entities.Length; i++)
+                {
+                    if (!members.TryGetValue(tags[i].GroupId, out var list)) members[tags[i].GroupId] = list = new List<Entity>();
+                    list.Add(entities[i]);
+                }
+            var drop = new List<Entity>();
+            int copies = 0, empty = 0;
+            foreach (var kv in byId)
+            {
+                if (!members.TryGetValue(kv.Key, out var own))
+                {
+                    drop.AddRange(kv.Value);
+                    empty += kv.Value.Count;
+                    continue;
+                }
+                if (kv.Value.Count == 1) continue;
+                Entity keep = Entity.Null;
+                int bestRefs = -1, bestInside = -1;
+                foreach (var r in kv.Value)
+                {
+                    int refs = LiveReferences(r), inside = MembersInsideOutline(r, own);
+                    if (refs > bestRefs || (refs == bestRefs && inside > bestInside)) { keep = r; bestRefs = refs; bestInside = inside; }
+                }
+                foreach (var r in kv.Value) if (r != keep) { drop.Add(r); copies++; }
+            }
+            if (drop.Count == 0) return;
+            foreach (var r in drop) EntityManager.DestroyEntity(r);
+            Mod.Log.Warn($"Placemaker load: {copies} duplicate group record(s) and {empty} record(s) of groups this city does not have were dropped "
+                + "(the city was saved after a second load in the same game; GitHub issue #6).");
+        }
+
+        /// <summary>A record's live references: owner lot 4, carrier 2, companion 1.</summary>
+        private int LiveReferences(Entity record)
+        {
+            var g = EntityManager.GetComponentData<PlacemakerGroup>(record);
+            bool Live(Entity e) => e != Entity.Null && EntityManager.Exists(e) && !EntityManager.HasComponent<Deleted>(e);
+            return (Live(g.Owner) && EntityManager.HasComponent<global::Game.Areas.Area>(g.Owner) ? 4 : 0)
+                + (Live(g.Carrier) ? 2 : 0) + (Live(g.Companion) ? 1 : 0);
+        }
+
+        /// <summary>How many of the members (up to 200) stand inside the outline of this record's receipt.</summary>
+        private int MembersInsideOutline(Entity record, List<Entity> members)
+        {
+            if (!EntityManager.HasBuffer<PlacemakerGroupBlob>(record)) return 0;
+            var buffer = EntityManager.GetBuffer<PlacemakerGroupBlob>(record, true);
+            var bytes = new byte[buffer.Length];
+            for (int i = 0; i < bytes.Length; i++) bytes[i] = buffer[i].Value;
+            var ring = ReceiptCodec.Decode(bytes)?.Area?.Ring2D();
+            if (ring == null || ring.Length < 3) return 0;
+            int inside = 0;
+            for (int i = 0; i < members.Count && i < 200; i++)
+            {
+                var m = members[i];
+                Unity.Mathematics.float2 p;
+                if (EntityManager.HasComponent<global::Game.Objects.Transform>(m)) p = EntityManager.GetComponentData<global::Game.Objects.Transform>(m).m_Position.xz;
+                else if (EntityManager.HasComponent<global::Game.Net.Node>(m)) p = EntityManager.GetComponentData<global::Game.Net.Node>(m).m_Position.xz;
+                else if (EntityManager.HasComponent<global::Game.Net.Curve>(m))
+                    p = Colossal.Mathematics.MathUtils.Position(EntityManager.GetComponentData<global::Game.Net.Curve>(m).m_Bezier, 0.5f).xz;
+                else continue;
+                if (Placemaker.Core.Geometry.Poly.Contains(ring, p)) inside++;
+            }
+            return inside;
         }
 
         /// <summary>

@@ -155,7 +155,7 @@ test("s42 review: permanent changes need the OK chip beside Build", async ({ pag
     const primary = page.getByTestId("primary");
     await expect(page.getByTestId("permanent").first()).toBeVisible();
     await expect(primary).toHaveAttribute("aria-disabled", "true");
-    await expect(page.getByTestId("primary-reason")).toContainText("Tick OK to build");
+    await expect(page.getByTestId("primary-reason")).toContainText("Click OK to build");
     await noTextOverflow(page, "review permanent");
     await panelShot(page, "s42-review-permanent");
     await page.getByTestId("ack-permanent").click();

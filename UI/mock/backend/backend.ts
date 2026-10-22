@@ -1201,9 +1201,13 @@ export class MockBackend {
         const l = this.layer(s.layer);
         if (!l) return undefined;
         if (l.markerKinds) return l.markerKinds;
-        if (l.real && l.id.toLowerCase().includes("parking")) {
+        if (l.real) {
+            // C# MarkerKinds.For / MarkerVariants.Walks: the kinds of the markers control, walking ones offer a crosswalk
             const c = l.controls.find((x) => x.kind === "markers" && x.markerKinds && x.markerKinds.length);
-            if (c) return (c.markerKinds ?? []).map((k) => ({ kind: k, label: "", crosswalk: k === "footpath" || undefined }));
+            const all = c?.markerKinds ?? [];
+            const cars = all.some((k) => k === "entry" || k === "exit" || k === "alley");
+            const walks = (k: string) => ["pedestrian", "bike", "main", "footpath", "access"].includes(k) || (k === "entrance" && !cars);
+            if (c && (l.id.toLowerCase().includes("parking") || all.length > 1)) return all.map((k) => ({ kind: k, label: "", crosswalk: walks(k) || undefined }));
         }
         return undefined;
     }

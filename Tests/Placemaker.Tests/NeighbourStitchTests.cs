@@ -243,6 +243,40 @@ namespace Placemaker.Tests
         }
 
         [Fact]
+        public void A_garden_never_grows_under_an_overpass_and_keeps_a_deck_gap_off_it()
+        {
+            // the user: lots find the crack under an overpass and tuck trees, bushes and fences under a road that is not on the
+            // ground. A deck 20 m to the house's right (x 28 to 40), a ground road beyond it (x 56 to 64)
+            var deck = Strip(28f, -200f, 40f, 200f);
+            var road = Strip(56f, -200f, 64f, 200f);
+            StitchPlan Plan(List<float2[]> barriers, List<int> kinds, float fill)
+            {
+                var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
+                a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 60f, ["fill"] = fill };
+                return YardStitch.Plan(new[] { a }, MiddleLine().WithBarriers(barriers, kinds));
+            }
+            // the deck left out (as the game handed the barriers before): the garden reached under it to the road
+            var before = Plan(new List<float2[]> { road }, null, PolishLooks.FillGarden);
+            Assert.True(before.Plots.TryGetValue(1, out var pb) && pb.Max(p => p.x) > 40f, $"without the deck the garden grows under it ({pb?.Max(p => p.x):F1})");
+            const float gap = 0.8f + 1.5f;   // the barrier margin and the deck gap
+            foreach (float fill in new[] { PolishLooks.FillGarden, PolishLooks.FillCarPark })
+            {
+                var plan = Plan(new List<float2[]> { deck, road }, new List<int> { YardStitch.DeckKind, 0 }, fill);
+                Assert.True(plan.Plots.TryGetValue(1, out var pa), "the garden grows");
+                float reach = pa.Max(p => p.x);
+                Assert.True(reach < 28f - gap + 0.05f && reach > 28f - gap - 1f, $"fill {fill}: the garden reaches the deck's gap and stops there ({reach:F2})");
+                // nothing of it under the deck nor in its gap: no lawn, bed, path, paving, fence, hedge, tree, bush or prop
+                Assert.DoesNotContain(plan.Bushes, b => b.Position.x > 28f - gap + 0.05f);
+                Assert.DoesNotContain(plan.FencePieces, f => f.Position.x > 28f - gap + 0.05f);
+                foreach (var ring in plan.Lawns.Values.Concat(plan.NewLawns.Select(l => l.Ring)).Concat(plan.Beds.Select(b => b.Ring)).Concat(plan.Paths.Select(p => p.Ring)))
+                    Assert.True(ring.Max(p => p.x) < 28f - gap + 0.05f, $"fill {fill}: a surface reaches {ring.Max(p => p.x):F2}");
+            }
+            // a ground road in the deck's place: the garden comes a road's margin near it
+            var ground = Plan(new List<float2[]> { deck, road }, null, PolishLooks.FillGarden);
+            Assert.True(ground.Plots.TryGetValue(1, out var pg) && pg.Max(p => p.x) > 28f - 0.8f - 0.3f, $"a ground road: up to its margin ({pg?.Max(p => p.x):F2})");
+        }
+
+        [Fact]
         public void A_big_garden_is_closed_all_round_with_pieces_of_its_own_fence_kind_but_its_street_front_stays_open()
         {
             var a = House(1, new float2(0f, 0f), new float2(0f, 1f));

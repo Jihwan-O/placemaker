@@ -94,7 +94,8 @@ namespace Placemaker.Core.Neighbours
         /// <summary>What gardens never join across nor reach onto, and grow out to meet: the ground surfaces of roads, paths and
         /// tracks and the lots of buildings that are not houses, as rings. Set per plan by the game (WithBarriers).</summary>
         public List<float2[]> Barriers;
-        /// <summary>What each barrier is: 0 a road, path or track, 1 a building's lot (null: all roads).</summary>
+        /// <summary>What each barrier is: 0 a road, path or track, 1 a building's lot, 2 water, 3 a deck overhead (an elevated
+        /// road, path or track: the ground under it; YardStitch.DeckKind) (null: all roads).</summary>
         public List<int> BarrierKinds;
         /// <summary>Which barriers are one thing (a road piece comes as several surfaces: its two halves and its ends at the
         /// junctions, a turning circle or a roundabout among them): barriers with the same number belong together (null:

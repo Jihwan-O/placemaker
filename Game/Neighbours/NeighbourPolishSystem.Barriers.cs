@@ -2,8 +2,9 @@
 //
 // For each pass the planner gets the barriers around its patch of town (StitchSettings.Barriers): the ground surfaces of
 // roads, paths and tracks (each edge's surface as the game draws it, sidewalks, junction corners, turning circles and
-// roundabouts included (Selection/RoadSurfaces); elevated and tunnelled
-// pieces left out), the lots of buildings that are not houses (service buildings, Placemaker builds' buildings, houses still
+// roundabouts included (Selection/RoadSurfaces); tunnelled pieces left out: the ground above a tunnel is open), the decks of
+// elevated ones as seen from above (an overpass, a bridge: the ground under it is no garden's; YardStitch.DeckKind), the lots
+// of buildings that are not houses (service buildings, Placemaker builds' buildings, houses still
 // being built: a building site is no house to plan yet), lot
 // areas and every Placemaker build's outline (as the area brush's "Lots" and "My builds": a park in the middle of a block
 // stays the park's), and water (sampled every 4 m, merged). Two houses never join across one, no garden reaches onto one,
@@ -17,6 +18,7 @@ using Game.Common;
 using Game.Net;
 using Game.Prefabs;
 using Game.Tools;
+using Placemaker.Core.Neighbours;
 using Placemaker.Game.Selection;
 using Unity.Collections;
 using Unity.Entities;
@@ -66,7 +68,7 @@ namespace Placemaker.Game.Neighbours
         {
             public EdgeGeometry Edge;
             public EdgeNodeGeometry Start, End;
-            public bool HasStart, HasEnd;
+            public bool HasStart, HasEnd, Deck;
             public Entity StartComp, EndComp;
             public List<float2[]> Rings;
         }
@@ -75,19 +77,20 @@ namespace Placemaker.Game.Neighbours
         // same roads were read for every pass)
         private readonly Dictionary<Entity, RoadShape> _roadShapes = new Dictionary<Entity, RoadShape>();
 
-        /// <summary>The road piece's surfaces (RoadSurfaces; a strip along its curve when it has no geometry yet).</summary>
-        private List<float2[]> RoadRings(Entity e, float width)
+        /// <summary>The road piece's surfaces (RoadSurfaces; a strip along its curve when it has no geometry yet); a deck's
+        /// with its elevated ends.</summary>
+        private List<float2[]> RoadRings(Entity e, float width, bool deck)
         {
             var g = EntityManager.GetComponentData<EdgeGeometry>(e);
             bool hs = EntityManager.HasComponent<StartNodeGeometry>(e), he = EntityManager.HasComponent<EndNodeGeometry>(e);
             var sg = hs ? EntityManager.GetComponentData<StartNodeGeometry>(e).m_Geometry : default;
             var eg = he ? EntityManager.GetComponentData<EndNodeGeometry>(e).m_Geometry : default;
             var comp = EntityManager.HasComponent<Composition>(e) ? EntityManager.GetComponentData<Composition>(e) : default;
-            if (_roadShapes.TryGetValue(e, out var c) && c.HasStart == hs && c.HasEnd == he && c.StartComp == comp.m_StartNode && c.EndComp == comp.m_EndNode
+            if (_roadShapes.TryGetValue(e, out var c) && c.HasStart == hs && c.HasEnd == he && c.Deck == deck && c.StartComp == comp.m_StartNode && c.EndComp == comp.m_EndNode
                 && Exact(c.Edge.m_Start, g.m_Start) && Exact(c.Edge.m_End, g.m_End) && (!hs || Exact(c.Start, sg)) && (!he || Exact(c.End, eg)))
                 return c.Rings;
             _roadPieces.Clear();
-            RoadSurfaces.Pieces(EntityManager, e, _roadPieces);
+            RoadSurfaces.Pieces(EntityManager, e, _roadPieces, deck);
             var rings = new List<float2[]>(_roadPieces.Count);
             foreach (var (ring, _) in _roadPieces) rings.Add(ring);
             if (rings.Count == 0)
@@ -96,7 +99,7 @@ namespace Placemaker.Game.Neighbours
                 if (strip != null) rings.Add(strip);
             }
             if (_roadShapes.Count > 50000) _roadShapes.Clear();
-            _roadShapes[e] = new RoadShape { Edge = g, Start = sg, End = eg, HasStart = hs, HasEnd = he, StartComp = comp.m_StartNode, EndComp = comp.m_EndNode, Rings = rings };
+            _roadShapes[e] = new RoadShape { Edge = g, Start = sg, End = eg, HasStart = hs, HasEnd = he, Deck = deck, StartComp = comp.m_StartNode, EndComp = comp.m_EndNode, Rings = rings };
             return rings;
         }
 
@@ -105,7 +108,8 @@ namespace Placemaker.Game.Neighbours
         private static bool Exact(EdgeNodeGeometry x, EdgeNodeGeometry y) => Exact(x.m_Left, y.m_Left) && Exact(x.m_Right, y.m_Right) && Exact(x.m_Middle, y.m_Middle) && x.m_MiddleRadius == y.m_MiddleRadius;
 
         /// <summary>The barriers in a box, what each is (0 a road, path or track, 1 a building's lot, a lot area or a
-        /// Placemaker build, 2 water) and which belong together (a road piece's surfaces: the edge's entity).</summary>
+        /// Placemaker build, 2 water, 3 the deck of an elevated road, path or track) and which belong together (a road piece's
+        /// surfaces: the edge's entity).</summary>
         private List<float2[]> BarriersIn(float2 min, float2 max, List<int> kinds, List<long> groups, HashSet<Entity> planned = null)
         {
             var list = new List<float2[]>();
@@ -137,16 +141,21 @@ namespace Placemaker.Game.Neighbours
                         var comp = EntityManager.GetComponentData<Composition>(e).m_Edge;
                         if (comp == Entity.Null || !EntityManager.HasComponent<NetCompositionData>(comp)) continue;
                         var data = EntityManager.GetComponentData<NetCompositionData>(comp);
-                        if ((data.m_Flags.m_General & (CompositionFlags.General.Elevated | CompositionFlags.General.Tunnel)) != 0 || data.m_Width < 1f) continue;
+                        // a tunnel: the ground above it is open
+                        if ((data.m_Flags.m_General & CompositionFlags.General.Tunnel) != 0 || data.m_Width < 1f) continue;
                         // walked, driven or ridden on: roads, paths, tracks (not pipes or power lines)
                         var prefab = EntityManager.GetComponentData<PrefabRef>(e).m_Prefab;
                         bool ground = EntityManager.HasComponent<Road>(e) || EntityManager.HasComponent<PathwayData>(prefab)
                             || EntityManager.HasComponent<TrainTrack>(e) || EntityManager.HasComponent<TramTrack>(e);
                         if (!ground) continue;
+                        // elevated (an overpass, a bridge): its deck as seen from above, the ground under it no garden's (gardens
+                        // found the crack under an overpass and tucked trees, bushes and fences under it, "a road that's not
+                        // technically on the ground")
+                        bool deck = (data.m_Flags.m_General & CompositionFlags.General.Elevated) != 0;
                         // its ground as the game draws it: both halves and its ends at the junctions, so a turning circle
                         // or a roundabout is a barrier too (a strip along the curve ends square at the node's centre:
                         // gardens grew into them, "they think they can encroach")
-                        foreach (var ring in RoadRings(e, data.m_Width)) Add(ring, 0, Id(e));
+                        foreach (var ring in RoadRings(e, data.m_Width, deck)) Add(ring, deck ? YardStitch.DeckKind : 0, Id(e));
                     }
                 }
                 results.Clear();

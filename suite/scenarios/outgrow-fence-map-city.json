@@ -65,9 +65,9 @@
           "op": "fenceMap",
           "box": "gardens",
           "label": "redone",
-          "closeups": 8,
-          "junctions": 30,
-          "edges": 12
+          "closeups": 6,
+          "junctions": 12,
+          "edges": 6
         }
       ]
     }

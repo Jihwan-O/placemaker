@@ -198,7 +198,7 @@ function normalizeStep(s: Record<string, any>): StepView {
         markers: arr(s.markers),
         markerList: arr<any>(s.markerList)
             .filter(isObj)
-            .map((m, i) => ({ kind: String(m.kind ?? ""), index: typeof m.index === "number" ? m.index : i, position: (Array.isArray(m.position) ? m.position : [0, 0, 0]) as [number, number, number] })),
+            .map((m, i) => ({ kind: String(m.kind ?? ""), index: typeof m.index === "number" ? m.index : i, position: (Array.isArray(m.position) ? m.position : [0, 0, 0]) as [number, number, number], crosswalk: m.crosswalk === true || undefined })),
         markerKinds: arr<any>(s.markerKinds)
             .map((k) => (typeof k === "string" ? { kind: k, label: "" } : k))
             .filter((k) => isObj(k) && typeof k.kind === "string"),
@@ -376,6 +376,10 @@ export const act = {
     locate: (at: [number, number, number]) => fire(Triggers.locate, Number(at[0]) || 0, Number(at[1]) || 0, Number(at[2]) || 0),
     setMarkerKind: (path: string, kind: string) => fire(Triggers.setMarkerKind, path, kind),
     removeMarker: (path: string, index: number) => fire(Triggers.removeMarker, path, index),
+    /** Crosswalk or not: index -1 = the entrances placed next, else that placed marker. */
+    setMarkerCrosswalk: (path: string, index: number, on: boolean) => fire(Triggers.setMarkerCrosswalk, path, index, on),
+    ungroupGroup: (id: number, ungroup: boolean) => fire(Triggers.ungroupGroup, id, ungroup),
+    setBuildUngrouped: (on: boolean) => fire(Triggers.setBuildUngrouped, on),
     /** Leave marker placement: in marker mode the C# primary action is "placeMarkers" (Done), which toggles it off. */
     endMarkers: () => fire(Triggers.primary),
     /** The player ticked the permanent-effects box (C# also guards Enter with it). */

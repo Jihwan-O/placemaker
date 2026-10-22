@@ -101,7 +101,10 @@ namespace Placemaker.Tests
             return false;
         }
 
-        /// <summary>Net ends of the plan that join an existing street: attached ends, and ends at a kerb (a drive the game connects).</summary>
+        /// <summary>
+        /// Net ends of the plan that join an existing street: attached ends, and ends at a kerb (a drive or a walk the game
+        /// connects). A walk's end stops half its width off the kerb (StreetJoins: its round end must not touch the street).
+        /// </summary>
         private static List<(PlannedNet net, float2 at)> StreetJoins(ComposedPlan plan, SiteContext site)
         {
             var list = new List<(PlannedNet, float2)>();
@@ -111,9 +114,9 @@ namespace Placemaker.Tests
                     if (n.Role == NetRole.Fence) continue;
                     if (n.StartAttach >= 0) list.Add((n, n.A.xz));
                     if (n.EndAttach >= 0) list.Add((n, n.D.xz));
-                    if (n.Role == NetRole.DriveConnector || n.Role == NetRole.Pathway)
+                    if (n.Role == NetRole.DriveConnector || n.Role == NetRole.Pathway || n.Role == NetRole.PathwayWide)
                         foreach (var e in new[] { n.A.xz, n.D.xz })
-                            if (NearStreet(site, e, 1.5f)) list.Add((n, e));
+                            if (NearStreet(site, e, 1.5f + (n.Role == NetRole.DriveConnector ? 0f : Composer.DefaultHalfWidth(n.Role)))) list.Add((n, e));
                 }
             return list;
         }
@@ -160,7 +163,7 @@ namespace Placemaker.Tests
             // The driveway: a real lane junction with the street.
             Assert.Contains(joins, j => (j.net.Role == NetRole.Alley || j.net.Role == NetRole.Street) && (j.net.StartAttach >= 0 || j.net.EndAttach >= 0) && Near(j.at, At(ShopEntrances.Alley)));
             // The footpath: a walk from the sidewalk.
-            Assert.Contains(joins, j => j.net.Role == NetRole.Pathway && Near(j.at, At(ShopEntrances.Footpath)));
+            Assert.Contains(joins, j => (j.net.Role == NetRole.Pathway || j.net.Role == NetRole.PathwayWide) && Near(j.at, At(ShopEntrances.Footpath)));
             // Nothing else joins a street.
             Assert.True(joins.All(j => markers.Any(m => Near(j.at, m.Position.xz))), $"{ctx}: a street join away from every entrance: {string.Join("; ", joins.Where(j => !markers.Any(m => Near(j.at, m.Position.xz))).Select(j => j.net.Role + " at " + j.at))}");
         }

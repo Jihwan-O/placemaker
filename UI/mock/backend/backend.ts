@@ -105,6 +105,12 @@ export class MockBackend {
     areaModes: ToolState["areaModes"] = (["draw", "block", "blockPaint", "paint", "perimeter"] as AreaMode[]).map((mode) => ({ mode, enabled: true }));
     userCollapsed: boolean | null = null;
     anarchy = { available: true, enabled: false };
+    /** Entrances placed next come with a crosswalk (C# PlacemakerToolSystem._markerCrosswalk). */
+    entranceCrosswalk = false;
+    /** Review's "One group" switch off: the next build is born ungrouped. */
+    buildSeparate = false;
+    /** Ungrouped builds (C# GroupFlags.Ungrouped). */
+    ungrouped = new Set<number>();
     money = 250000;
 
     // ── area ──
@@ -561,7 +567,9 @@ export class MockBackend {
         const q = closestOnRing(p, this.ring);
         if (q.d > 14) return;
         const kind = this.markerMode.kind;
-        this.edit({ key: "Placemaker.Undo.AddMarker", args: [en(`Placemaker.Marker.${kind}`, kind)] }, () => step.markers.push({ kind, p: q.q }));
+        const walks = !!this.markerKindsOf(step)?.find((k) => k.kind === kind && k.crosswalk);
+        const stored = this.entranceCrosswalk && walks ? kind + "+crosswalk" : kind;
+        this.edit({ key: "Placemaker.Undo.AddMarker", args: [en(`Placemaker.Marker.${kind}`, kind)] }, () => step.markers.push({ kind: stored, p: q.q }));
     }
 
     removeMarkerNear(p: V2) {
@@ -946,6 +954,21 @@ export class MockBackend {
                 // Which entrance type the next click places; also enters placement for that step.
                 if (this.get(a[0])) this.markerMode = { stepPath: a[0], kind: String(a[1]) };
                 break;
+            case "setMarkerCrosswalk": {
+                const i = Number(a[1]);
+                if (i < 0) { this.entranceCrosswalk = !!a[2]; break; }
+                const step = this.get(a[0]);
+                if (!step || !(i < step.markers.length)) break;
+                const base = step.markers[i].kind.split("+crosswalk")[0];
+                this.edit({ key: "Placemaker.Undo.Crosswalk" }, () => (step.markers[i].kind = a[2] ? base + "+crosswalk" : base));
+                return;
+            }
+            case "ungroupGroup":
+                if (a[1]) this.ungrouped.add(Number(a[0])); else this.ungrouped.delete(Number(a[0]));
+                break;
+            case "setBuildUngrouped":
+                this.buildSeparate = !!a[0];
+                break;
             case "removeMarker": {
                 const step = this.get(a[0]);
                 const i = Number(a[1]);
@@ -1169,13 +1192,13 @@ export class MockBackend {
     }
 
     /** Typed marker kinds of a step (StepView.markerKinds): declared by the fake layer, or derived from a real layer's markers control. */
-    markerKindsOf(s: StepModel): { kind: string; label: string; icon?: string }[] | undefined {
+    markerKindsOf(s: StepModel): { kind: string; label: string; icon?: string; crosswalk?: boolean }[] | undefined {
         const l = this.layer(s.layer);
         if (!l) return undefined;
         if (l.markerKinds) return l.markerKinds;
         if (l.real && l.id.toLowerCase().includes("parking")) {
             const c = l.controls.find((x) => x.kind === "markers" && x.markerKinds && x.markerKinds.length);
-            if (c) return (c.markerKinds ?? []).map((k) => ({ kind: k, label: "" }));
+            if (c) return (c.markerKinds ?? []).map((k) => ({ kind: k, label: "", crosswalk: k === "footpath" || undefined }));
         }
         return undefined;
     }
@@ -1562,6 +1585,8 @@ export class MockBackend {
             buildProgress: this.stage === "building" ? this.buildProgress : undefined,
             editingGroup: this.editingGroup ?? undefined,
             anarchy: this.anarchy,
+            grouping: { separate: this.buildSeparate },
+            entranceCrosswalk: this.entranceCrosswalk,
             panelCollapsed: this.collapsed(),
             previewMode: this.previewMode(),
             planningProgress: this.planning ? this.planProgress : undefined,
@@ -1653,7 +1678,7 @@ export class MockBackend {
             }
         }
         const counts = new Map<string, number>();
-        for (const m of s.markers) counts.set(m.kind, (counts.get(m.kind) ?? 0) + 1);
+        for (const m of s.markers) { const k = m.kind.split("+crosswalk")[0]; counts.set(k, (counts.get(k) ?? 0) + 1); }
         const kinds = new Set<string>();
         for (const c of this.layer(s.layer)?.controls ?? []) if (c.kind === "markers") (c.markerKinds ?? [c.id]).forEach((k) => kinds.add(k));
         for (const k of this.markerKindsOf(s) ?? []) kinds.add(k.kind);
@@ -1683,7 +1708,7 @@ export class MockBackend {
             values,
             locked: s.locked.slice(),
             markers: Array.from(kinds).map((k) => ({ kind: k, count: counts.get(k) ?? 0 })),
-            markerList: s.markers.map((m, index) => ({ kind: m.kind, index, position: [m.p[0], 0, m.p[1]] as [number, number, number] })),
+            markerList: s.markers.map((m, index) => ({ kind: m.kind.split("+crosswalk")[0], index, position: [m.p[0], 0, m.p[1]] as [number, number, number], crosswalk: m.kind.endsWith("+crosswalk") || undefined })),
             markerKinds: this.markerKindsOf(s),
             markersRequired: this.markersRequiredOf(s),
             ready: r.ready,
@@ -1729,7 +1754,7 @@ export class MockBackend {
     managed(): ManagedGroup | null {
         const g = this.groups.find((x) => x.id === this.managedId);
         if (!g) return null;
-        return { id: g.id, recipeName: g.recipeName, customName: g.customName || undefined, stats: g.stats, upkeep: g.upkeep, canEdit: true };
+        return { id: g.id, recipeName: g.recipeName, customName: g.customName || undefined, stats: g.stats, upkeep: g.upkeep, canEdit: true, ungrouped: this.ungrouped.has(g.id) || undefined };
     }
 
     publishAll() {

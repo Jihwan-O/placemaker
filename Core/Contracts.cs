@@ -196,6 +196,56 @@ namespace Placemaker.Core
         public int RingSegment;
         public float RingT;
         public float3 Position;
+        /// <summary>
+        /// The player wants a crosswalk where this entrance's path meets the street (Layers/Common/StreetJoins). Recipes,
+        /// receipts and the tool keep it as the kind's <see cref="MarkerVariants.CrosswalkSuffix"/>; Composer.MarkersOn turns
+        /// that into this flag and the plain kind, so layers only ever see the kinds they know.
+        /// </summary>
+        public bool Crosswalk;
+    }
+
+    /// <summary>
+    /// Entrance variants stored in the marker kind (no save format change: an older Placemaker sees an unknown kind and
+    /// leaves the marker out). "pedestrian+crosswalk" = a pedestrian entrance whose path splits the street and gets a crosswalk.
+    /// </summary>
+    public static class MarkerVariants
+    {
+        public const string CrosswalkSuffix = "+crosswalk";
+
+        public static bool HasCrosswalk(string kind) => kind != null && kind.EndsWith(CrosswalkSuffix, StringComparison.Ordinal);
+
+        /// <summary>The kind without its variant.</summary>
+        public static string BaseKind(string kind) => HasCrosswalk(kind) ? kind.Substring(0, kind.Length - CrosswalkSuffix.Length) : kind;
+
+        public static string WithCrosswalk(string kind, bool on) => on ? BaseKind(kind) + CrosswalkSuffix : BaseKind(kind);
+
+        /// <summary>The marker as layers see it: plain kind, <see cref="EdgeMarker.Crosswalk"/> set from the suffix.</summary>
+        public static EdgeMarker Normalize(EdgeMarker m)
+        {
+            if (!HasCrosswalk(m.Kind)) return m;
+            m.Kind = BaseKind(m.Kind);
+            m.Crosswalk = true;
+            return m;
+        }
+
+        /// <summary>
+        /// Entrance kinds people walk in through, whose path can meet a street: the crosswalk choice applies to them.
+        /// "entrance" walks only for the park family (where it is the old pedestrian kind); with car kinds beside it
+        /// (parking, malls, markets) it is the two-way car entrance.
+        /// </summary>
+        public static bool Walks(string kind, IEnumerable<string> stepKinds)
+        {
+            switch (BaseKind(kind))
+            {
+                case "pedestrian": case "bike": case "main": case "footpath": case "access": return true;
+                case "entrance":
+                    if (stepKinds != null)
+                        foreach (var k in stepKinds)
+                            if (k == "entry" || k == "exit" || k == "alley") return false;
+                    return true;
+                default: return false;
+            }
+        }
     }
 
     public sealed class AreaInput

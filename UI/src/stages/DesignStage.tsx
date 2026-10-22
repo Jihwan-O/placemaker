@@ -73,7 +73,7 @@ const MARKER_FALLBACK: Record<string, [string, string, string]> = {
     footpath: ["Placemaker.UI.Marker.Footpath", "Footpath", "footpath"],
 };
 
-type MarkerKind = { kind: string; label: string; icon?: string; tooltip?: string };
+type MarkerKind = { kind: string; label: string; icon?: string; tooltip?: string; crosswalk?: boolean };
 
 export function markerLabel(t: TFunc, k: MarkerKind): string {
     const fb = MARKER_FALLBACK[k.kind.toLowerCase()];
@@ -128,6 +128,14 @@ const Entrances = ({ step, state }: { step: StepView; state: ToolState }) => {
     };
     const missing = need > 0 && have < need;
     const numbers = new Map<string, number>();
+    // Walking entrances come with or without a crosswalk across the street (Core StreetJoins): one switch for the ones
+    // placed next, and each placed one can be changed in the list.
+    const walks = kinds.some((k) => !!k.crosswalk);
+    const crossing = !!state.entranceCrosswalk;
+    const crosswalkTip = t(
+        "Placemaker.UI.Markers.CrosswalkTip",
+        "On: the entrances you place next get a crosswalk across the street (the path joins the road at a new junction). Off: the path stops at the sidewalk and the game joins it, with no crosswalk and no cut in the road."
+    );
     // The footer's "Add an entrance" leads here: scroll to it and flash.
     const ref = useRef<HTMLDivElement>(null);
     const flash = useReveal("entrances:" + step.path, () => {
@@ -180,6 +188,23 @@ const Entrances = ({ step, state }: { step: StepView; state: ToolState }) => {
                                 </Tip>
                             );
                         })}
+                        {walks ? (
+                            <Tip title={t("Placemaker.UI.Markers.Crosswalk", "With crosswalk")} description={crosswalkTip}>
+                                <button
+                                    type="button"
+                                    data-testid="marker-crosswalk"
+                                    aria-pressed={crossing ? "true" : "false"}
+                                    className={classNames(s.kindBtn, s.kindToggle, { [s.kindBtnOn]: crossing })}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        act.setMarkerCrosswalk(step.path, -1, !crossing);
+                                    }}
+                                >
+                                    <Icon name="crosswalk" size={12} tint={crossing ? "dark" : "light"} />
+                                    <div className={s.kindLabel}>{t("Placemaker.UI.Markers.CrosswalkShort", "Crosswalk")}</div>
+                                </button>
+                            </Tip>
+                        ) : null}
                     </div>
                 }
             />
@@ -193,6 +218,18 @@ const Entrances = ({ step, state }: { step: StepView; state: ToolState }) => {
                             <div key={m.index} className={s.markerItem} data-testid={`marker-${m.index}`} data-kind={m.kind}>
                                 <Icon name={markerIcon(k)} size={11} tint="warn" />
                                 <div className={s.markerName}>{markerShort(t, k) + " " + n}</div>
+                                {k.crosswalk ? (
+                                    <Btn
+                                        icon="crosswalk"
+                                        iconSize={11}
+                                        selected={!!m.crosswalk}
+                                        className={s.markerBtn}
+                                        title={m.crosswalk ? t("Placemaker.UI.Markers.CrosswalkOn", "Crosswalk: on") : t("Placemaker.UI.Markers.CrosswalkOff", "Crosswalk: off")}
+                                        description={t("Placemaker.UI.Markers.CrosswalkItemTip", "Click to switch. On: a crosswalk across the street here. Off: the path stops at the sidewalk.")}
+                                        onClick={() => act.setMarkerCrosswalk(step.path, m.index, !m.crosswalk)}
+                                        testId={`marker-crosswalk-${m.index}`}
+                                    />
+                                ) : null}
                                 <Btn icon="eye" iconSize={11} className={s.markerBtn} title={t("Placemaker.UI.Markers.Show", "Show on map")} onClick={() => act.locate(m.position)} testId={`marker-show-${m.index}`} />
                                 <Btn icon="close" iconSize={11} className={s.markerBtn} title={t("Placemaker.UI.Markers.Remove", "Remove")} onClick={() => act.removeMarker(step.path, m.index)} testId={`marker-remove-${m.index}`} />
                             </div>

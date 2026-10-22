@@ -190,6 +190,18 @@
     white-space: nowrap;
 }
 
+// "Crosswalk": a switch for the entrances placed next, set apart from the kind buttons, white like road markings when on
+.kindToggle {
+    margin-left: 8rem;
+    &.kindBtnOn {
+        background-color: #e4ecf1;
+        @include border-color(#e4ecf1);
+        &:hover {
+            background-color: #ffffff;
+        }
+    }
+}
+
 .markerList {
     @include row;
     flex-wrap: wrap;

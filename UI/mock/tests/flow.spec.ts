@@ -93,6 +93,41 @@ test("Build & keep area: the area stays, back to Design with no type chosen", as
     expect(errors).toEqual([]);
 });
 
+test("Review's One group switch; Ungroup (asks first) and Group again in Manage", async ({ page }) => {
+    const errors = await open(page);
+    await drawPolygon(page, FIELD);
+    await page.getByTestId("primary").click();
+    await waitPlanned(page);
+    await page.keyboard.press("Enter");
+    expect(await stage(page)).toBe("review");
+    await waitPlanned(page);
+    // One group is on by default; off = built as separate pieces
+    await expect(page.getByTestId("build-group")).toHaveAttribute("aria-checked", "true");
+    await page.getByTestId("build-group").click();
+    await expect(page.getByTestId("build-group")).toHaveAttribute("aria-checked", "false");
+    expect(await page.evaluate(() => (window as any).pm.backend.buildSeparate)).toBe(true);
+    await panelShot(page, "panel-review-separate");
+    await page.getByTestId("build-group").click();
+    await page.getByTestId("build-close").click();
+    await expect(page.getByTestId("launcher")).toHaveAttribute("data-open", "false", { timeout: 10000 });
+    await page.getByTestId("launcher").locator("button").click();
+    await expect(page.getByTestId("stage-area")).toBeVisible();
+    await clickWorld(page, 650, 380);
+    await expect(page.getByTestId("stage-manage")).toBeVisible();
+    // Ungroup asks first (its pieces are then picked one by one); Group again does not
+    await page.getByTestId("manage-ungroup").click();
+    await expect(page.getByTestId("confirm-dialog")).toBeVisible();
+    await expect(page.getByTestId("confirm-dialog")).toContainText("bulldozer");
+    await panelShot(page, "panel-ungroup-confirm");
+    await page.getByTestId("confirm-ok").click();
+    await expect(page.getByTestId("manage-ungroup")).toContainText("Group again");
+    expect(await page.evaluate(() => [...(window as any).pm.backend.ungrouped])).toHaveLength(1);
+    await page.getByTestId("manage-ungroup").click();
+    await expect(page.getByTestId("manage-ungroup")).toContainText("Ungroup");
+    expect(await page.evaluate(() => [...(window as any).pm.backend.ungrouped])).toHaveLength(0);
+    expect(errors).toEqual([]);
+});
+
 test("going back to Area keeps the design; switching recipe keeps the area", async ({ page }) => {
     await open(page);
     await drawPolygon(page, FIELD);

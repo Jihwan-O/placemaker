@@ -78,6 +78,7 @@ namespace Placemaker.Game.Tool
                 Recipe = _recipe.Clone(),
                 Area = _shape,
                 ReplaceGroup = _editingGroup,
+                Ungrouped = _buildUngrouped,
             };
             bool started;
             // Instant Build from the ghost when it shows exactly this plan; otherwise the ghost is hidden first.
@@ -221,6 +222,8 @@ namespace Placemaker.Game.Tool
             _recipeId = "";
             _presetLayer = ""; _presetId = "";
             _focus = RecipePaths.Root;
+            if (_editingGroup != 0) _buildUngrouped = false;   // the edited build's choice was for that build only
+            _markerCrosswalk = false;   // the Crosswalk switch is for the entrances of one build: off again for the next
             _editingGroup = 0;
             _plan = null;
             _planRevision = -1;
@@ -321,6 +324,7 @@ namespace Placemaker.Game.Tool
             _focus = RecipePaths.Root;
             _editingGroup = groupId;
             _managedGroup = 0;
+            _buildUngrouped = groups.IsUngrouped(groupId);   // a rebuild stays as it was: grouped or in pieces
             DesignChanged();
             _history.Reset(Capture());
             SetStage(ToolStage.Design);
@@ -339,6 +343,32 @@ namespace Placemaker.Game.Tool
             if (_editingGroup == groupId) _editingGroup = 0;
             _membersGroup = -1;
             Flash(new LocText("Placemaker.Hint.Removed"));
+            Touch();
+        }
+
+        /// <summary>
+        /// Review switch "One group" off: the next build is born ungrouped (separate pieces). Off by default; Edit restores
+        /// the edited build's own choice.
+        /// </summary>
+        private bool _buildUngrouped;
+        public bool BuildUngrouped => _buildUngrouped;
+
+        public void SetBuildUngrouped(bool on)
+        {
+            if (_buildUngrouped == on) return;
+            _buildUngrouped = on;
+            Touch();
+        }
+
+        /// <summary>Info panel / Manage: ungroup a finished build (its parts picked one by one), or group it again.</summary>
+        public void UngroupGroup(int groupId, bool ungroup)
+        {
+            bool ok;
+            try { ok = Services.Groups?.SetUngrouped(groupId, ungroup) ?? false; }
+            catch (Exception e) { Mod.Log.Warn("Placemaker: ungroup failed: " + e.Message); ok = false; }
+            if (!ok) { Flash(new LocText("Placemaker.Problem.UngroupFailed")); return; }
+            _membersGroup = -1;
+            Flash(new LocText(ungroup ? "Placemaker.Hint.Ungrouped" : "Placemaker.Hint.Grouped"));
             Touch();
         }
 

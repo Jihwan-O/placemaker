@@ -453,6 +453,8 @@ namespace Placemaker.Game.Overlay
                     // Inner dot: entry/exit read at a glance even for colour-blind players (entry filled, exit hollow).
                     if (m.Kind == "exit" || m.Kind == "alleyOut") buffer.DrawCircle(Color.white, new Color(0, 0, 0, 0.6f), w * 0.4f, 0, new float2(0, 1), m.Position, size * 0.45f);
                     else if (m.Kind == "entry" || m.Kind == "alleyIn") buffer.DrawCircle(Color.white, Color.white, w * 0.4f, 0, new float2(0, 1), m.Position, size * 0.35f);
+                    // An entrance with a crosswalk: a white ring round it, like the road markings it brings.
+                    if (MarkerVariants.HasCrosswalk(m.Kind)) buffer.DrawCircle(Color.white, new Color(0, 0, 0, 0), w * 0.5f, 0, new float2(0, 1), m.Position, size * 1.5f);
                 }
             }
             if (_tool.MarkerKind != null && _tool.MarkerHoverValid)

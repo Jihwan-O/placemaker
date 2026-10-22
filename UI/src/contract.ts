@@ -112,7 +112,7 @@ export interface ToolState {
   undoLabel?: LocText;
   redoLabel?: LocText;
   /** Marker placement mode active (entrances/access points/split line) and for which step path. */
-  markerMode?: { stepPath: string; kind: string; label: LocText };
+  markerMode?: { stepPath: string; kind: string; label: LocText; /** The entrances placed next come with a crosswalk (walking kinds). */ crosswalk?: boolean };
   hints: Hint[];
   /** Non-null while the composer is planning in the background. */
   planning: boolean;
@@ -122,6 +122,10 @@ export interface ToolState {
   editingGroup?: number;
   /** Anarchy mod detected → show its toggle. */
   anarchy?: { available: boolean; enabled: boolean };
+  /** The build becomes one group (not a loose road grid). separate = the Review switch "One group" is off: built ungrouped. */
+  grouping?: { separate: boolean };
+  /** The entrances placed next come with a crosswalk across the street (walking entrance kinds only). */
+  entranceCrosswalk?: boolean;
   panelCollapsed: boolean;
   /** "sketch" = fast overlay lines/dots; "ghost" = real translucent game models + surfaces (Review uses ghost by default). */
   previewMode?: "sketch" | "ghost";
@@ -455,9 +459,9 @@ export interface StepView {
   locked: string[];         // ids set explicitly by the player
   markers: { kind: string; count: number }[];
   /** Every placed marker in placement order (index = removeMarker index). */
-  markerList?: { kind: string; index: number; position: [number, number, number] }[];
-  /** Marker kinds this step accepts, in display order (e.g. entrance, entry, exit, alley, footpath). */
-  markerKinds?: { kind: string; label: string; icon?: string; tooltip?: string }[];
+  markerList?: { kind: string; index: number; position: [number, number, number]; /** with a crosswalk across the street */ crosswalk?: boolean }[];
+  /** Marker kinds this step accepts, in display order (e.g. entrance, entry, exit, alley, footpath). crosswalk = people walk in there: it can have one. */
+  markerKinds?: { kind: string; label: string; icon?: string; tooltip?: string; crosswalk?: boolean }[];
   /** Minimum markers needed before Build (0 = optional). */
   markersRequired?: number;
   /** Readiness from IAreaGenerator.CheckReady for this step. */
@@ -626,6 +630,8 @@ export interface ManagedGroup {
   stats: Stat[];
   upkeep: number;
   canEdit: boolean;
+  /** Ungrouped: its parts are clicked and bulldozed one by one. */
+  ungrouped?: boolean;
 }
 
 export const Values = {
@@ -700,6 +706,9 @@ export const Triggers = {
   acknowledgePermanent: "acknowledgePermanent", // (ack: boolean) — required before Build when summary.permanent is non-empty (Enter included)
   setMarkerKind: "setMarkerKind",           // (path: string, kind: string) — which marker type the next click places (entrance types etc.)
   removeMarker: "removeMarker",             // (path: string, index: number)
+  setMarkerCrosswalk: "setMarkerCrosswalk", // (path: string, index: number, on: boolean) — index -1: the entrances placed next
+  ungroupGroup: "ungroupGroup",             // (groupId: number, ungroup: boolean) — false: group again
+  setBuildUngrouped: "setBuildUngrouped",   // (on: boolean) — the next build is born ungrouped (separate pieces)
   setFeature: "setFeature",                 // (path: string, featureLayerId: string, enabled: boolean)
   setPreviewMode: "setPreviewMode",         // (mode: "sketch" | "ghost")
   selectPreset: "selectPreset",             // (layerId: string, presetId: string) — select type (single-layer recipe) + apply preset; undoable

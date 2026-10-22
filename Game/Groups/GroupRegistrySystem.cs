@@ -36,6 +36,7 @@ namespace Placemaker.Game.Groups
         private readonly Dictionary<int, List<string>> _missing = new Dictionary<int, List<string>>();
         private readonly List<int> _allIds = new List<int>();
         private readonly Dictionary<int, Entity> _owners = new Dictionary<int, Entity>();
+        private readonly HashSet<int> _ungrouped = new HashSet<int>();
         private readonly HashSet<int> _duplicateWarned = new HashSet<int>();
 
         /// <summary>For Harmony patches (static context, main thread only).</summary>
@@ -218,6 +219,67 @@ namespace Placemaker.Game.Groups
             return true;
         }
 
+        /// <summary>The player ungrouped this build: its pieces are picked and bulldozed one by one.</summary>
+        public bool IsUngrouped(int groupId)
+        {
+            EnsureIndex();
+            return _ungrouped.Contains(groupId);
+        }
+
+        /// <summary>
+        /// Ungroup (or group again): clicks on a part pick that part, the bulldozer removes single parts, and the owner lot is
+        /// never hit, so nothing removes the whole build by accident. Kept on the record (ECS flags and receipt) so it survives
+        /// a save. Remove/Edit in Placemaker's panels still work on the whole build.
+        /// </summary>
+        public bool SetUngrouped(int groupId, bool ungrouped)
+        {
+            EnsureIndex();
+            if (!_records.TryGetValue(groupId, out var entity) || !EntityManager.Exists(entity)) return false;
+            if (EntityManager.HasComponent<PlacemakerRemoval>(entity)) return false;
+            var g = EntityManager.GetComponentData<PlacemakerGroup>(entity);
+            int flags = ungrouped ? g.Flags | (int)GroupFlags.Ungrouped : g.Flags & ~(int)GroupFlags.Ungrouped;
+            if (flags == g.Flags) return true;
+            g.Flags = flags;
+            EntityManager.SetComponentData(entity, g);
+            var rec = GetRecord(groupId);
+            if (rec != null)
+            {
+                rec.Flags = ungrouped ? rec.Flags | GroupFlags.Ungrouped : rec.Flags & ~GroupFlags.Ungrouped;
+                WriteRecord(entity, rec);
+            }
+            if (ungrouped) _ungrouped.Add(groupId); else _ungrouped.Remove(groupId);
+            Mod.Log.Info($"Placemaker: group {groupId} {(ungrouped ? "ungrouped (its parts are picked one by one)" : "grouped again")}.");
+            Bump();
+            return true;
+        }
+
+        /// <summary>
+        /// Raycast of an ungrouped build: <paramref name="owner"/> is what the game picked (the top owner of <paramref name="hit"/>).
+        /// True when it must change: the build's owner lot → nothing (<paramref name="pick"/> = Null); its carrier or another
+        /// auxiliary → the member that was hit (walking up from <paramref name="hit"/>), or nothing. False: leave the pick as it is.
+        /// </summary>
+        internal bool TryUngroupedPick(Entity owner, Entity hit, out Entity pick)
+        {
+            pick = Entity.Null;
+            if (owner == Entity.Null || !EntityManager.Exists(owner) || !EntityManager.HasComponent<PlacemakerMember>(owner)) return false;
+            var tag = EntityManager.GetComponentData<PlacemakerMember>(owner);
+            if (!IsUngrouped(tag.GroupId)) return false;
+            if (tag.Role == MemberRole.OwnerArea) return true;
+            if (tag.Kind != MemberKind.Auxiliary) return false;
+            var e = hit;
+            for (int depth = 0; depth < 4 && e != Entity.Null && e != owner && EntityManager.Exists(e); depth++)
+            {
+                if (EntityManager.HasComponent<PlacemakerMember>(e))
+                {
+                    var t = EntityManager.GetComponentData<PlacemakerMember>(e);
+                    if (t.GroupId == tag.GroupId && t.Kind != MemberKind.Auxiliary) { pick = e; return true; }
+                }
+                if (!EntityManager.HasComponent<Owner>(e)) break;
+                e = EntityManager.GetComponentData<Owner>(e).m_Owner;
+            }
+            return true;
+        }
+
         public void Rename(int groupId, string name)
         {
             var rec = GetRecord(groupId);
@@ -253,6 +315,7 @@ namespace Placemaker.Game.Groups
                 {
                     var tag = EntityManager.GetComponentData<PlacemakerMember>(e);
                     if (tag.Role == MemberRole.OwnerArea) return false;   // already the owner
+                    if (IsUngrouped(tag.GroupId)) return false;            // ungrouped: the part itself
                     owner = OwnerAreaOf(tag.GroupId);
                     return owner != Entity.Null && owner != hit;
                 }
@@ -279,6 +342,7 @@ namespace Placemaker.Game.Groups
             if (entity == Entity.Null || !EntityManager.Exists(entity) || !EntityManager.HasComponent<PlacemakerMember>(entity)) return false;
             var tag = EntityManager.GetComponentData<PlacemakerMember>(entity);
             if (tag.Role == MemberRole.OwnerArea || tag.Kind == MemberKind.Edge || tag.Kind == MemberKind.Node || tag.Kind == MemberKind.Auxiliary) return false;
+            if (IsUngrouped(tag.GroupId)) return false;   // ungrouped: bulldozing a part removes that part only
             if (!TryGetRecordEntity(tag.GroupId, out var rec) || EntityManager.HasComponent<PlacemakerRemoval>(rec)
                 || EntityManager.HasComponent<PlacemakerUnderConstruction>(rec)) return false;
             if (OwnerAreaOf(tag.GroupId) != Entity.Null) return false;
@@ -343,6 +407,7 @@ namespace Placemaker.Game.Groups
             var g = EntityManager.GetComponentData<PlacemakerGroup>(e);
             g.Flags = (int)rec.Flags;
             EntityManager.SetComponentData(e, g);
+            if ((rec.Flags & GroupFlags.Ungrouped) != 0) _ungrouped.Add(rec.GroupId); else _ungrouped.Remove(rec.GroupId);
             _decoded[rec.GroupId] = rec;
             Bump();
         }
@@ -406,6 +471,7 @@ namespace Placemaker.Game.Groups
             _members.Clear();
             _allIds.Clear();
             _owners.Clear();
+            _ungrouped.Clear();
             using (var records = _recordQuery.ToEntityArray(Allocator.Temp))
                 for (int i = 0; i < records.Length; i++)
                 {
@@ -419,6 +485,7 @@ namespace Placemaker.Game.Groups
                     }
                     _records[g.GroupId] = records[i];
                     if (g.Owner != Entity.Null) _owners[g.GroupId] = g.Owner;
+                    if ((g.Flags & (int)GroupFlags.Ungrouped) != 0) _ungrouped.Add(g.GroupId);
                     _allIds.Add(g.GroupId);
                 }
             _allIds.Sort();
@@ -453,6 +520,9 @@ namespace Placemaker.Game.Groups
                     // The player bulldozed the ONE thing (US7): cascade to every member. Removal marks
                     // Deleted in PreTool of the next frame (RESEARCH-NOTES 11–12), never here.
                     if (TryGetRecordEntity(tag.GroupId, out var ownerRec) && !EntityManager.HasComponent<PlacemakerRemoval>(ownerRec)
+                        && !EntityManager.HasComponent<PlacemakerUnderConstruction>(ownerRec) && IsUngrouped(tag.GroupId))
+                        Mod.Log.Warn($"Placemaker: the owner area of ungrouped group {tag.GroupId} was deleted by another tool; its parts stay.");
+                    else if (TryGetRecordEntity(tag.GroupId, out ownerRec) && !EntityManager.HasComponent<PlacemakerRemoval>(ownerRec)
                         && !EntityManager.HasComponent<PlacemakerUnderConstruction>(ownerRec))
                     {
                         Mod.Log.Info($"Placemaker: owner area of group {tag.GroupId} was bulldozed; removing the whole group.");

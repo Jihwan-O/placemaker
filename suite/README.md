@@ -304,7 +304,7 @@ after a failed `area`, `type`, `preview` or `build` the scenario's remaining ste
 | `type` | `layer`, `preset` (style), `fresh` (true) | the type tile of the Make row, then the style chip; refuses a type the Make row does not offer; lists the valid ids on a typo |
 | `preset` | `layer` (the current type), `preset` | the style chip (Design) |
 | `value` | `path` ("0"), `id`, `value` or `json` | a slider is dragged (previewValue each frame, then setValue and endPreview, clamped and snapped to the control's range); a picker hovered then clicked; a toggle or choice set; refused when the panel greys the control out; the value is read back |
-| `entrance` | `side` (`south`/`east`/`north`/`west`, `t` 0.5 along it west→east or south→north) or `at`; `path`, `kind` | presses "Add an entrance" (or picks the marker kind), clicks the outline at the point, Esc. The tool's own (snapped) marker is recorded |
+| `entrance` | `side` (`south`/`east`/`north`/`west`, `t` 0.5 along it west→east or south→north) or `at`; `path`, `kind`; `crosswalk` (true/false: presses the panel's Crosswalk switch first when it is the other way) | presses "Add an entrance" (or picks the marker kind), clicks the outline at the point, Esc. The tool's own (snapped) marker is recorded (`placedKind`: `pedestrian+crosswalk` with a crosswalk) |
 | `entrances` | – | while the button asks for entrances: one on the south street, then east, north, west |
 | `moveEntrance` | `index` (0: the script's n-th entrance, matched by position), `side`/`t`/`at` | in placement mode: right-click the marker, left-click the new spot, Esc |
 | `removeEntrance` | `index` | right-click the marker |
@@ -316,6 +316,7 @@ after a failed `area`, `type`, `preview` or `build` the scenario's remaining ste
 | `delete` | – | select, Remove, OK; waits until the build is gone |
 | `bulldoze` | `target`: `owner` (the owner lot), `part` | the bulldozer's delete definition on that member (applied through the runner's fixture tool, not the bulldozer UI), then the group's own cascade |
 | `infoEdit` / `infoRemove` | – | the Placemaker tool closed, the build selected the vanilla way, its info panel's Edit / Remove |
+| `infoUngroup` | `ungroup` (true) | the same, its info panel's Ungroup and OK (or Group again with `ungroup: false`) |
 | `camera` | `target`, `view`, `index` (or `"all"`), `yaw`, `pitch`, `distance`, `fov`, `at`, `abs` | frames the camera (below); a target that does not exist is an error and no picture is taken |
 | `shot` | `name`, `shotMode`, `labels` (false: street names stay off) | a settled PNG of the current view |
 | `terrain` | `name` (`terrain`), `margin` (20 m) | not a camera picture: a map of the ground's height over the outline and the margin, from the game's height data (see `-Modes terrain` above); the step's record has the typical ground level and the lowest and highest ground |
@@ -324,6 +325,7 @@ after a failed `area`, `type`, `preview` or `build` the scenario's remaining ste
 | `undo` / `redo` | `via`: `key` (Ctrl+Z / Ctrl+Y, default), `panel` | says so when there is nothing to undo or redo |
 | `key` | `key`: `enter`, `esc`, `undo`, `redo` | the key, through the tool's own key handling |
 | `anarchy` | `on` | the panel's anarchy switch (not there in a clean run: the Anarchy mod is not loaded) |
+| `group` | `on` | Review's "One group" switch beside Build (off: the build is born ungrouped) |
 | `setting` | `name`, `value` | a Placemaker option (e.g. `IgnoreOwnCollisions`), read back |
 
 World clicks: the point is projected to the screen; off the screen or under the panel the camera pans to it like a

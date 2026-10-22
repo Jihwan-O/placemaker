@@ -616,6 +616,7 @@ namespace Placemaker.Game.Neighbours
             foreach (var h in stitch)
                 if (h.Options != null) foreach (var k in PolishLooks.ReachKnobs) if (h.Options.TryGetValue(k, out var v)) reach = math.max(reach, v);
             if (Settings.Extra != null) foreach (var k in PolishLooks.ReachKnobs) if (Settings.Extra.TryGetValue(k, out var v)) reach = math.max(reach, v);
+            int nearCount = stitch.Count;
             // polished houses further out whose gardens reach into what this pass may give its houses: fixed for the plan, so
             // the gardens it edits keep off them. A garden reaches further than the cluster radius (up to 500 m), and two big
             // gardens planned in different passes lay over each other, the fences of one standing in the other (the game
@@ -647,7 +648,8 @@ namespace Placemaker.Game.Neighbours
             PassPart(3, sw);
             var lo = new float2(float.MaxValue);
             var hi = new float2(float.MinValue);
-            foreach (var h in stitch)
+            // (around the houses of the neighbourhood: a far house is only there with its garden as it stands)
+            foreach (var h in stitch.Take(nearCount))
             {
                 float r = math.length(h.HalfLot) + reach + 20f;
                 lo = math.min(lo, h.Position - r);

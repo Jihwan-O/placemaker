@@ -43,10 +43,19 @@ to hide the blue outline. Measured in the game runner and offline; **[P]** = pro
 |---|---|---|
 | Brecon, lit house panned 240 frames: outline jumps / frames under half | 20 / 27 | 0 / 0 |
 | Brecon, 10 s after settling: pieces deleted / made | 477 / 432 | 0 / 0 |
+| Brecon, Outgrow busy after the load | > 150 s (never settled) | 3 s |
+| Brecon, every outgrown building re-planned (613): gaps / crossings / fences inside a garden / gardens over each other | 354 / 5 / 14 / 8 (as saved) | 188 / 4 / 0 / 0 |
 | Real preview: game outlines on ghost trees and bushes | all | none |
-| Offline replay, Brecon passes (59): gaps / gardens over a lot | 116 / 133 | 0 / 0 |
-| Offline replay, test town passes (43 + 39): gaps | 80 + 53 | 3 + 3 |
-| Runner, test town at 500 m reach: gaps / overlaps / fences inside a garden / pieces hidden | 26 / 17 / 281 / 134 | 2 / 0 / 0 / 0 |
+| Offline replay, Brecon passes (59): gaps / crossings / gardens over a lot | 116 / 0 / 133 | 0 / 0 / 0 |
+| Offline replay, test town passes (45 + 43 + 39): gaps / crossings | ? / 0, 80 / 0, 53 / 0 | 2 / 0, 3 / 0, 2 / 0 |
+| Runner, test town at 500 m reach, first fixes only: gaps / overlaps / fences inside a garden / pieces hidden | 26 / 17 / 281 / 134 | 2 / 0 / 0 / 0 |
+| Runner, test town at 500 m reach, final, old layout → new layout (same game) | 5 / 1 / 5 / 3 | 0 / 0 / 0 / 0 |
+
+Gaps between a house's own fence lanes (its gate, its driveway's opening: always 3.41 m or 7.3 m) are counted apart. Most of
+the 188 left in Brecon are openings by design the check still counts (street fronts at corners, shop-yard gates, fence ends
+against a house's side buildings). Left to do: a few short zig-zag pieces where a garden's edge follows a cut-out lot corner
+at a turning circle; existing cities keep the fences an older build saved until their buildings are planned again (the
+options' Redo outgrown buildings).
 
 ## 4. Tools
 

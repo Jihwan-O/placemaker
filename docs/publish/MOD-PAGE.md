@@ -10,7 +10,7 @@ Placemaker
 
 ## Short description
 
-Select an area and turn it into roads, parking, parks, shops, nature, farms or sports: 25 types, over 100 styles, every setting adjustable. Preview it, then build it.
+Pick an area. Pick what goes there. Roads, parking, parks, shops, industrial, zoning and more. Preview it, then build it. Early access.
 
 ## Long description
 
@@ -112,6 +112,16 @@ Placemaker is licensed under the GNU General Public License v3.0. Source on [Git
 Have fun :)
 
 ## Changelog (shown in its own panel)
+
+0.2.0
+- New: Outgrow (beta). Gardens and car parks grow past their lots and join up. Off by default.
+- New: Zoning. Set the zone mix and lot sizes and it zones your selection.
+- New: Industrial. Container yards, car yards, junk yards and industrial works.
+- Fixed: white boxes after loading a save (decal packs).
+- Smarter road grids and terraced blocks on slopes.
+- Odd-shaped parking lots work now.
+- No more lag spikes from the paint tools.
+- New panel: a Placemaker | Outgrow switch at the top, scrollbars, a cleaner preview.
 
 0.1.1: area tools: the paint bucket follows roads and buildings more exactly and previews as you hover, painting shows a live outline, slow drags now paint, and fills pick up new buildings and zoning.
 

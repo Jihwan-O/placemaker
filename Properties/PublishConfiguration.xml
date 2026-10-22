@@ -2,7 +2,7 @@
 	<!--Empty for the first upload. The publisher prints "Mod published with Id=NNNNNN": write it here, or the next upload makes a second listing-->
 	<ModId Value="163638" />
 	<DisplayName Value="Placemaker" />
-	<ShortDescription Value="Select an area and turn it into roads, parking, parks, shops, nature, farms or sports: 25 types, over 100 styles, every setting adjustable. Preview it, then build it." />
+	<ShortDescription Value="Pick an area. Pick what goes there. Roads, parking, parks, shops, industrial, zoning and more. Preview it, then build it. Early access." />
 	<!--Same text as docs/publish/MOD-PAGE.md. Markdown; no leading spaces; &amp; for "and" signs-->
 	<LongDescription>
 [Here's a 3-minute showcase.](https://www.youtube.com/watch?v=ghIR5UhFwj4)
@@ -118,9 +118,9 @@ Have fun :)
 	<!--"Code Mod" is added by the publisher itself-->
 	<Tag Value="Code Mod" />
 	<ForumLink Value="" />
-	<ModVersion Value="0.1.1" />
+	<ModVersion Value="0.2.0" />
 	<GameVersion Value="1.6.*" />
-	<ChangeLog Value="Area tools: the paint bucket follows roads and buildings more exactly and previews as you hover, painting shows a live outline, slow drags now paint, and fills pick up new buildings and zoning." />
+	<ChangeLog Value="- New: Outgrow (beta). Gardens and car parks grow past their lots and join up. Off by default.&#10;- New: Zoning. Set the zone mix and lot sizes and it zones your selection.&#10;- New: Industrial. Container yards, car yards, junk yards and industrial works.&#10;- Fixed: white boxes after loading a save (decal packs).&#10;- Smarter road grids and terraced blocks on slopes.&#10;- Odd-shaped parking lots work now.&#10;- No more lag spikes from the paint tools.&#10;- New panel: a Placemaker | Outgrow switch at the top, scrollbars, a cleaner preview." />
 	<ExternalLink Type="youtube" Url="https://www.youtube.com/watch?v=ghIR5UhFwj4" />
 	<ExternalLink Type="github" Url="https://github.com/jackwrichards/placemaker" />
 	<!--Public, Unlisted or Private, exactly as written (a typo falls back to Public). Made Public by the user on the website, 2026-10-17-->

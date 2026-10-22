@@ -95,21 +95,26 @@ namespace Placemaker.Core.Neighbours
         /// tracks and the lots of buildings that are not houses, as rings. Set per plan by the game (WithBarriers).</summary>
         public List<float2[]> Barriers;
         /// <summary>What each barrier is: 0 a road, path or track, 1 a building's lot, 2 water, 3 a deck overhead (an elevated
-        /// road, path or track: the ground under it; YardStitch.DeckKind) (null: all roads).</summary>
+        /// road, path or track, or a pillar under one; YardStitch.DeckKind: a barrier only where it is too low to grow under,
+        /// BarrierHeights) (null: all roads).</summary>
         public List<int> BarrierKinds;
         /// <summary>Which barriers are one thing (a road piece comes as several surfaces: its two halves and its ends at the
         /// junctions, a turning circle or a roundabout among them): barriers with the same number belong together (null:
         /// each its own).</summary>
         public List<long> BarrierGroups;
+        /// <summary>How high each barrier stands above the ground (m): for a deck overhead, its road surface (the game gives a
+        /// deck in slices along it: a ramp is a crack at its low end); 0 for the rest (null: all 0).</summary>
+        public List<float> BarrierHeights;
         /// <summary>The ground height (set per plan by the game; null: gardens grow regardless of the slope).</summary>
         public Func<float2, float> Ground;
         /// <summary>A copy of these settings for one plan, with the barriers around its houses.</summary>
-        public StitchSettings WithBarriers(List<float2[]> barriers, List<int> kinds = null, List<long> groups = null)
+        public StitchSettings WithBarriers(List<float2[]> barriers, List<int> kinds = null, List<long> groups = null, List<float> heights = null)
         {
             var c = (StitchSettings)MemberwiseClone();
             c.Barriers = barriers;
             c.BarrierKinds = kinds;
             c.BarrierGroups = groups;
+            c.BarrierHeights = heights;
             return c;
         }
     }

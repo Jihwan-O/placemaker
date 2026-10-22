@@ -3,7 +3,8 @@
 // the neighbour's fence. The user fixes this by hand with the vanilla Surface Area tool (dragging a house's own lawn
 // across the gap). This does the same automatically, for every house, whatever its asset:
 //   {"do":"lab","op":"street","shape":"arc","radius":90,"from":0,"to":180}   a curved (or "straight") street, zoned both sides
-//     ("elevation": 10 lays it that high above the ground: an elevated road, an overpass; with "zone":"none")
+//     ("elevation": 10 lays it that high above the ground: an elevated road, an overpass; [2, 12] a ramp climbing along it;
+//     with "zone":"none")
 //   {"do":"grow", ...}                                                         houses grow
 //   {"do":"lab","op":"yards","reach":10,"depth":56,"closeups":2}               each house's own lawn grows into the bare land
 // Bare land = inside the street's zoning depth, not road, not under any surface; each piece goes to the nearest lot within
@@ -43,8 +44,10 @@ namespace Placemaker.Game.Suite
             string roadName = (string)step["road"] ?? Placemaker.Core.Suite.SuiteLayout.SmallRoad;
             if (!_fixture.Prefabs.TryGetValue(roadName, out var road)) { rec["error"] = "lab: no road prefab " + roadName; yield break; }
             var curves = new List<Bezier4x3>();
-            float elevation = (float?)step["elevation"] ?? 0f;
-            float3 P(float2 p) => new float3(p.x, _fixture.H(p.x, p.y) + elevation, p.y);
+            float elevation = 0f, elevationTo = 0f;
+            if (step["elevation"] is JArray ramp && ramp.Count >= 2) { elevation = (float)ramp[0]; elevationTo = (float)ramp[1]; }
+            else elevation = elevationTo = (float?)step["elevation"] ?? 0f;
+            float3 P(float2 p) => new float3(p.x, _fixture.H(p.x, p.y), p.y);
             if (shape == "block")
             {
                 // a square loop of streets: houses on all four sides meet back to back in the middle
@@ -97,25 +100,41 @@ namespace Placemaker.Game.Suite
                     curves.Add(new Bezier4x3(P(p0), P(p1), P(p2), P(p3)));
                 }
             }
+            // lifted off the ground: each piece's start and end as far along the climb as they lie along the street
+            var lift = new List<float2>(curves.Count);
+            float total = 0f, run = 0f;
+            foreach (var c in curves) total += MathUtils.Length(c.xz);
+            for (int i = 0; i < curves.Count; i++)
+            {
+                float len = MathUtils.Length(curves[i].xz);
+                var el = total > 0f ? new float2(math.lerp(elevation, elevationTo, run / total), math.lerp(elevation, elevationTo, (run + len) / total)) : new float2(elevation);
+                run += len;
+                var c = curves[i];
+                c.a.y += el.x; c.b.y += math.lerp(el.x, el.y, 1f / 3f); c.c.y += math.lerp(el.x, el.y, 2f / 3f); c.d.y += el.y;
+                curves[i] = c;
+                lift.Add(el);
+            }
             var em = _world.EntityManager;
             yield return ApplyWithFixtureTool(t =>
             {
                 var random = new Unity.Mathematics.Random(0x1AB5u);
-                foreach (var curve in curves)
+                for (int i = 0; i < curves.Count; i++)
                 {
-                    CoursePos End(float3 at, float3 tangent, float delta, CoursePosFlags f) => new CoursePos
+                    var curve = curves[i];
+                    var el = lift[i];
+                    CoursePos End(float3 at, float3 tangent, float delta, float up, CoursePosFlags f) => new CoursePos
                     {
                         m_Entity = Entity.Null, m_Position = at, m_Rotation = NetUtils.GetNodeRotation(tangent), m_CourseDelta = delta,
-                        m_Elevation = new float2(elevation), m_Flags = f | CoursePosFlags.IsLeft | CoursePosFlags.IsRight, m_ParentMesh = -1, m_SplitPosition = 0f,
+                        m_Elevation = new float2(up), m_Flags = f | CoursePosFlags.IsLeft | CoursePosFlags.IsRight, m_ParentMesh = -1, m_SplitPosition = 0f,
                     };
                     var def = t.NewDefinition();
                     em.AddComponentData(def, new CreationDefinition { m_Prefab = road, m_RandomSeed = random.NextInt() });
                     em.AddComponent<Updated>(def);
                     em.AddComponentData(def, new NetCourse
                     {
-                        m_Curve = curve, m_Length = MathUtils.Length(curve), m_FixedIndex = -1, m_Elevation = new float2(elevation),
-                        m_StartPosition = End(curve.a, MathUtils.StartTangent(curve), 0f, CoursePosFlags.IsFirst),
-                        m_EndPosition = End(curve.d, MathUtils.EndTangent(curve), 1f, CoursePosFlags.IsLast),
+                        m_Curve = curve, m_Length = MathUtils.Length(curve), m_FixedIndex = -1, m_Elevation = new float2((el.x + el.y) * 0.5f),
+                        m_StartPosition = End(curve.a, MathUtils.StartTangent(curve), 0f, el.x, CoursePosFlags.IsFirst),
+                        m_EndPosition = End(curve.d, MathUtils.EndTangent(curve), 1f, el.y, CoursePosFlags.IsLast),
                     });
                 }
                 return curves.Count;
@@ -133,7 +152,7 @@ namespace Placemaker.Game.Suite
                 rec["pieces"] = curves.Count;
                 st.Ring = new[] { lo + 30f, new float2(hi.x - 30f, lo.y + 30f), hi - 30f, new float2(lo.x + 30f, hi.y - 30f) };
                 Event("build");
-                Mod.Log.Info($"Placemaker lab: street {shape} ({curves.Count} pieces of {roadName}{(elevation != 0f ? $", {elevation:F0} m up" : "")}), not zoned");
+                Mod.Log.Info($"Placemaker lab: street {shape} ({curves.Count} pieces of {roadName}{(elevation != elevationTo ? $", climbing {elevation:F0} to {elevationTo:F0} m" : elevation != 0f ? $", {elevation:F0} m up" : "")}), not zoned");
                 yield break;
             }
             // the same zone in the other theme when this one has none (NA and EU name most zones alike)

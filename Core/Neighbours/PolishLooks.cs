@@ -63,6 +63,9 @@ namespace Placemaker.Core.Neighbours
             // the land a garden grows onto: no steeper than this (%), no further above or below the house (m); 0: no limit.
             // Forgiving by default ("they basically just avoid going up a mega cliff"): only cliffs stop a garden.
             ["maxSlope"] = 80f, ["maxRise"] = 0f,
+            // under an elevated road or a bridge: only where its road is this high above the ground (m; lower, it is a crack
+            // nothing grows into: "it's just when it crams itself in a little crack, that's bad"). Trees never go under one
+            ["deckClearance"] = 7f,
             // never nearer the water than this (m; from the waterline, along a smooth line)
             ["waterGap"] = 30f,
             // lawns and ground paint
@@ -133,6 +136,7 @@ namespace Placemaker.Core.Neighbours
             new Knob("openReach", "reach", KnobKind.Slider, ControlTier.Essential, 0, 500, 1, "m"),
             new Knob("maxSlope", "reach", KnobKind.Slider, ControlTier.Essential, 0, 150, 5, "%"),
             new Knob("maxRise", "reach", KnobKind.Slider, ControlTier.More, 0, 40, 0.5, "m"),
+            new Knob("deckClearance", "reach", KnobKind.Slider, ControlTier.More, 0, 40, 0.5, "m"),
             new Knob("wrap", "reach", KnobKind.Toggle, ControlTier.More),
             new Knob("closeBacks", "reach", KnobKind.Toggle, ControlTier.More),
             new Knob("closeGardens", "fences", KnobKind.Toggle, ControlTier.Essential),

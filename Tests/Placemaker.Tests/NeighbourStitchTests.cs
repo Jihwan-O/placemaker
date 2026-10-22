@@ -243,37 +243,64 @@ namespace Placemaker.Tests
         }
 
         [Fact]
-        public void A_garden_never_grows_under_an_overpass_and_keeps_a_deck_gap_off_it()
+        public void A_garden_keeps_out_of_the_crack_under_a_low_deck_and_grows_under_a_high_one_but_no_tree()
         {
-            // the user: lots find the crack under an overpass and tuck trees, bushes and fences under a road that is not on the
-            // ground. A deck 20 m to the house's right (x 28 to 40), a ground road beyond it (x 56 to 64)
+            // the user: "going under an elevated road is totally fine. It's just when it crams itself in a little crack, that's
+            // bad"; "a huge tree doesn't belong under a highway, even if it's a really tall highway". A deck 20 m to the
+            // house's right (x 28 to 40), a ground road beyond it (x 56 to 64) that the garden reaches for
             var deck = Strip(28f, -200f, 40f, 200f);
             var road = Strip(56f, -200f, 64f, 200f);
-            StitchPlan Plan(List<float2[]> barriers, List<int> kinds, float fill)
+            StitchPlan Plan(float deckHeight, float fill, float? clearance = null, float2[] pillar = null)
             {
                 var a = House(1, new float2(0f, 0f), new float2(0f, 1f));
                 a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 60f, ["fill"] = fill };
-                return YardStitch.Plan(new[] { a }, MiddleLine().WithBarriers(barriers, kinds));
+                if (clearance != null) a.Options["deckClearance"] = clearance.Value;
+                var barriers = new List<float2[]> { deck, road };
+                var kinds = new List<int> { YardStitch.DeckKind, 0 };
+                var heights = new List<float> { deckHeight, 0f };
+                if (pillar != null) { barriers.Add(pillar); kinds.Add(YardStitch.DeckKind); heights.Add(0f); }
+                return YardStitch.Plan(new[] { a }, MiddleLine().WithBarriers(barriers, kinds, null, heights));
             }
-            // the deck left out (as the game handed the barriers before): the garden reached under it to the road
-            var before = Plan(new List<float2[]> { road }, null, PolishLooks.FillGarden);
-            Assert.True(before.Plots.TryGetValue(1, out var pb) && pb.Max(p => p.x) > 40f, $"without the deck the garden grows under it ({pb?.Max(p => p.x):F1})");
+            bool IsTree(int kind) => YardStitch.BushKinds[kind].Contains("Tree");
             const float gap = 0.8f + 1.5f;   // the barrier margin and the deck gap
+            Assert.Equal(7f, PolishLooks.Defaults["deckClearance"]);
             foreach (float fill in new[] { PolishLooks.FillGarden, PolishLooks.FillCarPark })
             {
-                var plan = Plan(new List<float2[]> { deck, road }, new List<int> { YardStitch.DeckKind, 0 }, fill);
-                Assert.True(plan.Plots.TryGetValue(1, out var pa), "the garden grows");
+                // 3 m up (a ramp's foot): a crack. The garden reaches the deck's gap and stops; nothing of it under the deck
+                var low = Plan(3f, fill);
+                Assert.True(low.Plots.TryGetValue(1, out var pa), "the garden grows");
                 float reach = pa.Max(p => p.x);
-                Assert.True(reach < 28f - gap + 0.05f && reach > 28f - gap - 1f, $"fill {fill}: the garden reaches the deck's gap and stops there ({reach:F2})");
-                // nothing of it under the deck nor in its gap: no lawn, bed, path, paving, fence, hedge, tree, bush or prop
-                Assert.DoesNotContain(plan.Bushes, b => b.Position.x > 28f - gap + 0.05f);
-                Assert.DoesNotContain(plan.FencePieces, f => f.Position.x > 28f - gap + 0.05f);
-                foreach (var ring in plan.Lawns.Values.Concat(plan.NewLawns.Select(l => l.Ring)).Concat(plan.Beds.Select(b => b.Ring)).Concat(plan.Paths.Select(p => p.Ring)))
+                Assert.True(reach < 28f - gap + 0.05f && reach > 28f - gap - 1f, $"fill {fill}: the garden stops a deck gap short of the crack ({reach:F2})");
+                Assert.DoesNotContain(low.Bushes, b => b.Position.x > 28f - gap + 0.05f);
+                Assert.DoesNotContain(low.FencePieces, f => f.Position.x > 28f - gap + 0.05f);
+                foreach (var ring in low.Lawns.Values.Concat(low.NewLawns.Select(l => l.Ring)).Concat(low.Beds.Select(b => b.Ring)).Concat(low.Paths.Select(p => p.Ring)))
                     Assert.True(ring.Max(p => p.x) < 28f - gap + 0.05f, $"fill {fill}: a surface reaches {ring.Max(p => p.x):F2}");
+                // 10 m up (an overpass): room under it. The garden grows under it to the ground road beyond, as if it were not
+                // there, but no tree stands under it nor within a crown of it
+                var high = Plan(10f, fill);
+                Assert.True(high.Plots.TryGetValue(1, out var ph) && ph.Max(p => p.x) > 50f, $"fill {fill}: under a high deck the garden reaches the road beyond ({ph?.Max(p => p.x):F1})");
+                Assert.DoesNotContain(high.Bushes, b => IsTree(b.Kind) && b.Position.x > 28f - 3f && b.Position.x < 40f + 3f);
+                // the look asks more room: the same deck is a crack
+                var strict = Plan(10f, fill, 12f);
+                Assert.True(strict.Plots.TryGetValue(1, out var ps) && ps.Max(p => p.x) < 28f - gap + 0.05f, $"fill {fill}: 12 m asked, a 10 m deck is a crack ({ps?.Max(p => p.x):F1})");
             }
-            // a ground road in the deck's place: the garden comes a road's margin near it
-            var ground = Plan(new List<float2[]> { deck, road }, null, PolishLooks.FillGarden);
-            Assert.True(ground.Plots.TryGetValue(1, out var pg) && pg.Max(p => p.x) > 28f - 0.8f - 0.3f, $"a ground road: up to its margin ({pg?.Max(p => p.x):F2})");
+            // a car park yard plants trees: some stand where they would without the deck, none by it
+            var open = Plan(10f, PolishLooks.FillCarPark, 0f);
+            var noDeck = YardStitch.Plan(new[] { WithOptions(House(1, new float2(0f, 0f), new float2(0f, 1f)), PolishLooks.FillCarPark) }, MiddleLine().WithBarriers(new List<float2[]> { road }));
+            Assert.Contains(noDeck.Bushes, b => IsTree(b.Kind) && b.Position.x > 25f && b.Position.x < 43f);
+            Assert.DoesNotContain(open.Bushes, b => IsTree(b.Kind) && b.Position.x > 25f && b.Position.x < 43f);
+            // a pillar under the high deck: nothing grows into it
+            var pillar = Strip(33f, -30f, 35f, -28f);
+            var withPillar = Plan(10f, PolishLooks.FillGarden, null, pillar);
+            Assert.True(withPillar.Plots.TryGetValue(1, out var pp) && !Poly.Contains(pp, new float2(34f, -29f)), "the garden keeps out of the pillar");
+            Assert.DoesNotContain(withPillar.FencePieces, f => Poly.Contains(pillar, f.Position));
+            Assert.DoesNotContain(withPillar.Bushes, b => Poly.Contains(pillar, b.Position));
+        }
+
+        private static StitchHouse WithOptions(StitchHouse h, float fill)
+        {
+            h.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 60f, ["fill"] = fill };
+            return h;
         }
 
         [Fact]

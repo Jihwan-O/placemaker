@@ -39,10 +39,11 @@ namespace Placemaker.Game.Neighbours
             public NativeList<Entity> Results;
             [Unity.Collections.ReadOnly] public ComponentLookup<global::Game.Buildings.Building> Buildings;
             [Unity.Collections.ReadOnly] public ComponentLookup<global::Game.Buildings.Extension> Extensions;
+            [Unity.Collections.ReadOnly] public ComponentLookup<global::Game.Objects.Pillar> Pillars;
             public bool Intersect(QuadTreeBoundsXZ bounds) => MathUtils.Intersect(bounds.m_Bounds.xz, Bounds);
             public void Iterate(QuadTreeBoundsXZ bounds, Entity e)
             {
-                if (MathUtils.Intersect(bounds.m_Bounds.xz, Bounds) && (Buildings.HasComponent(e) || Extensions.HasComponent(e))) Results.Add(e);
+                if (MathUtils.Intersect(bounds.m_Bounds.xz, Bounds) && (Buildings.HasComponent(e) || Extensions.HasComponent(e) || Pillars.HasComponent(e))) Results.Add(e);
             }
         }
 
@@ -68,29 +69,44 @@ namespace Placemaker.Game.Neighbours
         {
             public EdgeGeometry Edge;
             public EdgeNodeGeometry Start, End;
-            public bool HasStart, HasEnd, Deck;
+            public bool HasStart, HasEnd;
             public Entity StartComp, EndComp;
             public List<float2[]> Rings;
+            /// <summary>A deck's: how high each ring's road surface is above the ground.</summary>
+            public List<float> Heights;
         }
 
         // every road piece's surfaces, read again only when its geometry changed (the patches of a growing town overlap: the
-        // same roads were read for every pass)
+        // same roads were read for every pass); the decks of elevated ones apart
         private readonly Dictionary<Entity, RoadShape> _roadShapes = new Dictionary<Entity, RoadShape>();
+        private readonly Dictionary<Entity, RoadShape> _deckShapes = new Dictionary<Entity, RoadShape>();
+        private readonly List<(float2[] Ring, float Height)> _deckPieces = new List<(float2[], float)>();
 
-        /// <summary>The road piece's surfaces (RoadSurfaces; a strip along its curve when it has no geometry yet); a deck's
-        /// with its elevated ends.</summary>
-        private List<float2[]> RoadRings(Entity e, float width, bool deck)
+        /// <summary>The cached shape of the road piece when its geometry has not changed since (else null; <paramref name="now"/>
+        /// is then filed in its place, its rings for the caller to fill).</summary>
+        private RoadShape Cached(Dictionary<Entity, RoadShape> cache, Entity e, out RoadShape now)
         {
             var g = EntityManager.GetComponentData<EdgeGeometry>(e);
             bool hs = EntityManager.HasComponent<StartNodeGeometry>(e), he = EntityManager.HasComponent<EndNodeGeometry>(e);
             var sg = hs ? EntityManager.GetComponentData<StartNodeGeometry>(e).m_Geometry : default;
             var eg = he ? EntityManager.GetComponentData<EndNodeGeometry>(e).m_Geometry : default;
             var comp = EntityManager.HasComponent<Composition>(e) ? EntityManager.GetComponentData<Composition>(e) : default;
-            if (_roadShapes.TryGetValue(e, out var c) && c.HasStart == hs && c.HasEnd == he && c.Deck == deck && c.StartComp == comp.m_StartNode && c.EndComp == comp.m_EndNode
+            now = new RoadShape { Edge = g, Start = sg, End = eg, HasStart = hs, HasEnd = he, StartComp = comp.m_StartNode, EndComp = comp.m_EndNode };
+            if (cache.TryGetValue(e, out var c) && c.HasStart == hs && c.HasEnd == he && c.StartComp == comp.m_StartNode && c.EndComp == comp.m_EndNode
                 && Exact(c.Edge.m_Start, g.m_Start) && Exact(c.Edge.m_End, g.m_End) && (!hs || Exact(c.Start, sg)) && (!he || Exact(c.End, eg)))
-                return c.Rings;
+                return c;
+            if (cache.Count > 50000) cache.Clear();
+            cache[e] = now;
+            return null;
+        }
+
+        /// <summary>The road piece's surfaces (RoadSurfaces; a strip along its curve when it has no geometry yet).</summary>
+        private List<float2[]> RoadRings(Entity e, float width)
+        {
+            var c = Cached(_roadShapes, e, out var now);
+            if (c != null) return c.Rings;
             _roadPieces.Clear();
-            RoadSurfaces.Pieces(EntityManager, e, _roadPieces, deck);
+            RoadSurfaces.Pieces(EntityManager, e, _roadPieces);
             var rings = new List<float2[]>(_roadPieces.Count);
             foreach (var (ring, _) in _roadPieces) rings.Add(ring);
             if (rings.Count == 0)
@@ -98,9 +114,23 @@ namespace Placemaker.Game.Neighbours
                 var strip = Strip(EntityManager.GetComponentData<Curve>(e), width * 0.5f);
                 if (strip != null) rings.Add(strip);
             }
-            if (_roadShapes.Count > 50000) _roadShapes.Clear();
-            _roadShapes[e] = new RoadShape { Edge = g, Start = sg, End = eg, HasStart = hs, HasEnd = he, Deck = deck, StartComp = comp.m_StartNode, EndComp = comp.m_EndNode, Rings = rings };
+            now.Rings = rings;
             return rings;
+        }
+
+        /// <summary>An elevated road piece's deck in slices along it, each with how high it is above the ground
+        /// (RoadSurfaces.DeckPieces; read again when its geometry changed).</summary>
+        private RoadShape DeckRings(Entity e)
+        {
+            var c = Cached(_deckShapes, e, out var now);
+            if (c != null) return c;
+            var heights = _terrain.GetHeightData(true);
+            _deckPieces.Clear();
+            RoadSurfaces.DeckPieces(EntityManager, e, p => global::Game.Simulation.TerrainUtils.SampleHeight(ref heights, p), _deckPieces);
+            now.Rings = new List<float2[]>(_deckPieces.Count);
+            now.Heights = new List<float>(_deckPieces.Count);
+            foreach (var (ring, h) in _deckPieces) { now.Rings.Add(ring); now.Heights.Add(h); }
+            return now;
         }
 
         private static bool Exact(Bezier4x3 x, Bezier4x3 y) => x.a.Equals(y.a) && x.b.Equals(y.b) && x.c.Equals(y.c) && x.d.Equals(y.d);
@@ -108,17 +138,19 @@ namespace Placemaker.Game.Neighbours
         private static bool Exact(EdgeNodeGeometry x, EdgeNodeGeometry y) => Exact(x.m_Left, y.m_Left) && Exact(x.m_Right, y.m_Right) && Exact(x.m_Middle, y.m_Middle) && x.m_MiddleRadius == y.m_MiddleRadius;
 
         /// <summary>The barriers in a box, what each is (0 a road, path or track, 1 a building's lot, a lot area or a
-        /// Placemaker build, 2 water, 3 the deck of an elevated road, path or track) and which belong together (a road piece's
-        /// surfaces: the edge's entity).</summary>
-        private List<float2[]> BarriersIn(float2 min, float2 max, List<int> kinds, List<long> groups, HashSet<Entity> planned = null)
+        /// Placemaker build, 2 water, 3 the deck of an elevated road, path or track, or a pillar under one), which belong
+        /// together (a road piece's surfaces: the edge's entity) and how high each stands above the ground (a deck's slices:
+        /// the planner grows under the ones high enough).</summary>
+        private List<float2[]> BarriersIn(float2 min, float2 max, List<int> kinds, List<long> groups, HashSet<Entity> planned = null, List<float> heights = null)
         {
             var list = new List<float2[]>();
             long single = long.MinValue;   // groups of one (lots, water): numbers no entity has
-            void Add(float2[] ring, int kind, long group)
+            void Add(float2[] ring, int kind, long group, float height = 0f)
             {
                 list.Add(ring);
                 kinds?.Add(kind);
                 groups?.Add(group);
+                heights?.Add(height);
             }
             _netSearch ??= World.GetExistingSystemManaged<global::Game.Net.SearchSystem>();
             _objectSearch ??= World.GetExistingSystemManaged<global::Game.Objects.SearchSystem>();
@@ -148,14 +180,19 @@ namespace Placemaker.Game.Neighbours
                         bool ground = EntityManager.HasComponent<Road>(e) || EntityManager.HasComponent<PathwayData>(prefab)
                             || EntityManager.HasComponent<TrainTrack>(e) || EntityManager.HasComponent<TramTrack>(e);
                         if (!ground) continue;
-                        // elevated (an overpass, a bridge): its deck as seen from above, the ground under it no garden's (gardens
-                        // found the crack under an overpass and tucked trees, bushes and fences under it, "a road that's not
-                        // technically on the ground")
-                        bool deck = (data.m_Flags.m_General & CompositionFlags.General.Elevated) != 0;
+                        // elevated (an overpass, a bridge): its deck as seen from above in slices, each with its height (gardens
+                        // found the crack under a low one and tucked trees, bushes and fences under it, "a road that's not
+                        // technically on the ground"; under a high one they may grow, but no tree)
+                        if ((data.m_Flags.m_General & CompositionFlags.General.Elevated) != 0)
+                        {
+                            var deck = DeckRings(e);
+                            for (int k = 0; k < deck.Rings.Count; k++) Add(deck.Rings[k], YardStitch.DeckKind, Id(e), deck.Heights[k]);
+                            continue;
+                        }
                         // its ground as the game draws it: both halves and its ends at the junctions, so a turning circle
                         // or a roundabout is a barrier too (a strip along the curve ends square at the node's centre:
                         // gardens grew into them, "they think they can encroach")
-                        foreach (var ring in RoadRings(e, data.m_Width, deck)) Add(ring, deck ? YardStitch.DeckKind : 0, Id(e));
+                        foreach (var ring in RoadRings(e, data.m_Width)) Add(ring, 0, Id(e));
                     }
                 }
                 results.Clear();
@@ -164,19 +201,28 @@ namespace Placemaker.Game.Neighbours
                 {
                     var tree = _objectSearch.GetStaticSearchTree(true, out var deps);
                     deps.Complete();
-                    // only buildings (and extensions): the trees, props, bushes and fence pieces around a patch number thousands
+                    // only buildings (and extensions) and the pillars under decks: the trees, props, bushes and fence pieces
+                    // around a patch number thousands
                     var it = new BuildingIterator
                     {
                         Bounds = new Bounds2(min, max), Results = results,
                         Buildings = GetComponentLookup<global::Game.Buildings.Building>(true), Extensions = GetComponentLookup<global::Game.Buildings.Extension>(true),
+                        Pillars = GetComponentLookup<global::Game.Objects.Pillar>(true),
                     };
                     tree.Iterate(ref it);
                     var seen = new HashSet<Entity>();
                     for (int i = 0; i < results.Length && list.Count < MaxBarriers; i++)
                     {
                         var e = results[i];
-                        if (!seen.Add(e) || !BuildingFootprints.IsBuilding(EntityManager, e)) continue;
-                        if (EntityManager.HasComponent<Temp>(e) || EntityManager.HasComponent<Deleted>(e)) continue;
+                        if (!seen.Add(e) || EntityManager.HasComponent<Temp>(e) || EntityManager.HasComponent<Deleted>(e)) continue;
+                        // a pillar: nothing grows into it, whatever the deck above (a hedge ran through it)
+                        if (EntityManager.HasComponent<global::Game.Objects.Pillar>(e))
+                        {
+                            var box = ObjectBox(e);
+                            if (box != null) Add(box, YardStitch.DeckKind, single++);
+                            continue;
+                        }
+                        if (!BuildingFootprints.IsBuilding(EntityManager, e)) continue;
                         // houses are the plan's own; a house still being built is not (it is no house to plan yet): its lot is kept
                         // clear. So is the lot of a house the plan does not have (further out than its neighbourhood): a garden
                         // reaching that far grew over it, its fences inside that lot (the game hid them: holes in the run)
@@ -309,6 +355,19 @@ namespace Placemaker.Game.Neighbours
                 Mod.Log.Info($"Placemaker neighbourhood polish: something built or bulldozed nearby ({string.Join(", ", what)}): {marked} gardens planned again first");
                 s_logPasses = 4;
             }
+        }
+
+        /// <summary>An object's footprint (its geometry's bounds turned with it), or null without geometry.</summary>
+        private float2[] ObjectBox(Entity e)
+        {
+            if (!EntityManager.HasComponent<global::Game.Objects.Transform>(e) || !EntityManager.HasComponent<PrefabRef>(e)) return null;
+            var prefab = EntityManager.GetComponentData<PrefabRef>(e).m_Prefab;
+            if (!EntityManager.HasComponent<ObjectGeometryData>(prefab)) return null;
+            var b = EntityManager.GetComponentData<ObjectGeometryData>(prefab).m_Bounds;
+            if (b.max.x - b.min.x < 0.1f || b.max.z - b.min.z < 0.1f) return null;
+            var t = EntityManager.GetComponentData<global::Game.Objects.Transform>(e);
+            float2 W(float x, float z) => global::Game.Objects.ObjectUtils.LocalToWorld(t, new float3(x, 0f, z)).xz;
+            return new[] { W(b.min.x, b.min.z), W(b.max.x, b.min.z), W(b.max.x, b.max.z), W(b.min.x, b.max.z) };
         }
 
         /// <summary>A net edge's ground as a strip along its curve (its full width; ends square at its nodes).</summary>

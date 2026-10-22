@@ -661,9 +661,10 @@ namespace Placemaker.Game.Neighbours
             foreach (var h in stitch) if (h.Options != null && h.Options.TryGetValue("waterGap", out var w)) wetGap = math.max(wetGap, w);
             var kinds = new List<int>();
             var groups = new List<long>();
+            var heights = new List<float>();
             var planned = new HashSet<Entity>();
             foreach (var h in stitch) if (_houseOf.TryGetValue(h.Id, out var he)) planned.Add(he);
-            var settings = Settings.WithBarriers(stitch.Count > 0 ? BarriersIn(lo, hi, kinds, groups, planned) : null, kinds, groups);
+            var settings = Settings.WithBarriers(stitch.Count > 0 ? BarriersIn(lo, hi, kinds, groups, planned, heights) : null, kinds, groups, heights);
             PassPart(4, sw);
             // the ground (gardens stop where it gets too steep or too high) and the water: read by jobs, the plan starts when
             // they are done (StartSampledPlans)
@@ -709,6 +710,7 @@ namespace Placemaker.Game.Neighbours
                             settings.Barriers.Add(water[k]);
                             settings.BarrierKinds?.Add(2);
                             settings.BarrierGroups?.Add(long.MinValue / 2 + k);
+                            settings.BarrierHeights?.Add(0f);
                         }
                     if (dump) DumpPass(stitch, settings, raster, dumpNo);
                     var result = planner(stitch, settings);

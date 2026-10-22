@@ -1,5 +1,5 @@
 {
-  "_about": "Outgrow under overpasses (the user: lots find a crack under an overpass and tuck trees, bushes and fences under a road that is not on the ground). A straight street zoned on both sides; behind its north row an elevated road (10 m up) with a ground road further out, past its east end the same turned north-south. Gardens reach out to the ground roads, so without an overhead check they grow under the decks. The outgrow check measures gardens and Outgrow pieces under decks (gardensUnderDecks, underDeckM2, outgrowPiecesUnderDecks); the south row, with open land behind, is the control. Send with: powershell -File tools/suite/Send-Suite.ps1 -File suite/scenarios/outgrow-overpass.json -Who outgrow-overpass",
+  "_about": "Outgrow under overpasses (the user: going under an elevated road is fine, cramming into a little crack under one is not; no big tree under a highway). A straight street zoned on both sides; behind its north row an elevated road 10 m up (room under it: gardens may grow under it, but no tree), past its east end a ramp climbing from 3 to 13 m (its low south end a crack: nothing grows there), each with a ground road further out that gardens reach for. The outgrow check measures gardens and Outgrow pieces in cracks (gardensUnderDecks, underDeckM2, outgrowPiecesUnderDecks: want 0), under high decks (allowed) and trees by decks (outgrowTreesByDecks: want 0). Send with: powershell -File tools/suite/Send-Suite.ps1 -File suite/scenarios/outgrow-overpass.json -Who outgrow-overpass",
   "scenarios": [
     {
       "id": "overpass-shops",
@@ -10,7 +10,7 @@
         { "do": "lab", "op": "street", "shape": "straight", "length": 200, "zone": "NA Commercial Low" },
         { "do": "lab", "op": "street", "shape": "straight", "at": [ -4, 82 ], "length": 232, "road": "Medium Road", "elevation": 10, "zone": "none" },
         { "do": "lab", "op": "street", "shape": "straight", "at": [ -5, 110 ], "length": 230, "zone": "none" },
-        { "do": "lab", "op": "street", "shape": "straight", "at": [ 128, -22 ], "yaw": 90, "length": 176, "road": "Medium Road", "elevation": 10, "zone": "none" },
+        { "do": "lab", "op": "street", "shape": "straight", "at": [ 128, -22 ], "yaw": 90, "length": 176, "road": "Medium Road", "elevation": [ 3, 13 ], "zone": "none" },
         { "do": "lab", "op": "street", "shape": "straight", "at": [ 160, -20 ], "yaw": 90, "length": 180, "zone": "none" },
         { "do": "grow", "seconds": 120 },
         { "do": "lab", "op": "polishIdle", "seconds": 120 },
@@ -30,14 +30,15 @@
         { "do": "lab", "op": "street", "shape": "straight", "length": 200, "zone": "NA Residential Low" },
         { "do": "lab", "op": "street", "shape": "straight", "at": [ -4, 82 ], "length": 232, "road": "Medium Road", "elevation": 10, "zone": "none" },
         { "do": "lab", "op": "street", "shape": "straight", "at": [ -5, 110 ], "length": 230, "zone": "none" },
-        { "do": "lab", "op": "street", "shape": "straight", "at": [ 128, -22 ], "yaw": 90, "length": 176, "road": "Medium Road", "elevation": 10, "zone": "none" },
+        { "do": "lab", "op": "street", "shape": "straight", "at": [ 128, -22 ], "yaw": 90, "length": 176, "road": "Medium Road", "elevation": [ 3, 13 ], "zone": "none" },
         { "do": "lab", "op": "street", "shape": "straight", "at": [ 160, -20 ], "yaw": 90, "length": 180, "zone": "none" },
         { "do": "grow", "seconds": 120 },
         { "do": "lab", "op": "polishIdle", "seconds": 120 },
         { "do": "lab", "op": "outgrowQuiet", "seconds": 10 },
         { "do": "lab", "op": "outgrowCheck", "closeups": 4 },
         { "do": "shot", "name": "top", "camera": { "target": "area", "view": "top" }, "shotMode": "render" },
-        { "do": "shot", "name": "45-north-deck", "camera": { "target": "point", "at": [ 0, 60 ], "view": "oblique", "pitch": 45, "yaw": 180, "distance": 130 }, "shotMode": "render" }
+        { "do": "shot", "name": "45-north-deck", "camera": { "target": "point", "at": [ 0, 60 ], "view": "oblique", "pitch": 45, "yaw": 180, "distance": 130 }, "shotMode": "render" },
+        { "do": "shot", "name": "45-east-deck", "camera": { "target": "point", "at": [ 115, 0 ], "view": "oblique", "pitch": 45, "yaw": 270, "distance": 110 }, "shotMode": "render" }
       ]
     }
   ]

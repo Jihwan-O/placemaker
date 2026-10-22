@@ -708,31 +708,26 @@
     white-space: normal;
 }
 
-// Review: Build's options, one per line above the one Build button (permanent changes, grouping, keep area)
-.footOptions {
-    @include col;
-    margin-bottom: 7rem;
+// Review: Build's two switches side by side above the button row ([OK, permanent] then Build)
+.footSwitches {
+    @include row;
+    min-width: 0;
+    margin-bottom: 8rem;
 }
 
 .footOption {
     @include row;
-    min-height: 22rem;
-    margin-bottom: 3rem;
-    padding: 0 2rem;
-}
-
-// the permanent-changes tick: amber like the tags it answers
-.footOptionWarn {
-    padding: 0 6rem;
-    border-radius: $radius-s;
-    background-color: rgba(255, 181, 71, 0.12);
-    @include border(1rem, rgba(255, 181, 71, 0.45));
+    flex: 1 1 0;
+    min-width: 0;
+    height: 22rem;
+    padding-left: 2rem;
 }
 
 .footOptionLabel {
     margin-left: 8rem;
     font-size: $fs-s;
     color: var(--menuText1Normal);
+    @include ellipsis;
 }
 
 // s42: [☐ OK, permanent] beside the primary button; the button takes the rest of the row.

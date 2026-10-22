@@ -226,12 +226,12 @@ test("footpath entrances come with or without a crosswalk; car entrances never o
     await expect(toggle).toHaveAttribute("aria-checked", "true");
     await clickWorld(page, (FIELD[0][0] + FIELD[1][0]) / 2, (FIELD[0][1] + FIELD[1][1]) / 2);
     await expect(page.getByTestId("marker-0")).toHaveAttribute("data-kind", "footpath");
-    await expect(page.getByTestId("marker-crosswalk-0")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("marker-crosswalk-0")).toHaveAttribute("aria-checked", "true");
     expect(await page.evaluate(() => (window as any).pm.backend.root.markers[0].kind)).toBe("footpath+crosswalk");
     await panelShot(page, "panel-entrance-crosswalk");
     // switched off on the placed one
     await page.getByTestId("marker-crosswalk-0").click();
-    await expect(page.getByTestId("marker-crosswalk-0")).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByTestId("marker-crosswalk-0")).toHaveAttribute("aria-checked", "false");
     expect(await page.evaluate(() => (window as any).pm.backend.root.markers[0].kind)).toBe("footpath");
     // a two-way car entrance, switch still on: no crosswalk, no crosswalk button
     await page.getByTestId("marker-kind-entrance").click();
@@ -258,7 +258,7 @@ test("disabled primary explains why; permanent effects need acknowledgement", as
     await waitPlanned(page);
     await expect(page.getByTestId("permanent").first()).toBeVisible();
     await expect(primary).toHaveAttribute("aria-disabled", "true");
-    await expect(page.getByTestId("primary-reason")).toContainText("Tick OK to build");
+    await expect(page.getByTestId("primary-reason")).toContainText("Click OK to build");
     await panelShot(page, "panel-permanent");
     await page.getByTestId("ack-permanent").click();
     expect(await page.evaluate(() => (window as any).pm.backend.ackPermanent)).toBe(true);

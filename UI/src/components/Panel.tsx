@@ -486,7 +486,7 @@ const Footer = ({
         </div>
     ) : null;
     const label = tl(p.label, t("Placemaker.UI.Primary.Next", "Next"));
-    const buildOptions = (p.action === "build" || p.action === "finishEdit") && !compact && (!!ack || !!state.grouping || p.action === "build");
+    const buildOptions = (p.action === "build" || p.action === "finishEdit") && !compact;
     // s42: a blocked button says what blocks it ("Add an entrance to build"), short enough for one line.
     const shownLabel = !enabled && reason && reason.length <= 34 ? reason : label;
     const button = (
@@ -545,15 +545,8 @@ const Footer = ({
         <div className={classNames(s.footer, { [s.footerCompact]: compact })}>
             {info ? <div className={s.footInfo}>{info}</div> : null}
             {buildOptions ? (
-                // Review: what Build does, one switch per line above the one Build button (Enter)
-                <div className={s.footOptions} data-testid="build-options">
-                    {ack ? (
-                        <Tip title={t("Placemaker.UI.Review.AckShort", "OK, permanent")} description={t("Placemaker.UI.Review.AckTip", "Some changes stay after you remove the build (the amber tags). Tick to allow them.")}>
-                            <div className={classNames(s.footOption, s.footOptionWarn)} data-testid="build-ack-wrap">
-                                <Check testId="ack-permanent" checked={ack.on} onChange={ack.set} label={t("Placemaker.UI.Review.AckLong", "OK, some changes are permanent")} />
-                            </div>
-                        </Tip>
-                    ) : null}
+                // Review: the two switches for what Build does, side by side above the button row
+                <div className={s.footSwitches} data-testid="build-options">
                     {state.grouping ? (
                         <Tip
                             title={t("Placemaker.UI.Build.Group", "Group as one asset")}
@@ -570,18 +563,25 @@ const Footer = ({
                     ) : null}
                     {p.action === "build" ? (
                         <Tip
-                            title={t("Placemaker.UI.Build.KeepArea", "Keep area")}
+                            title={t("Placemaker.UI.Build.KeepArea", "Keep this area selected")}
                             description={t("Placemaker.UI.Build.KeepAreaTip", "On: after building, the area stays selected and Placemaker stays open, so you can build something else there. Off: Build closes Placemaker.")}
                         >
                             <div className={s.footOption} data-testid="build-keep-wrap" data-on={state.keepArea === false ? "false" : "true"}>
                                 <Switch testId="build-keep" on={state.keepArea !== false} onChange={(v) => act.setKeepArea(v)} />
-                                <div className={s.footOptionLabel}>{t("Placemaker.UI.Build.KeepArea", "Keep area")}</div>
+                                <div className={s.footOptionLabel}>{t("Placemaker.UI.Build.KeepArea", "Keep this area selected")}</div>
                             </div>
                         </Tip>
                     ) : null}
                 </div>
             ) : null}
             <div className={s.primaryRow}>
+                {ack && buildOptions ? (
+                    <Tip title={t("Placemaker.UI.Review.AckShort", "OK, permanent")} description={t("Placemaker.UI.Review.AckTip", "Some changes stay after you remove the build (the amber tags). Click it to allow them.")}>
+                        <div className={s.ackChip} data-testid="build-ack-wrap">
+                            <Check testId="ack-permanent" checked={ack.on} onChange={ack.set} label={t("Placemaker.UI.Review.AckLong", "OK, some changes are permanent")} />
+                        </div>
+                    </Tip>
+                ) : null}
                 {p.action === "polish" && state.painter ? (
                     // Live polish: the selection polished again a moment after every change of the look or the selection
                     <Tip
@@ -743,7 +743,7 @@ export const PlacemakerPanel = () => {
                 ? t("Placemaker.UI.Markers.NeedNBuild", "Add {0} entrances to build", [need])
                 : t("Placemaker.UI.Markers.NeedOneBuild", "Add an entrance to build");
     } else if (needsAck) {
-        blockedReason = t("Placemaker.UI.Review.AckFirst", "Tick OK to build");
+        blockedReason = t("Placemaker.UI.Review.AckFirst", "Click OK to build");
     }
 
     // the neighbourhood-polish tool (its own button, state.painter): Placemaker's panel and steps, its own Design and Review
@@ -917,7 +917,7 @@ export const PlacemakerPanel = () => {
                                         <ErrorBoundary name="footer">
                                             <Footer state={state} summary={summary} blockedReason={blockedReason} lead={lead} ack={ackShown ? { on: ack, set: setAckBoth } : null} />
                                         </ErrorBoundary>
-                                        <Hints state={state} />
+                                        {state.stage === "design" || state.stage === "review" ? null : <Hints state={state} />}
                                     </>
                                 )}
                             </div>

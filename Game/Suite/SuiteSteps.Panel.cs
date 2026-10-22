@@ -433,6 +433,14 @@ namespace Placemaker.Game.Suite
             yield return WaitPlan(st, rec);
         }
 
+        /// <summary>Review's "One group" switch beside Build (on: one group, the default; off: built as separate pieces).</summary>
+        private IEnumerator StepGroupSwitch(ScenarioState st, JObject step, JObject rec)
+        {
+            bool on = (bool?)step["on"] ?? true;
+            yield return UiAct(st, rec, "one group", "build-group", "setBuildUngrouped", new object[] { !on }, () => _tool.BuildUngrouped == !on, () => _tool.SetBuildUngrouped(!on));
+            rec["separate"] = _tool.BuildUngrouped;
+        }
+
         /// <summary>A Placemaker option (the Options page), set through the settings object and read back.</summary>
         /// <summary>
         /// The game's Options screen on Placemaker's page (what a person opens from the pause menu), scrolled so a label

@@ -11,7 +11,7 @@ import { humanize, useT } from "../lib/l10n";
 import { formatValue, money } from "../lib/format";
 import { ErrorBoundary } from "../lib/errorBoundary";
 import { VC } from "../lib/vanilla";
-import { useGroupActions, RenameField } from "../stages/ManageStage";
+import { useGroupActions, RenameField, UngroupButton } from "../stages/ManageStage";
 import { Btn, Icon } from "./common";
 import s from "./infoSection.module.scss";
 
@@ -32,6 +32,7 @@ type Props = {
     missingAssets?: boolean;
     modified?: boolean;
     removing?: boolean;
+    ungrouped?: boolean;
 };
 
 const Inner = (p: Props) => {
@@ -43,7 +44,7 @@ const Inner = (p: Props) => {
     const busy = !!p.removing;
     const stats = Array.isArray(p.stats) ? p.stats.filter((x) => x && x.unit === "count").slice(0, 3) : [];
     const name = p.customName || p.name || recipe || t("Placemaker.Name", "Placemaker");
-    const { askRemove, dialog } = useGroupActions(id, name);
+    const { askRemove, askUngroup, dialog } = useGroupActions(id, name);
     const content = (
         <div className={s.section} data-testid="info-section">
             <div className={s.head}>
@@ -75,11 +76,18 @@ const Inner = (p: Props) => {
                     <div className={s.noteText}>{t("Placemaker.UI.Info.Modified", "Changed with other tools since it was built. Editing rebuilds it from its design.")}</div>
                 </div>
             ) : null}
+            {p.ungrouped ? (
+                <div className={s.note} data-testid="info-ungrouped">
+                    <Icon name="info" size={14} color="#8fd1ff" />
+                    <div className={s.noteText}>{t("Placemaker.UI.Info.Ungrouped", "Ungrouped: you click and bulldoze its pieces one at a time. Remove takes all of it.")}</div>
+                </div>
+            ) : null}
             {busy ? <div className={s.facts}>{t("Placemaker.UI.Info.Removing", "Removing…")}</div> : null}
             {!renaming && !busy ? (
                 <div className={s.actions}>
                     <Btn variant="solid" icon="edit" iconSize={14} label={t("Placemaker.UI.Manage.Edit", "Edit")} disabled={p.canEdit === false || id < 0} onClick={() => act.editGroup(id)} testId="info-edit" />
                     <Btn variant="solid" label={t("Placemaker.UI.Manage.Rename", "Rename")} disabled={id < 0} onClick={() => setRenaming(true)} testId="info-rename" />
+                    <UngroupButton id={id} ungrouped={!!p.ungrouped} askUngroup={askUngroup} testId="info-ungroup" />
                     <div className={s.flex} />
                     <Btn variant="danger" icon="trash" iconSize={14} label={t("Placemaker.UI.Manage.Remove", "Remove")} disabled={id < 0} onClick={askRemove} testId="info-remove" />
                 </div>

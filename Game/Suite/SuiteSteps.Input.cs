@@ -460,7 +460,7 @@ namespace Placemaker.Game.Suite
             if (kind != null || _tool.SuiteMarkers().Count > 0)
             {
                 var last = _tool.SuiteMarkers().LastOrDefault();
-                string p = last.Path ?? "0", k = kind ?? last.Kind ?? "entrance";
+                string p = last.Path ?? "0", k = kind ?? MarkerVariants.BaseKind(last.Kind) ?? "entrance";
                 yield return UiAct(st, rec, "marker kind", "marker-kind-" + k, "setMarkerKind", new object[] { p, k }, () => _tool.MarkerKind != null, () => _tool.SetMarkerKind(p, k));
                 rec["via"] = "panel";
             }
@@ -476,6 +476,14 @@ namespace Placemaker.Game.Suite
             yield return Frames(2);
             rec["path"] = _tool.MarkerPath;
             rec["kind"] = _tool.MarkerKind;
+            // "crosswalk": true/false presses the panel's Crosswalk switch first when it is the other way (absent: as it is)
+            if (step["crosswalk"] != null && (bool)step["crosswalk"] != _tool.MarkerCrosswalk)
+            {
+                bool on = (bool)step["crosswalk"];
+                string mp = _tool.MarkerPath;
+                yield return UiAct(st, rec, "crosswalk", "marker-crosswalk", "setMarkerCrosswalk", new object[] { mp, -1.0, on }, () => _tool.MarkerCrosswalk == on, () => _tool.SetMarkerCrosswalk(mp, -1, on));
+            }
+            rec["crosswalk"] = _tool.MarkerCrosswalk;
             int before = _tool.SuiteMarkers().Count;
             var target = OnOutline(EntranceTarget(step, st.S.Block));
             RaycastHit? hit = null;
@@ -488,6 +496,7 @@ namespace Placemaker.Game.Suite
             // the tool's own marker (snapped to the outline), not the scripted point
             var placed = markers.OrderBy(m => math.distance(m.At.xz, target.xz)).First();
             rec["placed"] = new JArray(Math.Round(placed.At.x, 1), Math.Round(placed.At.z, 1));
+            rec["placedKind"] = placed.Kind;
             st.Markers.Add((placed.At, placed.Kind, placed.Path));
             yield return WaitPlan(st, rec);
         }
@@ -537,7 +546,8 @@ namespace Placemaker.Game.Suite
             else if (index >= 0 && index < markers.Count) m = markers[index];
             else { rec["error"] = $"no entrance {index} (script placed {st.Markers.Count}, design has {markers.Count})"; yield break; }
             int count0 = markers.Count;
-            yield return UiAct(st, rec, "marker kind", "marker-kind-" + m.Kind, "setMarkerKind", new object[] { m.Path, m.Kind }, () => _tool.MarkerKind != null, () => _tool.SetMarkerKind(m.Path, m.Kind));
+            string mk = MarkerVariants.BaseKind(m.Kind);
+            yield return UiAct(st, rec, "marker kind", "marker-kind-" + mk, "setMarkerKind", new object[] { m.Path, mk }, () => _tool.MarkerKind != null, () => _tool.SetMarkerKind(m.Path, mk));
             yield return Frames(2);
             RaycastHit? hit = null;
             yield return Press(st, rec, m.At, true, h => hit = h);

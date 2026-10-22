@@ -45,6 +45,8 @@ namespace Placemaker.Core.Tool
         public LocText UndoLabel, RedoLabel;
         public string MarkerStepPath, MarkerKind;
         public LocText MarkerLabel;
+        /// <summary>The entrances placed next come with a crosswalk (walking kinds only).</summary>
+        public bool MarkerCrosswalk;
         public List<HintInfo> Hints = new List<HintInfo>();
         public bool Planning;
         /// <summary>Coarse 0..0.95 while planning (0 = queued); not yet in contract.ts (proposed: state.planningProgress?: number).</summary>
@@ -52,6 +54,8 @@ namespace Placemaker.Core.Tool
         public float? BuildProgress;
         public int EditingGroup;
         public bool AnarchyAvailable, AnarchyEnabled;
+        /// <summary>The build becomes a group (not a loose road grid): the Review switch "One group" applies; BuildSeparate = off.</summary>
+        public bool GroupingAvailable, BuildSeparate;
         public bool PanelCollapsed;
         /// <summary>contract: state.previewMode — the player's choice for the current stage.</summary>
         public PreviewMode PreviewMode;
@@ -217,7 +221,8 @@ namespace Placemaker.Core.Tool
             if (s.CanRedo && s.RedoLabel != null) o.Set("redoLabel", s.RedoLabel.ToJson());
             if (!string.IsNullOrEmpty(s.MarkerKind))
                 o.Set("markerMode", JsonValue.Obj().Set("stepPath", s.MarkerStepPath ?? "").Set("kind", s.MarkerKind)
-                    .Set("label", (s.MarkerLabel ?? new LocText("Placemaker.Marker." + s.MarkerKind)).ToJson()));
+                    .Set("label", (s.MarkerLabel ?? new LocText("Placemaker.Marker." + s.MarkerKind)).ToJson())
+                    .Set("crosswalk", s.MarkerCrosswalk));
             var hints = JsonValue.Arr();
             foreach (var h in s.Hints)
             {
@@ -236,6 +241,8 @@ namespace Placemaker.Core.Tool
             if (s.BuildProgress.HasValue) o.Set("buildProgress", Round(math.saturate(s.BuildProgress.Value), 3));
             if (s.EditingGroup > 0) o.Set("editingGroup", s.EditingGroup);
             if (s.AnarchyAvailable) o.Set("anarchy", JsonValue.Obj().Set("available", true).Set("enabled", s.AnarchyEnabled));
+            if (s.GroupingAvailable) o.Set("grouping", JsonValue.Obj().Set("separate", s.BuildSeparate));
+            o.Set("entranceCrosswalk", s.MarkerCrosswalk);
             o.Set("panelCollapsed", s.PanelCollapsed);
             o.Set("previewMode", PreviewModes.Id(s.PreviewMode));
             o.Set("ghostPending", s.GhostPending);
@@ -560,7 +567,7 @@ namespace Placemaker.Core.Tool
             locked.Sort(StringComparer.Ordinal);
             o.Set("locked", Strings(locked.ToArray()));
             var counts = new SortedDictionary<string, int>(StringComparer.Ordinal);
-            foreach (var m in s.Markers) { counts.TryGetValue(m.Kind ?? "", out int c); counts[m.Kind ?? ""] = c + 1; }
+            foreach (var m in s.Markers) { var mk = MarkerVariants.BaseKind(m.Kind) ?? ""; counts.TryGetValue(mk, out int c); counts[mk] = c + 1; }
             var markers = JsonValue.Arr();
             foreach (var kv in counts) markers.Add(JsonValue.Obj().Set("kind", kv.Key).Set("count", kv.Value));
             o.Set("markers", markers);
@@ -568,8 +575,10 @@ namespace Placemaker.Core.Tool
             for (int i = 0; i < s.Markers.Count; i++)
             {
                 var p = s.Markers[i].Position;
-                markerList.Add(JsonValue.Obj().Set("kind", s.Markers[i].Kind ?? "").Set("index", i)
-                    .Set("position", JsonValue.Arr().Add(Round(p.x, 2)).Add(Round(p.y, 2)).Add(Round(p.z, 2))));
+                var mo = JsonValue.Obj().Set("kind", MarkerVariants.BaseKind(s.Markers[i].Kind) ?? "").Set("index", i)
+                    .Set("position", JsonValue.Arr().Add(Round(p.x, 2)).Add(Round(p.y, 2)).Add(Round(p.z, 2)));
+                if (MarkerVariants.HasCrosswalk(s.Markers[i].Kind)) mo.Set("crosswalk", true);
+                markerList.Add(mo);
             }
             o.Set("markerList", markerList);
             IAreaGenerator gen = null;
@@ -580,6 +589,7 @@ namespace Placemaker.Core.Tool
                 var ko = JsonValue.Obj().Set("kind", k.Kind).Set("label", k.LabelKey);
                 if (!string.IsNullOrEmpty(k.Icon)) ko.Set("icon", IconPath(k.Icon));
                 if (!string.IsNullOrEmpty(k.TooltipKey)) ko.Set("tooltip", k.TooltipKey);
+                if (k.Crosswalk) ko.Set("crosswalk", true);
                 kinds.Add(ko);
             }
             o.Set("markerKinds", kinds);

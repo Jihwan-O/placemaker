@@ -28,6 +28,8 @@ namespace Placemaker.Game.Suite
             switch (((string)step["op"] ?? "").ToLowerInvariant())
             {
                 case "street": yield return LabStreet(st, step, rec); yield break;
+                case "streetjoins": LabStreetJoins(st, step, rec); yield break;
+                case "pickpart": yield return LabPickPart(st, step, rec); yield break;
                 case "yards": yield return LabYards(st, step, rec); yield break;
                 case "outgrowcheck": yield return LabOutgrowCheck(st, step, rec); yield break;
                 case "fencemap": yield return LabFenceMap(st, step, rec); yield break;

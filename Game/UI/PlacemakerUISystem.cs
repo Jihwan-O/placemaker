@@ -112,6 +112,9 @@ namespace Placemaker.Game.UI
             Trigger<bool>("acknowledgePermanent", ack => _tool.AcknowledgePermanent(ack));
             Trigger<string, string>("setMarkerKind", (p, kind) => _tool.SetMarkerKind(p, kind));
             Trigger<string, double>("removeMarker", (p, i) => _tool.RemoveMarker(p, (int)Math.Round(i)));
+            Trigger<string, double, bool>("setMarkerCrosswalk", (p, i, on) => _tool.SetMarkerCrosswalk(p, (int)Math.Round(i), on));   // i < 0: the entrances placed next
+            Trigger<double, bool>("ungroupGroup", (id, on) => _tool.UngroupGroup((int)id, on));   // on = false: group again
+            Trigger<bool>("setBuildUngrouped", on => _tool.SetBuildUngrouped(on));
             Trigger<string>("setPreviewMode", m => _tool.SetPreviewMode(m));
             // s17 park stats (docs/proposals/s17.md)
             Trigger<string, string>("setParkStat", (id, json) => _tool.SetParkStat(id, json));
@@ -347,7 +350,9 @@ namespace Placemaker.Game.UI
         {
             int id = _tool.ManagedGroup != 0 ? _tool.ManagedGroup : _tool.HoverGroup;
             var groups = Services.Groups;
-            string stamp = id + "|" + (groups != null) + "|" + (_frame / 60);
+            bool ungrouped = false;
+            try { ungrouped = id != 0 && groups != null && groups.IsUngrouped(id); } catch (Exception) { }
+            string stamp = id + "|" + (groups != null) + "|" + ungrouped + "|" + (_frame / 60);
             if (stamp == _managedStamp) return;
             _managedStamp = stamp;
             if (id == 0 || groups == null) { _managed.Update("null"); return; }
@@ -366,6 +371,7 @@ namespace Placemaker.Game.UI
             o.Set("stats", UiModels.Stats(info.Stats));
             o.Set("upkeep", Math.Round(info.Upkeep));
             o.Set("canEdit", canEdit);
+            if (ungrouped) o.Set("ungrouped", true);
             _managed.Update(o.ToString());
         }
     }

@@ -127,6 +127,12 @@ namespace Placemaker.Core
         public Dictionary<AreaPlan, float2[]> FillRings = new Dictionary<AreaPlan, float2[]>();
         /// <summary>(zoning speed) Where the plan's time went: each layer and each step after them, ms (PlanTimings.Describe). Not persisted.</summary>
         public List<KeyValuePair<string, double>> Timings = new List<KeyValuePair<string, double>>();
+        /// <summary>Entrances the player marked "with crosswalk" (Layers/Common/StreetJoins). Set by Compose; not persisted.</summary>
+        public List<float2> Crosswalks = new List<float2>();
+        /// <summary>Footpath ends at a city street: stopped at the kerb (the game joins them) / split the street with a crosswalk. Set by StreetJoins.</summary>
+        public int KerbJoins, CrosswalkJoins;
+        /// <summary>Footpath ends attached to a net StreetJoins does not know as a captured road (left as they were).</summary>
+        public List<string> JoinNotes = new List<string>();
 
         public bool HasErrors
         {
@@ -183,6 +189,8 @@ namespace Placemaker.Core
             // CS2 joins paths only at identical nodes: split a path where a spur (often a feature's
             // "path to it") ends on it (g5).
             Layers.Common.PathJoins.JoinAll(result);
+            // Footpaths meet city streets at the kerb (the game joins them, no crosswalk), unless the entrance asks for a crosswalk.
+            Layers.Common.StreetJoins.Apply(result, site);
             clock.Lap("path joins");
             // s21: decals complement what was planned (leaves under trees, oil in bays, wear at junctions…). Before
             // cutouts and building lots are enforced, so those rules apply to decals too.
@@ -246,6 +254,7 @@ namespace Placemaker.Core
             };
             // Layers inside a place (the one filling it and its own children) must not see it as taken.
             if (ownPlaces != null) foreach (var mine in ownPlaces) input.Reserved.Polygons.Remove(mine);
+            foreach (var m in input.Markers) if (m.Crosswalk) result.Crosswalks.Add(m.Position.xz);
 
             AreaPlan plan;
             var layerClock = new PlanClock(result.Timings);
@@ -432,7 +441,7 @@ namespace Placemaker.Core
             {
                 if (ClosestSegment(ring, m.Position.xz, out int seg, out float t, out float d) && d <= 1.5f)
                 {
-                    var mm = m; mm.RingSegment = seg; mm.RingT = t; r.Add(mm);
+                    var mm = MarkerVariants.Normalize(m); mm.RingSegment = seg; mm.RingT = t; r.Add(mm);
                 }
             }
             return r;

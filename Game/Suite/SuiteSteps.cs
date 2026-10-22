@@ -298,6 +298,7 @@ namespace Placemaker.Game.Suite
                 case "bulldoze": yield return StepBulldoze(st, step, rec); break;
                 case "infoEdit": yield return StepInfo(st, step, rec, edit: true); break;
                 case "infoRemove": yield return StepInfo(st, step, rec, edit: false); break;
+                case "infoUngroup": yield return StepInfoUngroup(st, step, rec); break;
                 case "camera": yield return StepCameraAndShot(st, step, rec); break;
                 case "terrain": yield return StepTerrainMap(st, step, rec); break;
                 case "shot": yield return StepShot(st, step, rec, (string)step["name"] ?? (string)step["shot"] ?? "shot" + rec["i"]); break;
@@ -310,6 +311,7 @@ namespace Placemaker.Game.Suite
                 case "redo": yield return StepUndoRedo(st, step, rec, false); break;
                 case "key": yield return StepKey(st, step, rec); break;
                 case "anarchy": yield return StepAnarchy(st, step, rec); break;
+                case "group": yield return StepGroupSwitch(st, step, rec); break;
                 case "setting": yield return StepSetting(st, step, rec); break;
                 case "options": yield return StepOptions(st, step, rec); break;
                 case "preset": yield return StepPreset(st, step, rec); break;

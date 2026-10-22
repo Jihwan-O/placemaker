@@ -578,6 +578,21 @@ const Footer = ({
                         <div className={s.primaryLabel}>{t("Placemaker.UI.Painter.Unpolish", "Remove outgrow")}</div>
                     </button>
                 ) : null}
+                {(p.action === "build" || p.action === "finishEdit") && state.grouping ? (
+                    // One group (default) or separate pieces: an ungrouped build's parts are clicked and bulldozed one by one
+                    <Tip
+                        title={t("Placemaker.UI.Build.Group", "One group")}
+                        description={t(
+                            "Placemaker.UI.Build.GroupTip",
+                            "On: it is built as one thing. Click it to select all of it; the bulldozer removes all of it. Off: built as separate pieces you click, change and bulldoze one at a time. Removing all of it then takes Remove in a piece's info panel. You can ungroup or group it again later from there."
+                        )}
+                    >
+                        <div className={s.liveChip} data-testid="build-group-wrap" data-on={state.grouping.separate ? "false" : "true"}>
+                            <Switch testId="build-group" on={!state.grouping.separate} onChange={(v) => act.setBuildUngrouped(!v)} />
+                            <div className={s.liveLabel}>{t("Placemaker.UI.Build.Group", "One group")}</div>
+                        </div>
+                    </Tip>
+                ) : null}
                 {p.action === "build" ? (
                     // Build & close beside the primary (Build & keep area, Enter): builds, then closes Placemaker
                     <Tip title={t("Placemaker.UI.Build.Close", "Build & close")} description={t("Placemaker.UI.Build.CloseTip", "Builds it, then closes Placemaker.")}>

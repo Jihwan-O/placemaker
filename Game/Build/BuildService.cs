@@ -215,7 +215,10 @@ namespace Placemaker.Game.Build
             int auto = _catalog.ResolveAutomatic(request.Plan);
             if (auto > 0) Mod.Log.Info($"Placemaker resolved {auto} automatic assets at build start (the tool should do this before preview/pricing).");
             Go(Step.Prepare);
-            Mod.Log.Info($"Placemaker build started: {request.Plan.Layers.Count} layers, replace={request.ReplaceGroup}.");
+            Mod.Log.Info($"Placemaker build started: {request.Plan.Layers.Count} layers, replace={request.ReplaceGroup}{(request.Ungrouped ? ", ungrouped" : "")}.");
+            if (request.Plan.KerbJoins + request.Plan.CrosswalkJoins > 0 || request.Plan.JoinNotes.Count > 0)
+                Mod.Log.Info($"Placemaker street joins: {request.Plan.KerbJoins} footpath end(s) stop at the kerb (the game joins them), {request.Plan.CrosswalkJoins} split the street with a crosswalk."
+                    + (request.Plan.JoinNotes.Count > 0 ? " " + string.Join("; ", request.Plan.JoinNotes) : ""));
             return true;
         }
 

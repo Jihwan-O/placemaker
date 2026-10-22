@@ -40,7 +40,7 @@
   "Placemaker.Reason.StepNotReady": "Finish the settings first",
   "Placemaker.Reason.Planning": "Planning…",
   "Placemaker.Reason.PlanErrors": "Fix the red alerts first",
-  "Placemaker.Reason.AcknowledgePermanent": "Tick OK to build",
+  "Placemaker.Reason.AcknowledgePermanent": "Click OK to build",
   "Placemaker.Reason.NoMoney": "Not enough money",
   "Placemaker.Reason.BuildUnavailable": "Can't build right now",
   "Placemaker.Reason.GroupsUnavailable": "Can't manage builds now",

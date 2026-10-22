@@ -226,7 +226,7 @@ const PaintSettings = ({ state, rules }: { state: ToolState; rules: BrushRules }
             <div className={s.smartRow}>
                 <Tip
                     title={t("Placemaker.UI.Rules.Smart", "Smart edges")}
-                    description={t("Placemaker.UI.Rules.SmartTip", "On: the brush stops at what you tick below. Off: it paints over everything.")}
+                    description={t("Placemaker.UI.Rules.SmartTip", "On: the brush stops at what you switch on below. Off: it paints over everything.")}
                 >
                     <div className={s.smartLabel}>{t("Placemaker.UI.Rules.Smart", "Smart edges")}</div>
                 </Tip>

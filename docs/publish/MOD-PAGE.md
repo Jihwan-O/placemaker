@@ -10,104 +10,109 @@ Placemaker
 
 ## Short description
 
-Pick an area. Pick what goes there. Roads, parking, parks, shops, industrial, zoning and more. Preview it, then build it. Early access.
+Your plot's edges connect to each other and to the roads around them. Draw any area and turn it into a park, parking lot, plaza, beach or other amenity. Preview it, tweak it, build it.
 
 ## Long description
 
-[Here's a 3-minute showcase.](https://www.youtube.com/watch?v=ghIR5UhFwj4)
+[Here's a 4-minute showcase.](https://www.youtube.com/watch?v=Fa5TWC3B-Ps)
 
-■ **What you can make**
 
-* **Roads**: street grids that connect to the roads around them
-* **Parking**: lots of any shape with trees, lamps, fences and marked bays
-* **Parks**: parks, gardens, playgrounds, memorial parks and amphitheatres
-* **Beach**: sand painted from the water's edge, quays and boardwalks
-* **Shops & squares**: strip malls etc.
-* **Nature**: wetlands, reserves, lookout hills, hiking trails and campgrounds
-* **Farms**: farmsteads and animal parks
-* **Sports**: sports parks, skate bowls and golf
-* **Industrial**: container yards, car yards, junk yards and industrial works
-* **Zoning**: set the mix of zone types and the min and max lot sizes. It zones your selection for you.
+### What you can make
 
-⚠️ **Early access (please read this bit)**
+- **Roads**: street grids that connect to the roads around them
+- **Parking**: lots of any shape with trees, lamps, fences and marked bays
+- **Parks**: parks, gardens, playgrounds, memorial parks and amphitheatres
+- **Beach**: sand painted from the water's edge, quays and boardwalks
+- **Shops & squares**: strip malls etc.
+- **Nature**: wetlands, reserves, lookout hills, hiking trails and campgrounds
+- **Farms**: farmsteads and animal parks
+- **Sports**: sports parks, skate bowls and golf
+- **Industrial**: container yards, car yards, junk yards and industrial works
+- **Zoning**: Specify percentage breakdown of zone types and min and max lot sizes, and it auto zones for you in your selection.
 
-* Parks, parking and industrial are the most finished. Start with those!
-* This mod won't stop you building dumb stuff. I didn't want to box anyone in. So double check your selection before you hit Build.
 
-Expect some bugs. Use it at your own risk. **Back up your save before you try it.**
+### ⚠️ Early access (please read this bit)
 
-Built for game version 1.6.*
+- I consider **anarchy** essentially required to work with this mod, though it's not necessarily a requirement.
 
-■ **Will it wreck my save?**
+- This mod won't stop you building dumb looking stuff. I didn't want to box anyone in. So **double check your selection before you hit Build.**
 
-It shouldn't.
+Expect some bugs. Use it at your own risk.
 
-* I've tested it extensively, but obviously I can't speak for everything.
-* Coming from the last version? You're good. Nothing old changed.
-* Outgrow is new. It saves a little extra data in your save.
-* Still. Make a backup.
+**Back up your save before you try it.**
 
-■ **Can I remove it?**
+Built for game version **1.6.\***
 
-Yep. Your save still loads without it. What you built stays as regular game stuff.
 
-One catch. Some ground surfaces, decals and the little park buildings are made by the mod. Those go invisible without it. But again, no custom assets are used.
+### Will it wreck my save?
 
-■ **How to use it**
+It wont.
 
-1. Click the Placemaker button at the top left. Or hit Ctrl+Shift+A.
-2. Select an area with Points, Paint bucket or Paint area. More on those below.
+- I've tested it extensively, but obviously I can't speak for every other mod compatibility.
+- Still. **Make a backup.**
+
+
+### Can I remove it?
+
+Yep. Your save still loads without it.
+
+### How to use it
+
+1. Click the **Placemaker** button at the top left. Or hit **Ctrl+Shift+A**.
+
+2. Select an area with **Points**, **Paint bucket** or **Paint area**. More on those below.
+
+   You get three tools.
+
+   - **Points**: click the corners. It snaps to curbs, buildings, right angles and road nodes.
+   - **Paint bucket**: click a city block to fill it. **Shift+click** adds more.
+   - **Paint area**: just brush it on. **Right-click** erases.
+
+   You also choose what the selection stops at. Roads, paths, water, buildings, zoning and more.
+
 3. Under **Pick what to make**, choose a category. Then a type and a style.
+
+   Every type has a few styles to pick from. Don't love one? Mess with it.
+
 4. Check out the live preview. Tweak whatever you want.
-5. Hit Build. Done!
 
-**Handy to know**
+   Layout, paths, planting, surfaces, the works. Then save it as your own if you want.
 
-* Messed up? Ctrl+Z undoes it. Ctrl+Y redoes it.
-* Changed your mind? Pick an earlier build and change it.
-* Go big. Big areas have been tested and they work.
-* Don't like the keys? Rebind them in the game's options.
-* Settings are in Options > Placemaker.
+5. Hit **Build**. Done!
 
-■ **Select an area**
 
-You get three tools.
+### Outgrow (beta)
 
-* **Points**: click the corners. It snaps to curbs, buildings, right angles and road nodes.
-* **Paint bucket**: click a city block to fill it. Shift+click adds more.
-* **Paint area**: just brush it on. Right-click erases.
+- **Outgrow** settings can be found using a button at the top of the panel. It lets lots connect other to lots and roads that are nearby.
 
-You also choose what the selection stops at. Roads, paths, water, buildings, zoning and more.
+- There are many different styles of outgrow. You can mix and match any zone type with any outgrow type, and set their defaults.
 
-■ **Make it**
+- You can also paint an outgrow types on to the world with the **Outgrow Paint** button.
 
-Every type has a few styles to pick from. Don't love one? Mess with it. Layout, paths, planting, surfaces, the works. Then save it as your own.
+- It's **off by default** for new buildings.
 
-■ **Outgrow (beta)**
+- Want to try it? Turn it on for certain buildings. Or use the Outgrow brush on an area.
 
-* Outgrow settings are behind a button at the top of the panel. It lets lots connect to other lots and roads nearby.
-* There are many different styles of outgrow. You can mix and match any zone type with any outgrow type, and set their defaults.
-* You can also paint outgrow types onto the world with the Outgrow Paint button.
+- **Careful with outgrowing every building on a huge save.** It is to iterate through each lot and the have to calculate how to connect to each other. It can take a while on larger saves, but once it's caught up, its smooth. I haven't tested this on saves beyond 1 million population.
 
-* It's off by default for new buildings.
-* Want to try it? Turn it on for certain buildings. Or use the Outgrow brush on an area.
-* Careful with outgrowing every building on a huge save. It has to go through every lot and work out how they connect. That can take a while on bigger saves. Once it's caught up, it runs pretty nicely.
 
-■ **Found a bug?**
+### Found a bug?
 
-Tell me on [GitHub](https://github.com/jackwrichards/placemaker/issues). Throw in a screenshot and your Placemaker.log. It's in AppData\LocalLow\Colossal Order\Cities Skylines II\Logs. The log helps me a ton.
+Tell me on [GitHub](https://github.com/jackwrichards/placemaker/issues). Throw in a screenshot and your **Placemaker.log**.
 
-■ **Credits**
+It's in AppData\LocalLow\Colossal Order\Cities Skylines II\Logs. The log helps me a ton.
+
+
+### Credits
 
 Parts of Placemaker are built on these awesome mods. Go show them some love:
 
-* Parking has been overhauled, but some code is ported from Parking Lot Tool, Copyright (c) 2026 KruemelGames, GPL-3.0 https://github.com/KruemelGames/ParkingLotTool
-* Some park code (fences, terrain, asset picking) is ported from ParkManager by tomkpunkt, GPL-3.0 https://github.com/tomkpunkt/ParkManager
-* Some area tool code (brush, smoothing, road graph) is adapted from Grid Road Generator by Ti4goc https://github.com/Ti4goc/GridRoadGenerator
+**Parking** has been overhauled, but some code ported from **Parking Lot Tool**, Copyright (c) 2026 KruemelGames, GPL-3.0 https://github.com/KruemelGames/ParkingLotTool
 
-Includes Harmony 2.2.2, Copyright (c) 2017 Andreas Pardeike, MIT (see 0Harmony-LICENSE.txt) https://github.com/pardeike/Harmony
+Includes **Harmony 2.2.2**, Copyright (c) 2017 Andreas Pardeike, MIT (see 0Harmony-LICENSE.txt) https://github.com/pardeike/Harmony
 
-Placemaker is licensed under the GNU General Public License v3.0. Source on [GitHub](https://github.com/jackwrichards/placemaker).
+**Placemaker** Licensed under the GNU General Public License v3.0
+
 
 Have fun :)
 

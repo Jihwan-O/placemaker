@@ -103,6 +103,31 @@ namespace Placemaker.Tests
         }
 
         [Fact]
+        public void Where_the_street_curves_away_car_parks_reach_it_in_front_of_their_lots_and_gardens_do_not()
+        {
+            // three lots in a row on a curve: the street touches the middle one's front and curves away from the outer ones
+            // (the user's car parks on a curve: the triangles between their fronts and the kerb were nobody's)
+            var kerb = Enumerable.Range(0, 41).Select(k => { float x = -40f + 2f * k; return new float2(x, 24.2f + x * x / 120f); }).ToList();
+            var road = kerb.Concat(new[] { new float2(40f, 60f), new float2(-40f, 60f) }).ToArray();
+            foreach (bool carPark in new[] { true, false })
+            {
+                var row = new[] { -16f, 0f, 16f }.Select((x, k) => House(k + 1, new float2(x, 0f), new float2(0f, 1f), new float2(8f, 24f))).ToArray();
+                foreach (var h in row) h.Options["fill"] = carPark ? PolishLooks.FillCarPark : PolishLooks.FillGarden;
+                var s = new StitchSettings().WithBarriers(new List<float2[]> { road });
+                var plan = YardStitch.Plan(row, s);
+                Assert.True(plan.Plots.TryGetValue(3, out var plot), "the outer lot is given land");
+                Assert.True(Overlap(plot, road) < 0.5f, $"its land lies {Overlap(plot, road):F1} m² on the street");
+                // in front of the outer lot's front line (y 24; the kerb 26-29 m there): a car park reaches the kerb, a garden
+                // keeps to its lot's front line (its side fences carried forward met the neighbours' with gaps)
+                float front = plot.Where(p => p.x > 9f).Select(p => p.y).DefaultIfEmpty(0f).Max();
+                if (carPark) Assert.True(front > 25.5f, $"the car park stops at {front:F1} m in front (the lot's front line is at 24): " + string.Join(" ", plot.Select(p => $"({p.x:F0},{p.y:F0})")));
+                else Assert.True(front < 24.5f, $"the garden reaches {front:F1} m in front of its lot");
+                // no fence runs along the street
+                Assert.DoesNotContain(plan.FencePieces, p => p.Position.y > 24.5f && math.abs(math.sin(p.Yaw)) > 0.7f);
+            }
+        }
+
+        [Fact]
         public void A_short_piece_finishes_a_fence_run_where_the_kind_has_one()
         {
             Assert.Equal("FenceResidentialPieceLowShort01", YardStitch.ShortPiece("FenceResidentialPieceLow01"));

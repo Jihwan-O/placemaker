@@ -617,6 +617,7 @@ namespace Placemaker.Core.Neighbours
             FillGaps(houses, plots, touched, raw, kept, s, plan);
             Stage("gaps");
             FixedGardens(houses, plots, touched, plan);
+            if (s.Knob("separate", 1f) > 0.5f) Separate(houses, plots, touched, plan);
             Stage("fixed");
 
             // ── 3. fences on plot edges ──
@@ -1213,6 +1214,24 @@ namespace Placemaker.Core.Neighbours
                     float pad = math.min(0.3f / olen, (u1 - u0) * 0.2f);
                     if (u0 > 0f) u0 += pad;
                     if (u1 < 1f) u1 -= pad;
+                    // a line that ran across the kept one ends on it (a T), not a metre and a half short of it: that left a gap
+                    // where two gardens' fences met at an angle
+                    if (!parallel && s.Knob("dedupeT", 1f) > 0.5f)
+                    {
+                        var od = ob - oa;
+                        float den = od.x * (kb - ka).y - od.y * (kb - ka).x;
+                        if (math.abs(den) > 1e-6f)
+                        {
+                            var w = ka - oa;
+                            float tOther = (w.x * (kb - ka).y - w.y * (kb - ka).x) / den;
+                            float tKept = (w.x * od.y - w.y * od.x) / den;
+                            if (tKept > -0.3f / klen && tKept < 1f + 0.3f / klen)
+                            {
+                                if (u0 > 0f && tOther >= 0f && tOther < u0) u0 = tOther;
+                                else if (u1 < 1f && tOther > u1 && tOther <= 1f) u1 = tOther;
+                            }
+                        }
+                    }
                     moved[other.L.Id] = (math.lerp(oa, ob, u0), math.lerp(oa, ob, u1));
                 }
             }
@@ -2290,6 +2309,7 @@ namespace Placemaker.Core.Neighbours
                 return false;
             }
             int pieces = 0, gardens = 0;
+            bool runs = s.Knob("closeRuns", 1f) > 0.5f;
             for (int i = 0; i < n; i++)
             {
                 var h = houses[i];
@@ -2297,6 +2317,12 @@ namespace Placemaker.Core.Neighbours
                 string piece = PieceFor(h, (int)K(h, s, "fenceKind", 0f));
                 var ring = Ccw(plots[i]);
                 int before = plan.FencePieces.Count;
+                if (runs)
+                {
+                    CloseRuns(h, ring, piece, plan, near, InWall);
+                    if (plan.FencePieces.Count > before) { gardens++; pieces += plan.FencePieces.Count - before; }
+                    continue;
+                }
                 for (int k = 0; k < ring.Length; k++)
                 {
                     var a = ring[k];
@@ -2338,6 +2364,351 @@ namespace Placemaker.Core.Neighbours
                 if (plan.FencePieces.Count > before) { gardens++; pieces += plan.FencePieces.Count - before; }
             }
             if (pieces > 0) plan.Notes.Add($"{gardens} gardens closed with {pieces} fence and hedge pieces");
+            if (runs && s.Knob("joinEnds", 1f) > 0.5f) JoinEnds(houses, plots, touched, plan, moved, s);
+        }
+
+        // ───────────── closing a garden: runs of pieces ─────────────
+
+        /// <summary>The length a fence or hedge piece covers (vanilla pieces are 4 m, their short ones 2 m).</summary>
+        private const float PieceLong = 4f, PieceShort = 2f;
+
+        private enum EdgeState : byte { Open, Covered, Wall, Front }
+
+        /// <summary>
+        /// One garden closed (the user, 21 Oct: gaps in fence runs at roads and turning circles, corners that do not meet, steps
+        /// between a fence and the next): its edge walked every 25 cm, the stretches no line runs along (not its street front,
+        /// not through a house, shed, driveway, road or building) joined across the plot's corners into runs, and each run laid
+        /// end to end with pieces. Before, every edge was closed alone: a piece centred in each edge's open stretch, 20 cm short
+        /// of both ends (a notch at every corner), edges under 1.5 m and stretches under 2 m left out (a curve's short edges
+        /// were gaps), and a piece whose middle touched a driveway or a road left out whole (a 4 m gap). A run's end against a
+        /// line goes onto that line's end (no step where they meet).
+        /// </summary>
+        private static void CloseRuns(StitchHouse h, float2[] ring, string piece, StitchPlan plan, LineGrid near, Func<float2, bool> inWall)
+        {
+            // what a point along an edge going in direction dir is: open, along a line (and which), in a wall, the street front
+            (EdgeState State, float2 A, float2 B) At(float2 p, float2 dir, bool front)
+            {
+                if (front) return (EdgeState.Front, default, default);
+                if (inWall(p) || OnBarrier(p)) return (EdgeState.Wall, default, default);
+                foreach (var (a, b) in near.Big.Count == 0 ? near.At(p) : near.At(p).Concat(near.Big))
+                {
+                    var e = b - a;
+                    float len2 = math.dot(e, e);
+                    if (len2 < 0.01f) continue;
+                    float t = math.dot(p - a, e) / len2;
+                    if (t < -0.02f || t > 1.02f) continue;
+                    if (math.distance(p, a + e * math.saturate(t)) > 0.9f) continue;
+                    if (math.abs(math.dot(math.normalize(e), dir)) > 0.85f) return (EdgeState.Covered, a, b);
+                }
+                return (EdgeState.Open, default, default);
+            }
+            var pts = new List<float2>();
+            var states = new List<(EdgeState State, float2 A, float2 B)>();
+            var corner = new List<bool>();
+            for (int k = 0; k < ring.Length; k++)
+            {
+                var a = ring[k];
+                var b = ring[(k + 1) % ring.Length];
+                float len = math.distance(a, b);
+                if (len < 0.01f) continue;
+                var dir = (b - a) / len;
+                // the street front stays open (the lot's front line, carried along the street)
+                bool front = h.ToLocal(a).y >= h.HalfLot.y - 1.2f && h.ToLocal(b).y >= h.HalfLot.y - 1.2f;
+                int steps = math.max(1, (int)math.ceil(len / 0.25f));
+                for (int st = 0; st < steps; st++)
+                {
+                    var p = a + dir * (len * st / steps);
+                    pts.Add(p);
+                    states.Add(At(p, dir, front));
+                    corner.Add(st == 0);
+                }
+            }
+            int m = pts.Count;
+            if (m < 2) return;
+            // start where the edge is not open (a garden open all round: anywhere, the run closes on itself)
+            int start = states.FindIndex(x => x.State != EdgeState.Open);
+            bool loop = start < 0;
+            if (loop) start = 0;
+            var run = new List<float2>();
+            var runCorner = new List<bool>();
+            (EdgeState State, float2 A, float2 B) before = default;
+            int cap = plan.FencePieces.Count + 400;
+            for (int k = 0; k <= m; k++)
+            {
+                int idx = (start + k) % m;
+                bool last = k == m;
+                var st = states[idx];
+                if (!last && st.State == EdgeState.Open)
+                {
+                    if (run.Count == 0 && k > 0)
+                    {
+                        // it starts on the point that stopped the edge before it (as it ends on the one after it)
+                        int prev = (start + k - 1) % m;
+                        before = states[prev];
+                        run.Add(pts[prev]);
+                        runCorner.Add(corner[prev]);
+                    }
+                    run.Add(pts[idx]);
+                    runCorner.Add(corner[idx]);
+                    continue;
+                }
+                if (run.Count > 0)
+                {
+                    if (loop) { run.Add(run[0]); runCorner.Add(true); }
+                    else
+                    {
+                        // the run ends half a step into what stops it; against a line, on that line's end
+                        run.Add(pts[idx]);
+                        runCorner.Add(corner[idx]);
+                        SnapEnd(run, runCorner, true, before);
+                        SnapEnd(run, runCorner, false, st);
+                    }
+                    if (plan.FencePieces.Count < cap) LayRun(run, runCorner, h.Id, piece, plan);
+                    for (int r = 0; r + 1 < run.Count; r++) near.Add(run[r], run[r + 1]);
+                    run.Clear();
+                    runCorner.Clear();
+                }
+            }
+        }
+
+        /// <summary>A run's end next to a line (it stopped because a line runs along there): onto that line's nearer end when
+        /// it is close, else straight across onto the line (a short piece across the step).</summary>
+        private static void SnapEnd(List<float2> run, List<bool> runCorner, bool first, (EdgeState State, float2 A, float2 B) by)
+        {
+            if (by.State != EdgeState.Covered || run.Count < 2) return;
+            var end = first ? run[0] : run[run.Count - 1];
+            var inner = first ? run[1] : run[run.Count - 2];
+            // the nearer end of the line it ran into, when that line ends here (not one of another garden's run ends near
+            // by: two gardens snapping to each other's ends made a V of short pieces)
+            var q = math.distance(by.A, end) <= math.distance(by.B, end) ? by.A : by.B;
+            if (math.distance(q, end) < 1.6f && math.dot(q - inner, end - inner) > -0.01f)
+            {
+                if (math.distance(q, end) > 0.05f) { if (first) run[0] = q; else run[run.Count - 1] = q; }
+                return;
+            }
+            // no end near: across onto the line it runs into
+            var e = by.B - by.A;
+            float t = math.saturate(math.dot(end - by.A, e) / math.max(1e-6f, math.dot(e, e)));
+            var on = by.A + e * t;
+            if (math.distance(on, end) < 0.3f) return;
+            if (first) { run.Insert(0, on); runCorner.Insert(0, true); runCorner[1] = true; }
+            else { run.Add(on); runCorner.Add(true); runCorner[runCorner.Count - 2] = true; }
+        }
+
+        /// <summary>A fence kind's 2 m piece (FenceResidentialPieceLow01: FenceResidentialPieceLowShort01); hedges have none. The
+        /// game makes the 4 m one where it has no such piece.</summary>
+        public static string ShortPiece(string piece)
+        {
+            if (string.IsNullOrEmpty(piece) || piece.IndexOf("Fence", StringComparison.OrdinalIgnoreCase) < 0) return null;
+            var m = System.Text.RegularExpressions.Regex.Match(piece, @"^(.*Piece(?:High|Low))(\d+)$");
+            return m.Success ? m.Groups[1].Value + "Short" + m.Groups[2].Value : null;
+        }
+
+        /// <summary>
+        /// Pieces end to end along a run: it turns at a corner of more than 25° (a piece ends there), a gentle bend is followed
+        /// chord by chord; the last piece of each straight part ends exactly at its end (a short piece where the kind has one),
+        /// so neither a corner nor an end is left open.
+        /// </summary>
+        private static void LayRun(List<float2> run, List<bool> runCorner, long house, string piece, StitchPlan plan)
+        {
+            // the run without repeated points
+            var pts = new List<float2>();
+            var isCorner = new List<bool>();
+            for (int k = 0; k < run.Count; k++)
+            {
+                if (pts.Count > 0 && math.distance(pts[pts.Count - 1], run[k]) < 0.01f) continue;
+                pts.Add(run[k]);
+                isCorner.Add(runCorner[k]);
+            }
+            if (pts.Count < 2) return;
+            // where it turns: split into straight parts (a corner closer than a metre to the last one is passed over)
+            var parts = new List<List<float2>>();
+            var cur = new List<float2> { pts[0] };
+            float since = 0f;
+            for (int k = 1; k < pts.Count; k++)
+            {
+                cur.Add(pts[k]);
+                since += math.distance(pts[k - 1], pts[k]);
+                if (k == pts.Count - 1 || !isCorner[k]) continue;
+                var din = math.normalizesafe(pts[k] - pts[k - 1]);
+                var dout = math.normalizesafe(pts[k + 1] - pts[k]);
+                float rest = 0f;
+                for (int r = k; r + 1 < pts.Count && rest < 1f; r++) rest += math.distance(pts[r], pts[r + 1]);
+                if (math.dot(din, dout) > math.cos(math.radians(25f)) || since < 1f || rest < 1f) continue;
+                parts.Add(cur);
+                cur = new List<float2> { pts[k] };
+                since = 0f;
+            }
+            if (cur.Count >= 2) parts.Add(cur);
+            string shortName = ShortPiece(piece);
+            void Add(float2 a, float2 b, string name)
+            {
+                var d = b - a;
+                if (math.lengthsq(d) < 1e-4f) return;
+                plan.FencePieces.Add((house, (a + b) * 0.5f, math.atan2(d.x, d.y), name));
+            }
+            foreach (var part in parts)
+            {
+                float total = 0f;
+                for (int k = 0; k + 1 < part.Count; k++) total += math.distance(part[k], part[k + 1]);
+                if (total < 0.3f) continue;
+                var end = part[part.Count - 1];
+                var at = part[0];
+                int seg = 0, laid = 0;
+                // chords of a whole piece along the part while one fits before its end
+                while (math.distance(at, end) > PieceLong + 0.05f)
+                {
+                    float2? next = null;
+                    for (int k = seg; k + 1 < part.Count && next == null; k++)
+                    {
+                        // the point on this segment a piece's length from where we are
+                        var p = part[k];
+                        var e = part[k + 1] - p;
+                        float a2 = math.dot(e, e);
+                        if (a2 < 1e-8f) continue;
+                        var w = p - at;
+                        float bq = 2f * math.dot(w, e), c = math.dot(w, w) - PieceLong * PieceLong;
+                        float disc = bq * bq - 4f * a2 * c;
+                        if (disc < 0f) continue;
+                        float t = (-bq + math.sqrt(disc)) / (2f * a2);
+                        if (t < 0f || t > 1f) continue;
+                        next = p + e * t;
+                        seg = k;
+                    }
+                    if (next == null) break;
+                    Add(at, next.Value, piece);
+                    at = next.Value;
+                    laid++;
+                }
+                // what is left: up to the end exactly
+                float left = math.distance(at, end);
+                if (left < 0.15f && laid > 0) continue;
+                var dir = math.normalizesafe(end - at, new float2(0f, 1f));
+                if (shortName != null && left <= PieceShort + 0.05f)
+                {
+                    if (laid > 0 || left >= PieceShort - 0.3f) Add(end - dir * PieceShort, end, shortName);
+                    else { var mid = (at + end) * 0.5f; Add(mid - dir * (PieceShort * 0.5f), mid + dir * (PieceShort * 0.5f), shortName); }
+                }
+                else if (shortName != null && left <= 2f * PieceShort)
+                {
+                    Add(at, at + dir * PieceShort, shortName);
+                    Add(end - dir * PieceShort, end, shortName);
+                }
+                else if (laid > 0) Add(end - dir * PieceLong, end, piece);
+                else { var mid = (at + end) * 0.5f; Add(mid - dir * (PieceLong * 0.5f), mid + dir * (PieceLong * 0.5f), piece); }
+            }
+        }
+
+        /// <summary>
+        /// The last word on gaps: two loose ends of fences close together along a garden's edge (a corner the runs did not
+        /// close, the end of a line and the start of a run, a step between two gardens' fences) are joined with pieces of the
+        /// garden's own kind. Ends against a house, shed, driveway, road or building are no loose ends; two fences coming up to
+        /// the street side by side are left open (the street front); a house's own lines as the game made them are never
+        /// joined to each other (its gates).
+        /// </summary>
+        private static void JoinEnds(IReadOnlyList<StitchHouse> houses, float2[][] plots, bool[] touched, StitchPlan plan, Dictionary<long, (float2 A, float2 B)> moved, StitchSettings s)
+        {
+            int n = houses.Count;
+            var bits = new List<(float2 A, float2 B, float W, bool Ours, int House)>();
+            float W(string name) => name != null && name.IndexOf("Hedge", StringComparison.OrdinalIgnoreCase) >= 0 ? 1.1f : 0.2f;
+            for (int i = 0; i < n; i++)
+            {
+                var h = houses[i];
+                if (h.Polished && !h.Edit && h.Standing != null) { foreach (var (a, b) in h.Standing) bits.Add((a, b, 0.4f, true, i)); continue; }
+                foreach (var l in h.Lines)
+                {
+                    if (plan.HideLines.Contains(l.Id)) continue;
+                    bool mv = h.Polished && moved.TryGetValue(l.Id, out var m);
+                    var (a, b) = mv ? moved[l.Id] : (l.A, l.B);
+                    if (math.distance(a, b) < 0.3f) continue;
+                    bits.Add((a, b, W(l.Name), mv, i));
+                }
+            }
+            var byHouse = houses.Select((h, i) => (h.Id, i)).ToDictionary(x => x.Id, x => x.i);
+            foreach (var (house, at, yaw, name) in plan.FencePieces)
+            {
+                var d = new float2(math.sin(yaw), math.cos(yaw)) * ((name.IndexOf("Short", StringComparison.Ordinal) >= 0 ? PieceShort : PieceLong) * 0.5f);
+                bits.Add((at - d, at + d, W(name), true, byHouse.TryGetValue(house, out var hi) ? hi : -1));
+            }
+            var grid = new LineGrid(4f, 1.5f);
+            foreach (var b in bits) grid.Add(b.A, b.B);
+            var widthOf = new Dictionary<(float2, float2), float>();
+            foreach (var b in bits) widthOf[(b.A, b.B)] = b.W;
+            var walls = Obstacles(houses);
+            // against a house, shed or paving (within d), on a road or another building (a garden stops 0.8 m short of
+            // those, so a fence along a road is not against it)
+            bool Against(float2 p, float d)
+            {
+                foreach (var w in walls) if (Poly.Contains(w, p) || DistanceToRing(w, p) < d) return true;
+                foreach (int k in BarriersIn(p - 1f, p + 1f)) { var r = s_barriers[k].Ring; if (Poly.Contains(r, p) || DistanceToRing(r, p) < 0.3f) return true; }
+                return false;
+            }
+            bool NearBarrier(float2 p, float d)
+            {
+                foreach (int k in BarriersIn(p - d, p + d)) { var r = s_barriers[k].Ring; if (Poly.Contains(r, p) || DistanceToRing(r, p) < d) return true; }
+                return false;
+            }
+            var mine = Enumerable.Range(0, n).Where(i => touched[i] && houses[i].Edit && houses[i].Polished && plots[i] != null).ToList();
+            int NearPlot(float2 p, float d)
+            {
+                int best = -1;
+                float bd = d;
+                foreach (int i in mine) { float x = DistanceToRing(plots[i], p); if (x < bd) { bd = x; best = i; } }
+                return best;
+            }
+            var loose = new List<(int Bit, float2 P)>();
+            for (int bi = 0; bi < bits.Count; bi++)
+            {
+                var f = bits[bi];
+                foreach (var p in new[] { f.A, f.B })
+                {
+                    if (NearPlot(p, 1.5f) < 0) continue;
+                    bool met = false;
+                    foreach (var (a, b) in grid.At(p))
+                    {
+                        if (a.Equals(f.A) && b.Equals(f.B)) continue;
+                        if (DistanceToSegment(p, a, b) <= 0.35f + f.W * 0.5f + widthOf[(a, b)] * 0.5f) { met = true; break; }
+                    }
+                    if (!met && !Against(p, 0.6f)) loose.Add((bi, p));
+                }
+            }
+            var used = new HashSet<int>();
+            int joined = 0;
+            for (int i = 0; i < loose.Count; i++)
+            {
+                if (used.Contains(i)) continue;
+                int best = -1;
+                float bd = 6f;
+                for (int j = 0; j < loose.Count; j++)
+                {
+                    if (j == i || used.Contains(j) || loose[j].Bit == loose[i].Bit) continue;
+                    float d = math.distance(loose[i].P, loose[j].P);
+                    if (d < bd && d > 0.3f) { bd = d; best = j; }
+                }
+                if (best < 0) continue;
+                var f = bits[loose[i].Bit];
+                var g = bits[loose[best].Bit];
+                var p = loose[i].P;
+                var q = loose[best].P;
+                // a house's own lines as the game made them: its own gaps (gates)
+                if (!f.Ours && !g.Ours) continue;
+                var gd = math.normalizesafe(q - p);
+                var df = math.normalizesafe(f.B - f.A);
+                var dg = math.normalizesafe(g.B - g.A);
+                if (NearBarrier(p, 2.5f) && NearBarrier(q, 2.5f) && math.abs(math.dot(df, gd)) < 0.5f && math.abs(math.dot(dg, gd)) < 0.5f) continue;
+                // never across a house, shed, driveway, road or building
+                bool blocked = false;
+                for (int t = 1; t < 8 && !blocked; t++) blocked = Against(math.lerp(p, q, t / 8f), 0.05f);
+                if (blocked) continue;
+                int owner = NearPlot((p + q) * 0.5f, 1.5f);
+                if (owner < 0) continue;
+                var h = houses[owner];
+                LayRun(new List<float2> { p, q }, new List<bool> { true, true }, h.Id, PieceFor(h, (int)K(h, s, "fenceKind", 0f)), plan);
+                used.Add(i);
+                used.Add(best);
+                joined++;
+            }
+            if (joined > 0) plan.Notes.Add($"{joined} loose fence ends joined");
         }
 
         /// <summary>
@@ -2450,6 +2821,88 @@ namespace Placemaker.Core.Neighbours
             foreach (int j in fixedIdx) plots[j] = Ccw(houses[j].Garden);
             if (cut > 0) plan.Notes.Add($"{cut} gardens kept off their neighbours' gardens");
             if (plan.GardenClashes.Count > 0) plan.Notes.Add($"{plan.GardenClashes.Count} neighbours' gardens lie over a lot here: they are planned again");
+        }
+
+        /// <summary>
+        /// Last word on where the gardens this plan writes end: none lies over another house's lot or over another of them.
+        /// The middle line between two side neighbours runs through a lot where the houses stand at an angle on a curve
+        /// (Brecon, the user's city: one garden 92 m² into the next house's lot), and every later step (wraps, strips given to
+        /// a neighbour, the house's own lot added back) may reach a little over a lot too. A garden over a lot put a fence
+        /// through the neighbour's garden ("crossover errors"), and it never went away: each pass that saw it planned that
+        /// garden again (GardenClashes), which made the same garden again, every third of a second for as long as the city
+        /// ran, pieces made and taken away each time (fences and outlines flickering). Other lots are cut out (the house's own
+        /// lot always stays); land two of these gardens share goes to the house it is nearer.
+        /// </summary>
+        private static void Separate(IReadOnlyList<StitchHouse> houses, float2[][] plots, bool[] touched, StitchPlan plan)
+        {
+            int n = houses.Count;
+            bool Mine(int i) => touched[i] && houses[i].Edit && houses[i].Polished && plots[i] != null && plots[i].Length >= 3;
+            var lots = new float2[n][];
+            var lotLo = new float2[n];
+            var lotHi = new float2[n];
+            for (int j = 0; j < n; j++) { lots[j] = Ccw(Lot(houses[j])); Poly.Bounds(lots[j], out lotLo[j], out lotHi[j]); }
+            float2[] Keep(List<Region> parts, int i)
+            {
+                var withLot = Poly.Boolean(parts, new List<Region> { new Region(lots[i]) }, BoolOp.Union);
+                var keep = withLot.OrderByDescending(r => Poly.Contains(r.Outer, houses[i].Position) ? 1 : 0).ThenByDescending(r => r.Area).FirstOrDefault();
+                if (keep == null) return null;
+                var ring = keep.HasHoles ? Poly.CutHoles(keep, 0f).OrderByDescending(r => Poly.Area(r)).First() : keep.Outer;
+                return ring != null && ring.Length >= 3 && Poly.Area(ring) > 1f ? Poly.Simplify(ring, 0.05f) : null;
+            }
+            int offLots = 0, shared = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (!Mine(i)) continue;
+                Poly.Bounds(plots[i], out var plo, out var phi);
+                var over = new List<IReadOnlyList<float2>>();
+                for (int j = 0; j < n; j++)
+                {
+                    if (j == i || lotHi[j].x < plo.x || lotLo[j].x > phi.x || lotHi[j].y < plo.y || lotLo[j].y > phi.y) continue;
+                    if (OverlapArea(plots[i], lots[j]) > 0.05f) over.Add(lots[j]);
+                }
+                if (over.Count == 0) continue;
+                var left = Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(plots[i]) }, over, BoolOp.Difference, FillRule.NonZero);
+                var ring = Keep(left, i);
+                if (ring == null) continue;
+                plots[i] = ring;
+                offLots++;
+            }
+            for (int i = 0; i < n; i++)
+            {
+                if (!Mine(i)) continue;
+                for (int j = i + 1; j < n; j++)
+                {
+                    if (!Mine(j)) continue;
+                    Poly.Bounds(plots[i], out var ilo, out var ihi);
+                    Poly.Bounds(plots[j], out var jlo, out var jhi);
+                    if (jhi.x < ilo.x || jlo.x > ihi.x || jhi.y < ilo.y || jlo.y > ihi.y) continue;
+                    var both = Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(plots[i]) }, new[] { (IReadOnlyList<float2>)Ccw(plots[j]) }, BoolOp.Intersection, FillRule.NonZero);
+                    if (both.Sum(r => r.Area) < 0.5f) continue;
+                    // each piece of the shared land to the house it is nearer (its lot's edge, 0 inside it)
+                    var toI = new List<IReadOnlyList<float2>>();
+                    var toJ = new List<IReadOnlyList<float2>>();
+                    foreach (var r in both)
+                    {
+                        if (r.Area < 0.05f) continue;
+                        var c = Poly.Centroid(r.Outer);
+                        float di = Poly.Contains(lots[i], c) ? 0f : DistanceToRing(lots[i], c);
+                        float dj = Poly.Contains(lots[j], c) ? 0f : DistanceToRing(lots[j], c);
+                        (di <= dj ? toI : toJ).Add(Ccw(r.Outer));
+                    }
+                    if (toJ.Count > 0)
+                    {
+                        var ring = Keep(Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(plots[i]) }, toJ, BoolOp.Difference, FillRule.NonZero), i);
+                        if (ring != null) plots[i] = ring;
+                    }
+                    if (toI.Count > 0)
+                    {
+                        var ring = Keep(Poly.Boolean(new[] { (IReadOnlyList<float2>)Ccw(plots[j]) }, toI, BoolOp.Difference, FillRule.NonZero), j);
+                        if (ring != null) plots[j] = ring;
+                    }
+                    shared++;
+                }
+            }
+            if (offLots + shared > 0) plan.Notes.Add($"{offLots} gardens cut off other houses' lots, {shared} pairs of gardens over each other split");
         }
 
         /// <summary>A polished garden this plan does not edit and whose garden another pass wrote (StitchHouse.Garden): fixed.</summary>

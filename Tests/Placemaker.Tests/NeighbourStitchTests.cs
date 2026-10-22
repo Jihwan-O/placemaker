@@ -249,7 +249,8 @@ namespace Placemaker.Tests
             a.Options = new Dictionary<string, float>(PolishLooks.Defaults) { ["openReach"] = 40f };
             var plan = YardStitch.Plan(new[] { a }, MiddleLine());
             Assert.NotEmpty(plan.FencePieces);
-            Assert.All(plan.FencePieces, p => Assert.True(a.ToLocal(p.Position).y < a.HalfLot.y - 1f, $"a piece on the street front at {p.Position}"));
+            // nothing runs along the street front (a side's run reaches the street line, as the house's own side fences do)
+            Assert.All(plan.FencePieces, p => Assert.True(a.ToLocal(p.Position).y < a.HalfLot.y - 0.9f && (a.ToLocal(p.Position).y < a.HalfLot.y - 2.1f || math.abs(math.dot(new float2(math.sin(p.Yaw), math.cos(p.Yaw)), a.Right)) < 0.5f), $"a piece on the street front at {p.Position}"));
             // its fence kind: the right fence and back fence are FenceResidentialHigh01
             Assert.Contains(plan.FencePieces, p => p.Name == "FenceResidentialPieceHigh01");
             // pieces on both sides and along the back

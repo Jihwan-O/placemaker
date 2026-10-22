@@ -59,6 +59,36 @@ namespace Placemaker.Game.Neighbours
 
         private static float2[] LotRing(StitchHouse h) => h == null ? null : new[] { h.BackLeft, h.BackRight, h.FrontRight, h.FrontLeft };
 
+        // every garden's bounds (worked out again when its ring changes), and whether the gardens a loaded city saved are all
+        // read (a pass must see a far house's garden that reaches into it, not only the ones planned this session)
+        private readonly Dictionary<Entity, (float2[] Ring, float2 Lo, float2 Hi)> _gardenBox = new Dictionary<Entity, (float2[], float2, float2)>();
+        private bool _gardensRead;
+        private EntityQuery _savedGardens;
+        /// <summary>For the game runner: houses outside a pass's neighbourhood whose gardens reach into it, planned around.</summary>
+        public static int FarGardens;
+
+        /// <summary>Every polished garden known (this session's and the ones saved with the city) with its bounds.</summary>
+        private IEnumerable<(Entity House, float2 Lo, float2 Hi)> GardenBoxes()
+        {
+            if (!_gardensRead)
+            {
+                _gardensRead = true;
+                if (_savedGardens == default) _savedGardens = GetEntityQuery(ComponentType.ReadOnly<PolishGarden>(), ComponentType.Exclude<Deleted>(), ComponentType.Exclude<Temp>());
+                using (var all = _savedGardens.ToEntityArray(Allocator.Temp))
+                    foreach (var e in all) GardenOf(e);
+            }
+            foreach (var kv in _gardenOf)
+            {
+                if (kv.Value == null || kv.Value.Length < 3) continue;
+                if (!_gardenBox.TryGetValue(kv.Key, out var box) || !ReferenceEquals(box.Ring, kv.Value))
+                {
+                    Placemaker.Core.Geometry.Poly.Bounds(kv.Value, out var lo, out var hi);
+                    _gardenBox[kv.Key] = box = (kv.Value, lo, hi);
+                }
+                yield return (kv.Key, box.Lo, box.Hi);
+            }
+        }
+
         /// <summary>The house's fence and hedge lines where they stand now (a line collapsed to nothing left out) and the closing
         /// pieces it has, as segments.</summary>
         private List<(float2 A, float2 B)> StandingOf(Entity house)
@@ -84,6 +114,11 @@ namespace Placemaker.Game.Neighbours
                 if (PieceSegment(piece, out var a, out var b, out bool fence) && fence) list.Add((a, b));
             return list;
         }
+
+        /// <summary>The look (colour, mesh variation) of a garden's fence or hedge pieces: one for the whole garden, its 2 m
+        /// pieces the same as its 4 m ones (they finish its runs).</summary>
+        private static int PieceSeed(Entity owner, string name) =>
+            (int)math.hash(new int2(owner.Index, (name ?? "").Replace("Short", "").GetHashCode())) | 1;
 
         // ───────────── a piece as a segment ─────────────
 
@@ -256,6 +291,7 @@ namespace Placemaker.Game.Neighbours
             }
             var lo = math.min(a, b) - 1.5f;
             var hi = math.max(a, b) + 1.5f;
+            var owner = EntityManager.HasComponent<Owner>(e) ? EntityManager.GetComponentData<Owner>(e).m_Owner : Entity.Null;
             var found = new NativeList<Entity>(16, Allocator.Temp);
             try
             {
@@ -273,6 +309,9 @@ namespace Placemaker.Game.Neighbours
                         // a piece its garden no longer wants (deleted next frame) doubles nothing: the new piece taking its
                         // place was kept hidden for good
                         if (_goingSoon.Contains(o)) continue;
+                        // the same garden's own pieces: a run's last piece is laid over the one before it so it ends exactly
+                        // where the run does (YardStitch.LayRun); hidden as a double, it left a hole at the end of the run
+                        if (owner != Entity.Null && EntityManager.HasComponent<PolishPiece>(o) && EntityManager.HasComponent<Owner>(o) && EntityManager.GetComponentData<Owner>(o).m_Owner == owner) continue;
                         if (!PieceSegment(o, out var p, out var q, out bool fence) || !fence) continue;
                         // one that is hidden too only counts when it comes first (of two hidden ones, one is shown)
                         if (EntityManager.HasComponent<Overridden>(o) && o.Index > e.Index) continue;

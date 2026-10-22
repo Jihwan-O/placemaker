@@ -106,7 +106,7 @@ namespace Placemaker.Game.Neighbours
 
         /// <summary>The barriers in a box, what each is (0 a road, path or track, 1 a building's lot, a lot area or a
         /// Placemaker build, 2 water) and which belong together (a road piece's surfaces: the edge's entity).</summary>
-        private List<float2[]> BarriersIn(float2 min, float2 max, List<int> kinds, List<long> groups)
+        private List<float2[]> BarriersIn(float2 min, float2 max, List<int> kinds, List<long> groups, HashSet<Entity> planned = null)
         {
             var list = new List<float2[]>();
             long single = long.MinValue;   // groups of one (lots, water): numbers no entity has
@@ -168,8 +168,10 @@ namespace Placemaker.Game.Neighbours
                         var e = results[i];
                         if (!seen.Add(e) || !BuildingFootprints.IsBuilding(EntityManager, e)) continue;
                         if (EntityManager.HasComponent<Temp>(e) || EntityManager.HasComponent<Deleted>(e)) continue;
-                        // houses are the plan's own; a house still being built is not (it is no house to plan yet): its lot is kept clear
-                        if (IsGrowable(e) && !EntityManager.HasComponent<global::Game.Objects.UnderConstruction>(e)) continue;
+                        // houses are the plan's own; a house still being built is not (it is no house to plan yet): its lot is kept
+                        // clear. So is the lot of a house the plan does not have (further out than its neighbourhood): a garden
+                        // reaching that far grew over it, its fences inside that lot (the game hid them: holes in the run)
+                        if (IsGrowable(e) && !EntityManager.HasComponent<global::Game.Objects.UnderConstruction>(e) && (planned == null || planned.Contains(e))) continue;
                         BuildingFootprints.Of(EntityManager, e, out var lot, out _);
                         if (lot != null && lot.Length >= 3) Add(lot, 1, single++);
                     }

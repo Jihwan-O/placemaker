@@ -686,6 +686,9 @@ namespace Placemaker.Game.Neighbours
         private void ForgetCity()
         {
             _gardenOf.Clear();
+            _gardenBox.Clear();
+            _gardensRead = false;
+            _clashed.Clear();
             _remade.Clear();
             _healQueue = null;
             _laneCurve.Clear();

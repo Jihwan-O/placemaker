@@ -230,6 +230,8 @@ namespace Placemaker.Game.Neighbours
             /// <summary>Until its samples are in (Task null): what the plan starts with.</summary>
             public Sampling Samples;
             public StitchSettings Settings;
+            /// <summary>How far the gardens of this pass reach (another pass at once keeps this much further away).</summary>
+            public float Reach;
             public Func<IReadOnlyList<StitchHouse>, StitchSettings, StitchPlan> Planner;
         }
         private int _frame, _errors;
@@ -516,7 +518,8 @@ namespace Placemaker.Game.Neighbours
             var unknown = new List<Entity>();
             bool Clear(float2 at)
             {
-                foreach (var f in _inFlight) if (math.distance(f.Seed, at) < 2f * (PatchRadius + CoreRadius) + 10f) return false;
+                // (and as far again as the gardens of both reach: two plans at once never give the same land to two gardens)
+                foreach (var f in _inFlight) if (math.distance(f.Seed, at) < 2f * (PatchRadius + CoreRadius) + 10f + f.Reach + ReachInUse) return false;
                 return true;
             }
             // the player's own work first; a house still being built waits in _first until its lanes come (then it is dirty)
@@ -567,7 +570,7 @@ namespace Placemaker.Game.Neighbours
             _houseOf.Clear();
             _lawnPrefabOf.Clear();
             var coreIds = new HashSet<long>();
-            foreach (int i in cluster)
+            void Add(int i)
             {
                 var e = houses[i].E;
                 if (!_described.TryGetValue(e, out var d) || !EntityManager.Exists(e))
@@ -605,8 +608,7 @@ namespace Placemaker.Game.Neighbours
                 }
                 stitch.Add(copy);
             }
-            var planner = Planner;
-            PassPart(3, sw);
+            foreach (int i in cluster) Add(i);
             // the roads, paths, tracks and other buildings around the patch: never joined across, never reached onto, met
             // around every house as far as any garden here reaches (the looks in use, these lots' own changes, the tool's
             // values), plus a margin: nothing further out changes a plan (it was the whole cluster radius again around each)
@@ -614,6 +616,35 @@ namespace Placemaker.Game.Neighbours
             foreach (var h in stitch)
                 if (h.Options != null) foreach (var k in PolishLooks.ReachKnobs) if (h.Options.TryGetValue(k, out var v)) reach = math.max(reach, v);
             if (Settings.Extra != null) foreach (var k in PolishLooks.ReachKnobs) if (Settings.Extra.TryGetValue(k, out var v)) reach = math.max(reach, v);
+            // polished houses further out whose gardens reach into what this pass may give its houses: fixed for the plan, so
+            // the gardens it edits keep off them. A garden reaches further than the cluster radius (up to 500 m), and two big
+            // gardens planned in different passes lay over each other, the fences of one standing in the other (the game
+            // runner with every reach at its maximum: 18 gardens over each other, 269 fences inside another's garden)
+            {
+                var clo = new float2(float.MaxValue);
+                var chi = new float2(float.MinValue);
+                foreach (var h in stitch)
+                {
+                    if (!h.Edit) continue;
+                    float r = math.length(h.HalfLot) + reach + 10f;
+                    clo = math.min(clo, h.Position - r);
+                    chi = math.max(chi, h.Position + r);
+                }
+                if (clo.x <= chi.x)
+                {
+                    var far = new List<int>();
+                    foreach (var (house, glo, ghi) in GardenBoxes())
+                    {
+                        if (ghi.x < clo.x || glo.x > chi.x || ghi.y < clo.y || glo.y > chi.y) continue;
+                        if (!index.TryGetValue(house, out int j) || cluster.Contains(j) || !IsYes(house)) continue;
+                        far.Add(j);
+                    }
+                    foreach (int j in far) { cluster.Add(j); Add(j); }
+                    FarGardens += far.Count;
+                }
+            }
+            var planner = Planner;
+            PassPart(3, sw);
             var lo = new float2(float.MaxValue);
             var hi = new float2(float.MinValue);
             foreach (var h in stitch)
@@ -627,7 +658,9 @@ namespace Placemaker.Game.Neighbours
             foreach (var h in stitch) if (h.Options != null && h.Options.TryGetValue("waterGap", out var w)) wetGap = math.max(wetGap, w);
             var kinds = new List<int>();
             var groups = new List<long>();
-            var settings = Settings.WithBarriers(stitch.Count > 0 ? BarriersIn(lo, hi, kinds, groups) : null, kinds, groups);
+            var planned = new HashSet<Entity>();
+            foreach (var h in stitch) if (_houseOf.TryGetValue(h.Id, out var he)) planned.Add(he);
+            var settings = Settings.WithBarriers(stitch.Count > 0 ? BarriersIn(lo, hi, kinds, groups, planned) : null, kinds, groups);
             PassPart(4, sw);
             // the ground (gardens stop where it gets too steep or too high) and the water: read by jobs, the plan starts when
             // they are done (StartSampledPlans)
@@ -635,7 +668,7 @@ namespace Placemaker.Game.Neighbours
             {
                 Stitch = stitch, LanesOf = lanesOf, LawnsOf = lawnsOf, OwnerOf = ownerOf, CoreIds = coreIds, DoneIds = new HashSet<long>(done.Select(Id)), HouseOf = new Dictionary<long, Entity>(_houseOf),
                 LawnPrefabOf = new Dictionary<long, Entity>(_lawnPrefabOf), Asked = done.Count, Cluster = cluster.Count, Clock = sw, First = first, Seed = seedAt,
-                Settings = settings, Planner = planner, Samples = StartSampling(lo, hi, math.clamp(wetGap, 0f, 300f) + 4f),
+                Settings = settings, Planner = planner, Reach = reach, Samples = StartSampling(lo, hi, math.clamp(wetGap, 0f, 300f) + 4f),
             };
             PassPart(5, sw);
             _inFlight.Add(pend);
@@ -727,6 +760,7 @@ namespace Placemaker.Game.Neighbours
             foreach (var id in plan.GardenClashes)
                 if (pend.HouseOf.TryGetValue(id, out var ce) && EntityManager.Exists(ce) && IsYes(ce))
                 {
+                    if (!ClashAgain(ce)) continue;
                     if (_dirty.Add(ce)) { clashes++; DirtyBy[3]++; }
                     if (pend.First) _first.Add(ce);
                 }
@@ -866,7 +900,7 @@ namespace Placemaker.Game.Neighbours
                         NeighbourObjectSystem.Queue.Add(new NeighbourObjectSystem.Request
                         {
                             Name = NeighbourObjectSystem.PieceName(name), Position = at, Yaw = yaw, Owner = owner,
-                            Seed = (int)math.hash(new int2(owner.Index, name.GetHashCode())) | 1,   // one look for the whole garden
+                            Seed = PieceSeed(owner, name),   // one look for the whole garden
                         });
             }
             // shared land in the middle of a ring (polished all round): a lawn with a mulch bed in its centre, owned by the
@@ -890,6 +924,28 @@ namespace Placemaker.Game.Neighbours
             TotalPairs += plan.Pairs.Count; TotalEdgePairs += plan.Pairs.Count(p => p.Edge); TotalMoved = TotalMoved + plan.MoveLines.Count; TotalHidden += plan.HideLines.Count; TotalLawns += plan.Lawns.Count; TotalLawnM2 += plan.LawnAddedM2; TotalPasses++;
             _ms += sw.Elapsed.TotalMilliseconds;
             Prune();
+        }
+
+        // gardens planned again for lying over a lot (GardenClashes), and when: a garden whose new plan still lies over it would
+        // be planned again for ever, every third of a second, its pieces made and taken away each time (seen in the user's city
+        // Brecon: 620 times in 150 s, about 45 fence pieces a second, fences and outlines flickering)
+        private readonly Dictionary<Entity, (int Since, int Times)> _clashed = new Dictionary<Entity, (int, int)>();
+        private const int ClashWindow = 3600, ClashMax = 3;
+        /// <summary>For the game runner: clash re-plans held back (the same garden again and again).</summary>
+        public static int TotalClashesHeld;
+
+        /// <summary>The garden may be planned again for lying over a lot: not a fourth time within a minute.</summary>
+        private bool ClashAgain(Entity house)
+        {
+            if (_clashed.Count > 4096) _clashed.Clear();
+            var (since, times) = _clashed.TryGetValue(house, out var c) && LotFrame - c.Since < ClashWindow ? c : (LotFrame, 0);
+            if (times >= ClashMax)
+            {
+                if (TotalClashesHeld++ < 20) Mod.Log.Info($"Placemaker neighbourhood polish: house {house.Index}'s garden still lies over a lot after {times} plans: left as it is for a while");
+                return false;
+            }
+            _clashed[house] = (since, times + 1);
+            return true;
         }
 
         /// <summary>A house as YardStitch sees it: its lot, its fence lines at their ORIGINAL (prefab) places, its lawns as first seen.</summary>

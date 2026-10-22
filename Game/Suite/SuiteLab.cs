@@ -30,6 +30,8 @@ namespace Placemaker.Game.Suite
                 case "street": yield return LabStreet(st, step, rec); yield break;
                 case "yards": yield return LabYards(st, step, rec); yield break;
                 case "outgrowcheck": yield return LabOutgrowCheck(st, step, rec); yield break;
+                case "fencemap": yield return LabFenceMap(st, step, rec); yield break;
+                case "outlineflicker": yield return LabOutlineFlicker(st, step, rec); yield break;
                 case "outgrowaudit": yield return LabOutgrowAudit(st, step, rec); yield break;
                 case "outgrowrepaint": yield return LabOutgrowRepaint(st, step, rec); yield break;
                 case "yardscheck": LabYardsCheck(rec); yield break;
@@ -166,7 +168,14 @@ namespace Placemaker.Game.Suite
                         }
                     string themeName = ((string)step["theme"] ?? "zone").ToLowerInvariant();
                     // "theme": "painter": the polish tool's look as its rows have it (what its Polish gives)
-                    if (themeName == "painter") Placemaker.Game.Neighbours.NeighbourPolishSystem.Stamp(lots, yes, _tool.PainterTheme, yes ? _tool.PolishChanges : null);
+                    // "look": a look by its id with "changes" to its knobs ({"sideReach": 500, ...}), as the Outgrow brush stamps them
+                    if (!string.IsNullOrEmpty((string)step["look"]))
+                    {
+                        var changes = new System.Collections.Generic.Dictionary<string, float>();
+                        if (step["changes"] is JObject ch) foreach (var p in ch.Properties()) changes[p.Name] = (float)p.Value;
+                        Placemaker.Game.Neighbours.NeighbourPolishSystem.Stamp(lots, yes, (string)step["look"], changes.Count > 0 ? changes : null);
+                    }
+                    else if (themeName == "painter") Placemaker.Game.Neighbours.NeighbourPolishSystem.Stamp(lots, yes, _tool.PainterTheme, yes ? _tool.PolishChanges : null);
                     else Placemaker.Game.Neighbours.NeighbourPolishSystem.Stamp(lots, yes, (byte)Math.Max(0, Array.IndexOf(Placemaker.Game.Neighbours.NeighbourPolishSystem.ThemeNames, themeName)));
                     rec["stamped"] = lots.Count;
                     Mod.Log.Info($"Placemaker lab: {lots.Count} lots stamped {(yes ? "polished" : "back as the game made them")} ({side})");
